@@ -27,3 +27,11 @@ Next: Verify all scaffold checks in GitHub CI, commit the generated lockfile, th
 Needs from others: Respondent and Researcher can use the draft contracts after the scaffold merges.
 Contract or schema changes: Draft Brief, BriefPatch, GuideDraft, ScopingTurn, ProbeDecision, QualitySignals, ThemeSet, InvitePreview and InterviewProgress with parsing tests. The full v1 contracts are still in progress.
 Risks: The local environment could not reach the package registry to complete the monorepo install. The first GitHub CI run can generate the lockfile.
+
+## 2026-11-19, Gate 0 handoff
+
+Done: The [Platform scaffold](https://github.com/rachelgonsalves821/EnvoiLabs/pull/1) merged with passing CI. The [researcher and AI slice](https://github.com/rachelgonsalves821/EnvoiLabs/pull/2) and [respondent and shared UI slice](https://github.com/rachelgonsalves821/EnvoiLabs/pull/3) are in draft review.
+Next: Platform database, access policies, auth and fakes. Connect the respondent and researcher shells to auth and the researcher shell to the shared UI. Extend the provider and eval coverage.
+Needs from others: Platform auth and final Gate 0 contracts.
+Contract or schema changes: No changes in the two shell PRs.
+Risks: Browser and database integration evidence is still due for Gate 0 sign-off.
