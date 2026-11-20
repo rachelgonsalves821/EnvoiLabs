@@ -42,15 +42,15 @@ from (values
 grant select on access_matrix to authenticated, anon;
 
 select results_eq(
-    $select format('%I.%I', n.nspname, c.relname)
+    $$select format('%I.%I', n.nspname, c.relname)
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where c.relkind in ('r', 'p') and n.nspname in ('public', 'pii') order by 1$,
-    $select relation from access_matrix order by relation$,
+      where c.relkind in ('r', 'p') and n.nspname in ('public', 'pii') order by 1$$,
+    $$select relation from access_matrix order by relation$$,
     'The matrix covers every application base table'
 );
 
 create function pg_temp.check_access(actor text, matrix_column integer) returns setof text
-language sql security invoker as $
+language sql security invoker as $$
     select case
         when visible_rows[matrix_column] is null then
             throws_ok(format('select * from %s', relation), '42501', null,
@@ -62,7 +62,7 @@ language sql security invoker as $
         end
     from pg_temp.access_matrix
     order by relation;
-$;
+$$;
 
 select ok(
     c.relrowsecurity
@@ -136,7 +136,7 @@ insert into public.referrals (referrer_id, referee_id, state)
 values ('90500000-0000-4000-8000-000000000001', '90500000-0000-4000-8000-000000000002', 'pending');
 
 select throws_ok(
-    $insert into public.answers (study_id, session_id, guide_question_id, kind, sequence)
+    $$insert into public.answers (study_id, session_id, guide_question_id, kind, sequence)
       values ('90600000-0000-4000-8000-000000000001', '91200000-0000-4000-8000-000000000001',
           '91000000-0000-4000-8000-000000000002', 'text', 2)$$,
     '23503', null, 'An answer cannot link to a guide question from another study'
@@ -189,7 +189,7 @@ select * from pg_temp.check_access('Tenant admin before MFA', 6);
 
 set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
 select * from pg_temp.check_access('Respondent', 1);
-select throws_ok($select audio_object_id from public.answers$, '42501', null,
+select throws_ok($$select audio_object_id from public.answers$$, '42501', null,
     'A respondent cannot see private audio references in their own answers');
 
 set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}';
