@@ -139,7 +139,23 @@ test("email sign-in requires an explicit confirmation", async ({ page }) => {
 
 test("MFA only opens the workspace after the verify endpoint confirms", async ({ page }) => {
   let attempts = 0;
-  await page.route("**/simulated-redirect", (route) => route.fulfill({ json: { ok: true } }));
+  // WebKit cannot synthesize HTTP redirects through route.fulfill. The app server
+  // redirects the trailing-slash URL to the canonical endpoint with HTTP 308.
+  const endpoint = "/api/researcher/auth/mfa";
+  const redirect = await page.request.post(endpoint + "/", { maxRedirects: 0 });
+  expect(redirect.status()).toBe(308);
+  await page.addInitScript((path) => {
+    const networkFetch = window.fetch.bind(window);
+    window.fetch = (url, init) => {
+      if (String(url) === path && typeof init?.body === "string") {
+        const action = JSON.parse(init.body);
+        if (action.action === "verify" && action.code === "000002") {
+          return networkFetch(path + "/", init);
+        }
+      }
+      return networkFetch(url, init);
+    };
+  }, endpoint);
   await page.route("**/api/researcher/auth/mfa", (route) => {
     const { action } = route.request().postDataJSON();
     if (action === "status") return route.fulfill({ json: { state: "challenge", factorId: "factor" } });
@@ -147,7 +163,6 @@ test("MFA only opens the workspace after the verify endpoint confirms", async ({
     if (action !== "verify") throw new Error(`Unexpected action: ${action}`);
     attempts += 1;
     if (attempts === 1) return route.fulfill({ json: { ok: false } });
-    if (attempts === 2) return route.fulfill({ status: 302, headers: { Location: "/simulated-redirect" } });
     return route.fulfill({ json: { ok: true } });
   });
   await page.route("**/app", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Workspace</h1>" }));
