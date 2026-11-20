@@ -124,3 +124,11 @@ Next: Verify both sign-in journeys on the dedicated preview.
 Needs from others: Hosted preview access and test identities.
 Contract or schema changes: None.
 Risks: Hosted SMS and email delivery still need direct verification.
+
+## 2026-11-20, Platform, Gate 0 shared contracts distribution
+
+Done: Versioned the private contracts package at 1.0.0. CI packs its compiled exports, checks a consumer import and declaration entry point, and uploads the tarball on successful main builds. R-RSCH-01 and R-RESP-01 share the same package. The existing IT-0.3 suite verifies contract fixtures.
+Next: Verify the first main artifact and record it on goal #4. Hosted sign-in remains open.
+Needs from others: Dedicated Vercel and Supabase access and controlled test identities.
+Contract or schema changes: Package metadata and distribution only.
+Risks: CI artifacts follow the repository's retention policy.
