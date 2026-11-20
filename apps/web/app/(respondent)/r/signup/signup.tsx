@@ -89,6 +89,7 @@ export function RespondentSignup() {
   }
 
   function editPhone() {
+    if (requesting.current) return;
     clearFeedback();
     setCode("");
     setStep("phone");
@@ -133,7 +134,7 @@ export function RespondentSignup() {
             {copy.age}
           </label>
           {errorFor("age") && <span className="respondent-auth-error" id="signup-age-error" role="alert">{errorFor("age")}</span>}
-          <Button type="submit" variant="pulse" disabled={pending !== null}>{copy.start}</Button>
+          <Button type="submit" variant="pulse" aria-disabled={pending !== null}>{copy.start}</Button>
         </form>
       )}
       {step === "code" && (
@@ -152,10 +153,10 @@ export function RespondentSignup() {
             error={errorFor("code")}
             onChange={(event) => { setCode(event.currentTarget.value); clearFeedback(); }}
           />
-          <Button type="submit" variant="pulse" disabled={pending !== null}>{copy.verify}</Button>
+          <Button type="submit" variant="pulse" aria-disabled={pending !== null}>{copy.verify}</Button>
           <div className="respondent-auth-actions">
-            <Button variant="ghost" disabled={pending !== null} onClick={() => void request("resend", phone)}>{copy.resend}</Button>
-            <Button variant="ghost" disabled={pending !== null} onClick={editPhone}>{copy.editPhone}</Button>
+            <Button variant="ghost" aria-disabled={pending !== null} onClick={() => void request("resend", phone)}>{copy.resend}</Button>
+            <Button variant="ghost" aria-disabled={pending !== null} onClick={editPhone}>{copy.editPhone}</Button>
           </div>
         </form>
       )}
