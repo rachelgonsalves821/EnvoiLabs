@@ -1,5 +1,8 @@
 {
   "name": "@envoi-labs/db",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "lint": "cd ../.. && eslint --no-error-on-unmatched-pattern packages/db"
+  }
 }
