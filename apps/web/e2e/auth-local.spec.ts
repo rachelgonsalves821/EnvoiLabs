@@ -105,14 +105,17 @@ test.describe("local Auth with synthetic fixtures", () => {
     }, { timeout: 15_000, message: "A sign-in email should arrive for the synthetic researcher" }).toBe(true);
 
     if (!messageId) throw new Error("The local sign-in email is missing.");
-    const message = await page.request.get(mailpit + "/view/" + encodeURIComponent(messageId) + ".html");
+    const message = await page.request.get(mailpit + "/api/v1/message/" + encodeURIComponent(messageId));
     if (!message.ok()) throw new Error("Could not open the local sign-in email.");
+    const delivered: { HTML: string } = await message.json();
     const href = await page.evaluate((html) => new DOMParser().parseFromString(html, "text/html")
-      .querySelector("a")?.getAttribute("href"), await message.text());
+      .querySelector("a")?.getAttribute("href"), delivered.HTML);
     if (!href) throw new Error("The local sign-in email did not contain a link.");
     const callback = new URL(href);
     if (callback.origin !== origin || callback.pathname !== "/api/researcher/auth/callback") {
-      throw new Error("The email link did not point to the local researcher callback.");
+      const isDefault = callback.pathname.endsWith("/verify");
+      throw new Error(isDefault ? "Supabase delivered its default link instead of the app template."
+        : "The delivered template did not point to the local researcher callback.");
     }
     await page.goto(callback.href);
     await expect(page).toHaveURL(/\/app\/mfa$/);
