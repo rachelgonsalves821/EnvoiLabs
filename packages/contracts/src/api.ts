@@ -16,6 +16,7 @@ const exampleSession = { sessionId: exampleId };
 const exampleStudy = { studyId: exampleId };
 const exampleQuestion = { guideQuestionId: exampleId };
 const resumeToken = z.string().min(32).max(512);
+const gate1CoreQuestionCount = 4;
 
 export const PhoneOtpStartRequestSchema = withExample(z.strictObject({
   phone, ageAttested: z.literal(true),
@@ -96,7 +97,7 @@ export const ResumeSessionRequestSchema = withExample(z.strictObject({ token: re
 export const SessionResponseSchema = withExample(z.strictObject({
   ...sessionId, progress: InterviewProgressSchema, nextQuestion: z.strictObject({ id, text }).nullable(),
   expiresAt: timestamp,
-}), { ...exampleSession, progress: { ...exampleSession, currentQuestion: 1, coreQuestionCount: 3, rewardCents: 0 },
+}), { ...exampleSession, progress: { ...exampleSession, currentQuestion: 1, coreQuestionCount: gate1CoreQuestionCount, rewardCents: 0 },
   nextQuestion: { id: exampleId, text: "What did you order?" }, expiresAt: "2026-11-20T18:00:00.000Z" });
 
 export const StartAudioUploadRequestSchema = withExample(z.strictObject({
@@ -134,10 +135,14 @@ export const SubmitSessionResponseSchema = withExample(z.strictObject({
 
 export const CreateGate1StudyRequestSchema = withExample(z.strictObject({
   title: text, targetCompletes: positive, criteria: z.array(CriterionSchema).length(2),
-  coreQuestions: z.array(text).length(3),
+  coreQuestions: z.array(text).length(gate1CoreQuestionCount),
 }), { title: "Delivery study", targetCompletes: 5,
   criteria: [{ kind: "must", text: "Orders delivery" }, { kind: "exclude", text: "Works for app" }],
-  coreQuestions: ["What did you order?", "What made you choose that?", "What happened next?"] });
+  coreQuestions: [
+    "What did you order?", "What made you choose that?", "What happened next?",
+    "How did you decide whether to order again?",
+  ],
+});
 
 export const LaunchGate1StudyRequestSchema = withExample(z.strictObject({
   ...studyId, skip_payment: z.literal(true),
