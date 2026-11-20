@@ -1,0 +1,36 @@
+name: Local Auth checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-local-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  auth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      TURBO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - name: Exercise production auth against disposable Supabase
+        run: bash packages/db/scripts/test-local-auth.sh
