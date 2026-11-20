@@ -26,8 +26,10 @@ test("validates signup locally and verifies with the current phone and age attes
   await expect(alert).toHaveText("Confirm that you’re 18 or older to continue.");
   expect(requests).toEqual([]);
 
-  await age.press("Space");
-  await age.press("Tab");
+  await age.check();
+  await expect(age).toBeChecked();
+  await age.focus();
+  await page.keyboard.press("Tab");
   await expect(send).toBeFocused();
   await send.click();
   await expect(page.getByRole("heading", { name: "Enter your code" })).toBeFocused();
