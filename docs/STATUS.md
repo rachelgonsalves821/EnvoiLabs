@@ -116,3 +116,11 @@ Next: Verify hosted sign-in against the dedicated preview projects.
 Needs from others: Preview access and controlled test identities.
 Contract or schema changes: None.
 Risks: Real SMS and email delivery remain unverified.
+
+## 2026-11-20, Platform, Gate 0 design token drift
+
+Done: CI now compares the UI token JSON with the design-system export before the existing generated-CSS check. The comparison ignores JSON formatting and checks both themes. This covers the shared UI foundation used by R-RESP-01 and R-RSCH-01.
+Next: Verify both sign-in journeys on the dedicated preview.
+Needs from others: Hosted preview access and test identities.
+Contract or schema changes: None.
+Risks: Hosted SMS and email delivery still need direct verification.
