@@ -4,7 +4,7 @@ test("researcher sign-in submits the email and confirms the next step", async ({
   await page.route("**/api/researcher/auth/start", async (route) => {
     expect(route.request().method()).toBe("POST");
     expect(route.request().postDataJSON()).toEqual({ email: "researcher@example.test" });
-    await route.fulfill({ status: 202 });
+    await route.fulfill({ json: { ok: true } });
   });
 
   await page.goto("/app/sign-in?error=expired");
@@ -34,7 +34,9 @@ test("researcher sets up an authenticator and can retry verification", async ({ 
           action: "verify", factorId: "factor-1", challengeId: `challenge-${challenges}`,
           code: verifications++ === 0 ? "000001" : "000002",
         });
-        return route.fulfill({ status: verifications === 1 ? 401 : 204 });
+        return verifications === 1
+          ? route.fulfill({ status: 401 })
+          : route.fulfill({ json: { ok: true } });
       default:
         throw new Error("Unexpected MFA request.");
     }
@@ -93,3 +95,72 @@ for (const interruptedAction of ["enroll", "challenge", "verify"] as const) {
     await expect(page.getByLabel("Email address")).toBeEditable();
   });
 }
+
+test("a stalled email response body releases the form for retry", async ({ page }) => {
+  await page.addInitScript(() => {
+    const networkFetch = window.fetch.bind(window);
+    let stall = true;
+    window.fetch = async (url, init) => {
+      if (!stall || String(url) !== "/api/researcher/auth/start") return networkFetch(url, init);
+      stall = false;
+      // Headers arrive, then the connection stalls partway through the JSON body.
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          stream.enqueue(new TextEncoder().encode('{"ok":'));
+          init?.signal?.addEventListener("abort", () => stream.error(new Error("Aborted")));
+        },
+      });
+      return new Response(body, { headers: { "Content-Type": "application/json" } });
+    };
+  });
+  await page.route("**/api/researcher/auth/start", (route) => route.fulfill({ json: { ok: true } }));
+  await page.goto("/app/sign-in");
+  const email = page.getByLabel("Email address");
+  await email.fill("researcher@example.test");
+  await page.clock.install();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
+  await expect(page.getByRole("button", { name: /Sending link/ })).toBeDisabled();
+  await page.clock.fastForward(30_001);
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("could not be sent");
+  await expect(email).toHaveValue("researcher@example.test");
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+});
+
+test("email sign-in requires an explicit confirmation", async ({ page }) => {
+  await page.route("**/api/researcher/auth/start", (route) => route.fulfill({
+    contentType: "text/html", body: "<h1>Temporarily unavailable</h1>",
+  }));
+  await page.goto("/app/sign-in");
+  await page.getByLabel("Email address").fill("researcher@example.test");
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("could not be sent");
+});
+
+test("MFA only opens the workspace after the verify endpoint confirms", async ({ page }) => {
+  let attempts = 0;
+  await page.route("**/simulated-redirect", (route) => route.fulfill({ json: { ok: true } }));
+  await page.route("**/api/researcher/auth/mfa", (route) => {
+    const { action } = route.request().postDataJSON();
+    if (action === "status") return route.fulfill({ json: { state: "challenge", factorId: "factor" } });
+    if (action === "challenge") return route.fulfill({ json: { challengeId: "challenge" } });
+    if (action !== "verify") throw new Error(`Unexpected action: ${action}`);
+    attempts += 1;
+    if (attempts === 1) return route.fulfill({ json: { ok: false } });
+    if (attempts === 2) return route.fulfill({ status: 302, headers: { Location: "/simulated-redirect" } });
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.route("**/app", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Workspace</h1>" }));
+  await page.goto("/app/mfa");
+  const code = page.getByLabel("Authenticator code");
+  const verify = page.getByRole("button", { name: "Verify and continue" });
+  for (const sample of ["000001", "000002"]) {
+    await code.fill(sample);
+    await verify.click();
+    await expect(code).toHaveValue("");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("could not be verified");
+  }
+  await code.fill("000003");
+  await verify.click();
+  await expect(page).toHaveURL(/\/app$/);
+});
