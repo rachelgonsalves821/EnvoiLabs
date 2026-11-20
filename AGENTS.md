@@ -4,7 +4,7 @@ You are one of three coding agents building Envoi Labs, a voice-first AI market 
 
 ## Start of every session
 1. Read `docs/PRD.md` (what and why).
-2. Read `docs/BUILD_PLAN.md` (how, who, when, gates).
+2. Read `docs/BUILD_PLAN.md` (ownership, current acceptance criteria, pre-study checks and cross-agent implementation rules).
 3. Read your brief in `docs/agents/` (Agent 1 Platform, Agent 2 Respondent, Agent 3 Researcher and AI).
 4. Read the last 10 entries of `docs/STATUS.md` and any open `[NEEDS <your agent>]` issues.
 5. Check which gate we are in. If the gate's integration suite is red, fixing it comes before any new feature.

@@ -75,7 +75,7 @@ You build the foundation everything else stands on, and you run the stage gates.
    - `createInvites(study, n)` over-invites by `ceil(target / (accept × completion))`, in waves of 25% every 2 hours until filled.
 3. **Session services** for Agent 2 in `packages/services/session`. `startSession`, `recordAnswer` (stores answer, enqueues transcription event `answer.uploaded`), `submitSession`, `resumeSession(token)` returning the next unanswered question. Signed resume tokens valid until expiry.
 4. **Jobs** in `apps/web/inngest/platform`. `invite.waves`, `invite.expire` (24h), `session.abandon`, `study.check_complete`.
-5. **Gate 1 suite** `IT-1.1` to `IT-1.4`. Coordinate with Agents 2 and 3 on selectors (use `data-testid` names agreed in `packages/contracts/testids.ts`).
+5. **Gate 1 suite** `IT-1.1` to `IT-1.5`. Coordinate with Agents 2 and 3 on selectors (use `data-testid` names agreed in `packages/contracts/testids.ts`).
 
 ## Gate 2 tasks (weeks 4 to 5) → R-PLAT-01, R-PLAT-04, R-PLAT-08, R-RSCH-06 backend, R-RESP-10 and R-RESP-11 backend
 
@@ -85,10 +85,10 @@ You build the foundation everything else stands on, and you run the stage gates.
    - Components and weights are specificity 30 (from Agent 3's LLM judge), relevance 25 (LLM judge), profile consistency 20 (re-asked fact match), behavioral 15 (answer durations, re-records, speed), liveness 10.
    - Approve at 60 or above. Review between 45 and 59. Remove below 45.
    - Weights and thresholds in config, not code.
-4. **Quality hold job.** Runs 1 hour after submit, waits for transcripts and AI signals, scores, then approves, removes or sends to review. Removal creates a replacement invite.
-5. **Payouts.** Tremendous client with idempotency key `payout:<session_id>`. Gift card catalog limited to a configured list. Annual cap check below $2,000 with a $50 buffer. Retries with backoff. `IT-2.2` and `IT-2.5`.
+4. **Quality hold job.** May compute signals one hour after submit. Keep payout release within the PRD's 24 to 48 hour quality hold. Route missing or unclear signals to review. Removal creates a replacement invite.
+5. **Payouts.** Tremendous client with idempotency key `payout:<session_id>`. Gift card catalog limited to a configured list. Use the approved annual cap below $2,000 and include pending reservations in the cap check. Surface any proposed buffer for Rachel to decide. Retries with backoff. `IT-2.2` and `IT-2.5`.
 6. **Points ledger.** `awardPoints(reason, ref)` with unique constraint, milestone bonuses at 5, 10 and 25 approved completes, referral bonus after referee's first approved complete.
-7. **Gate 2 suite** `IT-2.1` to `IT-2.6`, then support the first real study on preview.
+7. **Gate 2 suite** `IT-2.1` to `IT-2.6`, then verify the pre-study checklist in BUILD_PLAN section 6. Verify privacy and compensation readiness before enrollment.
 
 ## Gate 3 tasks (weeks 6 to 7) → R-PLAT-05, R-PLAT-06, R-PLAT-09, R-PLAT-10, R-PLAT-12
 
