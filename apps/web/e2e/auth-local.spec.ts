@@ -54,7 +54,7 @@ test.describe("local Auth with synthetic fixtures", () => {
     const service = localService();
     await page.goto("/r/signup");
     await page.getByRole("textbox", { name: "Phone number" }).fill(phone);
-    await page.getByRole("checkbox", { name: "I'm 18 or older" }).check();
+    await page.getByRole("checkbox", { name: /18 or older/ }).check();
     await page.getByRole("button", { name: "Text me a code" }).click();
     await expect(page.getByRole("heading", { name: "Enter your code" })).toBeVisible();
     await page.getByRole("textbox", { name: "Verification code" }).fill(smsCode);

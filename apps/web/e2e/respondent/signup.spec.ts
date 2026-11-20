@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+// Keep auth requests observable by the route mocks in every browser.
+test.use({ serviceWorkers: "block" });
+
+test("opens signup from the respondent home", async ({ page }) => {
+  await page.goto("/r");
+  await page.getByRole("link", { name: "Create an account" }).click();
+  await expect(page).toHaveURL(/\/r\/signup$/);
+  await expect(page.getByRole("textbox", { name: "Phone number" })).toBeVisible();
+});
+
 test("validates signup locally and verifies with the current phone and age attestation", async ({ page }) => {
   const requests: unknown[] = [];
   await page.route("**/api/respondent/auth/*", async (route) => {
@@ -8,8 +18,7 @@ test("validates signup locally and verifies with the current phone and age attes
   });
 
   await page.setViewportSize({ width: 360, height: 540 });
-  await page.goto("/r");
-  await page.getByRole("link", { name: "Create an account" }).click();
+  await page.goto("/r/signup");
 
   const phone = page.getByRole("textbox", { name: "Phone number" });
   const age = page.getByRole("checkbox", { name: "I’m 18 or older" });
@@ -32,6 +41,8 @@ test("validates signup locally and verifies with the current phone and age attes
   await page.keyboard.press("Tab");
   await expect(send).toBeFocused();
   await send.click();
+  const startRequest = { path: "/api/respondent/auth/start", body: { phone: "+12025550142", ageAttested: true } };
+  await expect.poll(() => requests).toEqual([startRequest]);
   await expect(page.getByRole("heading", { name: "Enter your code" })).toBeFocused();
 
   const code = page.getByRole("textbox", { name: "Verification code" });
@@ -48,7 +59,7 @@ test("validates signup locally and verifies with the current phone and age attes
   await expect(page.getByRole("heading", { name: "Phone verified" })).toBeFocused();
   await expect(page.getByRole("link", { name: "Go to your interviews" })).toHaveAttribute("href", "/r");
   expect(requests).toEqual([
-    { path: "/api/respondent/auth/start", body: { phone: "+12025550142", ageAttested: true } },
+    startRequest,
     { path: "/api/respondent/auth/verify", body: { phone: "+12025550142", code: "012345", ageAttested: true } },
   ]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
