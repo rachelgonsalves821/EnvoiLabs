@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { FixtureLLMProvider } from "../src/index.ts";
+import { FixtureLLMProvider } from "../src/fixtures.ts";
 
 const load = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const loadJson = async (path) => JSON.parse(await load(path));

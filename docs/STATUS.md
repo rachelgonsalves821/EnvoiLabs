@@ -50,3 +50,11 @@ Next: Platform database, access policies, auth and fakes. Connect the respondent
 Needs from others: Platform auth and final Gate 0 contracts.
 Contract or schema changes: No changes in the two shell PRs.
 Risks: Browser and database integration evidence is still due for Gate 0 sign-off.
+
+## 2026-11-19 21:56, Agent 3 (Researcher and AI)
+
+Done: R-RSCH-02 and R-PLAT-07 provider foundations. Added Anthropic, OpenAI, and Groq adapters with mocked HTTP tests. The AI package typecheck and build, nine mocked transport checks, and all six replay fixtures passed locally.
+Next: Verify the package test runner in CI and wire the adapters into consent-checked server jobs in the appropriate gate.
+Needs from others: Platform must provide the reviewed vendor configuration and usage rates before enabling any live calls.
+Contract or schema changes: Provider interfaces are unchanged. Adapter factories and failure types are exported.
+Risks: OpenAI announced that the PRD-selected transcription model shuts down February 26, 2027. Choose and evaluate a replacement before enabling it past the cutoff. The Vitest run is pending CI because the local frozen install requires an uncached Playwright package.
