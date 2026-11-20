@@ -9,25 +9,46 @@ export class AuthRequestError extends Error {
   }
 }
 
-async function post(path: "start" | "mfa", body: object, signal?: AbortSignal) {
-  const response = await fetch(`/api/researcher/auth/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-    ...(signal && { signal }),
-  });
-  if (!response.ok) throw new AuthRequestError(response.status);
-  return response;
+const requestTimeoutMs = 30_000;
+
+async function post(path: "start" | "mfa", body: object, signal?: AbortSignal): Promise<unknown> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (signal?.aborted) abort();
+  else signal?.addEventListener("abort", abort, { once: true });
+  const timeout = setTimeout(abort, requestTimeoutMs);
+  try {
+    const response = await fetch(`/api/researcher/auth/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new AuthRequestError(response.status);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
+  }
+}
+
+function requireConfirmation(data: unknown) {
+  if (!isRecord(data) || data.ok !== true) throw new Error("Missing sign-in confirmation.");
 }
 
 export async function sendSignInLink(email: string) {
-  await post("start", { email });
+  requireConfirmation(await post("start", { email }));
 }
 
 export async function mfaRequest(action: MfaAction, signal?: AbortSignal): Promise<unknown> {
-  const response = await post("mfa", action, signal);
-  return action.action === "verify" ? undefined : response.json();
+  const data = await post("mfa", action, signal);
+  if (action.action === "verify") {
+    requireConfirmation(data);
+    return;
+  }
+  return data;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
