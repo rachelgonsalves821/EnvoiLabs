@@ -1,37 +1,40 @@
 import { z } from "zod";
-import { BriefPatchSchema, BriefSchema } from "./study.js";
+import { count, exampleId, score, text as nonBlank, withExample } from "./contract.js";
+import { BriefPatchSchema, BriefSchema, exampleBrief } from "./study.js";
 
-const nonBlank = z.string().trim().min(1);
-const score = z.int().min(0).max(100);
-const count = z.int().nonnegative();
+const exampleQuote = { transcriptId: exampleId, startChar: 4, endChar: 28 };
+const exampleTheme = {
+  claim: "Fees matter more for small orders.", count: 8, total: 12, confidence: "high" as const,
+  supportingQuotes: [exampleQuote], contradictingQuotes: [],
+};
 
-export const ScopingTurnSchema = z.strictObject({
+export const ScopingTurnSchema = withExample(z.strictObject({
   message: nonBlank,
   quickReplies: z.array(nonBlank).min(2).max(4),
   briefPatch: BriefPatchSchema,
-});
+}), { message: "What decision are you trying to make?", quickReplies: ["Pricing", "Something else"], briefPatch: {} });
 
-export const ProbeDecisionSchema = z.discriminatedUnion("action", [
+export const ProbeDecisionSchema = withExample(z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("probe"), text: nonBlank }),
   z.strictObject({ action: z.literal("next") }),
-]);
+]), { action: "probe", text: "What made you pick that app?" });
 
-export const QualitySignalsSchema = z.strictObject({
+export const QualitySignalsSchema = withExample(z.strictObject({
   specificity: score,
   relevance: score,
   profileConsistent: z.boolean().nullable(),
-});
+}), { specificity: 90, relevance: 75, profileConsistent: null });
 
-export const EvidenceQuoteReferenceSchema = z.strictObject({
+export const EvidenceQuoteReferenceSchema = withExample(z.strictObject({
   transcriptId: z.uuid(),
   startChar: count,
   endChar: z.int().positive(),
 }).refine(({ startChar, endChar }) => endChar > startChar, {
   path: ["endChar"],
   message: "The end offset must follow the start offset.",
-});
+}), exampleQuote);
 
-export const ThemeSchema = z.strictObject({
+export const ThemeSchema = withExample(z.strictObject({
   claim: nonBlank,
   count: z.int().positive(),
   total: z.int().positive(),
@@ -41,9 +44,9 @@ export const ThemeSchema = z.strictObject({
 }).refine(({ count, total }) => count <= total, {
   path: ["count"],
   message: "The theme count cannot exceed the total.",
-});
+}), exampleTheme);
 
-export const ThemeSetSchema = z.strictObject({
+export const ThemeSetSchema = withExample(z.strictObject({
   executiveAnswer: nonBlank,
   themes: z.array(ThemeSchema),
   hypotheses: z.array(z.strictObject({
@@ -51,7 +54,9 @@ export const ThemeSetSchema = z.strictObject({
     result: z.enum(["supported", "weakened", "untested"]),
   })),
   followUpBrief: BriefSchema,
-});
+}), { executiveAnswer: "Test a lower fee.", themes: [exampleTheme],
+  hypotheses: [{ hypothesis: "Fees matter more for small orders.", result: "supported" }],
+  followUpBrief: exampleBrief });
 
 export type ScopingTurn = z.infer<typeof ScopingTurnSchema>;
 export type ProbeDecision = z.infer<typeof ProbeDecisionSchema>;
