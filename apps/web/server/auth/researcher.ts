@@ -6,12 +6,13 @@ const codePattern = /^\d{6}$/;
 const uuidPattern = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-async function hasResearcherMembership(userId: string) {
+async function researcherMembership(userId: string): Promise<"member" | "absent" | "unavailable"> {
   const service = trustedClient();
-  if (!service) return false;
+  if (!service) return "unavailable";
   const { data, error } = await service.from("researchers").select("id")
     .eq("auth_user_id", userId).maybeSingle();
-  return !error && typeof data?.id === "string";
+  if (error) return "unavailable";
+  return typeof data?.id === "string" ? "member" : "absent";
 }
 
 export async function researcherStart(request: NextRequest) {
@@ -47,7 +48,7 @@ export async function researcherCallback(request: NextRequest) {
   if (!session.client) return failure(503);
   const { data, error } = await session.client.auth.verifyOtp({ token_hash: token, type });
   if (error || !data.user?.email_confirmed_at || !data.session
-      || !await hasResearcherMembership(data.user.id)) return expired();
+      || (await researcherMembership(data.user.id)) !== "member") return expired();
   return session.commit(NextResponse.redirect(`${origin}/app/mfa`, {
     status: 303, headers: privateHeaders,
   }));
@@ -65,7 +66,8 @@ export async function researcherMfa(request: NextRequest) {
   const { data: user, error: userError } = await auth.getUser();
   if (userError) return providerFailure(userError, 401);
   if (!user.user?.email_confirmed_at) return failure(401);
-  if (!await hasResearcherMembership(user.user.id)) return failure(403);
+  const membership = await researcherMembership(user.user.id);
+  if (membership !== "member") return failure(membership === "unavailable" ? 503 : 403);
   const { data: factors, error: factorsError } = await auth.mfa.listFactors();
   if (factorsError) return providerFailure(factorsError, 401);
   const totp = factors.all.filter((factor) => factor.factor_type === "totp");

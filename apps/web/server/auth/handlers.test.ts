@@ -100,6 +100,32 @@ describe("auth handlers", () => {
     expect(calls.commit).toHaveBeenCalledOnce();
   });
 
+  it("allows enrollment to retry after the membership database recovers", async () => {
+    calls.getUser.mockResolvedValue({ data: { user: { id: userId, email_confirmed_at: "2026-11-20" } } });
+    calls.maybeSingle.mockResolvedValueOnce({ data: null, error: { message: "database unavailable" } });
+    const failed = await researcherMfa(post({ action: "enroll" }));
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ ok: false });
+    expect(calls.listFactors).not.toHaveBeenCalled();
+    expect(calls.enroll).not.toHaveBeenCalled();
+    expect(calls.commit).not.toHaveBeenCalled();
+
+    calls.listFactors.mockResolvedValueOnce({ data: { all: [] }, error: null });
+    calls.enroll.mockResolvedValueOnce({ data: { id: userId, totp: { secret: "fixture" } }, error: null });
+    const recovered = await researcherMfa(post({ action: "enroll" }));
+    expect(recovered.status).toBe(200);
+    expect(calls.enroll).toHaveBeenCalledOnce();
+    expect(calls.commit).toHaveBeenCalledOnce();
+  });
+
+  it("requires a fresh sign-in link if membership cannot be checked after email verification", async () => {
+    calls.maybeSingle.mockResolvedValueOnce({ data: null, error: { message: "database unavailable" } });
+    const callback = new NextRequest(origin + "/api/researcher/auth/callback?token_hash=test-hash&type=email");
+    const result = await researcherCallback(callback);
+    expect(result.headers.get("Location")).toBe(origin + "/app/sign-in?error=expired");
+    expect(calls.commit).not.toHaveBeenCalled();
+  });
+
   it("denies TOTP enrollment for an account without researcher membership", async () => {
     calls.getUser.mockResolvedValue({ data: { user: { id: userId, email_confirmed_at: "2026-11-20" } } });
     calls.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
