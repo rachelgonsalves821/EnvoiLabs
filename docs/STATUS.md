@@ -68,3 +68,11 @@ Contract or schema changes: Gate 0 identity, survey schema, Auth provisioning, p
 Risks: Hosted configuration and provider delivery remain unverified. The local test used synthetic accounts and sent no real messages.
 
 Evidence: [auth integration PR](https://github.com/rachelgonsalves821/EnvoiLabs/pull/14), [browser CI](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100411), [positive local Auth CI](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100493), [database and type drift CI](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665291413).
+
+## Gate 0, Agent 1, R-PLAT-01 integer cents
+
+Done: Added lint coverage for fractional money constants in production application and package code. The regression suite exercises the repository ESLint configuration against valid and invalid cents fields. See `tools/eslint/integer-cents.test.mjs`.
+Next: Verify the PR checks and run both sign-in journeys on the hosted preview before Gate 0 sign-off.
+Needs from others: Access to the dedicated Vercel and Supabase preview projects.
+Contract or schema changes: None.
+Risks: Runtime inputs still require integer validation at their service and schema boundaries.

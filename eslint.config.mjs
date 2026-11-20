@@ -1,4 +1,5 @@
 import tseslint from "typescript-eslint";
+import integerCents from "./tools/eslint/integer-cents.mjs";
 
 const piiImports = ["**/db/src/pii", "**/db/src/pii/**", "**/db/pii", "**/db/pii/**"];
 
@@ -9,6 +10,13 @@ function restrictedImports(group, message) {
 export default tseslint.config(
   { ignores: ["**/.next/**", "**/dist/**", "**/next-env.d.ts"] },
   ...tseslint.configs.recommended,
+  {
+    files: ["{apps,packages}/**/*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}"],
+    // Negative test fixtures deliberately pass fractional values to runtime validators.
+    ignores: ["**/{test,tests,e2e}/**", "**/*.{spec,test}.*"],
+    plugins: { envoi: { rules: { "integer-cents": integerCents } } },
+    rules: { "envoi/integer-cents": "error" },
+  },
   {
     files: [
       "apps/web/app/[(]researcher[)]/**/*.{ts,tsx}",
