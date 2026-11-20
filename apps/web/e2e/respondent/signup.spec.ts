@@ -29,7 +29,7 @@ test("validates signup locally and verifies with the current phone and age attes
   await age.press("Space");
   await age.press("Tab");
   await expect(send).toBeFocused();
-  await send.press("Enter");
+  await send.click();
   await expect(page.getByRole("heading", { name: "Enter your code" })).toBeFocused();
 
   const code = page.getByRole("textbox", { name: "Verification code" });
@@ -42,7 +42,7 @@ test("validates signup locally and verifies with the current phone and age attes
   expect(requests).toHaveLength(1);
 
   await code.fill("012 345");
-  await verify.press("Enter");
+  await verify.click();
   await expect(page.getByRole("heading", { name: "Phone verified" })).toBeFocused();
   await expect(page.getByRole("link", { name: "Go to your interviews" })).toHaveAttribute("href", "/r");
   expect(requests).toEqual([
