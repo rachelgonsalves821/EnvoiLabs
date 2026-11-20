@@ -1,0 +1,14 @@
+[
+  {
+    "id": "first-question",
+    "requestKey": "349eda9cf9f4e9f0f873d0bf6939f288f1a5fe71fdba3ee35c5c64975d333182",
+    "messages": [
+      { "role": "user", "content": "I want to understand abandoned carts." }
+    ],
+    "response": {
+      "message": "What decision are you trying to make about abandoned carts?",
+      "quickReplies": ["Improve checkout", "Change shipping options", "Something else"],
+      "briefPatch": {}
+    }
+  }
+]

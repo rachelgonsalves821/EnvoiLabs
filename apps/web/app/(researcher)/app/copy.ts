@@ -1,0 +1,20 @@
+export const researcherCopy = {
+  brand: "Envoi Labs",
+  navigation: "Researcher workspace",
+  skip: "Skip to study",
+  studies: "Studies",
+  title: "New study",
+  question: "What decision are you trying to make?",
+  example: "For example, you might want to decide which pricing options to test.",
+  brief: "Study brief",
+  viewBrief: "View study brief",
+  fields: [
+    ["Decision", "The choice this study will inform"],
+    ["Hypotheses", "What you expect to hear"],
+    ["Respondents", "Who should take part"],
+    ["Exclusions", "Who should be screened out"],
+    ["Sample size", "How many interviews you need"],
+    ["Stimulus", "What respondents will react to"],
+    ["Deadline", "When you need the findings"],
+  ],
+} as const;
