@@ -49,20 +49,35 @@ test.describe("local Auth with synthetic fixtures", () => {
   test.skip(!enabled, "Requires a disposable loopback Supabase Auth stack.");
   test.skip(({ browserName }) => browserName !== "chromium", "Uses one synthetic phone per run.");
 
-  test("respondent verifies a fixed local OTP and captures the age attestation", async ({ page, baseURL }) => {
+  test("respondent can retry a rejected OTP before the app provisions an attested identity", async ({ page, baseURL }) => {
     loopbackOrigin(baseURL);
     const service = localService();
+    const countRespondents = () => service.from("respondents").select("id", { head: true, count: "exact" });
+    const before = await countRespondents();
+    expect(before.error).toBeNull();
+    expect(before.count).not.toBeNull();
     await page.goto("/r/signup");
     await page.getByRole("textbox", { name: "Phone number" }).fill(phone);
     await page.getByRole("checkbox", { name: /18 or older/ }).check();
     await page.getByRole("button", { name: "Text me a code" }).click();
     await expect(page.getByRole("heading", { name: "Enter your code" })).toBeVisible();
-    await page.getByRole("textbox", { name: "Verification code" }).fill(smsCode);
+    const codeInput = page.getByRole("textbox", { name: "Verification code" });
+    await codeInput.fill("111111");
+    await page.getByRole("button", { name: "Verify phone number" }).click();
+    await expect(page.getByText("This code couldn’t be verified. Check it or request a new one.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Phone verified" })).toHaveCount(0);
+    const authCookie = /^sb-.+-auth-token(?:\.\d+)?$/;
+    expect((await page.context().cookies()).some(({ name }) => authCookie.test(name))).toBe(false);
+    const afterRejection = await countRespondents();
+    expect(afterRejection.error).toBeNull();
+    expect(afterRejection.count).toBe(before.count);
+
+    await codeInput.fill(smsCode);
     await page.getByRole("button", { name: "Verify phone number" }).click();
     await expect(page.getByRole("heading", { name: "Phone verified" })).toBeVisible();
 
     const cookies = await page.context().cookies();
-    expect(cookies.some(({ name, httpOnly }) => /^sb-.+-auth-token(?:\.\d+)?$/.test(name) && httpOnly)).toBe(true);
+    expect(cookies.some(({ name, httpOnly }) => authCookie.test(name) && httpOnly)).toBe(true);
     const listing = await service.auth.admin.listUsers();
     expect(listing.error).toBeNull();
     const user = listing.data?.users.find(({ phone: candidate }) => candidate?.replace(/^\+/, "") === phone.slice(1));
