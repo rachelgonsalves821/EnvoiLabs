@@ -22,6 +22,7 @@ export default function ResearcherPage() {
       <nav className={styles.rail} aria-label={copy.navigation}>
         <span className={styles.brand}>{copy.brand}</span>
         <a href="/app" aria-current="page">{copy.studies}</a>
+        <a href="/app/sign-in">{copy.signIn}</a>
       </nav>
       <main className={styles.main} id="new-study" tabIndex={-1}>
         <h1>{copy.title}</h1>

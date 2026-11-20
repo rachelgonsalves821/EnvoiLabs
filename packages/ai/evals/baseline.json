@@ -1,0 +1,134 @@
+{
+  "sizing-pushback": [
+    {
+      "id": "prevalence",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What percent of shoppers abandon checkout when they see a shipping charge?"
+        }
+      ],
+      "response": {
+        "message": "Interviews cannot estimate that percentage. Which reasons for checkout abandonment should the study explore?",
+        "quickReplies": [
+          "Unexpected fees",
+          "Delivery timing",
+          "Something else"
+        ],
+        "briefPatch": {}
+      },
+      "requestKey": "e6239288d9dce55f51cbce7f6080b10040cfde9d5a1d8b5ee3bde4d67e9501ef"
+    }
+  ],
+  "guide": [
+    {
+      "id": "open-behavior-guide",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Draft an interview guide about a recent cart abandonment."
+        }
+      ],
+      "response": {
+        "coreQuestions": [
+          "When did you last add an item to a cart without buying it?",
+          "What were you shopping for that day?",
+          "What happened when you reached checkout?",
+          "How did you react to the delivery options?",
+          "What did you do after you left the cart?",
+          "How did you decide where to shop afterward?"
+        ]
+      },
+      "requestKey": "74898375d6f529be1c3f979782c123a0b4a84d881e04c4331617868254cd9ca2"
+    }
+  ],
+  "probe": [
+    {
+      "id": "probe-for-specifics",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What happened at checkout? It felt off. A follow-up is available."
+        }
+      ],
+      "response": {
+        "action": "probe",
+        "text": "What made it feel off?"
+      },
+      "expectedAction": "probe",
+      "requestKey": "af10dae476adafb93614e43b64fd295fea3ec290e164167b8a234d5372509016"
+    },
+    {
+      "id": "advance-when-time-is-up",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What happened at checkout? Shipping was added at the last step, so I closed the cart. No time remains for follow-ups."
+        }
+      ],
+      "response": {
+        "action": "next"
+      },
+      "expectedAction": "next",
+      "requestKey": "61655803b23e95a6fb86004d2ad6bae94254c008bc13453c90e1c6fd48a1f9d2"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "verifiable-shipping-quote",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Analyze this redacted transcript (f6dc67a5-8d7e-4436-97b0-7f354ea2e04e): I closed the cart when shipping appeared."
+        }
+      ],
+      "response": {
+        "executiveAnswer": "Investigate when the shipping estimate first appears.",
+        "themes": [
+          {
+            "claim": "Unexpected shipping prompted this respondent to leave.",
+            "count": 1,
+            "total": 1,
+            "confidence": "low",
+            "supportingQuotes": [
+              {
+                "transcriptId": "f6dc67a5-8d7e-4436-97b0-7f354ea2e04e",
+                "startChar": 0,
+                "endChar": 41
+              }
+            ],
+            "contradictingQuotes": []
+          }
+        ],
+        "hypotheses": [
+          {
+            "hypothesis": "Surprise shipping affects checkout.",
+            "result": "supported"
+          }
+        ],
+        "followUpBrief": {
+          "title": "Shipping timing",
+          "decision": "Decide when to display the shipping estimate.",
+          "hypotheses": [
+            "An earlier estimate makes checkout clearer."
+          ],
+          "criteria": [
+            {
+              "kind": "must",
+              "text": "Left a cart during the last 30 days."
+            }
+          ],
+          "targetCompletes": 8,
+          "stimulus": null,
+          "deadlineAt": "2027-01-15T00:00:00Z"
+        }
+      },
+      "expectedCount": 1,
+      "expectedQuote": "I closed the cart when shipping appeared.",
+      "transcripts": {
+        "f6dc67a5-8d7e-4436-97b0-7f354ea2e04e": "I closed the cart when shipping appeared."
+      },
+      "requestKey": "bfdff70a2439410c106a1195e5f0ad6f307bf728e450dd1f8f8ccc5900b70515"
+    }
+  ]
+}

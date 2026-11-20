@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "cd ../.. && eslint packages/ai",
-    "test": "vitest run",
+    "test": "vitest run && node evals/run.mjs all",
     "eval": "node evals/run.mjs"
   }
 }
