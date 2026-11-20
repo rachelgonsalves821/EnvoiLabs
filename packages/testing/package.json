@@ -1,5 +1,14 @@
 {
   "name": "@envoi-labs/testing",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "cd ../.. && eslint packages/testing",
+    "test": "vitest run"
+  }
 }

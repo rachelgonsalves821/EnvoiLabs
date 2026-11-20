@@ -1,8 +1,7 @@
 import { z } from "zod";
+import { exampleDate, exampleId, text, withExample } from "./contract.js";
 
-const text = z.string().trim().min(1);
-
-export const InvitePreviewSchema = z.strictObject({
+export const InvitePreviewSchema = withExample(z.strictObject({
   id: z.uuid(),
   title: text,
   rewardCents: z.int().nonnegative(),
@@ -10,9 +9,10 @@ export const InvitePreviewSchema = z.strictObject({
   coreQuestionCount: z.int().positive(),
   expiresAt: z.iso.datetime(),
   whyYou: text,
-});
+}), { id: exampleId, title: "Example study", rewardCents: 280, lengthMinutes: 10,
+  coreQuestionCount: 7, expiresAt: exampleDate, whyYou: "Ordered delivery" });
 
-export const InterviewProgressSchema = z.strictObject({
+export const InterviewProgressSchema = withExample(z.strictObject({
   sessionId: z.uuid(),
   currentQuestion: z.int().positive(),
   coreQuestionCount: z.int().positive(),
@@ -20,7 +20,7 @@ export const InterviewProgressSchema = z.strictObject({
 }).refine(({ currentQuestion, coreQuestionCount }) => currentQuestion <= coreQuestionCount, {
   path: ["currentQuestion"],
   message: "The current question cannot exceed the question count.",
-});
+}), { sessionId: exampleId, currentQuestion: 3, coreQuestionCount: 7, rewardCents: 280 });
 
 export type InvitePreview = z.infer<typeof InvitePreviewSchema>;
 export type InterviewProgress = z.infer<typeof InterviewProgressSchema>;
