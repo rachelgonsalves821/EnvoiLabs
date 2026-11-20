@@ -56,7 +56,11 @@ export function MfaForm() {
         throw new Error("Invalid MFA enrollment.");
       }
       setStep({ kind: "challenge", factorId: data.factorId, secret: data.secret });
-    } catch {
+    } catch (failure) {
+      if (failure instanceof AuthRequestError && failure.status === 401) {
+        window.location.replace("/app/sign-in?error=session");
+        return;
+      }
       setError(copy.setupFailed);
     } finally {
       setPending(false);
@@ -74,7 +78,19 @@ export function MfaForm() {
       if (!isRecord(data) || typeof data.challengeId !== "string") throw new Error("Invalid MFA challenge.");
       await mfaRequest({ action: "verify", factorId, challengeId: data.challengeId, code });
       window.location.replace("/app");
-    } catch {
+    } catch (failure) {
+      // The provider returns 401 for both an incorrect code and an expired session.
+      // Check the session before deciding whether the researcher needs a new link.
+      if (failure instanceof AuthRequestError && failure.status === 401) {
+        try {
+          await mfaRequest({ action: "status" });
+        } catch (statusFailure) {
+          if (statusFailure instanceof AuthRequestError && statusFailure.status === 401) {
+            window.location.replace("/app/sign-in?error=session");
+            return;
+          }
+        }
+      }
       setError(copy.verificationFailed);
       setCode("");
       setPending(false);

@@ -30,6 +30,7 @@ export const authCopy = {
   checkEmailHint: "Open the sign-in link to continue.",
   changeEmail: "Use a different email",
   expiredLink: "This sign-in link is no longer valid. Request a new one.",
+  expiredSession: "Your sign-in session expired. Request a new link to continue.",
   sendFailed: "The link could not be sent. Try again.",
   mfa: "Verify your sign-in",
   mfaHint: "Enter the 6-digit code from your authenticator app.",

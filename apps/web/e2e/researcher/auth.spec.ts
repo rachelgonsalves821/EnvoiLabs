@@ -34,7 +34,7 @@ test("researcher sets up an authenticator and can retry verification", async ({ 
           action: "verify", factorId: "factor-1", challengeId: `challenge-${challenges}`,
           code: verifications++ === 0 ? "000001" : "000002",
         });
-        return route.fulfill({ status: verifications === 1 ? 400 : 204 });
+        return route.fulfill({ status: verifications === 1 ? 401 : 204 });
       default:
         throw new Error("Unexpected MFA request.");
     }
@@ -63,3 +63,33 @@ test("the MFA page redirects when the sign-in session is missing", async ({ page
   await expect(page).toHaveURL(/\/app\/sign-in$/);
   await expect(page.getByRole("heading", { name: "Sign in to your workspace" })).toBeVisible();
 });
+
+for (const interruptedAction of ["enroll", "challenge", "verify"] as const) {
+  test(`a session expiring during ${interruptedAction} returns to email sign-in`, async ({ page }) => {
+    let expired = false;
+    await page.route("**/api/researcher/auth/mfa", async (route) => {
+      const { action } = route.request().postDataJSON();
+      if (action === interruptedAction) expired = true;
+      if (expired) return route.fulfill({ status: 401 });
+      if (action === "status") {
+        const state = interruptedAction === "enroll"
+          ? { state: "enroll" }
+          : { state: "challenge", factorId: "factor-1" };
+        return route.fulfill({ json: state });
+      }
+      if (action === "challenge") return route.fulfill({ json: { challengeId: "challenge-1" } });
+      throw new Error(`Unexpected MFA action: ${action}`);
+    });
+
+    await page.goto("/app/mfa");
+    if (interruptedAction === "enroll") {
+      await page.getByRole("button", { name: "Show setup key" }).click();
+    } else {
+      await page.getByLabel("Authenticator code").fill("000123");
+      await page.getByRole("button", { name: "Verify and continue" }).click();
+    }
+    await expect(page).toHaveURL(/\/app\/sign-in\?error=session$/);
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("session expired");
+    await expect(page.getByLabel("Email address")).toBeEditable();
+  });
+}
