@@ -69,7 +69,11 @@ test("offers recovery for rate limiting and rejected codes without exposing serv
   let sends = 0;
   await page.route("**/api/respondent/auth/start", async (route) => {
     sends++;
-    await route.fulfill({ status: sends === 1 ? 429 : 200, json: { message: "server detail" } });
+    if (sends === 1) {
+      await route.fulfill({ status: 429, json: { message: "server detail" } });
+    } else {
+      await route.fulfill({ json: { ok: true } });
+    }
   });
   await page.route("**/api/respondent/auth/verify", (route) =>
     route.fulfill({ status: 400, json: { message: "server detail" } }),
@@ -94,4 +98,42 @@ test("offers recovery for rate limiting and rejected codes without exposing serv
   await page.getByRole("button", { name: "Change phone number" }).click();
   await expect(page.getByRole("textbox", { name: "Phone number" })).toHaveValue("+12025550142");
   expect(sends).toBe(3);
+});
+
+test("preserves the verification code through a stalled request and a malformed success response", async ({ page }) => {
+  await page.route("**/api/respondent/auth/start", (route) => route.fulfill({ json: { ok: true } }));
+  let attempts = 0;
+  await page.route("**/api/respondent/auth/verify", async (route) => {
+    attempts++;
+    if (attempts === 1) return; // A connection that never returns response headers.
+    if (attempts === 2) {
+      await route.fulfill({ contentType: "text/html", body: "<p>Temporarily unavailable</p>" });
+      return;
+    }
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.goto("/r/signup");
+  await page.getByRole("textbox", { name: "Phone number" }).fill("2025550142");
+  await page.getByRole("checkbox", { name: "I’m 18 or older" }).check();
+  await page.getByRole("button", { name: "Text me a code" }).click();
+  const code = page.getByRole("textbox", { name: "Verification code" });
+  const verify = page.getByRole("button", { name: "Verify phone number" });
+  const alert = page.getByRole("main").getByRole("alert");
+  await code.fill("012345");
+  await page.clock.install();
+  await verify.click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(verify).toBeDisabled();
+  await page.clock.fastForward(30_001);
+  await expect(alert).toHaveText("The connection is unavailable. Try again in a moment.");
+  await expect(code).toHaveValue("012345");
+  await expect(verify).toBeEnabled();
+
+  await verify.click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(alert).toHaveText("The connection is unavailable. Try again in a moment.");
+  await expect(code).toHaveValue("012345");
+  await verify.click();
+  await expect(page.getByRole("heading", { name: "Phone verified" })).toBeFocused();
+  expect(attempts).toBe(3);
 });
