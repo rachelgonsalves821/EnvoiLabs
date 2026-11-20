@@ -64,7 +64,7 @@ Continue as Agent N. Read AGENTS.md, then the last 10 entries of docs/STATUS.md 
 
 ## 5. Delegated reviews and founder responsibilities
 
-- Answer open questions in PRD section 14 (pricing incentive Q-01, minimum study size Q-01b, iPhone nudge Q-02, counsel checks Q-04 to Q-06).
+- Answer open questions in PRD section 16 (pricing incentive Q-01, minimum study size Q-01b, iPhone nudge Q-02, counsel checks Q-04 to Q-06).
 - Codex reviews PRs under Rachel’s standing delegation. Continue to tag money, privacy and user-facing claims with `[MONEY]`, `[PRIVACY]` and `[COPY]` and require passing checks.
 - Agent 1 assembles the gate evidence in `STATUS.md`. Codex verifies it, records the delegated sign-off, and shares an update with Rachel before starting the next gate.
 - Recruit the hand-picked respondents and be the researcher for the first real study at Gate 2.

@@ -60,7 +60,7 @@ You build the foundation everything else stands on, and you run the stage gates.
 | `events` | name, actor_type, actor_hash, study_id, props, occurred_at |
 
 5. **RLS** on every table. Respondents see only their own rows. Researchers see rows for their organization through views that exclude PII. The `pii` schema is reachable only by service role functions. Write `IT-0.2` as a matrix test.
-6. **Contracts v1** in `packages/contracts`. Zod schemas and inferred types for every entity above (public shape), every API in Gate 1 scope, every event in PRD section 11, plus `Brief`, `BriefPatch`, `GuideDraft`, `ProbeDecision`, `ThemeSet`, `QualitySignals`. Each schema exports an `example` fixture used by `IT-0.3`.
+6. **Contracts v1** in `packages/contracts`. Zod schemas and inferred types for every entity above (public shape), every API in Gate 1 scope, every event in PRD section 12, plus `Brief`, `BriefPatch`, `GuideDraft`, `ProbeDecision`, `ThemeSet`, `QualitySignals`. Each schema exports an `example` fixture used by `IT-0.3`.
 7. **Auth.** Supabase phone OTP for respondents (Twilio Verify), magic link plus TOTP for researchers. Server helpers `requireRespondent()`, `requireResearcher()`, `requireAdmin()`.
 8. **Fakes and fixtures** in `packages/testing`. `FakeStripe`, `FakeTremendous`, `FakeTwilio`, `FakeLLM` (scripted and fixture-replay modes), `FakeTranscriber` (returns fixture text keyed by audio hash). Factories for every entity. A `TestClock`.
 9. **Seed** of 1 organization, 2 researchers, 60 respondents (mix of students and non-students, ages 18 to 45, on and off campus, varied food-ordering habits) and 1 draft study.

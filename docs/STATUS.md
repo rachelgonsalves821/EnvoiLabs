@@ -6,7 +6,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
-| Gate 0 Foundations | End of week 1 | Hosted preview pending | [Local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100493), [browser](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100411), [database and drift](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665291413) |
+| Gate 0 Foundations | End of week 1 | Hosted preview access and verification pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44837195089), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44837194978), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44837195053) |
 | Gate 1 Vertical slice | End of week 3 | Not started | |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
@@ -140,3 +140,11 @@ Next: Verify both hosted sign-in paths and reconcile the remaining Gate 0 eviden
 Needs from others: Dedicated preview access and controlled test identities.
 Contract or schema changes: None.
 Risks: Hosted acceptance and live provider behavior remain unverified.
+
+## 2026-11-20, Platform, revised kit and Gate 0 evidence
+
+Done: Reviewed the revised build kit and incorporated the respondent and researcher journeys, design guidelines and upstream evaluations. The three main workflows passed at `1f988488`. Confirmed the [contracts artifact](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44837195089/artifacts/14679237453) is available for that commit.
+Next: Close the four-question pre-freeze contract and IT-0.2 role coverage gaps. Match the dedicated hosted deployment to its commit and Supabase migration state. Record separate outcomes for real SMS delivery and attestation, email delivery, pre-MFA gating and post-MFA workspace access. The [Gate 1 handoff](GATE_1_HANDOFF.md) defines the initial work after sign-off.
+Needs from others: Dedicated Vercel preview URL and access, a preview Supabase project and an operator or scoped access, a controlled test phone, and a provisioned researcher with a controlled mailbox, organization membership and accepted terms.
+Contract or schema changes: None.
+Risks: The GitHub workflows verify local behavior. Both hosted journeys remain unverified.

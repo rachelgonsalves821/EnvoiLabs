@@ -19,14 +19,14 @@ You are one of three coding agents building Envoi Labs, a voice-first AI market 
 - Money is integer cents. Time is UTC.
 - Use fakes from `packages/testing/fakes` for anything not built yet, and log each one in `docs/DEBT.md`.
 - Tag PR titles `[MONEY]` for pricing, payouts or Stripe, `[PRIVACY]` for redaction, consent, PII or RLS, and `[COPY]` for user-facing claims. Codex may review and merge under Rachel’s standing delegation once the relevant checks pass. Record consequential decisions as delegated.
-- Price is $1 per core question per respondent (PRD section 10). Never hard-code it. Read it from `pricing_configs`.
+- Price is $1 per core question per respondent (PRD section 11). Never hard-code it. Read it from `pricing_configs`.
 - For every UI task, follow the design system and the workflow in [UI resource registry](docs/UI_RESOURCES.md). List the references used and the resulting design decisions in the PR.
 
 ## Keep the PRD alive
 - Set a requirement to `In progress` with your agent name when you start it.
 - Set it to `Done` with the test file path as evidence when it merges green.
 - If you change behavior the PRD describes, update the PRD in the same PR and add a changelog line.
-- If a requirement looks wrong, add an Open question (PRD section 14) and mark it `Needs decision`. Do not quietly change scope.
+- If a requirement looks wrong, add an Open question (PRD section 16) and mark it `Needs decision`. Do not quietly change scope.
 
 ## End of every session
 Append to `docs/STATUS.md` using the template in BUILD_PLAN section 9.

@@ -51,7 +51,7 @@ Source of truth is the [Envoi Labs design system](https://claude.ai/artifact/JfV
 5. **Voice capture and upload** (R-RESP-07).
    - `MediaRecorder`. Prefer `audio/webm;codecs=opus`, fall back to `audio/mp4` on Safari. Record mono.
    - Expose a mic level function from an `AnalyserNode` for the Echo.
-   - On stop, upload immediately to a signed storage URL from `recordAnswer`, then call `recordAnswer` to confirm. Retry 3 times with backoff. Keep the blob in IndexedDB until the server confirms, so a crash never loses an answer.
+   - On stop, request scoped authorization through `StartAudioUpload`, upload to the signed storage URL, then confirm against the same server-issued answer and upload IDs. Retry 3 times with backoff. Keep the blob in IndexedDB until the server confirms, so a crash never loses an answer.
    - Show "Got it" and move to the next question within 320ms of confirm.
    - Resume link (`/r/s/[token]`) lands on the next unanswered question.
 6. **Liveness phrase screen** before question 1 (stub in Gate 1, real check in Gate 3). Shows a 4-word phrase and records it like an answer.
