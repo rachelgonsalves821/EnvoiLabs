@@ -17,5 +17,5 @@ jobs:
       - uses: supabase/setup-cli@v3
         with:
           version: 2.84.2
-      - name: Apply migrations and test identity access
+      - name: Apply migrations, test access and check generated public types
         run: bash packages/db/scripts/test-local.sh
