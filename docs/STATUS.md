@@ -6,7 +6,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
-| Gate 0 Foundations | End of week 1 | In progress | |
+| Gate 0 Foundations | End of week 1 | Hosted preview pending | [Local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100493), [browser](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100411), [database and drift](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665291413) |
 | Gate 1 Vertical slice | End of week 3 | Not started | |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
@@ -58,3 +58,13 @@ Next: Verify the package test runner in CI and wire the adapters into consent-ch
 Needs from others: Platform must provide the reviewed vendor configuration and usage rates before enabling any live calls.
 Contract or schema changes: Provider interfaces are unchanged. Adapter factories and failure types are exported.
 Risks: OpenAI announced that the PRD-selected transcription model shuts down February 26, 2027. Choose and evaluate a replacement before enabling it past the cutoff. The Vitest run is pending CI because the local frozen install requires an uncached Playwright package.
+
+## Gate 0 local acceptance evidence
+
+Done: The production build, typecheck, lint, unit tests and desktop Chromium/mobile WebKit checks passed. The browser suite passed 20 tests. The two opt-in local Auth cases passed separately against a fresh Supabase stack, covering respondent phone OTP and researcher email link plus TOTP. Database migrations, seed replay, access policies, public type drift, contracts, generated design tokens and provider fakes are verified in CI.
+Next: Configure the hosted preview, apply migrations in its Supabase project and verify both auth flows there. Record delegated sign-off after that evidence is available.
+Needs from others: Access to the Vercel preview project and a disposable Supabase preview project.
+Contract or schema changes: Gate 0 identity, survey schema, Auth provisioning, public database types and Gate 1 data contracts are merged.
+Risks: Hosted configuration and provider delivery remain unverified. The local test used synthetic accounts and sent no real messages.
+
+Evidence: [auth integration PR](https://github.com/rachelgonsalves821/EnvoiLabs/pull/14), [browser CI](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100411), [positive local Auth CI](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665100493), [database and type drift CI](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44665291413).
