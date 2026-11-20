@@ -1,0 +1,43 @@
+.respondent-signup {
+  align-content: start;
+}
+.respondent-signup form {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+.respondent-age {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  min-block-size: 44px;
+}
+.respondent-age input {
+  accent-color: var(--pulse-edge);
+  block-size: 1.25rem;
+  inline-size: 1.25rem;
+  margin: 0;
+}
+.respondent-age input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.respondent-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.respondent-auth-actions .ev-button {
+  padding-inline: var(--space-2);
+}
+.respondent-auth-status {
+  color: var(--ink-muted);
+  font: var(--text-body-s);
+}
+.respondent-auth-status:empty {
+  position: absolute;
+}
+.respondent-auth-error {
+  color: var(--critical);
+  font: var(--text-body-s);
+}

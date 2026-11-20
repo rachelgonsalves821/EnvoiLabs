@@ -9,6 +9,7 @@ export default function RespondentHome() {
         <p>{copy.instruction}</p>
       </div>
       <div className="respondent-echo"><Echo state="idle" size={144} /></div>
+      <a className="ev-button respondent-signup-link" href="/r/signup">{copy.signup}</a>
       <Sheet trigger={<Button variant="secondary">{copy.help}</Button>} title={copy.help} description={copy.helpIntro}>
         <p>{copy.helpDetail}</p>
       </Sheet>

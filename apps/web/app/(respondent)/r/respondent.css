@@ -43,6 +43,7 @@ body:has(.respondent-shell) { margin: 0; }
 }
 .respondent-welcome p { color: var(--ink-muted); font: var(--text-body); margin-block: var(--space-2) 0; }
 .respondent-echo { display: grid; justify-items: center; padding-block: var(--space-8); }
+.respondent-signup-link { text-decoration: none; }
 @media (min-width: 390px) {
   .respondent-main { padding-block-start: var(--space-8); }
 }
