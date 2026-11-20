@@ -60,11 +60,11 @@ Continue as Agent N. Read AGENTS.md, then the last 10 entries of docs/STATUS.md 
 2. **During the day.** Each agent opens small PRs tied to a requirement ID. CI must be green to merge.
 3. **End of session.** Each agent appends to `docs/STATUS.md`. Read the three entries (10 minutes) and answer anything marked `Needs decision` or `[NEEDS RACHEL]`.
 
-## 5. What only you do
+## 5. Delegated reviews and founder responsibilities
 
 - Answer open questions in PRD section 14 (pricing incentive Q-01, minimum study size Q-01b, iPhone nudge Q-02, counsel checks Q-04 to Q-06).
-- Review every PR that touches money (`packages/core/pricing`, payouts, Stripe), privacy (redaction, consent, RLS) or user-facing claims. The agents flag these in the PR title with `[MONEY]`, `[PRIVACY]` or `[COPY]`.
-- Run the gate review. When Agent 1 posts the gate checklist in `STATUS.md`, check the evidence links, then reply "Gate N passed" in STATUS.md. Agents do not start the next gate's features without it.
+- Codex reviews PRs under Rachel’s standing delegation. Continue to tag money, privacy and user-facing claims with `[MONEY]`, `[PRIVACY]` and `[COPY]` and require passing checks.
+- Agent 1 assembles the gate evidence in `STATUS.md`. Codex verifies it, records the delegated sign-off, and shares an update with Rachel before starting the next gate.
 - Recruit the hand-picked respondents and be the researcher for the first real study at Gate 2.
 
 ## 6. If you can only run one or two agents at a time
