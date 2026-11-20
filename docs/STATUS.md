@@ -92,3 +92,11 @@ Next: Run both sign-in journeys on the dedicated hosted preview and record redac
 Needs from others: Dedicated Vercel and Supabase preview access, a test phone and mailbox, and a provisioned researcher with accepted terms.
 Contract or schema changes: None.
 Risks: Local delivery tests do not exercise the hosted sender or SMS configuration.
+
+## 2026-11-20, Gate 0 integration, R-RESP-01
+
+Done: Extended the disposable Supabase phone journey in `apps/web/e2e/auth-local.spec.ts` to submit an incorrect six-digit code, check the browser session and respondent count, and retry from the same form with the correct code. The successful path checks the server-side age attestation.
+Next: Verify real SMS delivery and researcher email plus TOTP on the dedicated preview deployment.
+Needs from others: Access to the dedicated Vercel and Supabase projects and their test identities.
+Contract or schema changes: None.
+Risks: The local OTP fixture cannot establish hosted SMS delivery.
