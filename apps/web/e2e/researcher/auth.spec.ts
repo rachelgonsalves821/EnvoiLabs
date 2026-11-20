@@ -8,7 +8,7 @@ test("researcher sign-in submits the email and confirms the next step", async ({
   });
 
   await page.goto("/app/sign-in?error=expired");
-  await expect(page.getByRole("alert")).toContainText("no longer valid");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("no longer valid");
   await page.getByLabel("Email address").fill("researcher@example.test");
   await page.getByRole("button", { name: "Send sign-in link" }).click();
   await expect(page.getByRole("status")).toContainText("Check your email");
@@ -49,7 +49,7 @@ test("researcher sets up an authenticator and can retry verification", async ({ 
   const code = page.getByLabel("Authenticator code");
   await code.fill("000001");
   await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(page.getByRole("alert")).toContainText("could not be verified");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("could not be verified");
   await expect(code).toHaveValue("");
   await code.fill("000002");
   await page.getByRole("button", { name: "Verify and continue" }).click();
