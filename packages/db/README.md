@@ -7,6 +7,12 @@ Docker running and the Supabase CLI available. The runner applies migrations to
 a fresh local database, runs the local fixture seed twice and runs the pgTAP tests.
 CI uses Supabase CLI 2.84.2. The seed is for local integration environments only.
 
+The runner regenerates `src/database.generated.ts` from the local `public`
+schema and compares it with the checked-in file. After a migration changes the
+schema, run `bash packages/db/scripts/test-local.sh --update-types` with the same
+CLI version and commit the updated file. The generated types describe database
+columns and relationships. Access still depends on roles and row-level security.
+
 The identity migration provisions read-only client access by verified auth
 identity. Researchers need an MFA-verified session to read their own
 membership and organization. Respondents can read their own identity row.

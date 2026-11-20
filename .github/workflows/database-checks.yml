@@ -17,5 +17,8 @@ jobs:
       - uses: supabase/setup-cli@v3
         with:
           version: 2.84.2
-      - name: Apply migrations and test identity access
-        run: bash packages/db/scripts/test-local.sh
+      - name: Apply migrations, test access and regenerate public types
+        run: bash packages/db/scripts/test-local.sh --update-types
+      - name: Export the generated public types for bootstrap
+        run: |
+          gzip -n -c packages/db/src/database.generated.ts | base64 -w 1024 | sed 's/^/PUBLIC_DATABASE_TYPES_BASE64 /'
