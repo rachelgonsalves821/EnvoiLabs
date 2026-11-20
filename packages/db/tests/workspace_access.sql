@@ -41,12 +41,15 @@ from (values
 ) as service_only(relation);
 grant select on access_matrix to authenticated, anon;
 
-select results_eq(
-    $$select format('%I.%I', n.nspname, c.relname)
-      from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where c.relkind in ('r', 'p') and n.nspname in ('public', 'pii') order by 1$$,
-    $$select relation from access_matrix order by relation$$,
-    'The matrix covers every application base table'
+select is(
+    (select count(*) from (
+        select c.oid
+        from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where c.relkind in ('r', 'p') and n.nspname in ('public', 'pii')
+    ) as application_tables
+    full join access_matrix on to_regclass(access_matrix.relation) = application_tables.oid
+    where application_tables.oid is null or access_matrix.relation is null),
+    0::bigint, 'The matrix covers every application base table'
 );
 
 create function pg_temp.check_access(actor text, matrix_column integer) returns setof text
