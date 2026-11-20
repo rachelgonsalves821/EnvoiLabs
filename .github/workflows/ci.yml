@@ -27,6 +27,14 @@ jobs:
         with:
           node-version: "24"
           package-manager-cache: false
+      - name: Verify UI tokens match the design-system export
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const design = require('./docs/design-system/tokens.json');
+          const ui = require('./packages/ui/tokens/tokens.json');
+          assert.deepStrictEqual(ui, design, 'Update the UI token copy from docs/design-system/tokens.json, then regenerate the CSS.');
+          NODE
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
