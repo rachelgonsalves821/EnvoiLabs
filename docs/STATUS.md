@@ -108,3 +108,11 @@ Next: Platform records both hosted outcomes against the tested deployment. Gate 
 Needs from others: Access to the dedicated preview projects, a controlled SMS number and mailbox, and a provisioned test researcher with accepted terms.
 Contract or schema changes: None.
 Risks: Hosted SMS and email delivery and MFA configuration are still unverified.
+
+## 2026-11-20, Platform, R-RSCH-01 membership lookup recovery
+
+Done: Researcher MFA returns a retryable 503 when membership lookup is unavailable and a 403 for a confirmed nonmember. Handler tests cover a failed lookup followed by successful enrollment and a consumed email link with unconfirmed membership. The callback requires a fresh link and withholds the pending session in that case.
+Next: Verify hosted sign-in against the dedicated preview projects.
+Needs from others: Preview access and controlled test identities.
+Contract or schema changes: None.
+Risks: Real SMS and email delivery remain unverified.
