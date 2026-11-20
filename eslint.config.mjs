@@ -1,6 +1,8 @@
 import tseslint from "typescript-eslint";
 import integerCents from "./tools/eslint/integer-cents.mjs";
 
+import routeOwner from "./tools/eslint/route-owner.mjs";
+
 const piiImports = ["**/db/src/pii", "**/db/src/pii/**", "**/db/pii", "**/db/pii/**"];
 
 function restrictedImports(group, message) {
@@ -25,7 +27,9 @@ export default tseslint.config(
       "packages/ui/src/researcher/**/*.{ts,tsx}",
       "packages/services/src/ai/**/*.{ts,tsx}",
     ],
+    plugins: { boundaries: { rules: { "route-owner": routeOwner } } },
     rules: {
+      "boundaries/route-owner": ["error", "respondent"],
       "no-restricted-imports": ["error", { patterns: [
         restrictedImports(piiImports, "Use the service interfaces for researcher and AI data."),
         restrictedImports(["**/(respondent)/**"], "Use shared packages across route groups."),
@@ -34,7 +38,9 @@ export default tseslint.config(
   },
   {
     files: ["apps/web/app/[(]respondent[)]/**/*.{ts,tsx}", "apps/web/app/api/respondent/**/*.{ts,tsx}"],
+    plugins: { boundaries: { rules: { "route-owner": routeOwner } } },
     rules: {
+      "boundaries/route-owner": ["error", "researcher"],
       "no-restricted-imports": ["error", { patterns: [
         restrictedImports(["**/(researcher)/**"], "Use shared packages across route groups."),
       ] }],
