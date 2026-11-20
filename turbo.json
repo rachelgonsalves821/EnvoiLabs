@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["tsconfig.base.json", "eslint.config.mjs"],
+  "globalDependencies": ["tsconfig.base.json", "eslint.config.mjs", "tools/eslint/integer-cents.mjs"],
   "tasks": {
     "dev": { "dependsOn": ["^build"], "cache": false, "persistent": true },
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", "!.next/cache/**"] },
