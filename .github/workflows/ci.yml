@@ -14,7 +14,8 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
     timeout-minutes: 12
     env:
       NEXT_TELEMETRY_DISABLED: "1"
@@ -33,3 +34,4 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm e2e
