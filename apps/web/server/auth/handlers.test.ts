@@ -106,4 +106,16 @@ describe("auth handlers", () => {
     expect((await researcherMfa(post({ action: "enroll" }))).status).toBe(403);
     expect(calls.enroll).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [400, 401], [401, 401], [429, 429], [500, 503], [503, 503], [undefined, 503],
+  ])("classifies an MFA identity lookup failure (provider %s, response %i)", async (status, expected) => {
+    calls.getUser.mockResolvedValueOnce({ data: { user: null }, error: { status } });
+    const response = await researcherMfa(post({ action: "status" }));
+    expect(response.status).toBe(expected);
+    expect(await response.json()).toEqual({ ok: false });
+    expect(calls.maybeSingle).not.toHaveBeenCalled();
+    expect(calls.listFactors).not.toHaveBeenCalled();
+    expect(calls.commit).not.toHaveBeenCalled();
+  });
 });

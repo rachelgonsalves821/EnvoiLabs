@@ -63,7 +63,8 @@ export async function researcherMfa(request: NextRequest) {
   if (!session.client) return failure(503);
   const { auth } = session.client;
   const { data: user, error: userError } = await auth.getUser();
-  if (userError || !user.user?.email_confirmed_at) return failure(401);
+  if (userError) return providerFailure(userError, 401);
+  if (!user.user?.email_confirmed_at) return failure(401);
   if (!await hasResearcherMembership(user.user.id)) return failure(403);
   const { data: factors, error: factorsError } = await auth.mfa.listFactors();
   if (factorsError) return providerFailure(factorsError, 401);
