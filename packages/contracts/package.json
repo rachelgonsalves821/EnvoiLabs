@@ -1,6 +1,8 @@
 {
   "name": "@envoi-labs/contracts",
+  "version": "1.0.0",
   "private": true,
+  "files": ["dist/*.js", "dist/*.d.ts"],
   "type": "module",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
