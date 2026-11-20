@@ -11,10 +11,14 @@ export function normalizeUsPhone(raw: string): string | null {
 type AuthRequest = { phone: string; ageAttested: true };
 type AuthResult = "success" | "throttled" | "unavailable" | "rejected";
 
+const requestTimeoutMs = 30_000;
+
 async function sendRequest(
   action: "start" | "verify",
   payload: AuthRequest & { code?: string },
 ): Promise<AuthResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
     const response = await fetch(`/api/respondent/auth/${action}`, {
       method: "POST",
@@ -23,14 +27,21 @@ async function sendRequest(
       credentials: "same-origin",
       cache: "no-store",
       redirect: "error",
+      signal: controller.signal,
     });
 
-    if (response.ok) return "success";
+    if (response.ok) {
+      const confirmation: unknown = await response.json();
+      return confirmation !== null && typeof confirmation === "object" &&
+        "ok" in confirmation && confirmation.ok === true ? "success" : "unavailable";
+    }
     if (response.status === 429) return "throttled";
     if (response.status >= 500 || response.status === 404) return "unavailable";
     return "rejected";
   } catch {
     return "unavailable";
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
