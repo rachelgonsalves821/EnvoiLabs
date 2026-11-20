@@ -1,0 +1,45 @@
+# Disposable Auth test fixture for the runner. Do not push it to a hosted project.
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3100"
+additional_redirect_urls = ["http://127.0.0.1:3100/api/researcher/auth/callback"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+max_frequency = "1s"
+
+[auth.sms.twilio]
+enabled = true
+account_sid = "placeholder"
+message_service_sid = "placeholder"
+auth_token = "placeholder"
+
+[auth.sms.test_otp]
+12025550142 = "012345"
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

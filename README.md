@@ -39,3 +39,11 @@ and allow-list `/api/researcher/auth/callback` on each deployed app origin.
 
 Run `pnpm --filter @envoi-labs/web test` for auth handler fixtures. Test runs
 mock the provider and do not send SMS or email.
+
+### Auth smoke tests on disposable local Supabase
+
+The regular browser tests check public onboarding and fail-closed workspace access without configured providers. For the live local flow, use the [Supabase local Auth test configuration](https://supabase.com/docs/guides/auth/testing-auth-flows) with a disposable project and the repository's database migrations. Enable phone signup and confirmations, add the local test OTP `12025550142 = "012345"`, and enable TOTP enrollment and verification. Use the documented dummy SMS provider settings. The researcher test generates a magic link through the local admin API without sending email.
+
+Before running the optional test, set `ENVOI_TEST_LOCAL_SUPABASE=1`, `ENVOI_APP_ORIGIN=http://127.0.0.1:3100`, `SUPABASE_URL` to your local API origin, and the two disposable Supabase keys and phone data key from the Auth configuration above. From the repository root, run `pnpm build` and then `pnpm exec playwright test --project desktop-chromium auth-local.spec.ts`. Start from a fresh local stack for each run so the fixed phone number starts unused.
+
+A hosted preview requires its own Supabase project and applied migrations, a server-only service role key and phone data key, its exact app origin and redirect allow-list, a configured email sender and SMS provider, and a provisioned researcher account with recorded terms. Keep local test phone mappings and dummy provider credentials out of hosted environments.

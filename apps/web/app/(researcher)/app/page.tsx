@@ -1,4 +1,5 @@
 import "../../../../../docs/design-system/tokens.css";
+import { requireResearcher } from "../../../server/auth/identity";
 import { researcherCopy as copy } from "./copy";
 import styles from "./researcher.module.css";
 
@@ -15,7 +16,9 @@ function BriefFields() {
   );
 }
 
-export default function ResearcherPage() {
+export default async function ResearcherPage() {
+  await requireResearcher();
+
   return (
     <div className={styles.workspace}>
       <a className={styles.skip} href="#new-study">{copy.skip}</a>
