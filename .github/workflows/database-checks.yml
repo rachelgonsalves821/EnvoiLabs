@@ -1,0 +1,21 @@
+name: Database checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  identity-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+      - name: Apply migrations and test identity access
+        run: bash packages/db/scripts/test-local.sh
