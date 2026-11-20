@@ -100,3 +100,11 @@ Next: Verify real SMS delivery and researcher email plus TOTP on the dedicated p
 Needs from others: Access to the dedicated Vercel and Supabase projects and their test identities.
 Contract or schema changes: None.
 Risks: The local OTP fixture cannot establish hosted SMS delivery.
+
+## 2026-11-20, Platform, hosted R-RESP-01 and R-RSCH-01 acceptance
+
+Done: Added the [hosted sign-in procedure](../README.md#verify-sign-in-on-the-hosted-preview) and evidence fields. Main at eabafad passed [build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44693133860), [database and seed](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44693133832), and [both local sign-in journeys](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44693133845).
+Next: Platform records both hosted outcomes against the tested deployment. Gate 0 remains open.
+Needs from others: Access to the dedicated preview projects, a controlled SMS number and mailbox, and a provisioned test researcher with accepted terms.
+Contract or schema changes: None.
+Risks: Hosted SMS and email delivery and MFA configuration are still unverified.
