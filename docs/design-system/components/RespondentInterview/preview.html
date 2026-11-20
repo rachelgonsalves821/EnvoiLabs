@@ -1,0 +1,52 @@
+<!-- @dsCard group="Screens" height=820 page=true subtitle="Mobile web, 390 wide" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Respondent interview screen</title>
+<style>
+.stage{display:flex;gap:var(--space-12);padding:var(--space-8) var(--space-6);align-items:flex-start;flex-wrap:wrap}
+.phone{width:390px;height:760px;background:var(--fog);border-radius:44px;box-shadow:0 0 0 10px var(--ink),var(--shadow-card);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.status{height:44px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:0 var(--space-4)}
+.close{width:40px;height:40px;border-radius:50%;border:0;background:transparent;color:var(--ink);display:grid;place-items:center;font-size:20px}
+.body{padding:var(--space-8) var(--space-4) 0;flex:1;display:flex;flex-direction:column}
+.kicker{font-size:14px;line-height:20px;color:var(--ink-muted);margin:0 0 var(--space-3)}
+.hint{margin:var(--space-3) 0 0;font-size:16px;line-height:24px;color:var(--ink-muted)}
+.mic{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:var(--space-3);padding-bottom:var(--space-6)}
+.orbbtn{width:200px;height:200px;border:0;background:transparent;padding:0;cursor:pointer;border-radius:50%}
+.recline{display:flex;align-items:center;gap:var(--space-2);height:28px}
+.recline .dot{width:10px;height:10px;border-radius:50%;background:var(--critical)}
+.notes{max-width:300px;display:flex;flex-direction:column;gap:var(--space-4);padding-top:var(--space-8)}
+.notes h3{margin:0}
+.notes ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:var(--space-3);font-size:14px;line-height:20px}
+</style></head>
+<body>
+<div class="stage" id="root">
+  <div class="phone" role="main" aria-label="Interview question 3 of 7">
+    <div class="status"></div>
+    <div class="top">
+      <div class="ev-progress"><div class="ev-track"><span class="done"></span><span class="done"></span><span class="now"></span><span></span><span></span><span></span><span></span></div><span class="ev-label ev-num">3 of 7</span></div>
+      <span class="ev-earn"><i class="ph-bold ph-gift"></i><span class="ev-num">$7</span></span>
+    </div>
+    <div class="body">
+      <p class="kicker">Late-night snacks</p>
+      <h1 class="ev-q">Tell me about the last time you ordered food after 10pm.</h1>
+      <p class="hint">Where were you, what did you get, and why that app?</p>
+      <div class="mic">
+        <button class="orbbtn" id="orb" aria-label="Stop recording" aria-pressed="true"></button>
+        <div class="recline" role="status"><span class="dot"></span><span class="ev-label">Recording</span><span class="ev-cap ev-num">0:14</span></div>
+        <button class="ev-btn ev-btn-ghost"><i class="ph ph-keyboard"></i>Type instead</button>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <h3 class="ev-h3">Anatomy</h3>
+    <ol>
+      <li>Progress on the left, this interview's reward on the right. Both stay put on every question.</li>
+      <li>The topic in <code>ink-muted</code>, then the question in <code>display-l</code>, left-aligned, then one hint line.</li>
+      <li>The Echo is the record button, 200px, inside thumb reach. Tap to start, tap to stop. It ripples with the voice level.</li>
+      <li>A live "Recording" status and timer sit under it. "Type instead" is always there.</li>
+      <li>When an answer saves, the Echo settles, the next question slides in from the right over 320ms, and progress advances.</li>
+    </ol>
+  </div>
+</div>
+<script>window.EnvoiLabs.Echo(document.getElementById('orb'),{state:'listen'});</script>
+</body></html>

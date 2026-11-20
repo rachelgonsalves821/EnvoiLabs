@@ -1,0 +1,57 @@
+<!-- @dsCard group="Screens" height=760 width=1280 page=true subtitle="Desktop, 1280 wide" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Researcher scoping screen</title>
+<style>
+.app{width:1280px;height:760px;display:grid;grid-template-columns:232px 1fr 440px;background:var(--fog)}
+.rail{border-right:1px solid var(--line);padding:var(--space-6) var(--space-4);display:flex;flex-direction:column;gap:var(--space-2)}
+.brand{font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:-0.02em;padding:0 var(--space-2) var(--space-6)}
+.nav{display:flex;align-items:center;gap:var(--space-2);height:40px;padding:0 var(--space-3);border-radius:var(--radius-sm);font-size:14px;font-weight:500;color:var(--ink-muted)}
+.nav.on{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--line)}
+.nav i{font-size:18px}
+.main{padding:var(--space-8) var(--space-12);display:flex;flex-direction:column;gap:var(--space-4);overflow:hidden}
+.me{align-self:flex-end;background:var(--paper-sunk);border-radius:var(--radius-md);border-bottom-right-radius:6px;padding:var(--space-3) var(--space-4);max-width:70%}
+.agent{display:flex;gap:var(--space-3);align-items:flex-start;max-width:620px}
+.agent .mini{width:36px;height:36px;flex:none}
+.agent p{margin:0 0 var(--space-2)}
+.opts{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.opt{font:inherit;font-size:14px;font-weight:600;height:36px;padding:0 14px;border-radius:var(--radius-pill);border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)}
+.opt.on{background:var(--pulse-wash);border-color:var(--pulse-edge)}
+.composer{margin-top:auto;position:relative}
+.send{position:absolute;right:8px;bottom:10px;width:40px;height:40px;border-radius:50%;border:0;background:var(--ink);color:var(--on-ink);display:grid;place-items:center}
+.side{padding:var(--space-6) var(--space-6) var(--space-6) 0;overflow:hidden}
+.side .ev-float{height:100%;box-sizing:border-box;display:flex;flex-direction:column}
+.sec{margin-top:var(--space-6)}
+.sec h4{margin:0 0 var(--space-2);font-size:13px;font-weight:600;color:var(--ink-muted)}
+.ghost{color:var(--ink-muted);font-size:14px;border:1px dashed var(--line-strong);border-radius:var(--radius-sm);padding:var(--space-3)}
+</style></head>
+<body>
+<div class="app" id="root">
+  <nav class="rail" aria-label="Studies">
+    <div class="brand">Envoi</div>
+    <div class="nav on"><i class="ph ph-chat-circle-dots"></i>New study</div>
+    <div class="nav"><i class="ph ph-waveform"></i>Snack delivery fee</div>
+    <div class="nav"><i class="ph ph-waveform"></i>Campus gym habits</div>
+    <div class="nav" style="margin-top:auto"><i class="ph ph-credit-card"></i>Billing</div>
+  </nav>
+  <main class="main">
+    <h1 class="ev-h1">New study</h1>
+    <div class="me">We're launching a late-night snack delivery app for college students. Want to know if they'd pay a delivery fee.</div>
+    <div class="agent"><div class="mini" id="e1"></div><div><p>Good decision to test. What would you do differently depending on the answer?</p>
+      <div class="opts"><span class="opt on">Set the fee price</span><span class="opt">Fee vs. subscription</span><span class="opt">Something else</span></div></div></div>
+    <div class="me">Set the fee price. Must be students who order late at night.</div>
+    <div class="agent"><div class="mini" id="e2"></div><div><p>Got it. I'll screen for students who ordered food after 10pm in the last 30 days. Should they live on campus, or is that a nice-to-have?</p><span class="ev-cap">Added 2 criteria to your brief.</span></div></div>
+    <div class="composer"><textarea class="ev-input" rows="2" placeholder="Reply, or paste your own questions"></textarea><button class="send" aria-label="Send"><i class="ph-bold ph-arrow-up"></i></button></div>
+  </main>
+  <aside class="side" aria-label="Study brief">
+    <section class="ev-float">
+      <div class="ev-row" style="justify-content:space-between"><span class="ev-chip">Draft brief</span><span class="ev-cap">Building as you chat</span></div>
+      <h2 class="ev-h2" style="margin-top:var(--space-3)">Would students pay a late-night delivery fee?</h2>
+      <div class="sec"><h4>Decision</h4><p style="margin:0">Set the delivery fee price for launch.</p></div>
+      <div class="sec"><h4>Who you'll hear from</h4><div class="ev-row" style="gap:var(--space-2)"><span class="ev-chip ev-chip-ink">College students</span><span class="ev-chip ev-chip-ink">Ordered food after 10pm, last 30 days</span></div></div>
+      <div class="sec"><h4>How many</h4><div class="ghost">Next, I'll ask how many people you want to hear from.</div></div>
+      <div class="sec"><h4>Quote</h4><div class="ghost">Appears once the brief is complete.</div></div>
+    </section>
+  </aside>
+</div>
+<script>var E=window.EnvoiLabs.Echo;E(document.getElementById('e1'),{state:'idle'});E(document.getElementById('e2'),{state:'think'});</script>
+</body></html>

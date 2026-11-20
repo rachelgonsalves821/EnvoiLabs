@@ -1,0 +1,19 @@
+<!-- @dsCard group="Actions" height=150 -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Button</title></head>
+<body>
+<div class="ev-pad ev-stack" id="root">
+  <div class="ev-row">
+    <button class="ev-btn ev-btn-primary">Launch study</button>
+    <button class="ev-btn ev-btn-pulse"><i class="ph-bold ph-microphone"></i>Start answering</button>
+    <button class="ev-btn ev-btn-secondary">Edit brief</button>
+    <button class="ev-btn ev-btn-ghost"><i class="ph ph-keyboard"></i>Type instead</button>
+  </div>
+  <div class="ev-row">
+    <button class="ev-btn ev-btn-primary ev-btn-sm">Approve</button>
+    <button class="ev-btn ev-btn-secondary ev-btn-sm"><i class="ph ph-download-simple"></i>Export</button>
+    <button class="ev-btn ev-btn-primary" disabled>Launch study</button>
+  </div>
+</div>
+<script>document.getElementById('root').setAttribute('data-ready','1');</script>
+</body></html>

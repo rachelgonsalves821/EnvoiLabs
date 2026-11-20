@@ -1,0 +1,21 @@
+<!-- @dsCard group="Rewards" height=150 -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Earnings and progress</title></head>
+<body>
+<div class="ev-pad ev-stack" id="root" style="gap:var(--space-6)">
+  <div class="ev-row" style="justify-content:space-between;max-width:400px">
+    <div class="ev-progress"><div class="ev-track"><span class="done"></span><span class="done"></span><span class="now"></span><span></span><span></span><span></span><span></span></div><span class="ev-label ev-num">3 of 7</span></div>
+    <span class="ev-earn"><i class="ph-bold ph-gift"></i><span class="ev-num" id="amt">$7.00</span></span>
+  </div>
+  <div class="ev-row">
+    <span class="ev-chip ev-chip-zest ev-num"><i class="ph-bold ph-coins"></i>$42 earned</span>
+    <span class="ev-chip ev-num"><i class="ph ph-star"></i>1,240 points</span>
+    <span class="ev-chip ev-num"><i class="ph ph-fire"></i>4 week streak</span>
+  </div>
+</div>
+<script>
+var el=document.getElementById('amt'),t0=null;
+function step(t){if(!t0)t0=t;var p=Math.min(1,(t-t0)/700),v=7*(1-Math.pow(1-p,3));el.textContent='$'+v.toFixed(2);if(p<1)requestAnimationFrame(step);}
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches)requestAnimationFrame(step);
+</script>
+</body></html>

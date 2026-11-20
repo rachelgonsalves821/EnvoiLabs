@@ -1,0 +1,152 @@
+/* Envoi Labs — generated from tokens.json */
+:root, [data-theme="light"] {
+  --fog: #f3f2f7; /* Page background for both apps. A cool lilac grey, never cream. */
+  --paper: #fbfbfd; /* Raised surfaces: cards, sheets, the composer, the brief panel. */
+  --paper-sunk: #eceaf2; /* Wells inside a card: the quote block, the transcript strip, input fields at rest. */
+  --line: #e2e0ea; /* Hairline dividers and card edges. Decorative only, never the only cue for a control. */
+  --line-strong: #8e8a9e; /* Input and control borders (3.2:1 on paper in light, 3.3:1 in dark). */
+  --ink: #17151f; /* Primary text and icons on fog, paper and paper-sunk (16:1+ in both themes). Fill of the primary button. */
+  --ink-muted: #5d5a6b; /* Secondary text, captions, placeholders on fog and paper (6:1+ light, 7:1+ dark). */
+  --on-ink: #fbfbfd; /* Text on an ink fill (primary button, ink chips). */
+  --pulse: #ff4f8b; /* The Envoi pink. The Echo, the record action, the one moment that matters per view. Graphics and fills only, never text on fog. */
+  --pulse-edge: #c21e5b; /* Pink as text or a 1px edge: links, active tab underline, the border on a pulse fill so it clears 3:1 on fog (5.2:1 light, 7.8:1 dark). */
+  --on-pulse: #17151f; /* Text and icons on a pulse fill (5.8:1 light, 7:1 dark). Never white. */
+  --pulse-wash: #ffe3ec; /* Soft pink ground for a selected option or the recording state. Ink text on it. */
+  --zest: #d4f55a; /* Money and rewards only: the earnings chip, payout receipts, points. Ink text on it. */
+  --zest-deep: #4a6600; /* Dollar amounts written as text on paper (6.4:1 light, 14:1 dark). */
+  --zest-wash: #eef9c7; /* Ground for a payout receipt card. Ink text on it. */
+  --tide: #3a5bff; /* Researcher data: second series in charts, segment tags, links in reports (4.9:1 light, 7.2:1 dark on paper). */
+  --good: #1e7f4f; /* Passed quality checks, filled quotas. Always with a word or check icon. */
+  --warn: #a85d00; /* Slow fill, expiring soon, needs review. Always with a word or icon. */
+  --critical: #c2283e; /* Removed responses, payment failed, errors. Always with a word or icon; differs from good in lightness too. */
+  --focus: #c21e5b; /* Keyboard focus ring: 2px solid, 2px offset, on every interactive element (5.2:1 on fog light, 7.8:1 dark). */
+  --shadow-card: 0 1px 2px rgba(23,21,31,0.06), 0 12px 32px -16px rgba(23,21,31,0.22); /* Floating cards: the invite card, the brief panel, sheets. Flat cards use a line edge instead. */
+  --shadow-press: inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 2px rgba(23,21,31,0.2); /* Primary and pulse buttons, so they read as pressable objects next to the 3D Echo. */
+}
+[data-theme="dark"] {
+  --fog: #121019;
+  --paper: #1c1925;
+  --paper-sunk: #0d0b12;
+  --line: #2e2a3a;
+  --line-strong: #6e6a80;
+  --ink: #f3f1f8;
+  --ink-muted: #a7a3b6;
+  --on-ink: #121019;
+  --pulse: #ff6b9e;
+  --pulse-edge: #ff8ab3;
+  --on-pulse: #121019;
+  --pulse-wash: #3a1b2a;
+  --zest: #d4f55a;
+  --zest-deep: #d4f55a;
+  --zest-wash: #2c3312;
+  --tide: #8fa2ff;
+  --good: #5fd49a;
+  --warn: #f2a93b;
+  --critical: #ff7a8a;
+  --focus: #ff8ab3;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.4), 0 12px 32px -16px rgba(0,0,0,0.7);
+  --shadow-press: inset 0 1px 0 rgba(255,255,255,0.12), 0 1px 2px rgba(0,0,0,0.5);
+}
+:root {
+  --space-1: 4px; /* Icon to label gap, chip inner padding. */
+  --space-2: 8px; /* Tight stacks: label to field, chip rows. */
+  --space-3: 12px; /* Button inner padding, list row gaps. */
+  --space-4: 16px; /* Card padding on mobile, gutters on mobile. */
+  --space-6: 24px; /* Card padding on desktop, gaps between cards. */
+  --space-8: 32px; /* Between sections inside a page. */
+  --space-12: 48px; /* Around the Echo, between major page regions. */
+  --space-16: 64px; /* Page top padding on desktop, hero breathing room. */
+  --radius-sm: 10px; /* Inputs, small buttons, quote wells. */
+  --radius-md: 16px; /* Cards and panels. */
+  --radius-lg: 28px; /* Bottom sheets, the invite card, the interview stage. */
+  --radius-pill: 999px; /* Buttons, chips, the earnings pill, progress tracks. */
+  --font-sans: "Manrope", system-ui, sans-serif;
+  --text-display-xl: 700 64px/60px var(--font-sans); /* One per page at most: marketing heroes, the respondent welcome, the payout moment. */
+  --text-display-l: 700 40px/42px var(--font-sans); /* The interview question on the respondent screen (32px under 400px wide). */
+  --text-h1: 700 30px/36px var(--font-sans); /* Page titles in the researcher app. */
+  --text-h2: 650 22px/28px var(--font-sans); /* Section and theme titles. */
+  --text-stat: 700 36px/40px var(--font-sans); /* Counts on the tracking page and the earnings total. Always tabular numbers. */
+  --text-h3: 600 17px/24px var(--font-sans); /* Card titles and labels for groups of fields. */
+  --text-body-l: 400 18px/28px var(--font-sans); /* Respondent body copy and agent messages on mobile. */
+  --text-body: 400 16px/24px var(--font-sans); /* Default text in both apps. Inputs are 16px so iOS never zooms. */
+  --text-body-s: 400 14px/20px var(--font-sans); /* Supporting text, table cells, metadata. */
+  --text-label: 600 13px/16px var(--font-sans); /* Chips, tags, button text in dense UI. Sentence case, never all caps. */
+  --text-caption: 500 12px/16px var(--font-sans); /* Timestamps and footnotes only. */
+}
+.display-xl {
+  font-family: var(--font-sans);
+  font-size: 64px;
+  line-height: 60px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+.display-l {
+  font-family: var(--font-sans);
+  font-size: 40px;
+  line-height: 42px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.h1 {
+  font-family: var(--font-sans);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.h2 {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.stat {
+  font-family: var(--font-sans);
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.h3 {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.body-l {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.body-s {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.caption {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}

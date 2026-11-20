@@ -1,0 +1,38 @@
+<!-- @dsCard group="Researcher" height=560 -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Study brief</title>
+<style>
+.wrap{padding:var(--space-6);max-width:440px}
+.sec{margin-top:var(--space-6)}
+.sec h4{margin:0 0 var(--space-2);font-size:13px;line-height:16px;font-weight:600;color:var(--ink-muted)}
+.price{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3)}
+.lines{margin:var(--space-3) 0 0;padding:0;list-style:none;font-size:14px;line-height:20px}
+.lines li{display:flex;justify-content:space-between;padding:4px 0;color:var(--ink-muted)}
+.lines li b{color:var(--ink);font-weight:600}
+.feas{display:flex;gap:var(--space-2);align-items:flex-start;margin-top:var(--space-4)}
+.feas i{color:var(--good);font-size:18px;margin-top:2px}
+.foot{display:flex;gap:var(--space-2);margin-top:var(--space-6)}
+.foot .ev-btn-primary{flex:1}
+</style></head>
+<body>
+<div class="wrap" id="root">
+  <section class="ev-float" aria-label="Study brief">
+    <div class="ev-row" style="justify-content:space-between"><span class="ev-chip">Draft brief</span><span class="ev-cap">Updated just now</span></div>
+    <h2 class="ev-h2" style="margin-top:var(--space-3)">Would students pay a late-night delivery fee?</h2>
+    <div class="sec"><h4>Decision</h4><p style="margin:0">Set the delivery fee price for launch.</p></div>
+    <div class="sec"><h4>Who you'll hear from</h4>
+      <div class="ev-row" style="gap:var(--space-2)">
+        <span class="ev-chip ev-chip-ink">College students</span>
+        <span class="ev-chip ev-chip-ink">Ordered food after 10pm in the last 30 days</span>
+        <span class="ev-chip ev-chip-outline">Lives on campus</span>
+      </div></div>
+    <div class="sec"><h4>Quote</h4>
+      <div class="price"><span class="ev-stat">$600</span><span class="ev-small ev-muted ev-num">20 interviews, 10 min each</span></div>
+      <ul class="lines ev-num"><li>Base per complete <b>$30</b></li><li>Screening, 2 must-haves <b>Included</b></li><li>Live follow-ups <b>Included</b></li></ul>
+      <div class="feas ev-small"><i class="ph-bold ph-check-circle"></i><span>We expect all 20 within 36 hours from our student panel.</span></div>
+    </div>
+    <div class="foot"><button class="ev-btn ev-btn-secondary">Edit</button><button class="ev-btn ev-btn-primary">Approve and pay $600</button></div>
+  </section>
+</div>
+<script>document.getElementById('root').setAttribute('data-ready','1');</script>
+</body></html>

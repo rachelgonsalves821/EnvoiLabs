@@ -1,0 +1,20 @@
+<!-- @dsCard group="Signature" height=300 subtitle="The 3D voice orb, live" -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Echo</title>
+<style>
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-6);padding:var(--space-6);align-items:end}
+.cell{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2)}
+.orb{width:180px;height:180px}
+.orb.sm{width:56px;height:56px}
+</style></head>
+<body>
+<div class="grid" id="root">
+  <div class="cell"><div class="orb" data-state="idle"></div><span class="ev-label">Idle</span><span class="ev-cap">Breathes on a 6s loop</span></div>
+  <div class="cell"><div class="orb" data-state="listen"></div><span class="ev-label">Listening</span><span class="ev-cap">Ripples with mic level</span></div>
+  <div class="cell"><div class="orb" data-state="think"></div><span class="ev-label">Thinking</span><span class="ev-cap">Agent writing a follow-up</span></div>
+  <div class="cell"><div class="orb" data-state="payout"></div><span class="ev-label">Payout</span><span class="ev-cap">Flashes zest once, then settles</span></div>
+</div>
+<script>
+document.querySelectorAll('[data-state]').forEach(function(el){ window.EnvoiLabs.Echo(el,{state:el.getAttribute('data-state')}); });
+</script>
+</body></html>

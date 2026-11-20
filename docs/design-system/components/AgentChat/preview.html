@@ -1,0 +1,35 @@
+<!-- @dsCard group="Researcher" height=420 -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Agent chat</title>
+<style>
+.wrap{padding:var(--space-6);max-width:560px;display:flex;flex-direction:column;gap:var(--space-4)}
+.me{align-self:flex-end;background:var(--paper-sunk);border-radius:var(--radius-md);border-bottom-right-radius:6px;padding:var(--space-3) var(--space-4);max-width:80%}
+.agent{display:flex;gap:var(--space-3);align-items:flex-start}
+.agent .mini{width:36px;height:36px;flex:none;margin-top:-2px}
+.agent .body{display:flex;flex-direction:column;gap:var(--space-2)}
+.agent p{margin:0}
+.opts{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.opt{font:inherit;font-size:14px;font-weight:600;height:36px;padding:0 14px;border-radius:var(--radius-pill);border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);cursor:pointer}
+.opt[aria-pressed=true]{background:var(--pulse-wash);border-color:var(--pulse-edge)}
+.composer{position:relative}
+.send{position:absolute;right:8px;bottom:8px;width:40px;height:40px;border-radius:50%;border:0;background:var(--ink);color:var(--on-ink);display:grid;place-items:center;cursor:pointer}
+</style></head>
+<body>
+<div class="wrap" id="root">
+  <div class="me">We're launching a late-night snack delivery app for college students. Want to know if they'd pay a delivery fee.</div>
+  <div class="agent"><div class="mini" id="echo"></div>
+    <div class="body">
+      <p>Good decision to test. Before I draft questions, what would you do differently depending on the answer?</p>
+      <div class="opts" role="group" aria-label="Decision">
+        <button class="opt" aria-pressed="true">Set the fee price</button>
+        <button class="opt" aria-pressed="false">Decide fee vs. subscription</button>
+        <button class="opt" aria-pressed="false">Something else</button>
+      </div>
+      <span class="ev-cap">I'll add this to your brief as the decision.</span>
+    </div>
+  </div>
+  <div class="composer"><textarea class="ev-input" rows="2" placeholder="Reply, or paste your own questions"></textarea>
+    <button class="send" aria-label="Send"><i class="ph-bold ph-arrow-up"></i></button></div>
+</div>
+<script>window.EnvoiLabs.Echo(document.getElementById('echo'),{state:'idle'});</script>
+</body></html>

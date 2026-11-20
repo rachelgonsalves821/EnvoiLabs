@@ -1,0 +1,32 @@
+<!-- @dsCard group="Researcher" height=470 -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Finding card</title>
+<style>
+.wrap{padding:var(--space-6);max-width:640px}
+.count{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-3)}
+.dots{display:flex;flex-wrap:wrap;gap:4px;max-width:260px}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--line);display:block}
+.dots i.on{background:var(--ink)}
+.quote{margin-top:var(--space-4);display:flex;gap:var(--space-3);align-items:flex-start}
+.play{width:36px;height:36px;flex:none;border-radius:50%;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+blockquote{margin:0;font-size:16px;line-height:24px}
+.who{margin-top:var(--space-2);display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center}
+</style></head>
+<body>
+<div class="wrap" id="root">
+  <article class="ev-card">
+    <div class="ev-row" style="justify-content:space-between"><span class="ev-chip ev-chip-good"><i class="ph-bold ph-seal-check"></i>High confidence</span><span class="ev-cap">Theme 1 of 4</span></div>
+    <h3 class="ev-h2" style="margin-top:var(--space-3)">A fee feels fair under $3, unfair once it beats walking to the store</h3>
+    <div class="count"><div class="dots" id="dots" aria-hidden="true"></div><span class="ev-label ev-num">11 of 20 said this</span></div>
+    <div class="ev-well quote">
+      <button class="play" aria-label="Play clip, 0:12"><i class="ph-fill ph-play"></i></button>
+      <div><blockquote>"If it's like two bucks I don't even think about it. Five bucks and I'm putting my shoes on."</blockquote>
+        <div class="who"><span class="ev-cap">Respondent 07, junior, on campus</span><span class="ev-chip ev-chip-good" style="height:22px;font-size:12px"><i class="ph-bold ph-check"></i>Quality 92</span></div></div>
+    </div>
+    <p class="ev-small" style="margin:var(--space-4) 0 0"><a class="ev-link" href="#">See all 11 quotes</a></p>
+  </article>
+</div>
+<script>
+var d=document.getElementById('dots');for(var i=0;i<20;i++){var e=document.createElement('i');if(i<11)e.className='on';d.appendChild(e);}
+</script>
+</body></html>

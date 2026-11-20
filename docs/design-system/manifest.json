@@ -1,0 +1,88 @@
+{
+  "manifestVersion": 3,
+  "name": "Envoi Labs",
+  "namespace": "EnvoiLabs",
+  "files": [
+    "components/AgentChat/README.md",
+    "components/Button/README.md",
+    "components/EarningsChip/README.md",
+    "components/Echo/README.md",
+    "components/FillTracker/README.md",
+    "components/FindingCard/README.md",
+    "components/InviteCard/README.md",
+    "components/ResearcherScoping/README.md",
+    "components/RespondentInterview/README.md",
+    "components/StatusChip/README.md",
+    "components/StudyBrief/README.md",
+    "components/VoiceAnswer/README.md",
+    "components/bundle.css",
+    "components/bundle.js",
+    "tokens.css"
+  ],
+  "libraries": [],
+  "components": [
+    {
+      "name": "Echo",
+      "group": "Signature",
+      "summary": "The Echo is Envoi Labs's signature 3D object, a glossy pink sound blob that is the record button for respondents and the agent's presence for researchers."
+    },
+    {
+      "name": "AgentChat",
+      "group": "Researcher",
+      "summary": "The scoping conversation between a researcher and the Envoi agent, the left half of the scoping screen."
+    },
+    {
+      "name": "Button",
+      "group": "Actions",
+      "summary": "Pill-shaped buttons in four variants, verb first and sentence case."
+    },
+    {
+      "name": "EarningsChip",
+      "group": "Rewards",
+      "summary": "The lime pill that tells a respondent what they will earn, paired with the question progress track."
+    },
+    {
+      "name": "FillTracker",
+      "group": "Researcher",
+      "summary": "The live progress card on a launched study, showing how far fieldwork has come and whether it will fill on time."
+    },
+    {
+      "name": "FindingCard",
+      "group": "Researcher",
+      "summary": "One theme in a study report, stated as a claim with the evidence that backs it."
+    },
+    {
+      "name": "InviteCard",
+      "group": "Respondent",
+      "summary": "The offer a respondent sees before accepting a study, built so the decision takes three seconds."
+    },
+    {
+      "name": "ResearcherScoping",
+      "group": "Screens",
+      "summary": "The researcher's first screen, a conversation with the agent on the left and the study brief building itself on the right.",
+      "page": true
+    },
+    {
+      "name": "RespondentInterview",
+      "group": "Screens",
+      "summary": "The core respondent screen, one interview question answered by voice on a phone.",
+      "page": true
+    },
+    {
+      "name": "StatusChip",
+      "group": "Status",
+      "summary": "Small pills for state, criteria and labels, always a word with an optional icon."
+    },
+    {
+      "name": "StudyBrief",
+      "group": "Researcher",
+      "summary": "The live one-page brief that fills in beside the scoping chat and ends in the quote, the right half of the scoping screen."
+    },
+    {
+      "name": "VoiceAnswer",
+      "group": "Respondent",
+      "summary": "How a respondent's spoken answer, the agent's live follow-up and the recording state appear in the interview thread."
+    }
+  ],
+  "assetGroups": []
+}

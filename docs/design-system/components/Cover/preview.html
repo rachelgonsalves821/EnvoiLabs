@@ -1,0 +1,51 @@
+<!-- @dsCard height=300 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Envoi Labs</title>
+<style>
+  html, body { margin:0; height:100%; }
+  body { background:var(--fog); color:var(--ink); overflow:hidden; }
+  .cover { position:relative; width:960px; height:300px; overflow:hidden; }
+  .art { position:absolute; top:0; left:480px; width:480px; height:300px; overflow:hidden; }
+  .art svg { display:block; width:480px; height:300px; }
+  .pulse { fill:var(--pulse); }
+  .wash { fill:var(--pulse-wash); }
+  .ink { fill:var(--ink); }
+  .zest { fill:var(--zest); }
+  .tide { fill:var(--tide); }
+  .ring { fill:none; stroke:var(--pulse-edge); stroke-width:2; }
+  .words { position:absolute; left:var(--space-8); bottom:var(--space-8); max-width:440px; }
+  .name { margin:0; font-family:"Manrope", system-ui, sans-serif; font-size:84px; line-height:.94; font-weight:700; letter-spacing:-0.05em; color:var(--ink); }
+  .tag { margin:var(--space-3) 0 0 4px; font-family:"Manrope", system-ui, sans-serif; font-size:14px; line-height:20px; color:var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 300" width="480" height="300">
+<!--
+  blocks      pulse disc r=112 (the Echo silhouette, largest, bleeding off the top) · ink slab 128×236 radius-lg (28) bleeding off the bottom right · pulse-wash disc r=48 (the tint) · zest pill 112×32 radius-pill (money, small) · tide disc r=16 (data, smallest)
+  arrangement one big disc with satellites, ink slab anchoring the right edge, everything right of x=480 in the 960 layout
+  pattern     concentric arcs from "Voice first", the sound rings around the Echo: four pulse-edge rings at a space-6 (24px) pitch, cut by the ink slab
+  scales      ring pitch space-6; gutters space-4 and space-6; slab corner radius-lg; pill rx = half its 32px height (radius-pill)
+-->
+<circle class="ring" cx="176" cy="88" r="136"/>
+<circle class="ring" cx="176" cy="88" r="160"/>
+<circle class="ring" cx="176" cy="88" r="184"/>
+<circle class="ring" cx="176" cy="88" r="208"/>
+<circle class="pulse" cx="176" cy="88" r="112"/>
+<circle class="wash" cx="64" cy="244" r="48"/>
+<rect class="ink" x="336" y="104" width="128" height="236" rx="28"/>
+<rect class="zest" x="200" y="236" width="112" height="32" rx="16"/>
+<circle class="tide" cx="400" cy="64" r="16"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">Envoi<br>Labs</h1>
+<p class="tag">Real customers, before your next move.</p>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!-- @dsCard group="Respondent" height=330 -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Voice answer</title>
+<style>
+.wrap{padding:var(--space-6);max-width:420px;display:flex;flex-direction:column;gap:var(--space-4)}
+.ans{background:var(--ink);color:var(--on-ink);border-radius:var(--radius-lg);border-bottom-right-radius:8px;padding:var(--space-3) var(--space-4);align-self:flex-end;max-width:86%}
+.ans .ev-wave span{background:var(--on-ink)}
+.ans .top{display:flex;align-items:center;gap:var(--space-3)}
+.play{width:36px;height:36px;border-radius:50%;border:0;background:var(--pulse);color:var(--on-pulse);display:grid;place-items:center;cursor:pointer}
+.ans p{margin:var(--space-2) 0 0;font-size:14px;line-height:20px;opacity:.86}
+.followup{display:flex;gap:var(--space-3);align-items:flex-start}
+.followup .mini{width:40px;height:40px;flex:none}
+.followup p{margin:0;font-size:18px;line-height:28px}
+.rec{display:flex;align-items:center;gap:var(--space-3);background:var(--pulse-wash);border-radius:var(--radius-pill);padding:6px 16px 6px 6px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--critical)}
+</style></head>
+<body>
+<div class="wrap" id="root">
+  <div class="ans" aria-label="Your answer, 0:38">
+    <div class="top"><button class="play" aria-label="Play your answer"><i class="ph-fill ph-play"></i></button>
+      <div class="ev-wave" id="w"></div><span class="ev-cap ev-num" style="color:inherit">0:38</span></div>
+    <p>"Honestly it's usually after 11, when the dining hall's closed and I just want something salty…"</p>
+  </div>
+  <div class="followup"><div class="mini" id="echo"></div><p>What made you pick that app over just walking to the store?</p></div>
+  <div class="rec" role="status"><span class="dot"></span><span class="ev-label">Recording</span><div class="ev-wave" id="w2"></div><span class="ev-cap ev-num" style="margin-left:auto">0:07</span></div>
+</div>
+<script>
+function bars(id,n,seed){var w=document.getElementById(id);for(var i=0;i<n;i++){var s=document.createElement('span');var h=6+Math.abs(Math.sin(i*seed)*Math.cos(i*0.7))*20;s.style.height=h+'px';w.appendChild(s);}}
+bars('w',26,1.7);bars('w2',18,2.3);
+window.EnvoiLabs.Echo(document.getElementById('echo'),{state:'think'});
+</script>
+</body></html>

@@ -1,0 +1,36 @@
+<!-- @dsCard group="Respondent" height=440 -->
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Invite card</title>
+<style>
+.wrap{padding:var(--space-6);max-width:390px}
+.meta{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:var(--space-6);margin:var(--space-4) 0}
+.meta b{display:block;font-family:var(--font-display);font-size:24px;line-height:28px;letter-spacing:-0.02em}
+.meta b.money{color:var(--zest-deep)}
+.why{display:flex;gap:var(--space-2);align-items:flex-start}
+.why i{color:var(--pulse-edge);font-size:18px;margin-top:2px}
+.actions{display:flex;gap:var(--space-2);margin-top:var(--space-6)}
+.actions .ev-btn-pulse{flex:1}
+</style></head>
+<body>
+<div class="wrap" id="root">
+  <article class="ev-float" aria-labelledby="t">
+    <div class="ev-row" style="justify-content:space-between">
+      <span class="ev-chip ev-chip-warn"><i class="ph-bold ph-clock"></i>Ends in 23 h</span>
+      <span class="ev-cap">New match</span>
+    </div>
+    <h2 class="ev-h2" id="t" style="margin-top:var(--space-4)">How you shop for snacks late at night</h2>
+    <div class="meta">
+      <div><span class="ev-cap">You get</span><b class="money ev-num">$7</b></div>
+      <div><span class="ev-cap">Time</span><b class="ev-num">8 min</b></div>
+      <div><span class="ev-cap">Questions</span><b class="ev-num">6</b></div>
+    </div>
+    <div class="ev-well why ev-small"><i class="ph-bold ph-sparkle"></i><span>You said you order food online most weeks. That's exactly who they want to hear from.</span></div>
+    <p class="ev-cap" style="margin:var(--space-3) 0 0"><i class="ph ph-lock-simple"></i> Your voice is turned into text. Researchers never see your name or number.</p>
+    <div class="actions">
+      <button class="ev-btn ev-btn-secondary">Not for me</button>
+      <button class="ev-btn ev-btn-pulse"><i class="ph-bold ph-microphone"></i>Start answering</button>
+    </div>
+  </article>
+</div>
+<script>document.getElementById('root').setAttribute('data-ready','1');</script>
+</body></html>
