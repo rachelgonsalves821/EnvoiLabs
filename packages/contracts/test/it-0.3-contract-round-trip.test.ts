@@ -18,6 +18,24 @@ describe("IT-0.3 public contract round trip", () => {
     }
   });
 
+  it("requires exactly four questions for the Gate 1 study slice", () => {
+    const study = {
+      title: "Delivery study",
+      targetCompletes: 5,
+      criteria: [{ kind: "must", text: "Orders delivery" }, { kind: "exclude", text: "Works for app" }],
+      coreQuestions: ["When did you last order?", "What did you order?", "How did you choose?",
+        "What happened next?"],
+    };
+
+    expect(contracts.CreateGate1StudyRequestSchema.parse(study)).toEqual(study);
+    expect(contracts.CreateGate1StudyRequestSchema.safeParse({
+      ...study, coreQuestions: study.coreQuestions.slice(0, 3),
+    }).success).toBe(false);
+    expect(contracts.CreateGate1StudyRequestSchema.safeParse({
+      ...study, coreQuestions: [...study.coreQuestions, "What would you do next time?"],
+    }).success).toBe(false);
+  });
+
   it("keeps raw identifiers and transcript text outside researcher responses", () => {
     const id = "11111111-1111-4111-8111-111111111111";
     expect(contracts.ResearcherTranscriptListSchema.safeParse({
