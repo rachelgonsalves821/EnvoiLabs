@@ -89,13 +89,35 @@ test.describe("local Auth with synthetic fixtures", () => {
     });
     expect(membership.error).toBeNull();
 
-    const link = await service.auth.admin.generateLink({ type: "magiclink", email });
-    if (link.error || !link.data.properties?.hashed_token) throw new Error("Could not generate the synthetic sign-in link.");
-    const callback = new URL("/api/researcher/auth/callback", origin);
-    callback.searchParams.set("token_hash", link.data.properties.hashed_token);
-    callback.searchParams.set("type", "email");
+    await page.goto("/app/sign-in");
+    await page.getByLabel("Email address").fill(email);
+    await page.getByRole("button", { name: "Send sign-in link" }).click();
+    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
 
-    await page.goto(callback.toString());
+    const mailpit = "http://127.0.0.1:54324";
+    let messageId: string | undefined;
+    await expect.poll(async () => {
+      const response = await page.request.get(mailpit + "/api/v1/search", { params: { query: "to:" + email } });
+      if (!response.ok()) throw new Error("The disposable mail server could not search messages.");
+      const inbox: { messages: { ID: string }[] } = await response.json();
+      messageId = inbox.messages[0]?.ID;
+      return Boolean(messageId);
+    }, { timeout: 15_000, message: "A sign-in email should arrive for the synthetic researcher" }).toBe(true);
+
+    if (!messageId) throw new Error("The local sign-in email is missing.");
+    const message = await page.request.get(mailpit + "/api/v1/message/" + encodeURIComponent(messageId));
+    if (!message.ok()) throw new Error("Could not open the local sign-in email.");
+    const delivered: { HTML: string } = await message.json();
+    const href = await page.evaluate((html) => new DOMParser().parseFromString(html, "text/html")
+      .querySelector("a")?.getAttribute("href"), delivered.HTML);
+    if (!href) throw new Error("The local sign-in email did not contain a link.");
+    const callback = new URL(href);
+    if (callback.origin !== origin || callback.pathname !== "/api/researcher/auth/callback") {
+      const isDefault = callback.pathname.endsWith("/verify");
+      throw new Error(isDefault ? "Supabase delivered its default link instead of the app template."
+        : "The delivered template did not point to the local researcher callback.");
+    }
+    await page.goto(callback.href);
     await expect(page).toHaveURL(/\/app\/mfa$/);
     await page.goto("/app");
     await expect(page).toHaveURL(/\/app\/mfa$/);

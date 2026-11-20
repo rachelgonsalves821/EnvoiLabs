@@ -26,6 +26,10 @@ additional_redirect_urls = ["http://127.0.0.1:3100/api/researcher/auth/callback"
 enable_signup = true
 enable_confirmations = false
 
+[auth.email.template.magic_link]
+subject = "Your Envoi Labs sign-in link"
+content_path = "./supabase/templates/magic-link.html"
+
 [auth.sms]
 enable_signup = true
 enable_confirmations = true

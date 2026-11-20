@@ -19,9 +19,13 @@ mkdir -- "$test_dir/supabase"
   cat -- "$db_dir/scripts/auth-test-config.toml"
 } >"$test_dir/supabase/config.toml"
 cp -R -- "$db_dir/migrations" "$test_dir/supabase/migrations"
+cp -R -- "$db_dir/templates" "$test_dir/supabase/templates"
+# Kong runs as a separate UID and serves this public email template to local Auth.
+chmod 755 "$test_dir/supabase/templates"
+chmod 644 "$test_dir/supabase/templates/magic-link.html"
 
 # Startup and status can print credentials. Keep their output out of the CI log.
-if ! supabase start --workdir "$test_dir" >/dev/null 2>&1; then
+if ! (umask 022; supabase start --workdir "$test_dir") >/dev/null 2>&1; then
   printf '%s\n' 'The disposable Supabase stack failed to start and apply migrations.' >&2
   docker ps --all --filter "name=$project_id" --format '{{.Names}}: {{.Status}}' >&2 || true
   exit 1
