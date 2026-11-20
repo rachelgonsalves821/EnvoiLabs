@@ -1,0 +1,51 @@
+:global(body):has(.screen) { margin: 0; }
+
+.screen {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--fog);
+  color: var(--ink);
+  font: var(--text-body);
+}
+
+.panel {
+  box-sizing: border-box;
+  width: min(100%, 30rem);
+  padding: clamp(var(--space-4), 6vw, var(--space-8));
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.brand { margin: 0 0 var(--space-8); font: var(--text-h2); letter-spacing: -0.04em; }
+.panel h1 { margin: 0 0 var(--space-2); font: var(--text-h1); letter-spacing: -0.03em; }
+.hint { margin: 0 0 var(--space-5); color: var(--ink-muted); }
+.form { display: grid; gap: var(--space-3); }
+.form label, .keyLabel { font: var(--text-label); }
+.form input, .panel button, .panel a { box-sizing: border-box; min-height: 44px; font: inherit; }
+.form input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+.panel button {
+  justify-self: start;
+  padding: var(--space-2) var(--space-4);
+  color: var(--paper);
+  background: var(--ink);
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.panel button:disabled { opacity: 0.65; cursor: wait; }
+.panel a { display: inline-flex; align-items: center; color: var(--ink); }
+.panel :is(input, button, a):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.error { margin: var(--space-3) 0; color: var(--critical); }
+.key { display: block; padding: var(--space-3); background: var(--paper-sunk); overflow-wrap: anywhere; user-select: all; }
+.secondary { margin-top: var(--space-4); }
