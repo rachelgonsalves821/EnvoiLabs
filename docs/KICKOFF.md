@@ -26,6 +26,8 @@ This is for Rachel. It explains how to set up, start and supervise the three age
 
 ## 3. Kickoff prompts (paste one into each agent)
 
+For UI work in any lane, read [the UI resource registry](UI_RESOURCES.md) before design or implementation.
+
 **Agent 1, Platform**
 ```
 You are Agent 1 (Platform) on Envoi Labs. Read AGENTS.md, docs/PRD.md, docs/BUILD_PLAN.md and docs/agents/AGENT_1_PLATFORM.md in that order.

@@ -20,6 +20,7 @@ You are one of three coding agents building Envoi Labs, a voice-first AI market 
 - Use fakes from `packages/testing/fakes` for anything not built yet, and log each one in `docs/DEBT.md`.
 - Tag PR titles `[MONEY]` for pricing, payouts or Stripe, `[PRIVACY]` for redaction, consent, PII or RLS, and `[COPY]` for user-facing claims. Rachel reviews these before merge.
 - Price is $1 per core question per respondent (PRD section 10). Never hard-code it. Read it from `pricing_configs`.
+- For every UI task, follow the design system and the workflow in [UI resource registry](docs/UI_RESOURCES.md). List the references used and the resulting design decisions in the PR.
 
 ## Keep the PRD alive
 - Set a requirement to `In progress` with your agent name when you start it.
