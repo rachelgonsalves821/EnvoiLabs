@@ -22,8 +22,8 @@
 .ev-button[data-variant=secondary] { background: var(--paper); border-color: var(--line-strong); box-shadow: none; color: var(--ink); }
 .ev-button[data-variant=ghost] { background: transparent; box-shadow: none; color: var(--ink); }
 .ev-button[data-size=small] { min-block-size: 36px; }
-.ev-button:active:not(:disabled) { transform: scale(0.97); }
-.ev-button:disabled { cursor: default; opacity: 0.45; }
+.ev-button:active:not(:disabled, [aria-disabled=true]) { transform: scale(0.97); }
+.ev-button:is(:disabled, [aria-disabled=true]) { cursor: default; opacity: 0.45; }
 .ev-button:focus-visible, .ev-field input:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -119,5 +119,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ev-button, .ev-sheet[data-state=open] { animation: none; transition: none; }
-  .ev-button:active:not(:disabled) { transform: none; }
+  .ev-button:active:not(:disabled, [aria-disabled=true]) { transform: none; }
 }
