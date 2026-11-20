@@ -19,6 +19,7 @@ mkdir -- "$test_dir/supabase"
   cat -- "$db_dir/scripts/auth-test-config.toml"
 } >"$test_dir/supabase/config.toml"
 cp -R -- "$db_dir/migrations" "$test_dir/supabase/migrations"
+cp -R -- "$db_dir/templates" "$test_dir/supabase/templates"
 
 # Startup and status can print credentials. Keep their output out of the CI log.
 if ! supabase start --workdir "$test_dir" >/dev/null 2>&1; then
