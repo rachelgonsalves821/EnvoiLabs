@@ -10,9 +10,10 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
-    "e2e": "turbo run e2e"
+    "e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "1.58.2",
     "eslint": "9.39.1",
     "turbo": "2.11.13",
     "typescript": "5.9.3",
