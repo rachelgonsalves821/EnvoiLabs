@@ -24,7 +24,7 @@ You build what founders touch, from the first scoping message to the report, and
 3. Structured output only. Every agent returns data validated by a contract schema. On validation failure retry once with the error, then fail safe.
 4. No LLM ever outputs a price, a payout amount or a quality decision. It may output signals that `packages/core` turns into decisions.
 5. Researcher-facing AI only reads `redacted_text`. Raw transcripts are read only by the redaction job and the interviewer (respondent side).
-6. Fixture-replay mode for tests. Record real responses to `packages/ai/fixtures` with a script, replay them in CI by request hash.
+6. Fixture-replay mode for tests. Record responses from synthetic or expressly approved test inputs and replay them in CI by request hash. Keep participant data out of the repo and CI logs.
 7. Fail-safe defaults. If the interviewer fails or times out, the interview continues without a probe. If analysis fails, the study shows "Report in progress" and retries.
 
 ## Gate 0 tasks (week 1)
@@ -34,9 +34,9 @@ You build what founders touch, from the first scoping message to the report, and
 4. Researcher auth screens (magic link, TOTP setup) using Agent 1's helpers.
 
 ## Gate 1 tasks (weeks 2 to 3) → R-RSCH-07 partial, R-RSCH-10 partial, R-PLAT-07
-1. **Minimal study form** (temporary, replaced by scoping in Gate 2). Title, target completes, 2 criteria, 3 guide questions, launch with `skip_payment` flag in non-prod.
+1. **Minimal study form** (temporary, replaced by scoping in Gate 2). Title, target completes, 2 criteria, 4 core guide questions, launch with `skip_payment` flag in non-prod.
 2. **Transcription job** on `answer.uploaded`. Fetch audio from storage, transcribe with timeout 20 s, fallback provider on error, store transcript with metadata, emit `transcript.ready`.
-3. **Redaction v1** (R-PLAT-07). Deterministic pass first (regex for phones, emails, URLs, street addresses), then an LLM pass for names, employers, schools and other identifiers, replacing with tags like `[name]`, `[employer]`. Store `redacted_text`. Raw text stays in the PII schema.
+3. **Redaction v1** (R-PLAT-07). Follow BUILD_PLAN sections 11 and 12. Evaluate Presidio with Platform, run the approved contextual pass, and publish `redacted_text` only after both checks pass. Raw text stays in the PII schema.
 4. **Tracking page v1** (R-RSCH-07). Counts from services, live updates via Supabase Realtime, sample composition table, removals list.
 5. **Transcript viewer** (R-RSCH-10 partial). Redacted transcripts per respondent with profile descriptor (never name).
 6. Researcher half of `IT-1.1`, plus `IT-1.2` jointly with Agent 1.
@@ -53,7 +53,7 @@ You build what founders touch, from the first scoping message to the report, and
 3. **Quote and feasibility UI** (R-RSCH-05). Calls Agent 1's `quoteStudy`. Shows total in the stat style, line items, feasibility sentence with a status chip. "Approve and pay $140" button repeats the amount (7 questions × 20 respondents × $1).
 4. **Checkout UI** (R-RSCH-06). Redirect to Stripe Checkout, success page that waits for the webhook state change, cancel page.
 5. **Quality signals.** An LLM judge in `packages/ai/quality` scores each transcript for specificity and relevance (0 to 100 each) against the guide question, plus the consistency check result for the re-asked profile fact. Emit `QualitySignals`. Agent 1's quality hold turns these into a decision.
-6. **Interviewer agent v1** (PRD 7.2) for the first real study.
+6. **Interviewer agent v1** (PRD 7.2) for the first real study. Record the OpenInterviewer review before implementation and verify the complete probe path with Agent 2.
    - Triggered on `transcript.ready` for core-question answers.
    - Input is the guide question, the transcript, prior answers in this session and the study goal.
    - Output `ProbeDecision { action: 'probe' | 'next', text? }`. Max 2 probes per core question. Never leading. Never reveals the client.
@@ -63,7 +63,7 @@ You build what founders touch, from the first scoping message to the report, and
 
 ## Gate 3 tasks (weeks 6 to 7) → R-RSCH-08, 09, 11, R-RESP-08 backend
 1. **Analyst agent** (PRD 7.3). Map step codes each redacted transcript against hypotheses and guide questions. Reduce step builds a `ThemeSet`. Confidence rules exactly as the PRD. Hypothesis scores supported, weakened or untested.
-2. **Evidence verification.** Every quote must match an exact span in a stored redacted transcript (`start_char`, `end_char`). Drop and log any quote that does not. `IT-3.2`.
+2. **Evidence verification.** Review OpenVerbatim's evidence-location pattern. Every quote must match an exact span in the redacted source version for that study (`start_char`, `end_char`). Drop invalid evidence and invalidate published references when the source changes or is withdrawn. `IT-3.2`.
 3. **Report UI** (R-RSCH-08). Executive answer first, then FindingCards (claim, dot strip, "11 of 20 said this", confidence chip, one lead quote with clip if consented), segment cuts, contradictions, methods appendix (sample against spec, removals, guide). Counts only below 30 completes.
 4. **Next-study proposal** (R-RSCH-09). A `Brief` draft from the analyst, opened in the scoping screen pre-filled, launchable in two clicks after quote.
 5. **Honest labels** (R-RSCH-11). "Directional qualitative" on every study and report. "Student convenience sample" when over 50% of completes are students.

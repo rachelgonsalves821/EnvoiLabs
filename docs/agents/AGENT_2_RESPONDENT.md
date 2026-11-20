@@ -40,7 +40,7 @@ Source of truth is the [Envoi Labs design system](https://claude.ai/artifact/JfV
 
 ## Gate 1 tasks (weeks 2 to 3) → R-RESP-01, 02, 03, 04, 06, 07
 1. **Profile** (R-RESP-02). 6 to 8 questions from a config file in `packages/contracts/profile-questions.ts` (owned by Agent 1, you propose content via `[CONTRACT]` PR). Tap answers, optional voice. Saves through services.
-2. **Consent** (R-RESP-03). One screen, four toggles with plain language, links to full text. Recording and transcription are required to take interviews. Researcher access and voice clip sharing are separate. Store `text_version`.
+2. **Consent** (R-RESP-03). One screen, four toggles with plain language, links to full text. Enforce consent for recording and transcription before accepting voice. Keep researcher access and voice sharing separate. Preserve typed answers and confirm study eligibility rules with Platform. Store `text_version`.
 3. **Home and invite card** (R-RESP-04). Invite list sorted by expiry. Card content and order exactly as the design system InviteCard. "Not for me" with optional reason chips.
 4. **Interview screen** (R-RESP-06).
    - One question per screen. Top bar has `ProgressTrack` and `EarningsChip`. Topic line, question in display style, hint line.
@@ -64,10 +64,11 @@ Source of truth is the [Envoi Labs design system](https://claude.ai/artifact/JfV
 4. **Receipt and payout** (R-RESP-10). Instant receipt screen with the Echo in `payout` state and the amount counting up once over 700ms. "Pending quality check" with expected date. Gift card picker from Agent 1's catalog after the first approved complete. Payout history.
 5. **Points and levels** (R-RESP-11). Earnings screen with total, points with cash value, streak, next milestone. Never show money at risk.
 6. `IT-2.6` with Agent 1, plus respondent steps of `IT-2.1`.
+7. Before the first real study, add the baseline probe display and timeout with Agent 3, and run the mobile and privacy checks in BUILD_PLAN section 6.
 
 ## Gate 3 tasks (weeks 6 to 7) → R-RESP-08, 12, 13, 14
 1. **Full Echo.** WebGL fragment shader or three.js, matching the design system preview (glossy pulse body, peach highlight, lilac rim). States idle, listen (driven by mic level), think, sent, payout. Pause the render loop when off-screen or hidden. One still frame under reduced motion. Flat disc when WebGL is missing. Lazy-load the Echo chunk so it never blocks first paint.
-2. **Probe display** (R-RESP-08). After upload, Echo goes to `think`. Subscribe to `probe.ready` for the answer (Supabase Realtime or polling at 1 s). Show the probe within the same screen as a follow-up, then continue. If no probe arrives in 8 seconds, move on without it and log `probe.timeout`.
+2. **Probe display hardening** (R-RESP-08). After upload, Echo goes to `think`. Subscribe to `probe.ready` for the answer (Supabase Realtime or polling at 1 s). Show the probe within the same screen as a follow-up, then continue. If no probe arrives in 8 seconds, move on without it and log `probe.timeout`.
 3. **Privacy controls** (R-RESP-12). Delete account, export, stop invites, withdraw from a study, voice sharing per study. Each is a single clear screen with a confirmation for destructive actions.
 4. **WhatsApp waitlist** (R-RESP-13). Optional checkbox on signup, "Prefer to answer on WhatsApp? Join the waitlist."
 5. **Referrals** (R-RESP-14). Share link with native share sheet, referral status list.

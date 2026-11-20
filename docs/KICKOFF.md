@@ -4,7 +4,7 @@ This is for Rachel. It explains how to set up, start and supervise the three age
 
 ## 1. Setup (once)
 
-1. Create one GitHub repo. Unzip the build kit at the root so `AGENTS.md` and `docs/` are committed on `main`.
+1. Start from the latest `main` in EnvoiLabs. Read the current gate evidence in [STATUS](STATUS.md) and the tasks still open on [goal #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4).
 2. Give each agent its own working copy so they never edit the same files on disk.
    ```
    git worktree add ../envoi-platform   -b agent1/setup
@@ -16,6 +16,8 @@ This is for Rachel. It explains how to set up, start and supervise the three age
 4. Create accounts and put test keys in each worktree's `.env.local` (Agent 1 writes `.env.example` listing them). Supabase (one dev project for previews, local Supabase for each agent), Stripe test mode, Tremendous sandbox, Twilio test credentials, OpenAI, Anthropic, Groq, Sentry, Inngest, Vercel.
 
 ## 2. Start order
+
+The initial scaffold has merged. The Day 1 rows record the original setup sequence. Resume at the current gate in STATUS.
 
 | When | Who runs | Why |
 | --- | --- | --- |
@@ -31,21 +33,21 @@ For UI work in any lane, read [the UI resource registry](UI_RESOURCES.md) before
 **Agent 1, Platform**
 ```
 You are Agent 1 (Platform) on Envoi Labs. Read AGENTS.md, docs/PRD.md, docs/BUILD_PLAN.md and docs/agents/AGENT_1_PLATFORM.md in that order.
-Your first job is the repo scaffold from BUILD_PLAN section 3 (pnpm, Turborepo, empty packages with READMEs, CI running typecheck, lint and an empty test), then a first draft of packages/contracts. Open one PR for the scaffold and merge it as soon as CI is green, because Agents 2 and 3 are waiting on it.
+Resume from the merged foundations. Own hosted preview acceptance, reconcile the full Gate 0 checklist against evidence and line up the Gate 1 service and contract handoffs.
 Then work through your Gate 0 task list. Keep the PRD statuses current and append to docs/STATUS.md at the end of the session.
 ```
 
 **Agent 2, Respondent**
 ```
 You are Agent 2 (Respondent) on Envoi Labs. Read AGENTS.md, docs/PRD.md, docs/BUILD_PLAN.md and docs/agents/AGENT_2_RESPONDENT.md in that order. Read the last entries in docs/STATUS.md.
-Start with your Gate 0 tasks in packages/ui (token generation from the design system tokens.json, base components, the Echo component API with the static fallback) and the respondent shell. Use fakes from packages/testing for anything Agent 1 has not shipped yet and log each in docs/DEBT.md.
+Verify the merged respondent and UI foundations against Gate 0 evidence, then follow the respondent brief for the current gate. Use fakes from packages/testing for anything Agent 1 has not shipped yet and log each in docs/DEBT.md.
 Only edit files you own. Keep the PRD statuses current and append to docs/STATUS.md at the end of the session.
 ```
 
 **Agent 3, Researcher and AI**
 ```
 You are Agent 3 (Researcher and AI) on Envoi Labs. Read AGENTS.md, docs/PRD.md, docs/BUILD_PLAN.md and docs/agents/AGENT_3_RESEARCHER_AI.md in that order. Read the last entries in docs/STATUS.md.
-Start with your Gate 0 tasks in packages/ai (provider interfaces with fakes, prompt file structure, the eval harness) and the researcher shell. Use fakes for anything Agent 1 has not shipped yet and log each in docs/DEBT.md.
+Verify the merged researcher and AI foundations against Gate 0 evidence, then follow the researcher brief for the current gate. Use fakes for anything Agent 1 has not shipped yet and log each in docs/DEBT.md.
 Only edit files you own. Keep the PRD statuses current and append to docs/STATUS.md at the end of the session.
 ```
 

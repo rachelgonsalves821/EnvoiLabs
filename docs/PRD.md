@@ -242,7 +242,7 @@ Follow the design system at the link above. Summary for agents.
 | Gate 3 | End of week 7 | Probing, reports, quality, pilot with 30 to 50 respondents and 2 to 3 founders |
 | Gate 4 | End of week 8 | Launch hardening |
 
-Details in `docs/BUILD_PLAN.md`.
+See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for the acceptance criteria and the prerequisites for enrolling real respondents. Week numbers are planning targets.
 
 ## 14. Open questions
 

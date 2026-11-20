@@ -132,3 +132,11 @@ Next: Verify the first main artifact and record it on goal #4. Hosted sign-in re
 Needs from others: Dedicated Vercel and Supabase access and controlled test identities.
 Contract or schema changes: Package metadata and distribution only.
 Risks: CI artifacts follow the repository's retention policy.
+
+## 2026-11-20, Platform, build plan audit
+
+Done: Compared the build kit and standalone plan with the merged foundations. Updated gate criteria, pre-study checks, implementation boundaries and the three briefs. See the [audit](BUILD_PLAN_AUDIT.md).
+Next: Verify both hosted sign-in paths and reconcile the remaining Gate 0 evidence. Prepare Gate 1 acceptance scenarios while preview access is pending.
+Needs from others: Dedicated preview access and controlled test identities.
+Contract or schema changes: None.
+Risks: Hosted acceptance and live provider behavior remain unverified.
