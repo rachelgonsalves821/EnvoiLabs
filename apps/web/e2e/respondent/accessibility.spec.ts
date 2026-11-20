@@ -1,6 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 
-test.use({ serviceWorkers: "block", reducedMotion: "reduce" });
+test.use({ serviceWorkers: "block" });
 
 async function expectTouchTarget(control: Locator) {
   const box = await control.boundingBox();
@@ -44,6 +44,7 @@ test("keeps keyboard focus on the code request while it is pending and can retry
 });
 
 test("supports phone widths, reduced motion and keyboard navigation on the shell and signup", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/r");
   const echo = page.locator(".ev-echo");
   await expect(echo).toHaveCount(1);
