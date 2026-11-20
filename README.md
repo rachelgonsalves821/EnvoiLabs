@@ -8,3 +8,14 @@ Researchers pay $1 per core question per respondent. Live follow-up questions an
 - [Build plan](docs/BUILD_PLAN.md)
 - [Agent kickoff](docs/KICKOFF.md)
 - [Design reference](docs/design-system/README.md)
+
+## Local development
+
+Use Node.js 24 and pnpm 9.15.4. Install dependencies and start the web app from the repository root.
+
+```sh
+pnpm install
+pnpm dev
+```
+
+Run `pnpm typecheck`, `pnpm lint`, `pnpm test` and `pnpm build` before opening a pull request.
