@@ -1,0 +1,144 @@
+:global(body):has(.workspace) {
+  margin: 0;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr) 440px;
+  min-height: 100dvh;
+  background: var(--fog);
+  color: var(--ink);
+  font: var(--text-body);
+}
+
+.rail,
+.brief {
+  background: var(--paper);
+  padding: var(--space-6);
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  border-inline-end: 1px solid var(--line);
+}
+
+.brand {
+  font: var(--text-h2);
+  letter-spacing: -0.045em;
+}
+
+.skip {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.skip:not(:focus) {
+  clip-path: inset(50%);
+}
+
+.rail a {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding-inline: var(--space-3);
+  background: var(--paper-sunk);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: var(--text-label);
+  text-decoration: none;
+}
+
+.main {
+  padding: var(--space-8);
+}
+
+.main h1 {
+  margin: 0 0 var(--space-8);
+  font: var(--text-h1);
+  letter-spacing: -0.03em;
+}
+
+.scoping {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  max-width: 620px;
+}
+
+.echo {
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--pulse);
+  box-shadow: inset 0 0 0 1px var(--pulse-edge);
+}
+
+.scoping h2,
+.brief h2 {
+  margin: 0;
+  font: var(--text-h2);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.scoping p,
+.fields dd {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-muted);
+  font: var(--text-body-s);
+}
+
+.brief {
+  border-inline-start: 1px solid var(--line);
+}
+
+.fields {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+}
+
+.fields div {
+  padding: var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.fields dt {
+  font: var(--text-label);
+}
+
+.mobileBrief {
+  display: none;
+}
+
+.skip:focus-visible,
+.rail a:focus-visible,
+.mobileBrief summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: 152px minmax(0, 1fr) 340px; }
+  .main { padding: var(--space-6); }
+}
+
+@media (max-width: 899px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .rail { flex-direction: row; align-items: center; justify-content: space-between; padding: var(--space-4); border: 0; border-block-end: 1px solid var(--line); }
+  .brief { display: none; }
+  .mobileBrief { display: block; margin-top: var(--space-8); }
+  .mobileBrief summary { min-height: 44px; padding-inline: var(--space-2); line-height: 44px; cursor: pointer; }
+}
+
+@media (max-width: 430px) {
+  .main { padding: var(--space-4); }
+}
