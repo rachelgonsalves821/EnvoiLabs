@@ -131,7 +131,7 @@ Work proceeds in five gates. **At each gate, all feature work stops until the ga
 Exit criteria
 - [ ] Monorepo builds, CI runs typecheck, lint, unit tests, integration tests and Playwright on every PR in under 12 minutes
 - [ ] Supabase local runs in CI. Migrations apply from zero. Seed script creates 1 organization, 2 researchers, 60 respondents with varied profiles and 1 draft study
-- [ ] `packages/contracts` v1 published with schemas for every entity, every API request and response in Gate 1 scope, every event in PRD section 11, `BriefPatch`, `ProbeDecision`, `ThemeSet`
+- [ ] `packages/contracts` v1 published with schemas for every entity, every API request and response in Gate 1 scope, every event in PRD section 12, `BriefPatch`, `ProbeDecision`, `ThemeSet`
 - [ ] RLS policies on every table, with tests that a respondent cannot read another respondent's data and a researcher cannot read PII
 - [ ] Auth works for both user types locally and on the dedicated hosted preview. Use the [hosted sign-in procedure](../README.md#verify-sign-in-on-the-hosted-preview). Record the deployment commit and both outcomes before sign-off. Platform owns execution and tracks preview access and controlled test identities on [goal #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4).
 - [ ] `packages/ui` exports tokens (CSS variables generated from the design system `tokens.json`), Button, Chip, EarningsChip, and an Echo stub that renders the static fallback
@@ -139,7 +139,7 @@ Exit criteria
 - [ ] Fakes for Stripe, Tremendous, Twilio, LLM and transcription in `packages/testing/fakes`
 - [ ] Lint rules for the PII boundary, no `any`, no floats for money (named `cents` fields), and no cross-agent imports into app route folders
 
-Use merged CI and the existing auth, database, contract, UI and AI foundations as the starting point. In the gate evidence, link the local checks and mark hosted checks separately. Confirm coverage against each criterion, including any gap in the access matrix or eval harness. While preview access is pending, complete Gate 0 evidence and prepare Gate 1 contract and acceptance scenarios.
+Use merged CI and the existing auth, database, contract, UI and AI foundations as the starting point. In the gate evidence, link the local checks and mark hosted checks separately. Confirm coverage against each criterion, including any gap in the access matrix or eval harness. While preview access is pending, complete Gate 0 evidence and prepare Gate 1 contract and acceptance scenarios. See the [Gate 1 handoff](GATE_1_HANDOFF.md) for ownership, merge order and test coverage.
 
 Integration tests required
 - `IT-0.1` migrations up from zero, and seed is idempotent
@@ -202,7 +202,7 @@ Exit criteria
 - [ ] Privacy controls (delete, export, withdraw, voice sharing toggle) and the retention job
 - [ ] Echo in full WebGL with all states, reduced-motion and no-WebGL fallbacks
 - [ ] Accessibility pass with axe on all main screens, zero serious or critical issues
-- [ ] Pilot with 30 to 50 respondents and 2 to 3 founders completed, and metrics from PRD section 11 recorded in `STATUS.md`
+- [ ] Pilot with 30 to 50 respondents and 2 to 3 founders completed, and metrics from PRD section 12 recorded in `STATUS.md`
 
 Integration tests required
 - `IT-3.1` Playwright `gate3-full.spec.ts`, full journey including probes and report, with LLM in fixture-replay mode

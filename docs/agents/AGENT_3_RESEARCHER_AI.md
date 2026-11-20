@@ -43,7 +43,7 @@ You build what founders touch, from the first scoping message to the report, and
 
 ## Gate 2 tasks (weeks 4 to 5) → R-RSCH-01 to 06, R-PLAT-04 signals
 1. **Scoping agent** (R-RSCH-02, 03, 04).
-   - System prompt implements PRD 7.1 exactly. Question order is decision, hypotheses, must-have and nice-to-have criteria, exclusions, number of completes, stimulus, deadline.
+   - System prompt implements PRD 8.1 exactly. Question order is decision, hypotheses, must-have and nice-to-have criteria, exclusions, number of completes, stimulus, deadline.
    - Each turn returns `{ message, quickReplies[], briefPatch }`. Apply the patch through `packages/services` `updateBrief`, which validates and versions.
    - Criteria must be written as behavior in a time window ("ordered food after 10pm in the last 30 days"). If the researcher gives an identity label, the agent proposes a behavioral version.
    - Sizing detection. If the goal asks "how many", "what percent" or "market size", the agent explains in one or two sentences that interviews cannot size, and offers what they can answer.
@@ -53,7 +53,7 @@ You build what founders touch, from the first scoping message to the report, and
 3. **Quote and feasibility UI** (R-RSCH-05). Calls Agent 1's `quoteStudy`. Shows total in the stat style, line items, feasibility sentence with a status chip. "Approve and pay $140" button repeats the amount (7 questions × 20 respondents × $1).
 4. **Checkout UI** (R-RSCH-06). Redirect to Stripe Checkout, success page that waits for the webhook state change, cancel page.
 5. **Quality signals.** An LLM judge in `packages/ai/quality` scores each transcript for specificity and relevance (0 to 100 each) against the guide question, plus the consistency check result for the re-asked profile fact. Emit `QualitySignals`. Agent 1's quality hold turns these into a decision.
-6. **Interviewer agent v1** (PRD 7.2) for the first real study. Record the OpenInterviewer review before implementation and verify the complete probe path with Agent 2.
+6. **Interviewer agent v1** (PRD 8.2) for the first real study. Record the OpenInterviewer review before implementation and verify the complete probe path with Agent 2.
    - Triggered on `transcript.ready` for core-question answers.
    - Input is the guide question, the transcript, prior answers in this session and the study goal.
    - Output `ProbeDecision { action: 'probe' | 'next', text? }`. Max 2 probes per core question. Never leading. Never reveals the client.
@@ -62,7 +62,7 @@ You build what founders touch, from the first scoping message to the report, and
 7. Researcher steps of `IT-2.1`.
 
 ## Gate 3 tasks (weeks 6 to 7) → R-RSCH-08, 09, 11, R-RESP-08 backend
-1. **Analyst agent** (PRD 7.3). Map step codes each redacted transcript against hypotheses and guide questions. Reduce step builds a `ThemeSet`. Confidence rules exactly as the PRD. Hypothesis scores supported, weakened or untested.
+1. **Analyst agent** (PRD 8.3). Map step codes each redacted transcript against hypotheses and guide questions. Reduce step builds a `ThemeSet`. Confidence rules exactly as the PRD. Hypothesis scores supported, weakened or untested.
 2. **Evidence verification.** Review OpenVerbatim's evidence-location pattern. Every quote must match an exact span in the redacted source version for that study (`start_char`, `end_char`). Drop invalid evidence and invalidate published references when the source changes or is withdrawn. `IT-3.2`.
 3. **Report UI** (R-RSCH-08). Executive answer first, then FindingCards (claim, dot strip, "11 of 20 said this", confidence chip, one lead quote with clip if consented), segment cuts, contradictions, methods appendix (sample against spec, removals, guide). Counts only below 30 completes.
 4. **Next-study proposal** (R-RSCH-09). A `Brief` draft from the analyst, opened in the scoping screen pre-filled, launchable in two clicks after quote.
