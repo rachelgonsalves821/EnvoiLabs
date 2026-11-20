@@ -1,5 +1,29 @@
 {
   "name": "@envoi-labs/ui",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "scripts": {
+    "gen:tokens": "node scripts/tokens.mjs",
+    "gen:tokens:check": "node scripts/tokens.mjs --check",
+    "test": "pnpm gen:tokens:check && vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "cd ../.. && eslint packages/ui"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "1.3.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
 }
