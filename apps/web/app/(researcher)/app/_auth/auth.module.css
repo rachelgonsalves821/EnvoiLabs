@@ -22,7 +22,7 @@
 
 .brand { margin: 0 0 var(--space-8); font: var(--text-h2); letter-spacing: -0.04em; }
 .panel h1 { margin: 0 0 var(--space-2); font: var(--text-h1); letter-spacing: -0.03em; }
-.hint { margin: 0 0 var(--space-5); color: var(--ink-muted); }
+.hint { margin: 0 0 var(--space-6); color: var(--ink-muted); }
 .form { display: grid; gap: var(--space-3); }
 .form label, .keyLabel { font: var(--text-label); }
 .form input, .panel button, .panel a { box-sizing: border-box; min-height: 44px; font: inherit; }

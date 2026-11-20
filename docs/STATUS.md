@@ -28,6 +28,14 @@ Needs from others: Respondent and Researcher can use the draft contracts after t
 Contract or schema changes: Draft Brief, BriefPatch, GuideDraft, ScopingTurn, ProbeDecision, QualitySignals, ThemeSet, InvitePreview and InterviewProgress with parsing tests. The full v1 contracts are still in progress.
 Risks: The local environment could not reach the package registry to complete the monorepo install. The first GitHub CI run can generate the lockfile.
 
+## 2026-11-19 21:34, Agent 3 (Researcher and AI)
+
+Done: R-RSCH-01 sign-in and authenticator setup screens and browser specs. R-RSCH-02 to R-RSCH-04 offline baseline evals replay six fixtures across five suites.
+Next: Integrate the researcher auth service and browser harness, then verify both locally and in preview.
+Needs from others: Agent 1 authenticated workspace guard and routes for email start, confirmation and MFA.
+Contract or schema changes: Agreed researcher auth request and response shapes. No shared schema edits.
+Risks: Offline dependency cache could not install Next.js. Auth browser specs need the shared Playwright harness. Full eval fixture counts and live model and judge runs remain open.
+
 ## 2026-11-19 21:16, Agent 1 (Platform)
 Done: R-RESP-01 and R-RSCH-01 identity migration with tenant, self-only and MFA access boundaries. Added the first IT-0.2 pgTAP checks and a fresh-migration CI job.
 Next: Wire server-side signup and enrollment, expand the schema and access matrix, and add the Gate 0 seed.
