@@ -5,11 +5,11 @@ import { authCopy as copy } from "../copy";
 import { sendSignInLink } from "../_auth/auth-api";
 import styles from "../_auth/auth.module.css";
 
-export function SignInForm({ expired }: Readonly<{ expired: boolean }>) {
+export function SignInForm({ initialError }: Readonly<{ initialError: string }>) {
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState(expired ? copy.expiredLink : "");
+  const [error, setError] = useState(initialError);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
