@@ -123,7 +123,7 @@ Contracts frozen at Gate 0 (v1). After Gate 0, additive changes are fine. Breaki
 
 ## 6. Stage gates
 
-Work proceeds in five gates. **At each gate, all feature work stops until the gate's integration suite is green and its debt review is done.** Agent 1 runs the gate. The gate passes when every exit criterion is checked in `docs/STATUS.md` with evidence links and Rachel replies "Gate N passed" there. See `docs/KICKOFF.md` for how the agents are started and supervised.
+Work proceeds in five gates. **At each gate, all feature work stops until the gate's integration suite is green and its debt review is done.** Agent 1 runs the gate. After every exit criterion has evidence in `docs/STATUS.md`, Codex may record "Gate N passed" there under Rachel’s delegated sign-off. Share the gate result with Rachel and then start the next gate. See `docs/KICKOFF.md` for how the agents are started and supervised.
 
 ### Gate 0. Foundations (end of week 1)
 
@@ -258,7 +258,7 @@ Risks: <anything that might slip a gate>
 
 - **Blocked work.** If blocked by another agent for more than one session, use a fake, log the debt, and keep going on something else in your area.
 - **Merge order on conflicts.** Agent 1 merges contract and migration PRs first each day. Others rebase after.
-- **Escalate to Rachel** for anything in PRD section 5 (decided), anything touching money amounts, privacy promises or user-facing claims, and any requirement marked `Needs decision`.
+- **Record decisions** that affect PRD section 5, money, privacy, or user-facing claims and tag the relevant PR. Use the delegated review process. Escalate unresolved questions and actions that require Rachel’s direct access or participation.
 
 ## 10. Week by week
 

@@ -18,7 +18,7 @@ You are one of three coding agents building Envoi Labs, a voice-first AI market 
 - Never let researcher-facing code touch PII.
 - Money is integer cents. Time is UTC.
 - Use fakes from `packages/testing/fakes` for anything not built yet, and log each one in `docs/DEBT.md`.
-- Tag PR titles `[MONEY]` for pricing, payouts or Stripe, `[PRIVACY]` for redaction, consent, PII or RLS, and `[COPY]` for user-facing claims. Rachel reviews these before merge.
+- Tag PR titles `[MONEY]` for pricing, payouts or Stripe, `[PRIVACY]` for redaction, consent, PII or RLS, and `[COPY]` for user-facing claims. Codex may review and merge under Rachel’s standing delegation once the relevant checks pass. Record consequential decisions as delegated.
 - Price is $1 per core question per respondent (PRD section 10). Never hard-code it. Read it from `pricing_configs`.
 - For every UI task, follow the design system and the workflow in [UI resource registry](docs/UI_RESOURCES.md). List the references used and the resulting design decisions in the PR.
 
