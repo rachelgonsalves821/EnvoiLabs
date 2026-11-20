@@ -90,7 +90,7 @@ North star metric is **decision-ready studies delivered per week**. A study coun
 
 | ID | Requirement | Acceptance criteria | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| R-RESP-01 | Phone signup with one-time code | Phone number is the identity. No password. Code arrives by SMS. Duplicate numbers rejected. 18+ attestation captured. | Agent 2 | Not started | |
+| R-RESP-01 | Phone signup with one-time code | Phone number is the identity. No password. Code arrives by SMS. Duplicate numbers rejected. 18+ attestation captured. | Agent 2 with Agent 1 | In progress | |
 | R-RESP-02 | Profile of 6 to 8 questions | Answerable by tap or voice. Stored as structured profile attributes. Takes under 2 minutes. | Agent 2 | Not started | |
 | R-RESP-03 | Consent by purpose | Separate consent records for recording, third-party transcription, retention and researcher access. Versioned consent text. | Agent 2 | Not started | |
 | R-RESP-04 | Invite card | Shows reward, minutes, question count, time left, one-line "why you", privacy line. Accept or "Not for me". Declining never penalizes. | Agent 2 | Not started | |
@@ -109,7 +109,7 @@ North star metric is **decision-ready studies delivered per week**. A study coun
 
 | ID | Requirement | Acceptance criteria | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| R-RSCH-01 | Sign up and organization | Email magic link plus MFA (TOTP). One organization per researcher in v1. Terms acceptance recorded. | Agent 3 with Agent 1 | Not started | |
+| R-RSCH-01 | Sign up and organization | Email magic link plus MFA (TOTP). One organization per researcher in v1. Terms acceptance recorded. | Agent 3 with Agent 1 | In progress | |
 | R-RSCH-02 | Scoping chat | Agent asks one question at a time in order (decision, hypotheses, who, exclusions, how many, stimulus, deadline). Quick-reply chips. Researcher can paste their own questions. | Agent 3 | Not started | |
 | R-RSCH-03 | Live brief | Brief panel fills as the chat progresses. Every change is announced in chat. Researcher can edit fields directly. | Agent 3 | Not started | |
 | R-RSCH-04 | Sizing pushback | When a goal implies market sizing, the agent explains interviews cannot size and reframes. | Agent 3 | Not started | |

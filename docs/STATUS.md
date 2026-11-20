@@ -28,6 +28,13 @@ Needs from others: Respondent and Researcher can use the draft contracts after t
 Contract or schema changes: Draft Brief, BriefPatch, GuideDraft, ScopingTurn, ProbeDecision, QualitySignals, ThemeSet, InvitePreview and InterviewProgress with parsing tests. The full v1 contracts are still in progress.
 Risks: The local environment could not reach the package registry to complete the monorepo install. The first GitHub CI run can generate the lockfile.
 
+## 2026-11-19 21:16, Agent 1 (Platform)
+Done: R-RESP-01 and R-RSCH-01 identity migration with tenant, self-only and MFA access boundaries. Added the first IT-0.2 pgTAP checks and a fresh-migration CI job.
+Next: Wire server-side signup and enrollment, expand the schema and access matrix, and add the Gate 0 seed.
+Needs from others: RachelΓÇÖs privacy review before merge.
+Contract or schema changes: Added organizations, researcher membership, respondent identity and a server-only private phone table.
+Risks: The local Docker daemon was unavailable. The migration and pgTAP tests need their first GitHub CI run before this slice can merge.
+
 ## 2026-11-19, Gate 0 handoff
 
 Done: The [Platform scaffold](https://github.com/rachelgonsalves821/EnvoiLabs/pull/1) merged with passing CI. The [researcher and AI slice](https://github.com/rachelgonsalves821/EnvoiLabs/pull/2) and [respondent and shared UI slice](https://github.com/rachelgonsalves821/EnvoiLabs/pull/3) are in draft review.
