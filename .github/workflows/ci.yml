@@ -42,6 +42,9 @@ jobs:
           name: pnpm-lockfile
           path: pnpm-lock.yaml
           if-no-files-found: error
+      - name: Export the generated lockfile for the bootstrap commit
+        if: steps.install.outputs.generated-lockfile == 'true'
+        run: gzip -n -c pnpm-lock.yaml | base64 -w 1024 | sed 's/^/PUBLIC_LOCKFILE_BASE64 /'
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
