@@ -76,3 +76,11 @@ Next: Verify the PR checks and run both sign-in journeys on the hosted preview b
 Needs from others: Access to the dedicated Vercel and Supabase preview projects.
 Contract or schema changes: None.
 Risks: Runtime inputs still require integer validation at their service and schema boundaries.
+
+## 2026-11-20, Gate 0 integration handoff
+
+- Respondents can retry a stalled signup request, and verification requires explicit server confirmation. Keyboard users retain focus during a pending request and after a recoverable failure. The browser tests cover reduced motion, 44 px hit targets and 360, 390 and 430 px viewports. [Signup recovery](https://github.com/rachelgonsalves821/EnvoiLabs/pull/18) · [Accessibility checks](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44678457421)
+- Researchers can request a new sign-in link after an expired MFA session. A temporary identity provider outage returns a retryable service error. [MFA recovery](https://github.com/rachelgonsalves821/EnvoiLabs/pull/19) · [Auth service checks](https://github.com/rachelgonsalves821/EnvoiLabs/pull/22)
+- The local researcher journey now submits the sign-in form and opens the actual email captured by Mailpit before completing TOTP. The disposable Supabase suite also verifies respondent phone signup. [Delivered email change](https://github.com/rachelgonsalves821/EnvoiLabs/pull/20) · [Passing auth run](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44677957293)
+- The money lint rule catches fractional and unsafe numeric constants in cents fields. Runtime validation still belongs at service boundaries. [Rule and regression tests](https://github.com/rachelgonsalves821/EnvoiLabs/pull/21)
+- Gate 0 remains open. The remaining hosted acceptance evidence must show both respondent phone verification and researcher email plus TOTP using the dedicated Vercel and Supabase preview projects. No hosted sign-off was recorded in this handoff.
