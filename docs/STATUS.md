@@ -84,3 +84,11 @@ Risks: Runtime inputs still require integer validation at their service and sche
 - The local researcher journey now submits the sign-in form and opens the actual email captured by Mailpit before completing TOTP. The disposable Supabase suite also verifies respondent phone signup. [Delivered email change](https://github.com/rachelgonsalves821/EnvoiLabs/pull/20) · [Passing auth run](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44677957293)
 - The money lint rule catches fractional and unsafe numeric constants in cents fields. Runtime validation still belongs at service boundaries. [Rule and regression tests](https://github.com/rachelgonsalves821/EnvoiLabs/pull/21)
 - Gate 0 remains open. The remaining hosted acceptance evidence must show both respondent phone verification and researcher email plus TOTP using the dedicated Vercel and Supabase preview projects. No hosted sign-off was recorded in this handoff.
+
+## 2026-11-20, Platform, R-RSCH-01 and R-RESP-01
+
+Done: Added a Gate 0 lint check and regression cases for relative imports across respondent and researcher API folders. Researcher request timeout and confirmation coverage merged in #24.
+Next: Run both sign-in journeys on the dedicated hosted preview and record redacted evidence against the deployed commit.
+Needs from others: Dedicated Vercel and Supabase preview access, a test phone and mailbox, and a provisioned researcher with accepted terms.
+Contract or schema changes: None.
+Risks: Local delivery tests do not exercise the hosted sender or SMS configuration.
