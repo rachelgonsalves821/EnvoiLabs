@@ -39,6 +39,14 @@ Risks: Offline dependency cache could not install Next.js. Auth browser specs ne
 ## 2026-11-19 21:16, Agent 1 (Platform)
 Done: R-RESP-01 and R-RSCH-01 identity migration with tenant, self-only and MFA access boundaries. Added the first IT-0.2 pgTAP checks and a fresh-migration CI job.
 Next: Wire server-side signup and enrollment, expand the schema and access matrix, and add the Gate 0 seed.
-Needs from others: Rachel’s privacy review before merge.
+Needs from others: RachelΓÇÖs privacy review before merge.
 Contract or schema changes: Added organizations, researcher membership, respondent identity and a server-only private phone table.
 Risks: The local Docker daemon was unavailable. The migration and pgTAP tests need their first GitHub CI run before this slice can merge.
+
+## 2026-11-19, Gate 0 handoff
+
+Done: The [Platform scaffold](https://github.com/rachelgonsalves821/EnvoiLabs/pull/1) merged with passing CI. The [researcher and AI slice](https://github.com/rachelgonsalves821/EnvoiLabs/pull/2) and [respondent and shared UI slice](https://github.com/rachelgonsalves821/EnvoiLabs/pull/3) are in draft review.
+Next: Platform database, access policies, auth and fakes. Connect the respondent and researcher shells to auth and the researcher shell to the shared UI. Extend the provider and eval coverage.
+Needs from others: Platform auth and final Gate 0 contracts.
+Contract or schema changes: No changes in the two shell PRs.
+Risks: Browser and database integration evidence is still due for Gate 0 sign-off.
