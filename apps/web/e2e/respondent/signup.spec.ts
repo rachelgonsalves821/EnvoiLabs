@@ -124,7 +124,7 @@ test("protects account status and offers recovery for an expired link", async ({
   await page.goto("/r/status");
   await expect(page).toHaveURL(/\/r\/signup$/);
   await page.goto("/r/signup?error=expired");
-  await expect(page.getByRole("alert")).toHaveText(
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     "This link couldn’t sign you in. Request a new link and open it in this browser.",
   );
   await expect(page.getByRole("button", { name: sendLabel })).toBeVisible();
