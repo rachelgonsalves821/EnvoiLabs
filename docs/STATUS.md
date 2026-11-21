@@ -212,3 +212,15 @@ Needs from others. None for Gate 1 kickoff.
 Contract or schema changes. The v1 contract artifact includes respondent email-link start. The new provisioning function verifies the Auth email and preserves the respondent identity and original age confirmation on return.
 
 Risks. The hosted internal check uses Supabase's team-only sender. A dedicated email sender is required before external participant enrollment. The payment and incentive decisions remain scheduled for Gate 2.
+
+## 2026-11-21, Respondent, Gate 1 R-RESP-02 and R-RESP-03
+
+Done. Added a signed-in mobile profile and four separate privacy choices. The profile saves typed structured answers. Preview consent records the text version for each purpose and retains a history of changes. The respondent can review saved choices after returning.
+
+Next. Run the disposable Supabase browser and database checks. Connect eligible studies on Home and enforce current consent in the recording, transcription, retention and researcher access paths. Add optional spoken profile answers after the consented voice path is available.
+
+Needs from others. Platform matching and the consented voice intake path.
+
+Contract or schema changes. Reused the existing profile and consent request contracts. The migration adds two authenticated procedures that derive respondent identity from the session and serialize changes for the active account.
+
+Risks. This is the synthetic preview flow. Production consent text and processing still need the pre-study checks. See the [database checks](../packages/db/tests/respondent_onboarding.sql) and [disposable mobile browser scenario](../apps/web/e2e/auth-local.spec.ts).
