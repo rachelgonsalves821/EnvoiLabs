@@ -77,7 +77,11 @@ importers:
 
   packages/services: {}
 
-  packages/testing: {}
+  packages/testing:
+    devDependencies:
+      '@types/node':
+        specifier: 24.10.1
+        version: 24.10.1
 
   packages/ui:
     dependencies:
