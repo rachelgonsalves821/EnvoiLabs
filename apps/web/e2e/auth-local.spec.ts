@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
 const enabled = process.env.ENVOI_TEST_LOCAL_SUPABASE === "1";
+const useDefaultTemplate = process.env.ENVOI_AUTH_TEST_LINK === "pkce";
 const phone = "+12025550142";
 const smsCode = "012345";
 
@@ -92,7 +93,7 @@ test.describe("local Auth with synthetic fixtures", () => {
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `auth-smoke-${randomUUID()}@example.test`;
-    const created = await service.auth.admin.createUser({ email, email_confirm: true });
+    const created = await service.auth.admin.createUser({ email, email_confirm: !useDefaultTemplate });
     if (created.error || !created.data.user) throw new Error("Could not create the synthetic researcher.");
     const organization = await service.from("organizations").insert({ name: "Auth smoke fixture" }).select("id").single();
     if (organization.error || !organization.data) throw new Error("Could not create the synthetic organization.");
@@ -127,10 +128,16 @@ test.describe("local Auth with synthetic fixtures", () => {
       .querySelector("a")?.getAttribute("href"), delivered.HTML);
     if (!href) throw new Error("The local sign-in email did not contain a link.");
     const callback = new URL(href);
-    if (callback.origin !== origin || callback.pathname !== "/api/researcher/auth/callback") {
-      const isDefault = callback.pathname.endsWith("/verify");
-      throw new Error(isDefault ? "Supabase delivered its default link instead of the app template."
-        : "The delivered template did not point to the local researcher callback.");
+    if (useDefaultTemplate) {
+      const provider = loopbackOrigin(process.env.SUPABASE_URL);
+      if (callback.origin !== provider || callback.pathname !== "/auth/v1/verify"
+          || callback.searchParams.get("redirect_to") !== origin + "/api/researcher/auth/callback") {
+        throw new Error("The default link must verify on the disposable provider and return to the app.");
+      }
+      const cookies = await page.context().cookies();
+      expect(cookies.some(({ name, httpOnly }) => name.endsWith("-code-verifier") && httpOnly)).toBe(true);
+    } else if (callback.origin !== origin || callback.pathname !== "/api/researcher/auth/callback") {
+      throw new Error("The custom template did not point to the local researcher callback.");
     }
     await page.goto(callback.href);
     await expect(page).toHaveURL(/\/app\/mfa$/);

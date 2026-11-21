@@ -4,7 +4,7 @@ import { researcherCallback, researcherMfa, researcherStart } from "./researcher
 import { respondentAuth } from "./respondent";
 
 const calls = vi.hoisted(() => ({
-  commit: vi.fn(), signIn: vi.fn(), verifyOtp: vi.fn(), enroll: vi.fn(),
+  commit: vi.fn(), signIn: vi.fn(), verifyOtp: vi.fn(), exchangeCode: vi.fn(), enroll: vi.fn(),
   rpc: vi.fn(), maybeSingle: vi.fn(), getUser: vi.fn(), listFactors: vi.fn(),
 }));
 const origin = "https://example.test";
@@ -16,7 +16,7 @@ vi.mock("./supabase", () => ({
   privateHeaders: { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" },
   requestSession: () => ({
     client: { auth: {
-      signInWithOtp: calls.signIn, verifyOtp: calls.verifyOtp, getUser: calls.getUser,
+      signInWithOtp: calls.signIn, verifyOtp: calls.verifyOtp, exchangeCodeForSession: calls.exchangeCode, getUser: calls.getUser,
       mfa: { enroll: calls.enroll, listFactors: calls.listFactors },
     } },
     commit: calls.commit,
@@ -87,6 +87,26 @@ describe("auth handlers", () => {
         shouldCreateUser: false, emailRedirectTo: origin + "/api/researcher/auth/callback",
       },
     });
+  });
+
+  it("exchanges a browser-bound provider callback and still requires researcher membership", async () => {
+    const code = "f7370adf-aad5-47fd-bfab-ad372e4591e6";
+    const request = new NextRequest(origin + "/api/researcher/auth/callback?code=" + code);
+    const data = { user: { id: userId, email_confirmed_at: "2026-11-21" }, session: {} };
+    calls.exchangeCode.mockResolvedValueOnce({ data: null, error: { status: 400 } });
+    calls.exchangeCode.mockResolvedValue({ data, error: null });
+    const wrongBrowser = await researcherCallback(request);
+    expect(wrongBrowser.headers.get("Location")).toBe(origin + "/app/sign-in?error=expired");
+    expect(calls.commit).not.toHaveBeenCalled();
+    calls.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    const nonmember = await researcherCallback(request);
+    expect(nonmember.headers.get("Location")).toBe(origin + "/app/sign-in?error=expired");
+    expect(calls.commit).not.toHaveBeenCalled();
+    const member = await researcherCallback(request);
+    expect(member.headers.get("Location")).toBe(origin + "/app/mfa");
+    expect(calls.exchangeCode).toHaveBeenCalledWith(code);
+    expect(calls.verifyOtp).not.toHaveBeenCalled();
+    expect(calls.commit).toHaveBeenCalledOnce();
   });
 
   it("allows only provisioned researchers through the magic-link callback", async () => {

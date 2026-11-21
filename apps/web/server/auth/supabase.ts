@@ -34,7 +34,7 @@ export function trustedClient() {
   });
 }
 
-export function requestSession(request: NextRequest) {
+export function requestSession(request: NextRequest, { keepPendingVerifier = false } = {}) {
   const pending = new NextResponse();
   const values = new Map(request.cookies.getAll().map(({ name, value }) => [name, value]));
   const client = sessionClient({
@@ -42,6 +42,9 @@ export function requestSession(request: NextRequest) {
     setAll(cookies) {
       for (const { name, value, options } of cookies) {
         values.set(name, value);
+        // Auth may clear a newly staged verifier when email delivery fails. Keep the
+        // same cookie shape on generic sign-in replies to avoid exposing account state.
+        if (keepPendingVerifier && !value && name.endsWith("-code-verifier") && pending.cookies.get(name)?.value) continue;
         pending.cookies.set(name, value, options);
       }
     },
