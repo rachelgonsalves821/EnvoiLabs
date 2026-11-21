@@ -8,12 +8,12 @@ async function readSession() {
   if (!client) return null;
   const { data, error } = await client.auth.getClaims();
   if (error || !data?.claims?.sub) return null;
-  return { client, userId: data.claims.sub, assurance: data.claims.aal };
+  return { client, userId: data.claims.sub, assurance: data.claims.aal, email: data.claims.email };
 }
 
 export async function getRespondent() {
   const session = await readSession();
-  if (!session) return null;
+  if (!session?.email) return null;
   const { data, error } = await session.client.from("respondents")
     .select("id").eq("auth_user_id", session.userId).eq("status", "active").maybeSingle();
   return !error && typeof data?.id === "string" ? { id: data.id } : null;

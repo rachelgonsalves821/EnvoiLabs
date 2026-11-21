@@ -12,7 +12,7 @@ You build the foundation everything else stands on, and you run the stage gates.
 | Consumer | What | By |
 | --- | --- | --- |
 | Agents 2 and 3 | Contracts v1, typed DB queries, auth helpers `getRespondent()` and `getResearcher()` | Gate 0 |
-| Agents 2 and 3 | Fakes for Stripe, Tremendous, Twilio, LLM, transcription | Gate 0 |
+| Agents 2 and 3 | Fakes for Stripe, Tremendous, LLM and transcription. Mailpit for disposable Auth email. | Gate 0 |
 | Agent 2 | Session and answer services in `packages/services` (`startSession`, `recordAnswer`, `submitSession`, `resumeSession`) | Week 2 |
 | Agent 3 | Study lifecycle services in `packages/services` (`createStudy`, `updateBrief`, `quoteStudy`, `launchStudy`) and the `study.*` event stream | Week 2 and 4 |
 | Agent 3 | Quality scoring hook so the AI quality signals feed `packages/core/quality` | Week 4 |
@@ -29,7 +29,7 @@ You build the foundation everything else stands on, and you run the stage gates.
 | `organizations` | name, design_partner boolean, pricing_override_id |
 | `researchers` | auth_user_id, organization_id, role (`member`, `admin`), terms_version |
 | `respondents` | auth_user_id, status (`active`, `paused`, `banned`, `deleted`), quality_level, ytd_payout_cents, referral_code, whatsapp_waitlist_at |
-| `pii.respondent_pii` | respondent_id, phone_e164 encrypted, phone_hash, birth_year, device_fingerprints |
+| `pii.respondent_pii` | respondent_id, restricted respondent attributes and device fingerprints |
 | `profile_attributes` | respondent_id, key, value_json, source (`signup`, `screener`), updated_at |
 | `consents` | respondent_id, purpose (`recording`, `transcription_vendor`, `retention`, `researcher_access`, `voice_clip_sharing`), granted, text_version, study_id nullable |
 | `studies` | organization_id, title, state, target_completes, length_minutes, deadline_at, labels jsonb |
@@ -61,8 +61,8 @@ You build the foundation everything else stands on, and you run the stage gates.
 
 5. **RLS** on every table. Respondents see only their own rows. Researchers see rows for their organization through views that exclude PII. The `pii` schema is reachable only by service role functions. Write `IT-0.2` as a matrix test.
 6. **Contracts v1** in `packages/contracts`. Zod schemas and inferred types for every entity above (public shape), every API in Gate 1 scope, every event in PRD section 12, plus `Brief`, `BriefPatch`, `GuideDraft`, `ProbeDecision`, `ThemeSet`, `QualitySignals`. Each schema exports an `example` fixture used by `IT-0.3`.
-7. **Auth.** Supabase phone OTP for respondents (Twilio Verify), magic link plus TOTP for researchers. Server helpers `requireRespondent()`, `requireResearcher()`, `requireAdmin()`.
-8. **Fakes and fixtures** in `packages/testing`. `FakeStripe`, `FakeTremendous`, `FakeTwilio`, `FakeLLM` (scripted and fixture-replay modes), `FakeTranscriber` (returns fixture text keyed by audio hash). Factories for every entity. A `TestClock`.
+7. **Auth.** Supabase email link for respondents, email link plus TOTP for researchers. Link each role to its verified Auth identity. Test both paths with Mailpit. Server helpers `requireRespondent()`, `requireResearcher()`, `requireAdmin()`.
+8. **Fakes and fixtures** in `packages/testing`. `FakeStripe`, `FakeTremendous`, `FakeLLM` (scripted and fixture-replay modes), `FakeTranscriber` (returns fixture text keyed by audio hash). Factories for every entity. A `TestClock`.
 9. **Seed** of 1 organization, 2 researchers, 60 respondents (mix of students and non-students, ages 18 to 45, on and off campus, varied food-ordering habits) and 1 draft study.
 
 ## Gate 1 tasks (weeks 2 to 3) → R-PLAT-02, R-PLAT-03, R-PLAT-11
@@ -94,7 +94,7 @@ In Gate 2, apply the PRD 8.5 screening rules and own invitation state and IT-2.7
 
 ## Gate 3 tasks (weeks 6 to 7) → R-PLAT-05, R-PLAT-06, R-PLAT-09, R-PLAT-10, R-PLAT-12
 
-1. **Fraud controls.** Phone hash uniqueness, virtual number lookup through Twilio Lookup behind a flag, device fingerprint cap of 2 accounts, gift card recipient cap, audio sha256 duplicate detection across respondents, minimum plausible answer duration.
+1. **Fraud controls.** Verified email uniqueness, device fingerprint cap of 2 accounts, gift card recipient cap, audio sha256 duplicate detection across respondents, minimum plausible answer duration.
 2. **Liveness v1.** Generate a 4-word phrase per session, Agent 2 records it first, transcript match by normalized edit distance of 2 or less.
 3. **Retention job.** Delete audio after `delete_after`. Process deletion requests within 30 days. Export as JSON bundle.
 4. **Admin console** at `/admin`. Studies list, session review queue with approve and remove, payout retry, pricing config editor with versioning, respondent ban.
@@ -102,7 +102,7 @@ In Gate 2, apply the PRD 8.5 screening rules and own invitation state and IT-2.7
 6. **Gate 3 suite** `IT-3.3` (PII leak scan), `IT-3.4` (deletion), `IT-3.5` (k6 load). Own pilot operations checklist.
 
 ## Gate 4 tasks (week 8)
-Security checklist, rate limits (OTP 5 per hour per phone, uploads 60 per hour per session), dependency audit, chaos tests `IT-4.2`, runbooks, debt sprint, final PRD reconciliation.
+Security checklist, rate limits (5 sign-in links per hour per email, uploads 60 per hour per session), dependency audit, chaos tests `IT-4.2`, runbooks, debt sprint, final PRD reconciliation.
 
 ## Definition of done for your work
 Every function in `packages/core` is pure, typed from contracts and unit-tested. Every function in `packages/services` has an integration test against Supabase local. Every webhook and job is idempotent and has a replay test. Every table has RLS and a test.

@@ -26,9 +26,12 @@ test("the unauthenticated MFA API returns no identity or session", async ({ requ
 
 test("respondent onboarding and PWA assets stay public", async ({ page, request }) => {
   await page.goto("/r");
-  await page.getByRole("link", { name: "Create an account" }).click();
+  await page.getByRole("link", { name: "Sign in or get started" }).click();
   await expect(page).toHaveURL(/\/r\/signup$/);
-  await expect(page.getByRole("textbox", { name: "Phone number" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Email address" })).toBeVisible();
+  const account = await request.get("/r/status", { maxRedirects: 0 });
+  expect(account.status()).toBe(307);
+  expect(account.headers().location).toMatch(/\/r\/signup$/);
 
   const [manifest, worker, icon] = await Promise.all([
     request.get("/r/manifest.webmanifest"),

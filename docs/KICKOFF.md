@@ -13,7 +13,7 @@ This is for Rachel. It explains how to set up, start and supervise the three age
    ```
    Run one coding agent session in each folder.
 3. Protect `main`. Every change lands by PR with CI green. Turn on "require branches to be up to date".
-4. Create accounts and put test keys in each worktree's `.env.local` (Agent 1 writes `.env.example` listing them). Supabase (one dev project for previews, local Supabase for each agent), Stripe test mode, Tremendous sandbox, Twilio test credentials, OpenAI, Anthropic, Groq, Sentry, Inngest, Vercel.
+4. Create accounts and put test keys in each worktree's `.env.local` (Agent 1 writes `.env.example` listing them). Supabase (one dev project for previews, local Supabase for each agent), Stripe test mode, Tremendous sandbox, OpenAI, Anthropic, Groq, Sentry, Inngest, Vercel.
 
 ## 2. Start order
 

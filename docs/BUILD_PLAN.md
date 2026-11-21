@@ -32,14 +32,14 @@ Rule of ownership. Each directory has exactly one owning agent (section 3). You 
 | Validation and contracts | Zod schemas in `packages/contracts` | One source for API, events and LLM structured output |
 | Background jobs | Inngest | Durable steps, retries, schedules, local dev server |
 | Storage | Supabase Storage, private buckets, signed URLs | Audio files |
-| Auth | Supabase Auth. Phone OTP opens the persistent respondent account. Researchers use an email link plus TOTP MFA. | Matches PRD |
+| Auth | Supabase Auth. A one-time email link opens the persistent respondent account. Researchers use an email link plus TOTP MFA. | Match the callback to the account type. |
 | Payments | Stripe Checkout and webhooks | Researcher payment |
 | Payouts | Tremendous API (sandbox first) | Gift cards, W-9 and 1099 handling |
 | LLM | Anthropic Claude via `packages/ai` provider interface | Structured outputs, tool use |
 | Transcription | OpenAI primary and Groq Whisper fallback behind an interface | Pin and verify supported models for the deployment before enabling live calls |
 | Redaction | Deterministic analyzer plus approved contextual pass | See section 11 for Presidio evaluation and private hosting |
 | Push | Web Push (VAPID) with `web-push` | PWA notifications |
-| SMS | Twilio Verify delivers the phone sign-in code. Optional SMS nudges link to the web app and stay behind a flag (PRD Q-02). | |
+| Auth email delivery | Supabase Auth email with a dedicated sender before external study enrollment | Built-in delivery is limited to authorized internal test inboxes. |
 | UI | React, CSS variables from design tokens, Radix primitives for accessible behavior, Phosphor icons, three.js or raw WebGL for the Echo | Design system fidelity |
 | Testing | Vitest (unit and integration), Playwright (end to end, mobile and desktop projects), Testcontainers or Supabase local for DB tests | |
 | Observability | Sentry for errors, pino structured logs, Inngest dashboard, an `llm_call` table for cost and latency | |
@@ -69,7 +69,7 @@ Rule of ownership. Each directory has exactly one owning agent (section 3). You 
 │  ├─ core/                          pure domain logic, no I/O: pricing, matching rules, state machines, quality, points (Agent 1)
 │  ├─ services/                      orchestration with I/O: calls core, reads and writes db, emits events and jobs (Agent 1)
 │  │  └─ src/ai/                     persistence for transcripts, probes, briefs from chat, reports (Agent 3, uses Agent 1's db queries)
-│  ├─ integrations/                  Stripe, Tremendous, Twilio, web push clients (Agent 1, push sender by Agent 2)
+│  ├─ integrations/                  Stripe, Tremendous and web push clients (Agent 1, push sender by Agent 2)
 │  ├─ ai/                            LLM and transcription providers, prompts, agents, redaction, evals (Agent 3)
 │  ├─ ui/                            tokens, components, Echo (Agent 2; Agent 3 may add researcher components under ui/src/researcher)
 │  └─ testing/                       factories, fixtures, fake providers, test DB helpers (Agent 1)
@@ -132,7 +132,7 @@ The [PRD user journeys](PRD.md#6-user-journeys) describe the two paths in full. 
 
 | Gate | Respondent UI | Researcher UI |
 | --- | --- | --- |
-| 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [phone signup](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation and respondent account provisioning. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
+| 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [email signup and sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation and respondent account provisioning. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
 | 1 · Seeded study | Signed-in Home for eligible invites and in-progress studies, profile and consent screens, one-question interview with record or type, upload and retry states, resume and submission confirmation. | Minimal four-question study form, review and test launch, live counts and redacted transcript viewer. |
 | 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt, and Earnings with gift card brand selection, payout status and history. | Scoping chat beside the live brief, review of screening criteria and guide, quote, checkout, and live tracking. |
 | 3 · Pilot | Liveness, full Echo states, privacy and withdrawal controls. | Report and findings, verified quotes, hypothesis evidence and next-study proposal. |
@@ -150,7 +150,7 @@ Exit criteria
 - [ ] Auth works for both user types locally and on the dedicated hosted preview. Use the [hosted sign-in procedure](../README.md#verify-sign-in-on-the-hosted-preview). Record the deployment commit and both outcomes before sign-off. Platform owns execution and tracks preview access and controlled test identities on [goal #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4).
 - [ ] `packages/ui` exports tokens (CSS variables generated from the design system `tokens.json`), Button, Chip, EarningsChip, and an Echo stub that renders the static fallback
 - [ ] `packages/ai` exposes provider interfaces with fake implementations, plus a recorded-fixture mode for tests
-- [ ] Fakes for Stripe, Tremendous, Twilio, LLM and transcription in `packages/testing/fakes`
+- [ ] Fakes for Stripe, Tremendous, LLM and transcription in `packages/testing/fakes`. Disposable Auth email is delivered to Mailpit in CI.
 - [ ] Lint rules for the PII boundary, no `any`, no floats for money (named `cents` fields), and no cross-agent imports into app route folders
 
 Use merged CI and the existing auth, database, contract, UI and AI foundations as the starting point. In the gate evidence, link the local checks and mark hosted checks separately. Confirm coverage against each criterion, including any gap in the access matrix or eval harness. While preview access is pending, complete Gate 0 evidence and prepare Gate 1 contract and acceptance scenarios. See the [Gate 1 handoff](GATE_1_HANDOFF.md) for ownership, merge order and test coverage.
@@ -167,7 +167,7 @@ One study runs end to end with seeded data and fakes for paid vendors.
 Exit criteria
 - [ ] Researcher can create a study from a minimal form (scoping chat not required yet), add 4 core guide questions (the PRD billing minimum) and launch without payment (flagged `skip_payment` in non-prod)
 - [ ] Matching selects eligible seeded respondents, creates invites and respects caps
-- [ ] Respondent signs up by phone (Twilio fake in CI), completes profile and consent, and sees their own eligible invite on signed-in Home. They accept, record 4 answers in the browser, and submit. Return sign-in restores the same account, study access and saved progress.
+- [ ] Respondent signs up via a one-time email link (Mailpit in CI), completes profile and consent, and sees their own eligible invite on signed-in Home. They accept, record 4 answers in the browser, and submit. Return sign-in restores the same account, study access and saved progress.
 - [ ] Consented voice answers upload privately and a job calls the primary speech-to-text adapter with a bounded fallback. Record provider, model, latency and cost. Confirm a real-provider run on synthetic browser recordings and keep CI deterministic. Typed answers reach the same redaction path.
 - [ ] Session moves `started` to `submitted` to `quality_hold`
 - [ ] Researcher tracking shows live counts and only redacted transcripts. Record the Presidio benchmark and adoption decision before publication.
@@ -205,7 +205,7 @@ Integration tests required
 - `IT-2.6` push delivery contract, the nudge job enqueues correct payloads at the right times (injectable clock)
 - `IT-2.7` complete the screening sheet through eligibility and invite state. Cover typed and transcribed answers, supported and contradicted evidence, ambiguity, invalid and timed-out responses, consent, repeated delivery, and an existing participation cap.
 
-**Pre-study checklist.** Platform records the approved cohort and recruiting channel, consent text version and allowed processing, provider data handling and preview isolation. Apply PRD Q-04 through Q-06 to the proposed cohort and processing. Resolve applicable open decisions with Rachel before enrollment. Use synthetic participants while those decisions are pending. Exercise consent enforcement, withdrawal and deletion through storage, queues and derived data, and verify that researcher endpoints and exports only publish redacted artifacts. Keep raw voice sharing off for this first study. Exercise recording and retry on physical iOS Safari and Android Chrome, verify speech-to-text and the probe display, and verify the screener clarification and timeout paths on approved test inputs before inviting participants. Agree on participant compensation and applicable refund terms with Rachel before any real monetary commitment. Record the actual compensation path separately from sandbox evidence.
+**Pre-study checklist.** Platform records the approved cohort and recruiting channel, consent text version and allowed processing, provider data handling and preview isolation. Apply PRD Q-04 through Q-06 to the proposed cohort and processing. Resolve applicable open decisions with Rachel before enrollment. Use synthetic participants while those decisions are pending. Verify Auth email delivery with a dedicated sender to a controlled external test inbox before recruiting. Exercise consent enforcement, withdrawal and deletion through storage, queues and derived data, and verify that researcher endpoints and exports only publish redacted artifacts. Keep raw voice sharing off for this first study. Exercise recording and retry on physical iOS Safari and Android Chrome, verify speech-to-text and the probe display, and verify the screener clarification and timeout paths on approved test inputs before inviting participants. Agree on participant compensation and applicable refund terms with Rachel before any real monetary commitment. Record the actual compensation path separately from sandbox evidence.
 
 Debt review plus a **contract freeze check**. List every breaking contract change since Gate 0 and confirm old versions are removed or dated.
 
@@ -215,7 +215,7 @@ Exit criteria
 - [ ] Live probes show in under 6 seconds p95 from upload confirmation to browser render. Time the full path on representative mobile recordings and devices. Report sample size, p95 for rendered probes and separate counts/rates for intentional no-probe decisions, errors and timeouts. Agree on an acceptable timeout rate before fielding. A late result cannot replace the next question.
 - [ ] Analyst report with themes, counts, confidence, verified quotes, hypothesis scores and next-study proposal
 - [ ] Redaction eval passes thresholds (section 7)
-- [ ] Fraud controls (phone, device, recipient caps, duplicate audio hash, speed) and liveness phrase live
+- [ ] Fraud controls (verified email uniqueness, device and recipient caps, duplicate audio hash, speed) and liveness phrase live
 - [ ] Privacy controls (delete, export, withdraw, voice sharing toggle) and the retention job
 - [ ] Echo in full WebGL with all states, reduced-motion and no-WebGL fallbacks
 - [ ] Accessibility pass with axe on all main screens, zero serious or critical issues
@@ -231,7 +231,7 @@ Integration tests required
 ### Gate 4. Launch hardening (end of week 8)
 
 Exit criteria
-- [ ] Security review (OWASP top 10 checklist, dependency audit, RLS re-test, rate limits on OTP and uploads)
+- [ ] Security review (OWASP top 10 checklist, dependency audit, RLS re-test, rate limits on email sign-in and uploads)
 - [ ] Performance budgets, respondent interview screen LCP under 2.5 s on a mid-range phone profile, JS under 200 KB gzipped excluding the Echo chunk, which lazy-loads
 - [ ] Runbooks in `docs/runbooks/` for failed payouts, stuck jobs, LLM outage (fallback to static guide with no probes), and Stripe disputes
 - [ ] Debt sprint, every `DEBT.md` item tagged `gate4` closed or explicitly accepted by Rachel
@@ -260,7 +260,7 @@ Evals live in `packages/ai/evals`. Each has a fixture set and pass thresholds. R
 - **One source of truth per concept.** Schema in `packages/db`, shapes in `packages/contracts`, rules in `packages/core`, prompts in `packages/ai/prompts`. Never duplicate a type.
 - **Thin route handlers.** Route handlers validate input with contracts, call a `packages/services` function (or `packages/ai` for AI-only calls), return. No business logic in `apps/web`.
 - **Pure core, thin services.** `packages/core` has no I/O. `packages/services` does the I/O and calls core. Clock, random and IDs are injected. This keeps logic unit-testable and lets tests time-travel.
-- **Provider interfaces** for every vendor (LLM, transcription, payouts, payments, SMS, push). Fakes in `packages/testing`.
+- **Provider interfaces** for every vendor (LLM, transcription, payouts, payments, push). Fakes in `packages/testing`.
 - **ADRs.** Any decision that changes the stack, a boundary or a contract gets a one-page ADR in `docs/adr/NNNN-title.md`.
 - **Debt register.** `docs/DEBT.md` columns are ID, description, owner, created, must-fix-by gate, status. Each gate review closes or re-dates items. Debt with no gate is not allowed.
 - **Debt budget.** About 20% of each week after Gate 1 goes to debt items tagged for the next gate.
@@ -288,7 +288,7 @@ Risks: <anything that might slip a gate>
 
 | Week | Agent 1 Platform | Agent 2 Respondent | Agent 3 Researcher and AI |
 | --- | --- | --- | --- |
-| 1 | Repo, CI, Supabase, schema v1, RLS, contracts v1, fakes, seed, lint rules | `packages/ui` tokens and base components, respondent shell, phone auth screens | `packages/ai` interfaces and fakes, prompt file structure, eval harness, researcher shell |
+| 1 | Repo, CI, Supabase, schema v1, RLS, contracts v1, fakes, seed, lint rules | `packages/ui` tokens and base components, respondent shell, email signup and sign-in | `packages/ai` interfaces and fakes, prompt file structure, eval harness, researcher shell |
 | 2 | State machines, matching, invites, session APIs, audit log | Profile, consent, invite card, interview screen with recording | Minimal study form, guide editor, transcription pipeline |
 | 3 | Gate 1 integration suite, expiry job | Upload and resume, receipt stub | Redaction v1, tracking page |
 | 4 | Pricing, Stripe, quality v1, payout sandbox, screening rules | Confirming screener, push subscription and nudges, gift card choice | Scoping, screening interpretation and evals, live brief, quote and checkout |

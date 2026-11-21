@@ -6,7 +6,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
-| Gate 0 Foundations | End of week 1 | Researcher hosted email and TOTP passed. Respondent SMS pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035438), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035483), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035657), [preview](https://vercel.com/rachelgonsalves821s-projects/envoilabs/7oKtfT1S9yDVJkMbL83rAoG9yznX) |
+| Gate 0 Foundations | End of week 1 | Researcher hosted email and TOTP passed. Respondent hosted email verification pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035438), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035483), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035657), [preview](https://vercel.com/rachelgonsalves821s-projects/envoilabs/7oKtfT1S9yDVJkMbL83rAoG9yznX) |
 | Gate 1 Vertical slice | End of week 3 | Acceptance prep underway. Implementation awaits Gate 0 sign-off | [Handoff](GATE_1_HANDOFF.md) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
@@ -184,3 +184,15 @@ Needs from others. An activated SMS provider account and a controlled test phone
 Contract or schema changes. None.
 
 Risks. The live respondent check remains open. Researcher sign-in passed.
+
+## 2026-11-21, Platform, R-RESP-01 respondent email sign-in
+
+Done. Rachel approved passwordless email for the persistent respondent account. The PRD and build plan use an emailed link for sign-in, with the existing Home and Earnings journeys inside the app.
+
+Next. Verify live respondent email delivery, account provisioning and age attestation on the hosted preview. Check researcher workspace access before and after TOTP on the tested deployment. Record results on [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4) before Gate 1 implementation.
+
+Needs from others. None for the internal check. Use distinct test identities and the authorized team inbox for delivery. The first external study requires a dedicated email sender.
+
+Contract or schema changes. Respondent email-link start replaces the phone code request and verification contracts. The service-only provision function requires a verified email and preserves the existing respondent ID and age attestation on return.
+
+Risks. Supabase built-in email has team inbox and rate limits. Use a dedicated sender before recruiting external respondents.

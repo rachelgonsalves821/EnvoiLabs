@@ -3,107 +3,91 @@ import { expect, test } from "@playwright/test";
 // Keep auth requests observable by the route mocks in every browser.
 test.use({ serviceWorkers: "block" });
 
-test("opens signup from the respondent home", async ({ page }) => {
+const email = "respondent@example.com";
+const emailLabel = "Email address";
+const ageLabel = "I’m 18 or older";
+const sendLabel = "Email me a sign-in link";
+const sentTitle = "Check your email";
+const startPath = "/api/respondent/auth/start";
+
+test("opens email sign-in from the respondent home", async ({ page }) => {
   await page.goto("/r");
-  await page.getByRole("link", { name: "Create an account" }).click();
+  await page.getByRole("link", { name: "Sign in or get started" }).click();
   await expect(page).toHaveURL(/\/r\/signup$/);
-  await expect(page.getByRole("textbox", { name: "Phone number" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: emailLabel })).toBeVisible();
 });
 
-test("validates signup locally and verifies with the current phone and age attestation", async ({ page }) => {
+test("requires an email address and age confirmation before requesting a link", async ({ page }) => {
   const requests: unknown[] = [];
-  await page.route("**/api/respondent/auth/*", async (route) => {
-    requests.push({ path: new URL(route.request().url()).pathname, body: route.request().postDataJSON() });
+  await page.route(`**${startPath}`, async (route) => {
+    requests.push(route.request().postDataJSON());
     await route.fulfill({ json: { ok: true } });
   });
 
   await page.setViewportSize({ width: 360, height: 540 });
   await page.goto("/r/signup");
 
-  const phone = page.getByRole("textbox", { name: "Phone number" });
-  const age = page.getByRole("checkbox", { name: "I’m 18 or older" });
-  const send = page.getByRole("button", { name: "Text me a code" });
+  const address = page.getByRole("textbox", { name: emailLabel });
+  const age = page.getByRole("checkbox", { name: ageLabel });
+  const send = page.getByRole("button", { name: sendLabel });
   const alert = page.getByRole("main").getByRole("alert");
+  await expect(address).toHaveAttribute("autocomplete", "email");
   await expect(age).not.toBeChecked();
   await send.click();
-  await expect(phone).toBeFocused();
-  await expect(alert).toHaveText("Enter a 10-digit US phone number.");
+  await expect(address).toBeFocused();
+  await expect(alert).toHaveText("Enter a valid email address.");
 
-  await phone.fill("(202) 555-0142");
+  await address.fill("Respondent@EXAMPLE.COM");
   await send.click();
   await expect(age).toBeFocused();
   await expect(alert).toHaveText("Confirm that you’re 18 or older to continue.");
   expect(requests).toEqual([]);
 
   await age.check();
-  await expect(age).toBeChecked();
   await age.focus();
   await page.keyboard.press("Tab");
   await expect(send).toBeFocused();
   await send.click();
-  const startRequest = { path: "/api/respondent/auth/start", body: { phone: "+12025550142", ageAttested: true } };
-  await expect.poll(() => requests).toEqual([startRequest]);
-  await expect(page.getByRole("heading", { name: "Enter your code" })).toBeFocused();
-
-  const code = page.getByRole("textbox", { name: "Verification code" });
-  const verify = page.getByRole("button", { name: "Verify phone number" });
-  await expect(code).toHaveAttribute("autocomplete", "one-time-code");
-  await code.fill("12");
-  await verify.click();
-  await expect(code).toBeFocused();
-  await expect(alert).toHaveText("Enter all 6 digits of your code.");
-  expect(requests).toHaveLength(1);
-
-  await code.fill("012 345");
-  await verify.click();
-  await expect(page.getByRole("heading", { name: "Phone verified" })).toBeFocused();
-  await expect(page.getByRole("link", { name: "Go to your interviews" })).toHaveAttribute("href", "/r");
-  expect(requests).toEqual([
-    startRequest,
-    { path: "/api/respondent/auth/verify", body: { phone: "+12025550142", code: "012345", ageAttested: true } },
-  ]);
+  await expect(page.getByRole("heading", { name: sentTitle })).toBeFocused();
+  expect(requests).toEqual([{ email, ageAttested: true }]);
+  await expect(page.getByText("Open the sign-in link in the same browser you used to request it.")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
-test("offers recovery for rate limiting and rejected codes without exposing server details", async ({ page }) => {
-  let sends = 0;
-  await page.route("**/api/respondent/auth/start", async (route) => {
-    sends++;
-    if (sends === 1) {
-      await route.fulfill({ status: 429, json: { message: "server detail" } });
+test("offers retry, resend and email editing without exposing provider details", async ({ page }) => {
+  const requests: unknown[] = [];
+  await page.route(`**${startPath}`, async (route) => {
+    requests.push(route.request().postDataJSON());
+    if (requests.length <= 2) {
+      await route.fulfill({ status: requests.length === 1 ? 429 : 400, json: { message: "server detail" } });
     } else {
       await route.fulfill({ json: { ok: true } });
     }
   });
-  await page.route("**/api/respondent/auth/verify", (route) =>
-    route.fulfill({ status: 400, json: { message: "server detail" } }),
-  );
+
   await page.goto("/r/signup");
-  await page.getByRole("textbox", { name: "Phone number" }).fill("+12025550142");
-  await page.getByRole("checkbox", { name: "I’m 18 or older" }).check();
-  const send = page.getByRole("button", { name: "Text me a code" });
+  await page.getByRole("textbox", { name: emailLabel }).fill(email);
+  await page.getByRole("checkbox", { name: ageLabel }).check();
+  const send = page.getByRole("button", { name: sendLabel });
   const main = page.getByRole("main");
   const alert = main.getByRole("alert");
   await send.click();
   await expect(alert).toHaveText("Too many attempts. Wait before trying again.");
   await send.click();
+  await expect(alert).toHaveText("The link request failed. Check your email address and try again.");
+  await send.click();
+  await expect(page.getByRole("heading", { name: sentTitle })).toBeFocused();
 
-  const code = page.getByRole("textbox", { name: "Verification code" });
-  await code.fill("123456");
-  await page.getByRole("button", { name: "Verify phone number" }).click();
-  await expect(alert).toHaveText("This code couldn’t be verified. Check it or request a new one.");
-  await page.getByRole("button", { name: "Request a new code" }).click();
-  await expect(main.getByRole("status")).toHaveText("A new code was requested.");
-  await expect(code).toHaveValue("");
-  await page.getByRole("button", { name: "Change phone number" }).click();
-  await expect(page.getByRole("textbox", { name: "Phone number" })).toHaveValue("+12025550142");
-  expect(sends).toBe(3);
+  await page.getByRole("button", { name: "Request a new link" }).click();
+  await expect(main.getByRole("status")).toHaveText("A new link was requested.");
+  await page.getByRole("button", { name: "Change email address" }).click();
+  await expect(page.getByRole("textbox", { name: emailLabel })).toHaveValue(email);
+  expect(requests).toEqual(Array.from({ length: 4 }, () => ({ email, ageAttested: true })));
 });
 
-test("preserves the verification code through a stalled request and a malformed success response", async ({ page }) => {
-  await page.route("**/api/respondent/auth/start", (route) => route.fulfill({ json: { ok: true } }));
+test("preserves the email after a stalled request and malformed success response", async ({ page }) => {
   let attempts = 0;
-  await page.route("**/api/respondent/auth/verify", async (route) => {
+  await page.route(`**${startPath}`, async (route) => {
     attempts++;
     if (attempts === 1) return; // A connection that never returns response headers.
     if (attempts === 2) {
@@ -113,27 +97,35 @@ test("preserves the verification code through a stalled request and a malformed 
     await route.fulfill({ json: { ok: true } });
   });
   await page.goto("/r/signup");
-  await page.getByRole("textbox", { name: "Phone number" }).fill("2025550142");
-  await page.getByRole("checkbox", { name: "I’m 18 or older" }).check();
-  await page.getByRole("button", { name: "Text me a code" }).click();
-  const code = page.getByRole("textbox", { name: "Verification code" });
-  const verify = page.getByRole("button", { name: "Verify phone number" });
+  const address = page.getByRole("textbox", { name: emailLabel });
+  const send = page.getByRole("button", { name: sendLabel });
   const alert = page.getByRole("main").getByRole("alert");
-  await code.fill("012345");
+  await address.fill(email);
+  await page.getByRole("checkbox", { name: ageLabel }).check();
   await page.clock.install();
-  await verify.click();
+  await send.click();
   await expect.poll(() => attempts).toBe(1);
-  await expect(verify).toBeDisabled();
+  await expect(send).toBeDisabled();
   await page.clock.fastForward(30_001);
   await expect(alert).toHaveText("The connection is unavailable. Try again in a moment.");
-  await expect(code).toHaveValue("012345");
-  await expect(verify).toBeEnabled();
+  await expect(address).toHaveValue(email);
+  await expect(send).toBeEnabled();
 
-  await verify.click();
+  await send.click();
   await expect.poll(() => attempts).toBe(2);
   await expect(alert).toHaveText("The connection is unavailable. Try again in a moment.");
-  await expect(code).toHaveValue("012345");
-  await verify.click();
-  await expect(page.getByRole("heading", { name: "Phone verified" })).toBeFocused();
+  await expect(address).toHaveValue(email);
+  await send.click();
+  await expect(page.getByRole("heading", { name: sentTitle })).toBeFocused();
   expect(attempts).toBe(3);
+});
+
+test("protects account status and offers recovery for an expired link", async ({ page }) => {
+  await page.goto("/r/status");
+  await expect(page).toHaveURL(/\/r\/signup$/);
+  await page.goto("/r/signup?error=expired");
+  await expect(page.getByRole("alert")).toHaveText(
+    "This link couldn’t sign you in. Request a new link and open it in this browser.",
+  );
+  await expect(page.getByRole("button", { name: sendLabel })).toBeVisible();
 });

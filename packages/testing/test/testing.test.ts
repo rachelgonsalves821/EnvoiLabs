@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  FakeLLM, FakeStripe, FakeTranscriber, FakeTremendous, FakeTwilio, TestClock,
+  FakeLLM, FakeStripe, FakeTranscriber, FakeTremendous, TestClock,
   fakeLlmRequestHash, fakeTranscriptionAudioHash, fixtureFactory,
 } from "../src/index.js";
 
@@ -27,17 +27,11 @@ describe("offline test adapters", () => {
     expect(() => provider.createOrder({ ...payout, recipientId: "respondent-2" })).toThrow("different parameters");
   });
 
-  it("expires and consumes fixture phone codes without advancing wall time", () => {
+  it("advances fixture time without advancing wall time", () => {
     const clock = new TestClock();
-    const provider = new FakeTwilio({ code: "123456", now: clock.now, expiryMs: 500 });
-    const phone = "+12025550123";
-    provider.sendVerification(phone);
-    expect(provider.verify(phone, "000000")).toBe(false);
+    const start = clock.now();
     clock.advance(500);
-    expect(provider.verify(phone, "123456")).toBe(false);
-    provider.sendVerification(phone);
-    expect(provider.verify(phone, "123456")).toBe(true);
-    expect(provider.verify(phone, "123456")).toBe(false);
+    expect(clock.now().getTime() - start.getTime()).toBe(500);
   });
 
   it("replays scripted and hash-keyed AI fixtures and fails closed on misses", async () => {

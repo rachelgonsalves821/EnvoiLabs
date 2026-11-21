@@ -8,7 +8,7 @@ async function expectTouchTarget(control: Locator) {
   expect(box?.height).toBeGreaterThanOrEqual(44);
 }
 
-test("keeps keyboard focus on the code request while it is pending and can retry from the error", async ({ page }) => {
+test("keeps keyboard focus on the link request while it is pending and can retry from the error", async ({ page }) => {
   let attempts = 0;
   let replyToFirst: (() => Promise<void>) | undefined;
   await page.route("**/api/respondent/auth/start", async (route) => {
@@ -20,16 +20,16 @@ test("keeps keyboard focus on the code request while it is pending and can retry
     await route.fulfill({ json: { ok: true } });
   });
   await page.goto("/r/signup");
-  await page.getByRole("textbox", { name: "Phone number" }).fill("2025550142");
+  await page.getByRole("textbox", { name: "Email address" }).fill("respondent@example.com");
   const age = page.getByRole("checkbox", { name: "I’m 18 or older" });
   await age.focus();
   await page.keyboard.press("Space");
   await page.keyboard.press("Tab");
-  const send = page.getByRole("button", { name: "Text me a code" });
+  const send = page.getByRole("button", { name: "Email me a sign-in link" });
   await expect(send).toBeFocused();
   await page.keyboard.press("Enter");
   const main = page.getByRole("main");
-  await expect(main.getByRole("status")).toHaveText("Requesting a code…");
+  await expect(main.getByRole("status")).toHaveText("Requesting a link…");
   await expect(send).toBeDisabled();
   await expect(send).toBeFocused();
   await page.keyboard.press("Enter");
@@ -39,7 +39,7 @@ test("keeps keyboard focus on the code request while it is pending and can retry
   await expect(send).toBeFocused();
   expect(attempts).toBe(1);
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Enter your code" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeFocused();
   expect(attempts).toBe(2);
 });
 
@@ -50,7 +50,7 @@ test("supports phone widths, reduced motion and keyboard navigation on the shell
   await expect(echo).toHaveCount(1);
   await expect(echo).toHaveAttribute("aria-hidden", "true");
   await expect(echo).toHaveCSS("animation-name", "none");
-  const signup = page.getByRole("link", { name: "Create an account" });
+  const signup = page.getByRole("link", { name: "Sign in or get started" });
   const help = page.getByRole("button", { name: "How interviews work" });
   for (const width of [360, 390, 430]) {
     await page.setViewportSize({ width, height: 600 });
@@ -70,13 +70,13 @@ test("supports phone widths, reduced motion and keyboard navigation on the shell
   await signup.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/r\/signup$/);
-  const phone = page.getByRole("textbox", { name: "Phone number" });
+  const email = page.getByRole("textbox", { name: "Email address" });
   const attestation = page.locator("label").filter({ has: page.getByRole("checkbox") });
   for (const width of [360, 390, 430]) {
     await page.setViewportSize({ width, height: 600 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-    await expectTouchTarget(phone);
+    await expectTouchTarget(email);
     await expectTouchTarget(attestation);
-    await expectTouchTarget(page.getByRole("button", { name: "Text me a code" }));
+    await expectTouchTarget(page.getByRole("button", { name: "Email me a sign-in link" }));
   }
 });

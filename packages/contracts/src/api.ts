@@ -4,8 +4,6 @@ import { AnswerSchema, ConsentPurposeSchema, InviteStateSchema, ProfileAttribute
 import { InterviewProgressSchema, InvitePreviewSchema } from "./respondent.js";
 import { CriterionSchema } from "./study.js";
 
-const phone = z.e164().regex(/^\+1\d{10}$/);
-const samplePhone = "+12025550123";
 const code = z.string().regex(/^\d{6}$/);
 const exampleCode = "123456";
 const inviteId = { inviteId: id };
@@ -18,13 +16,9 @@ const exampleQuestion = { guideQuestionId: exampleId };
 const resumeToken = z.string().min(32).max(512);
 const gate1CoreQuestionCount = 4;
 
-export const PhoneOtpStartRequestSchema = withExample(z.strictObject({
-  phone, ageAttested: z.literal(true),
-}), { phone: samplePhone, ageAttested: true });
-
-export const PhoneOtpVerifyRequestSchema = withExample(PhoneOtpStartRequestSchema.extend({
-  code,
-}), { phone: samplePhone, ageAttested: true, code: exampleCode });
+export const RespondentEmailStartRequestSchema = withExample(z.strictObject({
+  email: z.email().max(254), ageAttested: z.literal(true),
+}), { email: "respondent@example.com", ageAttested: true });
 
 export const ResearcherMagicLinkRequestSchema = withExample(z.strictObject({
   email: z.email(),
@@ -162,8 +156,7 @@ export const ResearcherTranscriptListSchema = withExample(z.strictObject({
   ...studyId, transcripts: z.array(z.strictObject({ id, redactedText: z.string() })),
 }), { ...exampleStudy, transcripts: [{ id: exampleId, redactedText: "I ordered lunch." }] });
 
-export type PhoneOtpStartRequest = z.infer<typeof PhoneOtpStartRequestSchema>;
-export type PhoneOtpVerifyRequest = z.infer<typeof PhoneOtpVerifyRequestSchema>;
+export type RespondentEmailStartRequest = z.infer<typeof RespondentEmailStartRequestSchema>;
 export type ResearcherMagicLinkRequest = z.infer<typeof ResearcherMagicLinkRequestSchema>;
 export type ResearcherMagicLinkCallback = z.infer<typeof ResearcherMagicLinkCallbackSchema>;
 export type ResearcherMfaRequest = z.infer<typeof ResearcherMfaRequestSchema>;

@@ -1343,6 +1343,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      provision_email_respondent: {
+        Args: { supplied_user_id: string }
+        Returns: string
+      }
       provision_respondent: {
         Args: {
           supplied_ciphertext: string

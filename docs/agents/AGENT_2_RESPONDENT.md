@@ -36,12 +36,12 @@ Source of truth is the [Envoi Labs design system](https://claude.ai/artifact/JfV
    ```
    Week 1 renders the static fallback disc. The WebGL version lands in week 6 behind the same API.
 3. Respondent shell. Layout with safe areas, `100dvh`, top bar slot, mobile-first breakpoints (360, 390, 430). PWA manifest, icons placeholder, service worker registered (no caching of authenticated API responses).
-4. Phone signup screens wired to Agent 1's auth helper with `FakeTwilio` in CI.
+4. Email signup and return sign-in screens wired to Agent 1's auth helper. Confirm 18+ at signup and open the delivered one-time link. CI captures it through Mailpit.
 
 ## Gate 1 tasks (weeks 2 to 3) → R-RESP-01, 02, 03, 04, 06, 07
 1. **Profile** (R-RESP-02). 6 to 8 questions from a config file in `packages/contracts/profile-questions.ts` (owned by Agent 1, you propose content via `[CONTRACT]` PR). Tap answers, optional voice. Saves through services.
 2. **Consent** (R-RESP-03). One screen, four toggles with plain language, links to full text. Enforce consent for recording and transcription before accepting voice. Keep researcher access and voice sharing separate. Preserve typed answers and confirm study eligibility rules with Platform. Store `text_version`.
-3. **Home and invite card** (R-RESP-04). Invite list sorted by expiry. Card content and order exactly as the design system InviteCard. "Not for me" with optional reason chips.
+3. **Home and invite card** (R-RESP-04). Signed-in Home shows the respondent's eligible invites sorted by expiry and lets them resume in-progress interviews. Card content and order exactly as the design system InviteCard. "Not for me" with optional reason chips.
 4. **Interview screen** (R-RESP-06).
    - One question per screen. Top bar has `ProgressTrack` and `EarningsChip`. Topic line, question in display style, hint line.
    - Record button is the Echo inside a `<button aria-pressed>` with labels "Start recording" and "Stop recording". Tap to start and tap to stop. No hold-to-talk.
