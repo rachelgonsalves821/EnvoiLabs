@@ -6,7 +6,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
-| Gate 0 Foundations | End of week 1 | Preview ready. SMS setup and final researcher TOTP verification pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035438), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035483), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035657), [preview](https://vercel.com/rachelgonsalves821s-projects/envoilabs/7oKtfT1S9yDVJkMbL83rAoG9yznX) |
+| Gate 0 Foundations | End of week 1 | Researcher hosted email and TOTP passed. Respondent SMS pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035438), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035483), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035657), [preview](https://vercel.com/rachelgonsalves821s-projects/envoilabs/7oKtfT1S9yDVJkMbL83rAoG9yznX) |
 | Gate 1 Vertical slice | End of week 3 | Acceptance prep underway. Implementation awaits Gate 0 sign-off | [Handoff](GATE_1_HANDOFF.md) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
@@ -163,12 +163,12 @@ Risks: The preview database confirms internal researcher membership and recorded
 
 ## 2026-11-21, Platform, R-RESP-01 and R-RSCH-01 hosted preview
 
-Done. The dedicated preview is Ready at `7b62dcd` (Vercel deployment `dpl_5HQUNHouP23ELJRYExFCKJ8UNUHz`). The internal researcher received a real Supabase sign-in email using the project's built-in sender. PR [#38](https://github.com/rachelgonsalves821/EnvoiLabs/pull/38) supports that sender's standard proof-key callback and adds disposable browser coverage for both email templates through TOTP. The preview has the provisioned internal researcher and recorded terms acceptance.
+Done. The dedicated preview is Ready at `7b62dcd` (Vercel deployment `dpl_5HQUNHouP23ELJRYExFCKJ8UNUHz`). A live hosted HTTP check for the provisioned internal researcher passed. A sign-in email from the built-in Supabase sender reached the test inbox. The delivered link completed the proof-key callback. The workspace was locked before TOTP and rendered after verification. The check revoked its temporary TOTP factor and preview access. PR [#38](https://github.com/rachelgonsalves821/EnvoiLabs/pull/38) supports that sender's standard proof-key callback and adds disposable browser coverage for both email templates through TOTP. The preview has the provisioned internal researcher and recorded terms acceptance.
 
-Next. Finish the real-email callback and TOTP exercise on the preview, including denied workspace access before TOTP and confirmed workspace access afterward. For respondents, verify real SMS delivery, sign in with the code and confirm the persisted adult attestation. Record each result on [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4) before signing off.
+Next. Verify respondent SMS delivery, sign in with the code and confirm the persisted adult attestation. Record the outcome on [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4) before signing off.
 
 Needs from others. Access to an activated Twilio account and an adult-controlled test phone that can receive its verification SMS. The built-in sender covers the internal researcher mailbox.
 
 Contract or schema changes. None.
 
-Risks. Supabase's built-in email rate limit paused the final researcher retry. The preview's phone provider is disabled until a live SMS service is connected. Gate 1 acceptance scenarios, synthetic recordings and the first redaction benchmark are prepared. Feature work follows hosted Gate 0 sign-off.
+Risks. The preview's phone provider is disabled until a live SMS service is connected. Gate 1 acceptance scenarios, synthetic recordings and the first redaction benchmark are prepared. Feature work follows hosted Gate 0 sign-off.
