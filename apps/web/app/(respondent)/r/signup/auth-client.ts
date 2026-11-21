@@ -1,26 +1,13 @@
-export function normalizeUsPhone(raw: string): string | null {
-  const phone = raw.trim();
-  if (!/^\+?[\d ().-]+$/.test(phone)) return null;
-
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  if (digits.length === 10 && !phone.startsWith("+")) return `+1${digits}`;
-  return null;
-}
-
-type AuthRequest = { phone: string; ageAttested: true };
+type AuthRequest = { email: string; ageAttested: true };
 type AuthResult = "success" | "throttled" | "unavailable" | "rejected";
 
 const requestTimeoutMs = 30_000;
 
-async function sendRequest(
-  action: "start" | "verify",
-  payload: AuthRequest & { code?: string },
-): Promise<AuthResult> {
+export async function requestSignInLink(payload: AuthRequest): Promise<AuthResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
-    const response = await fetch(`/api/respondent/auth/${action}`, {
+    const response = await fetch("/api/respondent/auth/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -44,8 +31,3 @@ async function sendRequest(
     clearTimeout(timeout);
   }
 }
-
-export const respondentAuth = {
-  start: (payload: AuthRequest) => sendRequest("start", payload),
-  verify: (payload: AuthRequest & { code: string }) => sendRequest("verify", payload),
-};

@@ -20,7 +20,10 @@ port = 54324
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3100"
-additional_redirect_urls = ["http://127.0.0.1:3100/api/researcher/auth/callback"]
+additional_redirect_urls = [
+  "http://127.0.0.1:3100/api/researcher/auth/callback",
+  "http://127.0.0.1:3100/api/respondent/auth/callback",
+]
 
 [auth.email]
 enable_signup = true
@@ -29,20 +32,6 @@ enable_confirmations = false
 [auth.email.template.magic_link]
 subject = "Your Envoi Labs sign-in link"
 content_path = "./supabase/templates/magic-link.html"
-
-[auth.sms]
-enable_signup = true
-enable_confirmations = true
-max_frequency = "1s"
-
-[auth.sms.twilio]
-enabled = true
-account_sid = "placeholder"
-message_service_sid = "placeholder"
-auth_token = "placeholder"
-
-[auth.sms.test_otp]
-12025550142 = "012345"
 
 [auth.mfa.totp]
 enroll_enabled = true

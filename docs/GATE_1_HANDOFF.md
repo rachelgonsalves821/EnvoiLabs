@@ -14,7 +14,7 @@ Start from the merged four-question contract. The [journey map](BUILD_PLAN.md#wh
 
 | Check | Scenario to prove |
 | --- | --- |
-| IT-1.1 | Use separate researcher and respondent browsers. Create and launch a four-question study with the test payment bypass. Match and invite an eligible seeded respondent under the cap. Complete profile and consent. Open Home and verify the eligible invite appears and another respondent's invite stays private. Accept, answer four questions, submit, and confirm updated tracking, redacted transcripts and quality hold. Sign in again in a fresh session and verify access to the same account and saved study state. |
+| IT-1.1 | Use separate researcher and respondent browsers. Create and launch a four-question study with the test payment bypass. Match and invite an eligible seeded respondent under the cap. Complete profile and consent. Open Home and verify the eligible invite appears and another respondent's invite stays private. Accept, answer four questions, submit, and confirm updated tracking, redacted transcripts and quality hold. Request and open a new one-time email link in a fresh session. Verify it opens the same account and saved study state. |
 | IT-1.2 | Exercise synthetic WebM/Opus, MP4/AAC and WAV fixtures plus a recording made with the browser. Run primary success, timeout with fallback, microphone denial, typed intake and denied consent. Record provider and model metadata from the live synthetic run. |
 | IT-1.3 | Save two answers and close the interview. Reopen the authorized resume link at question three. A retry of answer two keeps the progress count stable. |
 | IT-1.4 | Advance the test clock 24 hours. Run expiry twice. An active session becomes abandoned once and a submitted session remains intact. |

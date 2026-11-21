@@ -2,24 +2,24 @@
 
 import { Button, Card, Field } from "@envoi-labs/ui";
 import { useEffect, useRef, useState, type SubmitEvent } from "react";
-import { normalizeUsPhone, respondentAuth } from "./auth-client";
+import { requestSignInLink } from "./auth-client";
 import { signupCopy as copy } from "./copy";
 
-type Step = "phone" | "code" | "complete";
-type Request = "start" | "verify" | "resend";
-type FieldError = { field: "phone" | "age" | "code"; message: string };
+type Step = "email" | "sent";
+type FieldError = { field: "email" | "age"; message: string };
 
-export function RespondentSignup() {
-  const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function RespondentSignup({ initialError }: { initialError: string }) {
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
   const [ageAttested, setAgeAttested] = useState(false);
-  const [code, setCode] = useState("");
-  const [pending, setPending] = useState<Request | null>(null);
+  const [pending, setPending] = useState(false);
   const [fieldError, setFieldError] = useState<FieldError | null>(null);
-  const [requestError, setRequestError] = useState("");
+  const [requestError, setRequestError] = useState(initialError);
   const [announcement, setAnnouncement] = useState("");
   const requesting = useRef(false);
-  const previousStep = useRef<Step>("phone");
+  const previousStep = useRef<Step>("email");
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -39,86 +39,68 @@ export function RespondentSignup() {
     if (input instanceof HTMLInputElement) input.focus();
   }
 
-  async function request(action: Request, normalized: string, verificationCode = "") {
+  async function sendLink(address: string) {
     if (requesting.current) return;
     requesting.current = true;
-    setPending(action);
+    setPending(true);
     clearFeedback();
-    const payload = { phone: normalized, ageAttested: true } as const;
-    const result = action === "verify"
-      ? await respondentAuth.verify({ ...payload, code: verificationCode })
-      : await respondentAuth.start(payload);
+    const result = await requestSignInLink({ email: address, ageAttested: true });
     requesting.current = false;
-    setPending(null);
+    setPending(false);
 
     if (result === "throttled") setRequestError(copy.throttled);
     if (result === "unavailable") setRequestError(copy.unavailable);
-    if (result === "rejected") setRequestError(action === "verify" ? copy.verifyFailed : copy.startFailed);
+    if (result === "rejected") setRequestError(copy.startFailed);
     if (result !== "success") return;
 
-    setCode("");
-    if (action === "resend") {
-      setAnnouncement(copy.resent);
-    } else if (action === "start") {
-      setPhone(normalized);
-      setStep("code");
-    } else {
-      setPhone("");
-      setAgeAttested(false);
-      setStep("complete");
+    setEmail(address);
+    if (step === "sent") setAnnouncement(copy.resent);
+    else setStep("sent");
+  }
+
+  function submitEmail(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (requesting.current) return;
+    clearFeedback();
+    const address = email.trim().toLowerCase();
+    if (address.length > 254 || !emailPattern.test(address)) {
+      return rejectField(event.currentTarget, "email", copy.emailError);
     }
-  }
-
-  function submitPhone(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (requesting.current) return;
-    clearFeedback();
-    const normalized = normalizeUsPhone(phone);
-    if (!normalized) return rejectField(event.currentTarget, "phone", copy.phoneError);
     if (!ageAttested) return rejectField(event.currentTarget, "age", copy.ageError);
-    void request("start", normalized);
+    void sendLink(address);
   }
 
-  function submitCode(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function editEmail() {
     if (requesting.current) return;
     clearFeedback();
-    const verificationCode = code.replace(/\s/g, "");
-    if (!/^\d{6}$/.test(verificationCode)) return rejectField(event.currentTarget, "code", copy.codeError);
-    void request("verify", phone, verificationCode);
+    setStep("email");
   }
 
-  function editPhone() {
-    if (requesting.current) return;
-    clearFeedback();
-    setCode("");
-    setStep("phone");
-  }
-
-  const title = step === "phone" ? copy.title : step === "code" ? copy.verifyTitle : copy.completeTitle;
-  const status = pending === "verify" ? copy.verifying : pending ? copy.sending : announcement;
   const errorFor = (field: FieldError["field"]) => fieldError?.field === field ? fieldError.message : undefined;
 
   return (
     <Card className="respondent-welcome respondent-signup">
       <div>
-        <h1 ref={heading} tabIndex={-1}>{title}</h1>
-        {step !== "complete" && <p>{step === "phone" ? copy.instruction : copy.verifyInstruction}</p>}
+        <h1 ref={heading} tabIndex={-1}>{step === "email" ? copy.title : copy.sentTitle}</h1>
+        <p>{step === "email" ? copy.instruction : copy.sentInstruction}</p>
       </div>
-      {step === "phone" && (
-        <form onSubmit={submitPhone} noValidate>
+      {step === "email" ? (
+        <form onSubmit={submitEmail} noValidate>
           <Field
-            id="signup-phone"
-            name="phone"
-            label={copy.phone}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
+            id="signup-email"
+            name="email"
+            label={copy.email}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={254}
             required
-            value={phone}
-            readOnly={pending !== null}
-            error={errorFor("phone")}
-            onChange={(event) => { setPhone(event.currentTarget.value); clearFeedback(); }}
+            value={email}
+            readOnly={pending}
+            error={errorFor("email")}
+            onChange={(event) => { setEmail(event.currentTarget.value); clearFeedback(); }}
           />
           <label className="respondent-age">
             <input
@@ -126,7 +108,7 @@ export function RespondentSignup() {
               name="age"
               checked={ageAttested}
               required
-              disabled={pending !== null}
+              disabled={pending}
               aria-invalid={Boolean(errorFor("age"))}
               aria-describedby={errorFor("age") ? "signup-age-error" : undefined}
               onChange={(event) => { setAgeAttested(event.currentTarget.checked); clearFeedback(); }}
@@ -134,34 +116,15 @@ export function RespondentSignup() {
             {copy.age}
           </label>
           {errorFor("age") && <span className="respondent-auth-error" id="signup-age-error" role="alert">{errorFor("age")}</span>}
-          <Button type="submit" variant="pulse" aria-disabled={pending !== null}>{copy.start}</Button>
+          <Button type="submit" variant="pulse" aria-disabled={pending}>{copy.start}</Button>
         </form>
+      ) : (
+        <div className="respondent-auth-actions">
+          <Button variant="secondary" aria-disabled={pending} onClick={() => void sendLink(email)}>{copy.resend}</Button>
+          <Button variant="ghost" aria-disabled={pending} onClick={editEmail}>{copy.editEmail}</Button>
+        </div>
       )}
-      {step === "code" && (
-        <form onSubmit={submitCode} noValidate>
-          <Field
-            id="signup-code"
-            name="code"
-            label={copy.code}
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            spellCheck={false}
-            required
-            value={code}
-            readOnly={pending !== null}
-            error={errorFor("code")}
-            onChange={(event) => { setCode(event.currentTarget.value); clearFeedback(); }}
-          />
-          <Button type="submit" variant="pulse" aria-disabled={pending !== null}>{copy.verify}</Button>
-          <div className="respondent-auth-actions">
-            <Button variant="ghost" aria-disabled={pending !== null} onClick={() => void request("resend", phone)}>{copy.resend}</Button>
-            <Button variant="ghost" aria-disabled={pending !== null} onClick={editPhone}>{copy.editPhone}</Button>
-          </div>
-        </form>
-      )}
-      {step === "complete" && <a className="ev-button respondent-signup-link" href="/r">{copy.completeAction}</a>}
-      {step !== "complete" && <div className="respondent-auth-status" role="status">{status}</div>}
+      <div className="respondent-auth-status" role="status">{pending ? copy.sending : announcement}</div>
       {requestError && <div className="respondent-auth-error" role="alert">{requestError}</div>}
     </Card>
   );

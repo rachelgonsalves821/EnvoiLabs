@@ -5,6 +5,9 @@ import "./signup.css";
 
 export const metadata: Metadata = { title: copy.pageTitle };
 
-export default function RespondentSignupPage() {
-  return <RespondentSignup />;
+export default async function RespondentSignupPage({ searchParams }: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
+  const { error } = await searchParams;
+  return <RespondentSignup initialError={error === "expired" ? copy.expired : ""} />;
 }

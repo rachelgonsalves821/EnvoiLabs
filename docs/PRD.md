@@ -84,7 +84,7 @@ North star metric is **decision-ready studies delivered per week**. A study coun
 | Follow-ups | Live AI probing in every study, 1 to 2 probes per question, not an add-on |
 | Platform | Mobile-first web app (PWA) for respondents, desktop web app for researchers, one codebase |
 | WhatsApp | Not in v1. Signup waitlist checkbox as a demand test, build in v1.1 if 30%+ opt in |
-| Email | Not a nudge channel. Allowed for receipts and legal notices only |
+| Email | Sign-in links for respondents and researchers, plus receipts and legal notices. Study nudges appear in the respondent app and via web push. |
 | Payouts | Gift cards only, through Tremendous |
 | Gamification | Points with stated cash value (100 points = $1), streaks, quality levels, milestone bonuses. No random prize draws |
 | Privacy default | Researchers see redacted transcripts. Voice clips only on per-study respondent opt-in |
@@ -103,7 +103,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 
 | Original note | v1 decision | Why |
 | --- | --- | --- |
-| Respondent account with MFA | Persistent respondent account with passwordless phone sign-in | SMS delivers the sign-in code. MFA stays for researchers. |
+| Respondent account with MFA | Persistent respondent account with passwordless email sign-in | A one-time email link opens the respondent account. Researcher sign-in also requires authenticator MFA. |
 | One general survey (age, gender, etc.) | 6 to 8 profile questions, grown over time by confirming screeners | Keeps signup under 2 minutes and avoids re-asking |
 | Waiver sign | Consent by purpose (recording, transcription vendor, retention, researcher access, voice clip sharing) | Voice is sensitive data. One waiver is not enough |
 | WhatsApp messages or in-app | Web app only in v1. WhatsApp waitlist at signup, build in v1.1 if 30%+ opt in | Keeps the first release focused on one interview channel |
@@ -122,12 +122,12 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 
 **Goal.** From link to first paid interview in under 10 minutes. Every later interview takes one tap to start.
 
-The respondent has a persistent account in the Envoi web app. Home shows study invites the respondent can act on, plus any pending screener or in-progress interview. Earnings is where the respondent sees rewards, chooses a gift card brand and checks payout history. The phone code signs the respondent into that same account on return. An optional SMS nudge, if enabled, links back to the app.
+The respondent has a persistent account in the Envoi web app. Home shows study invites the respondent can act on, plus any pending screener or in-progress interview. Earnings is where the respondent sees rewards, chooses a gift card brand and checks payout history. A one-time email link signs the respondent into that same account on return. Study activity and reminders live in the app, with web push when enabled.
 
 | Stage | What Maya sees and does | What the system does | Requirements |
 | --- | --- | --- | --- |
 | 1. Discover | Scans a campus QR code or taps a friend's referral link. Lands on a page that says "Talk for 10 minutes. Get paid." with an approved reward example and one button, "Get started" | Records the source (QR, referral code, ad) | R-RESP-14 |
-| 2. Sign up | Enters her phone number, types the 6-digit code from SMS, confirms she is 18 or older. Optional checkbox "Prefer to answer on WhatsApp? Join the waitlist" | Creates or retrieves the respondent account, hashes and encrypts the phone, blocks duplicate accounts and virtual numbers, stores the waitlist opt-in | R-RESP-01, R-RESP-13, R-PLAT-05 |
+| 2. Sign up | Enters her email address, confirms she is 18 or older, and opens the one-time sign-in link in the same browser. Optional checkbox "Prefer to answer on WhatsApp? Join the waitlist" | Creates or retrieves the account linked to the verified Supabase Auth identity, records the first age attestation, blocks duplicate respondent accounts and stores the waitlist opt-in | R-RESP-01, R-RESP-13, R-PLAT-05 |
 | 3. Profile | Answers 6 to 8 quick questions by tap or voice. Age range, gender, student status and year, on or off campus, region (ZIP), how often she orders food or shops online, and 2 or 3 interest categories. Takes under 2 minutes | Saves each answer as a profile attribute so it is never asked again | R-RESP-02 |
 | 4. Consent | One screen with plain-language toggles. Recording and transcription for voice answers, retention, researcher access to redacted transcripts and optional per-study voice sharing. Voice sharing is off for the first real study. Link to full terms | Stores one consent record per purpose with the text version | R-RESP-03 |
 | 5. First match | Signed-in Home shows her eligible study invites, a pending screener when required, or "We're finding your first match" with an estimated time | Matching runs on her profile, respecting caps and cooldowns | R-PLAT-02 |
@@ -149,7 +149,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 - Invite expires mid-interview. Answers so far are kept for quality signals, no payout, and the copy is kind ("This one closed. New matches are on the way").
 - Removed for quality. She sees "This interview didn't pass our quality check, so it isn't paid", with a link to the quality guidelines and a way to contact support. Repeated removals lower her level.
 - Payout cap reached. Flag potential cap conflicts before an invite or payout commitment and route exceptions to Platform for review.
-- Under 18, duplicate phone, or banned. Signup or invites are blocked with neutral copy.
+- Under 18 or banned. Signup or invites are blocked with neutral copy. Returning with a verified email opens the existing account.
 
 **Journey metrics.** Signup to first paid interview under 10 minutes (median). Completion after accept 70%+. Respondent satisfaction after the receipt 4.5 of 5 or higher.
 
@@ -203,7 +203,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 
 | ID | Requirement | Acceptance criteria | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| R-RESP-01 | Respondent account and phone sign-in | An SMS code authenticates the phone number. First sign-in creates a persistent account and records the 18+ attestation. Return sign-in opens the same account and preserves saved activity. | Agent 2 with Agent 1 | In progress | |
+| R-RESP-01 | Respondent account and email sign-in | A one-time link verifies access to the email address. First verified sign-in creates a persistent account and records the 18+ attestation. Return sign-in opens the same account and preserves saved activity. | Agent 2 with Agent 1 | In progress (Platform and Respondent) | |
 | R-RESP-02 | Profile of 6 to 8 questions | Answerable by tap or voice. Stored as structured profile attributes. Takes under 2 minutes. | Agent 2 | Not started | |
 | R-RESP-03 | Consent by purpose | Separate consent records for recording, third-party transcription, retention and researcher access. Versioned consent text. | Agent 2 | Not started | |
 | R-RESP-04 | Eligible studies on respondent Home | Signed-in Home shows the respondent's own eligible invites and indicates when a screener is required. Cards show reward, minutes, question count, time left, one-line "why you" and privacy. Accept or "Not for me". Declining never penalizes. | Agent 2 | Not started | |
@@ -242,7 +242,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 | R-PLAT-02 | Matching | SQL filter on profile attributes plus participation caps and cooldowns. Feasibility estimate from eligible active respondents and historical accept and complete rates. | Agent 1 | Not started | |
 | R-PLAT-03 | Study, invite, session and payout state machines | Explicit states and transitions as in section 10. Illegal transitions throw. Every transition writes an audit row. | Agent 1 | Not started | |
 | R-PLAT-04 | Quality scoring | Per-response score 0 to 100 from specificity, relevance, consistency with profile and behavioral signals. Below threshold auto-flags for removal and triggers a replacement invite. | Agent 1 with Agent 3 | Not started | |
-| R-PLAT-05 | Fraud controls | One account per phone, device and gift card recipient caps, virtual number detection, speed and duplicate audio checks. | Agent 1 | Not started | |
+| R-PLAT-05 | Fraud controls | One account per verified email. Device and gift card recipient caps, speed and duplicate audio checks. | Agent 1 | Not started | |
 | R-PLAT-06 | Voice liveness (v1 light) | Random spoken phrase before each study, checked by transcript match. Speaker match is a v1.1 stretch. | Agent 1 with Agent 2 | Not started | |
 | R-PLAT-07 | Redaction | Names, emails, phone numbers, addresses and employers removed from transcripts before any researcher view. An evaluated deterministic analyzer followed by approved contextual redaction. Presidio is the first candidate (BUILD_PLAN section 11). Recall 99%+ for phones and emails, 95%+ for names and employers on the redaction eval. Raw text never reaches researcher endpoints. | Agent 3 | Not started | |
 | R-PLAT-08 | Payout service | Tremendous gift card orders with idempotency keys, quality hold of 24 to 48 hours, annual cap per respondent below $2,000. | Agent 1 | Not started | |
@@ -291,14 +291,14 @@ All LLM calls go through `packages/ai`. Prompts live in versioned files. Every a
 ## 9. Trust and privacy
 
 - Respondent promise "Researchers never get your name, phone number or contact details, and we remove personal details from transcripts. If you choose to share your voice, someone may recognize it." Never say "anonymous".
-- Phone numbers are stored encrypted and never joined into researcher-facing queries. Researcher-facing tables and views exclude PII columns by construction (separate schema with RLS).
+- Respondent login emails are held in restricted Supabase Auth. Researcher-facing queries and views exclude respondent contact data by construction, with private records protected by schema and access policies.
 - Consent text is versioned and every consent record stores the version.
 - Counsel review is required before public launch for voice consent (Illinois BIPA and similar), international student incentive eligibility, and Harvard and MIT recruiting rules. Track in section 16.
 
 ## 10. Domain model and state machines
 
 ### Entities
-`organization`, `researcher`, `respondent`, `respondent_pii` (phone, encrypted), `profile_attribute`, `consent`, `study`, `brief_version`, `criterion`, `guide_question`, `pricing_config`, `quote`, `payment`, `invite`, `screener_answer`, `session`, `answer`, `audio_object`, `transcript`, `probe`, `quality_score`, `removal`, `payout`, `points_entry`, `referral`, `report`, `finding`, `evidence_quote`, `push_subscription`, `whatsapp_waitlist`, `audit_log`, `event`.
+`organization`, `researcher`, `respondent`, `respondent_pii` (restricted private records), `profile_attribute`, `consent`, `study`, `brief_version`, `criterion`, `guide_question`, `pricing_config`, `quote`, `payment`, `invite`, `screener_answer`, `session`, `answer`, `audio_object`, `transcript`, `probe`, `quality_score`, `removal`, `payout`, `points_entry`, `referral`, `report`, `finding`, `evidence_quote`, `push_subscription`, `whatsapp_waitlist`, `audit_log`, `event`.
 
 ### Study states
 `draft` → `scoping` → `brief_ready` → `awaiting_payment` → `fielding` → `fieldwork_complete` → `analyzing` → `report_ready` → `closed`. Side states `paused` and `cancelled` (refund rules in section 16).
@@ -525,7 +525,7 @@ See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for acceptance and pre-s
 | --- | --- | --- | --- | --- |
 | Q-01 | Respondent incentive per core question given the $1 price (30 or 40 cents), and whether to add a per-study platform fee or bill probes to reach positive margin | Claude | 40 cents, review after pilot margin data | Open |
 | Q-01b | Minimum respondents per study | Claude | 5 | Open |
-| Q-02 | iPhone nudge for respondents who never install the PWA. Ask after first payout, one-time SMS link, or both | Claude | Both, SMS behind a flag | Open |
+| Q-02 | How to reach iPhone respondents who never install the PWA | Claude | Use in-app install guidance after the first payout. Revisit optional SMS nudges after v1. | Deferred |
 | Q-03 | Where the first 100 respondents come from beyond MIT and Harvard | Council | Campus ambassadors plus $3k ads test | Open |
 | Q-04 | Can international students on study visas accept paid incentives | Claude | Counsel review before launch | Open |
 | Q-05 | Harvard and MIT rules for recruiting students into paid commercial studies | Claude | Counsel review before launch | Open |
@@ -546,3 +546,4 @@ See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for acceptance and pre-s
 | 2026-11-20 | Envoi Labs | Incorporated the revised kit’s journeys, design and upstream evaluations while preserving live status, Envoi Labs naming and the audited release prerequisites. |
 | 2026-11-21 | Envoi Labs | Added the confirming screener AI specification and mapped both UI journeys, voice transcription and upstream evaluation to gate acceptance. |
 | 2026-11-21 | Rachel via Codex | Clarified the persistent respondent account, eligible studies on Home and gift card management in Earnings. |
+| 2026-11-21 | Rachel via Codex | Switched respondent account sign-in to a one-time email link. Mapped email delivery, verified identity and the 18+ check to Gate 0. |

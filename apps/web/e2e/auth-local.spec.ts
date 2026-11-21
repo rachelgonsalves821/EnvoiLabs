@@ -1,11 +1,9 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
 const enabled = process.env.ENVOI_TEST_LOCAL_SUPABASE === "1";
 const useDefaultTemplate = process.env.ENVOI_AUTH_TEST_LINK === "pkce";
-const phone = "+12025550142";
-const smsCode = "012345";
 
 function loopbackOrigin(value: string | undefined) {
   const url = new URL(value ?? "");
@@ -46,44 +44,82 @@ function totp(secret: string, timeMs: number) {
   return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
+async function deliveredCallback(page: Page, email: string, origin: string, path: string) {
+  const mailpit = "http://127.0.0.1:54324";
+  let messageId: string | undefined;
+  await expect.poll(async () => {
+    const response = await page.request.get(mailpit + "/api/v1/search", { params: { query: "to:" + email } });
+    if (!response.ok()) throw new Error("The disposable mail server could not search messages.");
+    const inbox: { messages: { ID: string }[] } = await response.json();
+    messageId = inbox.messages[0]?.ID;
+    return Boolean(messageId);
+  }, { timeout: 15_000, message: "A sign-in email should arrive for the synthetic user" }).toBe(true);
+
+  if (!messageId) throw new Error("The local sign-in email is missing.");
+  const message = await page.request.get(mailpit + "/api/v1/message/" + encodeURIComponent(messageId));
+  if (!message.ok()) throw new Error("Could not open the local sign-in email.");
+  const delivered: { HTML: string } = await message.json();
+  const href = await page.evaluate((html) => new DOMParser().parseFromString(html, "text/html")
+    .querySelector("a")?.getAttribute("href"), delivered.HTML);
+  if (!href) throw new Error("The local sign-in email did not contain a link.");
+  const callback = new URL(href);
+  if (callback.pathname === "/auth/v1/verify") {
+    const provider = loopbackOrigin(process.env.SUPABASE_URL);
+    if (callback.origin !== provider || callback.pathname !== "/auth/v1/verify"
+        || callback.searchParams.get("redirect_to") !== origin + path) {
+      throw new Error("The default link must verify on the disposable provider and return to the app.");
+    }
+    const cookies = await page.context().cookies();
+    expect(cookies.some(({ name, httpOnly }) => name.endsWith("-code-verifier") && httpOnly)).toBe(true);
+  } else if (useDefaultTemplate || callback.origin !== origin || callback.pathname !== path) {
+    throw new Error("The custom template did not point to the expected local callback.");
+  }
+  return callback.href;
+}
+
 test.describe("local Auth with synthetic fixtures", () => {
   test.skip(!enabled, "Requires a disposable loopback Supabase Auth stack.");
-  test.skip(({ browserName }) => browserName !== "chromium", "Uses one synthetic phone per run.");
+  test.skip(({ browserName }) => browserName !== "chromium", "Uses the disposable local Chromium project.");
 
-  test("respondent can retry a rejected OTP before the app provisions an attested identity", async ({ page, baseURL }) => {
-    loopbackOrigin(baseURL);
+  test("delivered email provisions the respondent and persists age attestation", async ({ browser, page, baseURL }) => {
+    const origin = loopbackOrigin(baseURL);
     const service = localService();
-    const countRespondents = () => service.from("respondents").select("id", { head: true, count: "exact" });
-    const before = await countRespondents();
-    expect(before.error).toBeNull();
-    expect(before.count).not.toBeNull();
-    await page.goto("/r/signup");
-    await page.getByRole("textbox", { name: "Phone number" }).fill(phone);
+    const email = `respondent-${randomUUID()}@example.test`;
+    const expected = await service.from("respondents").select("id", { head: true, count: "exact" });
+    expect(expected.error).toBeNull();
+
+    await page.goto("/r/status");
+    await expect(page).toHaveURL(/\/r\/signup$/);
+    await page.getByLabel("Email address").fill(email);
     await page.getByRole("checkbox", { name: /18 or older/ }).check();
-    await page.getByRole("button", { name: "Text me a code" }).click();
-    await expect(page.getByRole("heading", { name: "Enter your code" })).toBeVisible();
-    const codeInput = page.getByRole("textbox", { name: "Verification code" });
-    await codeInput.fill("111111");
-    await page.getByRole("button", { name: "Verify phone number" }).click();
-    await expect(page.getByText("This code couldn’t be verified. Check it or request a new one.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Phone verified" })).toHaveCount(0);
-    const authCookie = /^sb-.+-auth-token(?:\.\d+)?$/;
-    expect((await page.context().cookies()).some(({ name }) => authCookie.test(name))).toBe(false);
-    const afterRejection = await countRespondents();
-    expect(afterRejection.error).toBeNull();
-    expect(afterRejection.count).toBe(before.count);
+    await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+    const href = await deliveredCallback(page, email, origin, "/api/respondent/auth/callback");
 
-    await codeInput.fill(smsCode);
-    await page.getByRole("button", { name: "Verify phone number" }).click();
-    await expect(page.getByRole("heading", { name: "Phone verified" })).toBeVisible();
+    const stranger = await browser.newContext();
+    try {
+      const rejected = await stranger.newPage();
+      await rejected.goto(origin + "/api/respondent/auth/callback?token_hash=synthetic&type=email");
+      await expect(rejected).toHaveURL(/\/r\/signup\?error=expired$/);
+      const beforeVerification = await service.from("respondents").select("id", { head: true, count: "exact" });
+      expect(beforeVerification.error).toBeNull();
+      expect(beforeVerification.count).toBe(expected.count);
+    } finally {
+      await stranger.close();
+    }
 
+    await page.goto(href);
+    await expect(page).toHaveURL(/\/r\/status$/);
+    await expect(page.getByRole("heading", { name: "You’re signed in" })).toBeVisible();
+    await page.reload();
+    await expect(page).toHaveURL(/\/r\/status$/);
     const cookies = await page.context().cookies();
-    expect(cookies.some(({ name, httpOnly }) => authCookie.test(name) && httpOnly)).toBe(true);
+    expect(cookies.some(({ name, httpOnly }) => /^sb-.+-auth-token(?:\.\d+)?$/.test(name) && httpOnly)).toBe(true);
     const listing = await service.auth.admin.listUsers();
     expect(listing.error).toBeNull();
-    const user = listing.data?.users.find(({ phone: candidate }) => candidate?.replace(/^\+/, "") === phone.slice(1));
-    expect(user).toBeDefined();
+    const user = listing.data?.users.find((candidate) => candidate.email === email);
     if (!user) throw new Error("Synthetic respondent was not created.");
+    expect(user.email_confirmed_at).toBeTruthy();
     const row = await service.from("respondents").select("age_attested_at").eq("auth_user_id", user.id).single();
     expect(row.error).toBeNull();
     expect(row.data?.age_attested_at).toBeTruthy();
@@ -109,37 +145,7 @@ test.describe("local Auth with synthetic fixtures", () => {
     await page.getByLabel("Email address").fill(email);
     await page.getByRole("button", { name: "Send sign-in link" }).click();
     await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
-
-    const mailpit = "http://127.0.0.1:54324";
-    let messageId: string | undefined;
-    await expect.poll(async () => {
-      const response = await page.request.get(mailpit + "/api/v1/search", { params: { query: "to:" + email } });
-      if (!response.ok()) throw new Error("The disposable mail server could not search messages.");
-      const inbox: { messages: { ID: string }[] } = await response.json();
-      messageId = inbox.messages[0]?.ID;
-      return Boolean(messageId);
-    }, { timeout: 15_000, message: "A sign-in email should arrive for the synthetic researcher" }).toBe(true);
-
-    if (!messageId) throw new Error("The local sign-in email is missing.");
-    const message = await page.request.get(mailpit + "/api/v1/message/" + encodeURIComponent(messageId));
-    if (!message.ok()) throw new Error("Could not open the local sign-in email.");
-    const delivered: { HTML: string } = await message.json();
-    const href = await page.evaluate((html) => new DOMParser().parseFromString(html, "text/html")
-      .querySelector("a")?.getAttribute("href"), delivered.HTML);
-    if (!href) throw new Error("The local sign-in email did not contain a link.");
-    const callback = new URL(href);
-    if (useDefaultTemplate) {
-      const provider = loopbackOrigin(process.env.SUPABASE_URL);
-      if (callback.origin !== provider || callback.pathname !== "/auth/v1/verify"
-          || callback.searchParams.get("redirect_to") !== origin + "/api/researcher/auth/callback") {
-        throw new Error("The default link must verify on the disposable provider and return to the app.");
-      }
-      const cookies = await page.context().cookies();
-      expect(cookies.some(({ name, httpOnly }) => name.endsWith("-code-verifier") && httpOnly)).toBe(true);
-    } else if (callback.origin !== origin || callback.pathname !== "/api/researcher/auth/callback") {
-      throw new Error("The custom template did not point to the local researcher callback.");
-    }
-    await page.goto(callback.href);
+    await page.goto(await deliveredCallback(page, email, origin, "/api/researcher/auth/callback"));
     await expect(page).toHaveURL(/\/app\/mfa$/);
     await page.goto("/app");
     await expect(page).toHaveURL(/\/app\/mfa$/);

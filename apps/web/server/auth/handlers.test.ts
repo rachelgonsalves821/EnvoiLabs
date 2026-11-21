@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { researcherCallback, researcherMfa, researcherStart } from "./researcher";
-import { respondentAuth } from "./respondent";
+import { respondentCallback, respondentStart } from "./respondent";
 
 const calls = vi.hoisted(() => ({
   commit: vi.fn(), signIn: vi.fn(), verifyOtp: vi.fn(), exchangeCode: vi.fn(), enroll: vi.fn(),
@@ -9,7 +9,9 @@ const calls = vi.hoisted(() => ({
 }));
 const origin = "https://example.test";
 const userId = "00000000-0000-4000-8000-000000000001";
-const phone = "+12025550123";
+const email = "respondent@example.test";
+const respondentCallbackPath = "/api/respondent/auth/callback";
+const authCode = "f7370adf-aad5-47fd-bfab-ad372e4591e6";
 
 vi.mock("./supabase", () => ({
   appOrigin: () => "https://example.test",
@@ -38,43 +40,67 @@ function post(body: object, requestOrigin = origin) {
 describe("auth handlers", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env.ENVOI_PHONE_DATA_KEY = Buffer.alloc(32, 7).toString("base64");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "synthetic-key-for-test-only");
     calls.commit.mockImplementation((response: Response) => response);
     calls.signIn.mockResolvedValue({ error: null });
     calls.verifyOtp.mockResolvedValue({
-      data: { user: { id: userId, email_confirmed_at: "2026-11-20" }, session: {} }, error: null,
+      data: { user: { id: userId, email, email_confirmed_at: "2026-11-20" }, session: {} }, error: null,
     });
+    calls.exchangeCode.mockImplementation(calls.verifyOtp);
     calls.rpc.mockResolvedValue({ error: null });
     calls.maybeSingle.mockResolvedValue({ data: { id: userId }, error: null });
   });
 
   it("rejects cross-origin starts and missing attestation without sending a message", async () => {
-    expect((await respondentAuth(post({ phone, ageAttested: true }, "https://untrusted.test"), false)).status).toBe(403);
-    expect((await respondentAuth(post({ phone, ageAttested: false }), false)).status).toBe(400);
+    expect((await respondentStart(post({ email, ageAttested: true }, "https://untrusted.test"))).status).toBe(403);
+    expect((await respondentStart(post({ email, ageAttested: false }))).status).toBe(400);
     expect(calls.signIn).not.toHaveBeenCalled();
   });
 
-  it("stores a keyed phone digest and randomized ciphertext after OTP verification", async () => {
-    for (const attempt of [1, 2]) {
-      const result = await respondentAuth(post({ phone, ageAttested: true, code: "123456" }), true);
-      expect(result.status).toBe(200);
-      expect(calls.commit).toHaveBeenCalledTimes(attempt);
-    }
-    const first = calls.rpc.mock.calls[0]?.[1];
-    const second = calls.rpc.mock.calls[1]?.[1];
-    expect(first).toEqual({
-      supplied_user_id: userId, supplied_ciphertext: expect.stringMatching(/^\\x01[\da-f]+$/),
-      supplied_hash: expect.stringMatching(/^\\x[\da-f]{64}$/),
+  it("requests a sign-in link and provisions only after same-browser email verification", async () => {
+    const started = await respondentStart(post({ email: " Respondent@Example.Test ", ageAttested: true }));
+    expect(started.status).toBe(200);
+    expect(calls.signIn).toHaveBeenCalledWith({
+      email, options: { shouldCreateUser: true, emailRedirectTo: origin + respondentCallbackPath },
     });
-    expect(first.supplied_ciphertext).not.toBe(second.supplied_ciphertext);
-    expect(first.supplied_hash).toBe(second.supplied_hash);
-    expect(JSON.stringify(first)).not.toContain(phone);
+    const cookie = started.headers.get("set-cookie") ?? "";
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/Secure/i);
+    expect(cookie).not.toContain(email);
+    expect(calls.rpc).not.toHaveBeenCalled();
+
+    const request = new NextRequest(origin + respondentCallbackPath + "?code=" + authCode, {
+      headers: { Cookie: cookie.split(";")[0]! },
+    });
+    const verified = await respondentCallback(request);
+    expect(verified.headers.get("Location")).toBe(origin + "/r/status");
+    expect(verified.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
+    expect(calls.rpc).toHaveBeenCalledWith("provision_email_respondent", { supplied_user_id: userId });
   });
 
-  it("abandons pending session cookies when the phone is already bound to a different identity", async () => {
-    calls.rpc.mockResolvedValueOnce({ error: { code: "23505" } });
-    const result = await respondentAuth(post({ phone, ageAttested: true, code: "123456" }), true);
-    expect(result.status).toBe(403);
+  it("rejects a callback without an age proof and rejects one bound to another email", async () => {
+    const url = origin + respondentCallbackPath + "?code=" + authCode;
+    const missing = await respondentCallback(new NextRequest(url));
+    expect(missing.headers.get("Location")).toBe(origin + "/r/signup?error=expired");
+    expect(calls.exchangeCode).not.toHaveBeenCalled();
+    const started = await respondentStart(post({ email: "other@example.test", ageAttested: true }));
+    const cookie = started.headers.get("set-cookie")!.split(";")[0]!;
+    calls.commit.mockClear();
+    const mismatched = await respondentCallback(new NextRequest(url, { headers: { Cookie: cookie } }));
+    expect(mismatched.headers.get("Location")).toBe(origin + "/r/signup?error=expired");
+    expect(calls.rpc).not.toHaveBeenCalled();
+    expect(calls.commit).not.toHaveBeenCalled();
+  });
+
+  it("does not commit a session when the respondent database rejects provisioning", async () => {
+    const started = await respondentStart(post({ email, ageAttested: true }));
+    const cookie = started.headers.get("set-cookie")!.split(";")[0]!;
+    calls.commit.mockClear();
+    calls.rpc.mockResolvedValueOnce({ error: { code: "42501" } });
+    const result = await respondentCallback(new NextRequest(
+      origin + respondentCallbackPath + "?token_hash=synthetic&type=email", { headers: { Cookie: cookie } },
+    ));
+    expect(result.headers.get("Location")).toBe(origin + "/r/signup?error=expired");
     expect(calls.commit).not.toHaveBeenCalled();
   });
 

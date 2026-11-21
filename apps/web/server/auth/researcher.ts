@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { emailCallbackCredential, normalizeEmail } from "./email-link";
 import { failure, input, providerFailure, reply } from "./http";
 import { appOrigin, privateHeaders, requestSession, trustedClient } from "./supabase";
 
 const codePattern = /^\d{6}$/;
 const uuidPattern = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i;
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function researcherMembership(userId: string): Promise<"member" | "absent" | "unavailable"> {
   const service = trustedClient();
@@ -18,8 +18,8 @@ async function researcherMembership(userId: string): Promise<"member" | "absent"
 export async function researcherStart(request: NextRequest) {
   const parsed = await input(request);
   if (parsed.error !== undefined) return failure(parsed.error);
-  const email = typeof parsed.body.email === "string" ? parsed.body.email.trim().toLowerCase() : "";
-  if (email.length > 254 || !emailPattern.test(email)) return failure(400);
+  const email = normalizeEmail(parsed.body.email);
+  if (!email) return failure(400);
 
   const origin = appOrigin();
   const session = requestSession(request, { keepPendingVerifier: true });
@@ -41,17 +41,12 @@ export async function researcherCallback(request: NextRequest) {
   const expired = () => NextResponse.redirect(`${origin}/app/sign-in?error=expired`, {
     status: 303, headers: privateHeaders,
   });
-  const token = request.nextUrl.searchParams.get("token_hash");
-  const type = request.nextUrl.searchParams.get("type");
-  const code = request.nextUrl.searchParams.get("code");
-  const credential = code && uuidPattern.test(code) && token === null && type === null
-    ? { code }
-    : token && token.length <= 512 && type === "email" && code === null ? { token } : null;
+  const credential = emailCallbackCredential(request.nextUrl.searchParams);
   if (!credential) return expired();
 
   const session = requestSession(request);
   if (!session.client) return failure(503);
-  const { data, error } = credential.code !== undefined
+  const { data, error } = "code" in credential
     ? await session.client.auth.exchangeCodeForSession(credential.code)
     : await session.client.auth.verifyOtp({ token_hash: credential.token, type: "email" });
   if (error || !data.user?.email_confirmed_at || !data.session

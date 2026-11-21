@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
-import { respondentAuth } from "../../../../../server/auth/respondent";
+import { respondentStart } from "../../../../../server/auth/respondent";
 
 export function POST(request: NextRequest) {
-  return respondentAuth(request, false);
+  return respondentStart(request);
 }
