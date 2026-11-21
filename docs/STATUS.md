@@ -172,3 +172,15 @@ Needs from others. Access to an activated Twilio account and an adult-controlled
 Contract or schema changes. None.
 
 Risks. The preview's phone provider is disabled until a live SMS service is connected. Gate 1 acceptance scenarios, synthetic recordings and the first redaction benchmark are prepared. Feature work follows hosted Gate 0 sign-off.
+
+## 2026-11-21, Platform, R-RESP-01, R-RESP-04 and R-RESP-10 respondent account
+
+Done. Clarified the persistent account in the PRD and mapped it to the build plan and hosted procedure. Gate 0 verifies phone sign-in and account provisioning. Gate 1 delivers signed-in Home for eligible invites and in-progress studies and checks return sign-in. Gate 2 delivers gift card brand choice, status and history in Earnings.
+
+Next. Verify the hosted respondent account with a real SMS and its saved age attestation, then start the Gate 1 implementation.
+
+Needs from others. An activated SMS provider account and a controlled test phone for the current hosted sign-in method.
+
+Contract or schema changes. None.
+
+Risks. The live respondent check remains open. Researcher sign-in passed.
