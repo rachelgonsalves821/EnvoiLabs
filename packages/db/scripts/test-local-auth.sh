@@ -16,7 +16,12 @@ trap cleanup EXIT
 mkdir -- "$test_dir/supabase"
 {
   printf 'project_id = "%s"\n\n' "$project_id"
-  cat -- "$db_dir/scripts/auth-test-config.toml"
+  if [[ "${ENVOI_AUTH_TEST_LINK:-}" == 'pkce' ]]; then
+    sed -e '/^\[auth\.email\.template\.magic_link\]/,+2d' \
+        -e 's/^enable_confirmations = false$/enable_confirmations = true/' "$db_dir/scripts/auth-test-config.toml"
+  else
+    cat -- "$db_dir/scripts/auth-test-config.toml"
+  fi
 } >"$test_dir/supabase/config.toml"
 cp -R -- "$db_dir/migrations" "$test_dir/supabase/migrations"
 cp -R -- "$db_dir/templates" "$test_dir/supabase/templates"

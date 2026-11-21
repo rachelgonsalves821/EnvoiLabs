@@ -14,11 +14,16 @@ concurrency:
 
 jobs:
   auth:
+    strategy:
+      fail-fast: false
+      matrix:
+        link: [custom, pkce]
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       TURBO_TELEMETRY_DISABLED: "1"
+      ENVOI_AUTH_TEST_LINK: ${{ matrix.link }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4

@@ -22,7 +22,8 @@ export async function researcherStart(request: NextRequest) {
   if (email.length > 254 || !emailPattern.test(email)) return failure(400);
 
   const origin = appOrigin();
-  const { client } = requestSession(request);
+  const session = requestSession(request, { keepPendingVerifier: true });
+  const { client } = session;
   if (!origin || !client || !trustedClient()) return failure(503);
   const { error } = await client.auth.signInWithOtp({
     email,
@@ -30,8 +31,8 @@ export async function researcherStart(request: NextRequest) {
   });
   if (error?.status === 429) return failure(429);
   if (error && (!error.status || error.status >= 500)) return failure(503);
-  // Keep the response the same whether or not an account exists.
-  return reply();
+  // Preserve the browser's verifier for standard Supabase links, including on a generic reply.
+  return session.commit(reply());
 }
 
 export async function researcherCallback(request: NextRequest) {
@@ -42,11 +43,17 @@ export async function researcherCallback(request: NextRequest) {
   });
   const token = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type");
-  if (!token || token.length > 512 || type !== "email") return expired();
+  const code = request.nextUrl.searchParams.get("code");
+  const credential = code && uuidPattern.test(code) && token === null && type === null
+    ? { code }
+    : token && token.length <= 512 && type === "email" && code === null ? { token } : null;
+  if (!credential) return expired();
 
   const session = requestSession(request);
   if (!session.client) return failure(503);
-  const { data, error } = await session.client.auth.verifyOtp({ token_hash: token, type });
+  const { data, error } = credential.code !== undefined
+    ? await session.client.auth.exchangeCodeForSession(credential.code)
+    : await session.client.auth.verifyOtp({ token_hash: credential.token, type: "email" });
   if (error || !data.user?.email_confirmed_at || !data.session
       || (await researcherMembership(data.user.id)) !== "member") return expired();
   return session.commit(NextResponse.redirect(`${origin}/app/mfa`, {
