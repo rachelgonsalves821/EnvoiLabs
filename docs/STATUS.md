@@ -6,7 +6,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
-| Gate 0 Foundations | End of week 1 | Hosted preview access and verification pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44837195089), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44837194978), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44837195053) |
+| Gate 0 Foundations | End of week 1 | Preview ready. Hosted respondent and researcher auth pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035438), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035483), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035657), [preview](https://vercel.com/rachelgonsalves821s-projects/envoilabs/7oKtfT1S9yDVJkMbL83rAoG9yznX) |
 | Gate 1 Vertical slice | End of week 3 | Not started | |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
@@ -148,3 +148,15 @@ Next: Close the four-question pre-freeze contract and IT-0.2 role coverage gaps.
 Needs from others: Dedicated Vercel preview URL and access, a preview Supabase project and an operator or scoped access, a controlled test phone, and a provisioned researcher with a controlled mailbox, organization membership and accepted terms.
 Contract or schema changes: None.
 Risks: The GitHub workflows verify local behavior. Both hosted journeys remain unverified.
+
+## 2026-11-20, Platform, Gate 0 hosted acceptance status
+
+Done: Verified the dedicated preview is Ready at app commit `fc19ba5`. The only file changed through `50cba3e` is the database test matrix. All five migrations are in the preview migration history. Main passed build and browser, database and local auth checks. The [four-question contracts package](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035438/artifacts/14680676355) is available. The database suite covers all 33 application tables across seven access contexts.
+
+Next: For R-RESP-01, configure live Twilio Verify, test with an adult-controlled number, verify code delivery and confirm the age-attestation record. For R-RSCH-01, configure SMTP, install the checked-in magic-link template and use the provisioned internal researcher account. Verify link delivery, workspace access denied before TOTP and workspace access after TOTP. Record both results on [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4) before sign-off.
+
+Needs from others: Twilio Verify and SMTP sender setup, plus an adult-controlled SMS test number. The internal researcher account is provisioned with confirmed draft v0.1 acceptance.
+
+Contract or schema changes: None.
+
+Risks: The preview database confirms internal researcher membership and recorded acceptance. The live sign-in checks remain open. Gate 1 has a [handoff](GATE_1_HANDOFF.md) ready for sign-off.
