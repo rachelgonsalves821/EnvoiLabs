@@ -6,8 +6,8 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
-| Gate 0 Foundations | End of week 1 | Researcher hosted email and TOTP passed. Respondent hosted email verification pending | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035438), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035483), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44840035657), [preview](https://vercel.com/rachelgonsalves821s-projects/envoilabs/7oKtfT1S9yDVJkMbL83rAoG9yznX) |
-| Gate 1 Vertical slice | End of week 3 | Acceptance prep underway. Implementation awaits Gate 0 sign-off | [Handoff](GATE_1_HANDOFF.md) |
+| Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [hosted results](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7069644053) |
+| Gate 1 Vertical slice | End of week 3 | Ready for implementation | [Handoff](GATE_1_HANDOFF.md) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
 | Gate 4 Launch hardening | End of week 8 | Not started | |
@@ -196,3 +196,19 @@ Needs from others. None for the internal check. Use distinct test identities and
 Contract or schema changes. Respondent email-link start replaces the phone code request and verification contracts. The service-only provision function requires a verified email and preserves the existing respondent ID and age attestation on return.
 
 Risks. Supabase built-in email has team inbox and rate limits. Use a dedicated sender before recruiting external respondents.
+
+## 2026-11-21, Platform, Gate 0 passed under Rachel’s delegation
+
+Done. The merged email sign-in change [#41](https://github.com/rachelgonsalves821/EnvoiLabs/pull/41) passed [build, lint, types, unit and browser checks](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database checks](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269) and [disposable email auth with both link formats](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268). The build produced the v1 contracts package and ran IT-0.3. The database suite verified clean migrations, idempotent seed, generated types and the IT-0.2 access matrix. The signed-in respondent page stays private, the researcher workspace enforces TOTP, and both role tests use delivered links. Gate 0 debt items D-002 through D-004 are closed. D-001 remains scheduled for Gate 2.
+
+Hosted R-RESP-01 passed on `6996f425` at [deployment dpl_B1vQ5ouSuxhaYM3MMaEVBiPEW5LR](https://vercel.com/rachelgonsalves821s-projects/envoilabs/B1vQ5ouSuxhaYM3MMaEVBiPEW5LR). The dedicated Supabase project `ndanhlqodsgfipwrulji` has all six migrations. In the 21:39 UTC check, a live email link opened the protected respondent account, age attestation persisted, and the respondent session was denied by the researcher MFA endpoint. The email sign-in merge and this preview have identical source trees.
+
+Hosted R-RSCH-01 passed on `7b62dcd` at [deployment dpl_5HQUNHouP23ELJRYExFCKJ8UNUHz](https://vercel.com/rachelgonsalves821s-projects/envoilabs/5HQUNHouP23ELJRYExFCKJ8UNUHz). The live email completed the callback, the workspace stayed locked before TOTP and opened afterward. [Researcher evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7069318710). Both researcher variants passed the disposable email and TOTP checks again on the respondent deployment's code. The supplemental live researcher retry on `6996f425` encountered an email quota and is queued for after the limit clears.
+
+Next. Start the Gate 1 implementation in the order documented in the [handoff](GATE_1_HANDOFF.md). Record the supplemental researcher retry on [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4).
+
+Needs from others. None for Gate 1 kickoff.
+
+Contract or schema changes. The v1 contract artifact includes respondent email-link start. The new provisioning function verifies the Auth email and preserves the respondent identity and original age confirmation on return.
+
+Risks. The hosted internal check uses Supabase's team-only sender. A dedicated email sender is required before external participant enrollment. The payment and incentive decisions remain scheduled for Gate 2.
