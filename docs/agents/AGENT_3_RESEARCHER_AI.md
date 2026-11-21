@@ -33,9 +33,11 @@ You build what founders touch, from the first scoping message to the report, and
 3. Researcher shell. Left rail (studies list, new study, billing), main column, right panel slot. Desktop first at 1280px, works at 1024px, brief becomes a sheet under 900px.
 4. Researcher auth screens (magic link, TOTP setup) using Agent 1's helpers.
 
+Record the OpenInterviewer review during Gate 1 so the decision is ready before live probe implementation in Gate 2.
+
 ## Gate 1 tasks (weeks 2 to 3) → R-RSCH-07 partial, R-RSCH-10 partial, R-PLAT-07
 1. **Minimal study form** (temporary, replaced by scoping in Gate 2). Title, target completes, 2 criteria, 4 core guide questions, launch with `skip_payment` flag in non-prod.
-2. **Transcription job** on `answer.uploaded`. Fetch audio from storage, transcribe with timeout 20 s, fallback provider on error, store transcript with metadata, emit `transcript.ready`.
+2. **Transcription job** on `answer.uploaded`. Fetch private audio after consent verification, transcribe with a bounded timeout and fallback, store provider metadata, and emit `transcript.ready`. Record the real-provider synthetic run and IT-1.2. Send typed answers straight to restricted intake and redaction.
 3. **Redaction v1** (R-PLAT-07). Follow BUILD_PLAN sections 11 and 12. Evaluate Presidio with Platform, run the approved contextual pass, and publish `redacted_text` only after both checks pass. Raw text stays in the PII schema.
 4. **Tracking page v1** (R-RSCH-07). Counts from services, live updates via Supabase Realtime, sample composition table, removals list.
 5. **Transcript viewer** (R-RSCH-10 partial). Redacted transcripts per respondent with profile descriptor (never name).
@@ -53,6 +55,8 @@ You build what founders touch, from the first scoping message to the report, and
 3. **Quote and feasibility UI** (R-RSCH-05). Calls Agent 1's `quoteStudy`. Shows total in the stat style, line items, feasibility sentence with a status chip. "Approve and pay $140" button repeats the amount (7 questions × 20 respondents × $1).
 4. **Checkout UI** (R-RSCH-06). Redirect to Stripe Checkout, success page that waits for the webhook state change, cancel page.
 5. **Quality signals.** An LLM judge in `packages/ai/quality` scores each transcript for specificity and relevance (0 to 100 each) against the guide question, plus the consistency check result for the re-asked profile fact. Emit `QualitySignals`. Agent 1's quality hold turns these into a decision.
+**Confirming screening.** Implement PRD 8.5 and the Gate 2 held-out eval with Platform. Validate structured evidence and its source span. Reuse the speech-to-text adapter for consented audio and handle uncertainty through clarification or review. In the researcher brief, make the screening criteria and questions reviewable before launch. Exercise IT-2.7.
+
 6. **Interviewer agent v1** (PRD 8.2) for the first real study. Record the OpenInterviewer review before implementation and verify the complete probe path with Agent 2.
    - Triggered on `transcript.ready` for core-question answers.
    - Input is the guide question, the transcript, prior answers in this session and the study goal.
