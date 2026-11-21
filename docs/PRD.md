@@ -129,7 +129,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 | 3. Profile | Answers 6 to 8 quick questions by tap or voice. Age range, gender, student status and year, on or off campus, region (ZIP), how often she orders food or shops online, and 2 or 3 interest categories. Takes under 2 minutes | Saves each answer as a profile attribute so it is never asked again | R-RESP-02 |
 | 4. Consent | One screen with plain-language toggles. Recording and transcription for voice answers, retention, researcher access to redacted transcripts and optional per-study voice sharing. Voice sharing is off for the first real study. Link to full terms | Stores one consent record per purpose with the text version | R-RESP-03 |
 | 5. First match | Home shows her first invite card, or "We're finding your first match" with an estimated time | Matching runs on her profile, respecting caps and cooldowns | R-PLAT-02 |
-| 6. Confirming screener (sometimes) | When a match is preliminary, a sheet asks 1 to 3 extra questions ("Have you ordered food after 10pm in the last 30 days?"). Paid a small amount if it takes over 60 seconds | Answers saved to her profile. If she does not qualify she sees "Not a fit this time. We'll find you another one" with no penalty | R-RESP-05 |
+| 6. Confirming screener (sometimes) | When a match is preliminary, a sheet asks 1 to 3 approved questions by typing or voice ("Have you ordered food after 10pm in the last 30 days?"). Paid a small amount if it takes over 60 seconds | Typed answers and consented voice transcripts enter the screening check. Confirmed facts can update her profile. If she does not qualify she sees "Not a fit this time. We'll find you another one" with no penalty | R-RESP-05 |
 | 7. Invite | Invite card shows time left ("Ends in 23 h"), topic in plain words, reward in lime, minutes, number of questions, one line on why she was picked, and the privacy line. Buttons "Start answering" and "Not for me" | Push notification sent if she has installed the app. Invite expires in 24 hours | R-RESP-04, R-RESP-09 |
 | 8. Liveness check | Reads a 4-word phrase out loud ("blue river seven lamp") | Transcript compared to the phrase. A mismatch flags the session for review | R-PLAT-06 |
 | 9. Interview | One question per screen. Progress "3 of 7" top left, reward chip top right. Taps the Echo to record, taps again to stop. Sees "Got it" and the next question. "Type instead" always available | Each answer uploads immediately and is kept locally until confirmed. Transcription runs. The interviewer decides to probe or move on | R-RESP-06, R-RESP-07 |
@@ -187,6 +187,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 | Notes item | v1 owner | Where |
 | --- | --- | --- |
 | Respondent matching | Deterministic SQL with participation caps and cooldowns | R-PLAT-02 |
+| Confirming screening | An LLM interprets free-text or transcribed answers against approved behavioral criteria after matching. Platform applies the screening rules | R-RESP-05, R-PLAT-02, Section 8.5 |
 | Respondent recruiting | Not AI in v1. Campus, referral and ads tracked by source | R-RESP-14 |
 | Survey nudges | Templated, scheduled by the session clock, not AI | R-RESP-09 |
 | Live survey follow-ups | Interviewer agent | Section 8.2 |
@@ -204,7 +205,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 | R-RESP-02 | Profile of 6 to 8 questions | Answerable by tap or voice. Stored as structured profile attributes. Takes under 2 minutes. | Agent 2 | Not started | |
 | R-RESP-03 | Consent by purpose | Separate consent records for recording, third-party transcription, retention and researcher access. Versioned consent text. | Agent 2 | Not started | |
 | R-RESP-04 | Invite card | Shows reward, minutes, question count, time left, one-line "why you", privacy line. Accept or "Not for me". Declining never penalizes. | Agent 2 | Not started | |
-| R-RESP-05 | Confirming screener | 1 to 3 extra questions when a match is preliminary. Pays a small amount if over 60 seconds. Answers saved to profile. | Agent 2 | Not started | |
+| R-RESP-05 | Confirming screener | 1 to 3 approved questions when a match is preliminary. Accept typed or consented spoken answers. Interpret ambiguous answers using section 8.5. Pays a small amount if over 60 seconds. Save confirmed profile facts. | Agent 2 | Not started | |
 | R-RESP-06 | Interview screen | One question per screen. Progress "3 of 7" and reward chip always visible. Echo is the record button. "Type instead" always available. | Agent 2 | Not started | |
 | R-RESP-07 | Voice capture and resume | Each answer uploads as soon as it is recorded. A nudge link resumes at the exact unanswered question. Re-record last answer allowed. | Agent 2 | Not started | |
 | R-RESP-08 | Live follow-up display | Probe appears within 6 seconds p95 of the answer upload. Echo shows `think` state while waiting. | Agent 2 with Agent 3 | Not started | |
@@ -275,8 +276,15 @@ All LLM calls go through `packages/ai`. Prompts live in versioned files. Every a
 - Proposes one follow-up study as a brief draft.
 
 ### 8.4 Transcription
-- Default provider `gpt-4o-mini-transcribe`, fallback Groq Whisper. Behind a provider interface.
-- Store provider, model, latency and cost per transcript.
+- Use the OpenAI primary adapter and Groq Whisper fallback behind `Transcriber`. Verify and pin supported models before enabling live requests. Run a real-provider check on synthetic audio at Gate 1.
+- Send consented audio for transcription after private upload confirmation. Store provider, model, latency and cost per transcript. Keep raw transcripts restricted and publish the redacted version only after the redaction checks pass.
+- Typed answers skip speech recognition and use the same redaction and publication rules. Gate 2 reuses the approved transcription path for spoken screening answers and live interview probes.
+
+### 8.5 LLM-assisted confirming screening
+- Platform matching first applies eligibility, quotas and cooldowns. When a behavioral criterion needs confirmation, the researcher approves the criterion and question in the brief before fielding.
+- Agent 3 interprets one typed answer or consented speech transcript at a time against the approved criterion. The model returns `supported`, `contradicted` or `unclear` with a supporting span when available. Validate both the output schema and the source span. Do not send contact details or full profiles to the model.
+- Agent 1 maps valid evidence to the versioned screening rule. Missing evidence, unclear or timed-out model output and invalid output go to an approved clarification or review. They cannot exclude a respondent on their own. Save only confirmed profile facts and keep raw answers restricted.
+- Run fixture and held-out evaluations in Gate 2 before using the model in a live study. The acceptance criteria are in BUILD_PLAN sections 6 and 7.
 
 ## 9. Trust and privacy
 
@@ -534,3 +542,4 @@ See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for acceptance and pre-s
 | 2026-11-20 | Rachel via Claude | Synced PRD with the build plan. Added the change summary, proprietary-core and reuse decisions, redaction and quote guidance, and the price example |
 | 2026-11-20 | Rachel via Claude | Added section 6 user journeys (notes-to-v1 map, respondent and researcher journeys with edge cases and metrics, where AI is used), section 13 design guidelines (tokens, type, Echo, components, layout, motion, copy, accessibility) and section 14 open-source building blocks. Renumbered sections 6 onward and updated references in all docs |
 | 2026-11-20 | Envoi Labs | Incorporated the revised kit’s journeys, design and upstream evaluations while preserving live status, Envoi Labs naming and the audited release prerequisites. |
+| 2026-11-21 | Envoi Labs | Added the confirming screener AI specification and mapped both UI journeys, voice transcription and upstream evaluation to gate acceptance. |

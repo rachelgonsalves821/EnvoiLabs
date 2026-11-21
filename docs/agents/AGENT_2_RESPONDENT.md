@@ -58,7 +58,7 @@ Source of truth is the [Envoi Labs design system](https://claude.ai/artifact/JfV
 7. Respondent half of `IT-1.1` and all of `IT-1.3`.
 
 ## Gate 2 tasks (weeks 4 to 5) → R-RESP-05, 09, 10, 11
-1. **Confirming screener** (R-RESP-05). Up to 3 questions in a sheet before the invite turns into an interview.
+1. **Confirming screener** (R-RESP-05). Up to 3 approved questions in a sheet for a preliminary match. Support typing and consented voice, show recording, processing and clarification states, and render only the validated result from Platform. Exercise IT-2.7 with Agents 1 and 3.
 2. **Push** (R-RESP-09). VAPID keys from env. Subscription stored via services. Jobs in `inngest/respondent` send the invite push, the halfway nudge (when half the questions are answered and no activity for 2 hours) and the 2-hours-left nudge. Each nudge deep-links to the resume token. Snooze for 3 hours and decline actions.
 3. **iPhone install guide** after the first payout. A 3-step sheet with screenshots placeholder, shown once, dismissible, re-openable from profile. Detect iOS Safari and standalone mode.
 4. **Receipt and payout** (R-RESP-10). Instant receipt screen with the Echo in `payout` state and the amount counting up once over 700ms. "Pending quality check" with expected date. Gift card picker from Agent 1's catalog after the first approved complete. Payout history.

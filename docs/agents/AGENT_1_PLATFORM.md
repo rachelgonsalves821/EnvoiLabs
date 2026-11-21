@@ -77,6 +77,8 @@ You build the foundation everything else stands on, and you run the stage gates.
 4. **Jobs** in `apps/web/inngest/platform`. `invite.waves`, `invite.expire` (24h), `session.abandon`, `study.check_complete`.
 5. **Gate 1 suite** `IT-1.1` to `IT-1.5`. Coordinate with Agents 2 and 3 on selectors (use `data-testid` names agreed in `packages/contracts/testids.ts`).
 
+In Gate 2, apply the PRD 8.5 screening rules and own invitation state and IT-2.7 with Agents 2 and 3. Persist the rule version and validated screening outcome. Keep the existing matching and participation caps authoritative.
+
 ## Gate 2 tasks (weeks 4 to 5) → R-PLAT-01, R-PLAT-04, R-PLAT-08, R-RSCH-06 backend, R-RESP-10 and R-RESP-11 backend
 
 1. **Pricing** in `packages/core/pricing`. `priceStudy(brief, config) -> Quote` where total = core guide questions × target respondents × `unitPriceCents` (default 100). Probes and screeners are never billed. Line items show questions, respondents and unit price. Integer cents. Config read from `pricing_configs` with organization override. Also compute `incentiveCents` per complete from `incentivePerQuestionCents` (placeholder 40) and store `expectedMarginCents` on the quote. Tests `IT-2.3`.

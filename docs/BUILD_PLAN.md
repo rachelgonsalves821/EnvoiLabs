@@ -126,6 +126,20 @@ Contracts frozen at Gate 0 (v1). After Gate 0, additive changes are fine. Breaki
 
 Work proceeds in five gates. **At each gate, all feature work stops until the gate's integration suite is green and its debt review is done.** Agent 1 runs the gate. After every exit criterion has evidence in `docs/STATUS.md`, Codex may record "Gate N passed" there under Rachel’s delegated sign-off. Share the gate result with Rachel and then start the next gate. See `docs/KICKOFF.md` for how the agents are started and supervised.
 
+### Where to see each journey
+
+The [PRD user journeys](PRD.md#6-user-journeys) describe the two paths in full. The [design system](design-system/README.md) includes the interaction specs and component previews. Use the table below to find the running screens or the gate that builds them.
+
+| Gate | Respondent UI | Researcher UI |
+| --- | --- | --- |
+| 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [phone signup](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
+| 1 · Seeded study | Mobile profile and consent screens, invite card, one-question interview with record or type, upload and retry states, resume, submission confirmation. | Minimal four-question study form, review and test launch, live counts and redacted transcript viewer. |
+| 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt and reward selection. | Scoping chat beside the live brief, review of screening criteria and guide, quote, checkout, and live tracking. |
+| 3 · Pilot | Liveness, full Echo states, privacy and withdrawal controls. | Report and findings, verified quotes, hypothesis evidence and next-study proposal. |
+| 4 · Launch | Accessible and resilient interview on mobile. | Export and launch hardening. |
+
+Record browser evidence against the paths for the applicable gate. Include the successful path and visible states for waiting, retry, disqualification or expiry where they apply, plus phone keyboard and reduced-motion checks.
+
 ### Gate 0. Foundations (end of week 1)
 
 Exit criteria
@@ -154,14 +168,15 @@ Exit criteria
 - [ ] Researcher can create a study from a minimal form (scoping chat not required yet), add 4 core guide questions (the PRD billing minimum) and launch without payment (flagged `skip_payment` in non-prod)
 - [ ] Matching selects eligible seeded respondents, creates invites and respects caps
 - [ ] Respondent signs up by phone (Twilio fake in CI), completes profile and consent, sees the invite, accepts, records 4 answers in the browser, and submits
-- [ ] Audio uploads to storage, transcription runs (real provider in a nightly job, fake in CI), transcripts stored with provider metadata
+- [ ] Consented voice answers upload privately and a job calls the primary speech-to-text adapter with a bounded fallback. Record provider, model, latency and cost. Confirm a real-provider run on synthetic browser recordings and keep CI deterministic. Typed answers reach the same redaction path.
 - [ ] Session moves `started` to `submitted` to `quality_hold`
-- [ ] Researcher tracking page shows counts updating, and transcripts are visible redacted
+- [ ] Researcher tracking shows live counts and only redacted transcripts. Record the Presidio benchmark and adoption decision before publication.
+- [ ] Record the OpenInterviewer review before the Gate 2 probe work. See section 11 for the upstream checks.
 - [ ] State machine transitions are audited
 
 Integration tests required
 - `IT-1.1` Playwright E2E `gate1-slice.spec.ts`, two browser contexts (desktop researcher and mobile respondent), full flow above
-- `IT-1.2` transcription pipeline with five synthetic recordings under `packages/testing/fixtures/audio`, including browser-compatible audio formats, asserts transcript stored and redaction applied
+- `IT-1.2` transcription pipeline with five synthetic recordings under `packages/testing/fixtures/audio`, including browser-compatible formats. Verify primary success, timeout and fallback, consent denial, provider metadata, typed answers bypassing speech recognition, and publication only after redaction.
 - `IT-1.3` session resume, kill the page mid-interview, reopen the resume link, land on the next unanswered question
 - `IT-1.4` invite expiry job marks active sessions `abandoned` after 24h (time-travel via injectable clock)
 - `IT-1.5` duplicate or concurrent launches, invite accepts and answer confirmations converge on one durable result. Simulate job dispatch failure after answer persistence and verify that retry delivers the event once logically. Assert that pending or failed redaction never publishes raw content.
@@ -171,7 +186,8 @@ Debt review. Every `Fake` used in the Gate 1 flow is listed in `DEBT.md` with th
 ### Gate 2. Money loop and scoping (end of week 5)
 
 Exit criteria
-- [ ] Scoping chat produces a complete brief through the real LLM with structured `BriefPatch` outputs, and the guide is drafted
+- [ ] Scoping chat produces a complete brief through the real LLM with structured `BriefPatch` outputs, and the researcher approves the screening criteria and guide.
+- [ ] A preliminary match can complete an LLM-assisted confirming screener (R-RESP-05, PRD 8.5). Respondents see the question, progress and a clear result. Platform applies documented qualification rules after Agent 3 validates the model output and evidence. Consent-gated voice answers use the Gate 1 speech-to-text path.
 - [ ] Quote computed by `packages/core` pricing with stored config version, and feasibility from matching
 - [ ] Stripe Checkout in test mode, webhook launches the study, refund path for cancelled studies
 - [ ] Web push invites and halfway and 2-hours-left nudges
@@ -187,8 +203,9 @@ Integration tests required
 - `IT-2.4` quality removal triggers replacement invite, and target completes still reached
 - `IT-2.5` payout cap, a respondent at $1,990 YTD cannot receive a $20 payout and is flagged
 - `IT-2.6` push delivery contract, the nudge job enqueues correct payloads at the right times (injectable clock)
+- `IT-2.7` complete the screening sheet through eligibility and invite state. Cover typed and transcribed answers, supported and contradicted evidence, ambiguity, invalid and timed-out responses, consent, repeated delivery, and an existing participation cap.
 
-**Pre-study checklist.** Platform records the approved cohort and recruiting channel, consent text version and allowed processing, provider data handling and preview isolation. Apply PRD Q-04 through Q-06 to the proposed cohort and processing. Resolve applicable open decisions with Rachel before enrollment. Use synthetic participants while those decisions are pending. Exercise consent enforcement, withdrawal and deletion through storage, queues and derived data, and verify that researcher endpoints and exports only publish redacted artifacts. Keep raw voice sharing off for this first study. Exercise recording and retry on physical iOS Safari and Android Chrome, and verify the respondent probe display and safe timeout before inviting participants. Agree on participant compensation and applicable refund terms with Rachel before any real monetary commitment. Record the actual compensation path separately from sandbox evidence.
+**Pre-study checklist.** Platform records the approved cohort and recruiting channel, consent text version and allowed processing, provider data handling and preview isolation. Apply PRD Q-04 through Q-06 to the proposed cohort and processing. Resolve applicable open decisions with Rachel before enrollment. Use synthetic participants while those decisions are pending. Exercise consent enforcement, withdrawal and deletion through storage, queues and derived data, and verify that researcher endpoints and exports only publish redacted artifacts. Keep raw voice sharing off for this first study. Exercise recording and retry on physical iOS Safari and Android Chrome, verify speech-to-text and the probe display, and verify the screener clarification and timeout paths on approved test inputs before inviting participants. Agree on participant compensation and applicable refund terms with Rachel before any real monetary commitment. Record the actual compensation path separately from sandbox evidence.
 
 Debt review plus a **contract freeze check**. List every breaking contract change since Gate 0 and confirm old versions are removed or dated.
 
@@ -233,6 +250,7 @@ Evals live in `packages/ai/evals`. Each has a fixture set and pass thresholds. R
 | Scoping completeness | 25 scripted founder conversations | 90%+ produce a valid complete `Brief`, 0 prices in agent text |
 | Sizing pushback | 10 sizing goals | 100% push back |
 | Guide quality | 25 briefs | 0 leading questions by rubric judge, 6 to 8 questions each |
+| Confirming screener | Labeled typed answers and equivalent synthetic audio, with clear, contradictory, ambiguous and invalid cases | Record decision agreement and exclusion errors on held-out fixtures. All unsupported, invalid and timed-out decisions must take the clarification or review path. Set the acceptable exclusion error budget before live use. |
 | Probe quality | 60 answer transcripts | 90%+ probes judged non-leading and on-goal, 0 off-topic answers |
 | Redaction | 100 synthetic transcripts with planted PII | Recall 99%+ for phones and emails, 95%+ for names and employers |
 | Analyst evidence | 10 studies of fixture transcripts | 100% quotes verified, theme counts within ±1 of hand labels |
@@ -273,7 +291,7 @@ Risks: <anything that might slip a gate>
 | 1 | Repo, CI, Supabase, schema v1, RLS, contracts v1, fakes, seed, lint rules | `packages/ui` tokens and base components, respondent shell, phone auth screens | `packages/ai` interfaces and fakes, prompt file structure, eval harness, researcher shell |
 | 2 | State machines, matching, invites, session APIs, audit log | Profile, consent, invite card, interview screen with recording | Minimal study form, guide editor, transcription pipeline |
 | 3 | Gate 1 integration suite, expiry job | Upload and resume, receipt stub | Redaction v1, tracking page |
-| 4 | Pricing, Stripe, quality v1, payouts with Tremendous sandbox | Push subscription and nudges, gift card choice | Scoping agent and live brief, quote UI, checkout UI |
+| 4 | Pricing, Stripe, quality v1, payout sandbox, screening rules | Confirming screener, push subscription and nudges, gift card choice | Scoping, screening interpretation and evals, live brief, quote and checkout |
 | 5 | Gate 2 suite, points ledger, replacement invites, pre-study privacy and compensation checks | Points and receipt, probe display, physical-device checks | Interviewer probe agent v1, first real study support |
 | 6 | Fraud controls, liveness check, retention job, admin console | Full Echo (WebGL states), probe display, privacy controls | Analyst agent, report UI, evidence verification |
 | 7 | Gate 3 suite, load test, pilot ops | Accessibility pass, pilot fixes | Evals to threshold, next-study proposal, pilot fixes |
@@ -284,8 +302,8 @@ Risks: <anything that might slip a gate>
 | Candidate | Owner and timing | Decision to record |
 | --- | --- | --- |
 | [Presidio](https://github.com/data-privacy-stack/presidio) | Agents 1 and 3, Gate 1 before researcher transcript publication | Benchmark the analyzer/anonymizer as the deterministic first pass against labeled text. Pin the source revision and image, choose a private deployment for preview and production, and verify failure keeps raw text private. Run an approved contextual pass for missed names, employers and schools. Document an alternative in an ADR if Presidio fails acceptance. |
-| [OpenInterviewer](https://github.com/linxule/openinterviewer) | Agent 3, before writing the live interviewer | Record adopt or skip in an ADR. Compare the probe loop, synthesis and follow-up study patterns against Envoi Labs contracts, voice latency and data boundaries. |
-| [OpenVerbatim](https://github.com/Vellum-Works/openverbatim) | Agent 3, before implementing report evidence | Evaluate its evidence-location pattern. Validate the quote against the exact version of the redacted source in Envoi Labs and suppress invalid evidence. |
+| [OpenInterviewer](https://github.com/linxule/openinterviewer) | Agent 3, review in Gate 1, adapt accepted patterns in Gates 2–3 | In the ADR, pin the commit and map the reviewed probe loop, synthesis and follow-up patterns to Envoi contracts, latency and consent. List what is reused or skipped. Exercise any adopted behavior in probe or report tests. |
+| [OpenVerbatim](https://github.com/Vellum-Works/openverbatim) | Agent 3, Gate 3 before report implementation | Record the pinned revision and adapt the evidence-location pattern. Validate the quote against the exact version of the redacted source, suppress invalid evidence, and submit IT-3.2 results. |
 
 For each proposal, verify the license at the pinned revision and for the files used. If shipping third-party code or images, preserve applicable license, copyright and NOTICE material, record modifications where required, and update [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) in the same PR. Add tests and record the reuse decision in STATUS. Ask Rachel to resolve unclear licensing before adopting code. Keep matching, quality decisions, pricing, points and payout policy in Envoi Labs.
 
