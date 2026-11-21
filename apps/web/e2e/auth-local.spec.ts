@@ -125,7 +125,7 @@ test.describe("local Auth with synthetic fixtures", () => {
     expect(row.data?.age_attested_at).toBeTruthy();
   });
 
-  test("a local magic link needs TOTP before the researcher workspace renders", async ({ page, baseURL }) => {
+  test("researcher email and TOTP unlock persistent study drafts", async ({ page, baseURL }) => {
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `auth-smoke-${randomUUID()}@example.test`;
@@ -150,6 +150,10 @@ test.describe("local Auth with synthetic fixtures", () => {
     await page.goto("/app");
     await expect(page).toHaveURL(/\/app\/mfa$/);
     await expect(page.locator("#new-study")).toHaveCount(0);
+    const denied = await page.request.post("/api/researcher/studies", {
+      headers: { origin, "idempotency-key": randomUUID() }, data: {},
+    });
+    expect(denied.status()).toBe(403);
 
     await page.getByRole("button", { name: "Show setup key" }).click();
     const setupKey = page.locator("main code");
@@ -160,5 +164,39 @@ test.describe("local Auth with synthetic fixtures", () => {
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(page).toHaveURL(/\/app$/);
     await expect(page.getByRole("heading", { name: "New study" })).toBeVisible();
+
+    await page.getByLabel("Study title").fill("Late-night ordering study");
+    await page.getByLabel("Target completes").fill("3");
+    await page.getByLabel("Criterion 1", { exact: true }).selectOption("Ordered food after 10 pm in the last 30 days");
+    await page.getByLabel("Criterion 2", { exact: true }).selectOption("Prefers ordering food in an app");
+    const questions = [
+      "When did you last order food after 10 pm?", "How did you choose what to order?",
+      "What happened when you checked out?", "What made you use that app the next time?",
+    ];
+    for (const [index, question] of questions.entries()) {
+      await page.getByLabel(`Question ${index + 1}`, { exact: true }).fill(question);
+    }
+    const [response] = await Promise.all([
+      page.waitForResponse((item) => item.url().endsWith("/api/researcher/studies") && item.request().method() === "POST"),
+      page.getByRole("button", { name: "Create draft" }).click(),
+    ]);
+    expect(response.status()).toBe(201);
+    await expect(page.getByRole("heading", { name: "Study draft created" })).toBeVisible();
+    const { studyId } = await response.json();
+    expect(studyId).toBe(response.request().headers()["idempotency-key"]);
+    const repeated = await page.request.post("/api/researcher/studies", {
+      data: response.request().postDataJSON(), headers: { origin, "idempotency-key": studyId },
+    });
+    expect(repeated.status()).toBe(201);
+    expect(await repeated.json()).toEqual({ studyId, state: "draft" });
+
+    const [study, guide, createdEvents] = await Promise.all([
+      service.from("studies").select("organization_id, state, target_completes").eq("id", studyId).single(),
+      service.from("guide_questions").select("text, max_probes").eq("study_id", studyId).order("position"),
+      service.from("events").select("name").eq("study_id", studyId).eq("name", "study.created"),
+    ]);
+    expect(study.data).toEqual({ organization_id: organization.data.id, state: "draft", target_completes: 3 });
+    expect(guide.data).toEqual(questions.map((text) => ({ text, max_probes: 0 })));
+    expect(createdEvents.data).toEqual([{ name: "study.created" }]);
   });
 });
