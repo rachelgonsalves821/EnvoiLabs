@@ -1,0 +1,92 @@
+{
+  "source": "Locally synthesized speech from fictional text using FFmpeg flite. These fixtures do not contain participant data.",
+  "cases": [
+    {
+      "codec": "libopus",
+      "media": {
+        "codec_name": "opus",
+        "sample_rate": "48000",
+        "channels": 1
+      },
+      "sha256": "1b10ef44b339dbccbed94025c14d893c963b6831929994d2832ebd4c31e77c0d",
+      "purpose": "Chromium style recording with a clear guide answer",
+      "mime": "audio/webm",
+      "seconds": 3.093,
+      "voice": "slt",
+      "text": "I ordered soup on Tuesday because the store was closed.",
+      "file": "01-delivery.webm",
+      "rate": "48000"
+    },
+    {
+      "codec": "aac",
+      "media": {
+        "codec_name": "aac",
+        "sample_rate": "44100",
+        "channels": 1
+      },
+      "sha256": "9f3b3adf63b310b3e24dab666a3c3c9de8427fb3b7d3f7988d0826f881a21329",
+      "purpose": "Safari style recording with a numeric detail",
+      "mime": "audio/mp4",
+      "seconds": 4.154014,
+      "voice": "kal",
+      "text": "I would pay two dollars if the delivery arrived before my next class.",
+      "file": "02-price.m4a",
+      "rate": "44100"
+    },
+    {
+      "codec": "libopus",
+      "expectedRedaction": [
+        "+1 202-555-0142"
+      ],
+      "media": {
+        "codec_name": "opus",
+        "sample_rate": "48000",
+        "channels": 1
+      },
+      "sha256": "7d40b3935911ee46e9b8b2d0f88a322adc4d803688fcf8c7b4169ad294c7106d",
+      "purpose": "Synthetic phone recognition and redaction",
+      "mime": "audio/webm",
+      "seconds": 5.958,
+      "voice": "awb",
+      "text": "My test phone number is two zero two five five five zero one four two. I ordered a sandwich.",
+      "file": "03-phone.webm",
+      "rate": "48000"
+    },
+    {
+      "codec": "aac",
+      "media": {
+        "codec_name": "aac",
+        "sample_rate": "44100",
+        "channels": 1
+      },
+      "sha256": "4d25eff866ab15e393d250a061f3496552fe063f0b638a3fb079bffb5f846644",
+      "purpose": "Safari style recording with an ambiguous answer",
+      "mime": "audio/mp4",
+      "seconds": 3.58,
+      "voice": "slt",
+      "text": "I am not sure. I think it was sometime before lunch.",
+      "file": "04-unclear.m4a",
+      "rate": "44100"
+    },
+    {
+      "codec": "pcm_s16le",
+      "expectedRedaction": [
+        "Mira Example",
+        "mira@example.test"
+      ],
+      "media": {
+        "codec_name": "pcm_s16le",
+        "sample_rate": "16000",
+        "channels": 1
+      },
+      "sha256": "538e02015963a33746886e467cf78113e04917b2c2b4e9269f7b32a2733ae140",
+      "purpose": "PCM control with synthetic name and email",
+      "mime": "audio/wav",
+      "seconds": 5.467625,
+      "voice": "kal",
+      "text": "My fictional name is Mira Example. The test email is mira at example dot test.",
+      "file": "05-email.wav",
+      "rate": "16000"
+    }
+  ]
+}
