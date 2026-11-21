@@ -240,7 +240,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 | --- | --- | --- | --- | --- | --- |
 | R-PLAT-01 | Pricing formula | Deterministic function `priceStudy(brief, config)` = core questions × target respondents × unit price (default 100 cents). Probes and screeners are not billed. Config in DB, versioned. Every quote stores the config version. | Agent 1 | Not started | |
 | R-PLAT-02 | Matching | SQL filter on profile attributes plus participation caps and cooldowns. Feasibility estimate from eligible active respondents and historical accept and complete rates. | Agent 1 | Not started | |
-| R-PLAT-03 | Study, invite, session and payout state machines | Explicit states and transitions as in section 10. Illegal transitions throw. Every transition writes an audit row. | Agent 1 | Not started | |
+| R-PLAT-03 | Study, invite, session and payout state machines | Explicit states and transitions as in section 10. Illegal transitions throw. Every transition writes an audit row. | Agent 1 | In progress (Platform) | [Pure transition tests](../packages/core/test/state.test.ts) |
 | R-PLAT-04 | Quality scoring | Per-response score 0 to 100 from specificity, relevance, consistency with profile and behavioral signals. Below threshold auto-flags for removal and triggers a replacement invite. | Agent 1 with Agent 3 | Not started | |
 | R-PLAT-05 | Fraud controls | One account per verified email. Device and gift card recipient caps, speed and duplicate audio checks. | Agent 1 | Not started | |
 | R-PLAT-06 | Voice liveness (v1 light) | Random spoken phrase before each study, checked by transcript match. Speaker match is a v1.1 stretch. | Agent 1 with Agent 2 | Not started | |
