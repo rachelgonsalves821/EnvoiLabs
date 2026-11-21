@@ -32,14 +32,14 @@ Rule of ownership. Each directory has exactly one owning agent (section 3). You 
 | Validation and contracts | Zod schemas in `packages/contracts` | One source for API, events and LLM structured output |
 | Background jobs | Inngest | Durable steps, retries, schedules, local dev server |
 | Storage | Supabase Storage, private buckets, signed URLs | Audio files |
-| Auth | Supabase Auth. Phone OTP for respondents, email magic link plus TOTP MFA for researchers | Matches PRD |
+| Auth | Supabase Auth. Phone OTP opens the persistent respondent account. Researchers use an email link plus TOTP MFA. | Matches PRD |
 | Payments | Stripe Checkout and webhooks | Researcher payment |
 | Payouts | Tremendous API (sandbox first) | Gift cards, W-9 and 1099 handling |
 | LLM | Anthropic Claude via `packages/ai` provider interface | Structured outputs, tool use |
 | Transcription | OpenAI primary and Groq Whisper fallback behind an interface | Pin and verify supported models for the deployment before enabling live calls |
 | Redaction | Deterministic analyzer plus approved contextual pass | See section 11 for Presidio evaluation and private hosting |
 | Push | Web Push (VAPID) with `web-push` | PWA notifications |
-| SMS | Twilio Verify for OTP only. SMS nudge behind a flag (PRD Q-02) | |
+| SMS | Twilio Verify delivers the phone sign-in code. Optional SMS nudges link to the web app and stay behind a flag (PRD Q-02). | |
 | UI | React, CSS variables from design tokens, Radix primitives for accessible behavior, Phosphor icons, three.js or raw WebGL for the Echo | Design system fidelity |
 | Testing | Vitest (unit and integration), Playwright (end to end, mobile and desktop projects), Testcontainers or Supabase local for DB tests | |
 | Observability | Sentry for errors, pino structured logs, Inngest dashboard, an `llm_call` table for cost and latency | |
@@ -132,9 +132,9 @@ The [PRD user journeys](PRD.md#6-user-journeys) describe the two paths in full. 
 
 | Gate | Respondent UI | Researcher UI |
 | --- | --- | --- |
-| 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [phone signup](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
-| 1 · Seeded study | Mobile profile and consent screens, invite card, one-question interview with record or type, upload and retry states, resume, submission confirmation. | Minimal four-question study form, review and test launch, live counts and redacted transcript viewer. |
-| 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt and reward selection. | Scoping chat beside the live brief, review of screening criteria and guide, quote, checkout, and live tracking. |
+| 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [phone signup](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation and respondent account provisioning. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
+| 1 · Seeded study | Signed-in Home for eligible invites and in-progress studies, profile and consent screens, one-question interview with record or type, upload and retry states, resume and submission confirmation. | Minimal four-question study form, review and test launch, live counts and redacted transcript viewer. |
+| 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt, and Earnings with gift card brand selection, payout status and history. | Scoping chat beside the live brief, review of screening criteria and guide, quote, checkout, and live tracking. |
 | 3 · Pilot | Liveness, full Echo states, privacy and withdrawal controls. | Report and findings, verified quotes, hypothesis evidence and next-study proposal. |
 | 4 · Launch | Accessible and resilient interview on mobile. | Export and launch hardening. |
 
@@ -167,7 +167,7 @@ One study runs end to end with seeded data and fakes for paid vendors.
 Exit criteria
 - [ ] Researcher can create a study from a minimal form (scoping chat not required yet), add 4 core guide questions (the PRD billing minimum) and launch without payment (flagged `skip_payment` in non-prod)
 - [ ] Matching selects eligible seeded respondents, creates invites and respects caps
-- [ ] Respondent signs up by phone (Twilio fake in CI), completes profile and consent, sees the invite, accepts, records 4 answers in the browser, and submits
+- [ ] Respondent signs up by phone (Twilio fake in CI), completes profile and consent, and sees their own eligible invite on signed-in Home. They accept, record 4 answers in the browser, and submit. Return sign-in restores the same account, study access and saved progress.
 - [ ] Consented voice answers upload privately and a job calls the primary speech-to-text adapter with a bounded fallback. Record provider, model, latency and cost. Confirm a real-provider run on synthetic browser recordings and keep CI deterministic. Typed answers reach the same redaction path.
 - [ ] Session moves `started` to `submitted` to `quality_hold`
 - [ ] Researcher tracking shows live counts and only redacted transcripts. Record the Presidio benchmark and adoption decision before publication.
@@ -175,7 +175,7 @@ Exit criteria
 - [ ] State machine transitions are audited
 
 Integration tests required
-- `IT-1.1` Playwright E2E `gate1-slice.spec.ts`, two browser contexts (desktop researcher and mobile respondent), full flow above
+- `IT-1.1` Playwright E2E `gate1-slice.spec.ts`, desktop researcher and mobile respondent, full flow above. Verify Home shows the respondent's eligible invites and excludes another respondent's invites. Return sign-in must open the same account.
 - `IT-1.2` transcription pipeline with five synthetic recordings under `packages/testing/fixtures/audio`, including browser-compatible formats. Verify primary success, timeout and fallback, consent denial, provider metadata, typed answers bypassing speech recognition, and publication only after redaction.
 - `IT-1.3` session resume, kill the page mid-interview, reopen the resume link, land on the next unanswered question
 - `IT-1.4` invite expiry job marks active sessions `abandoned` after 24h (time-travel via injectable clock)
@@ -192,12 +192,12 @@ Exit criteria
 - [ ] Stripe Checkout in test mode, webhook launches the study, refund path for cancelled studies
 - [ ] Web push invites and halfway and 2-hours-left nudges
 - [ ] Quality hold job approves or removes sessions using the v1 quality score, and removed sessions trigger replacement invites
-- [ ] Tremendous sandbox gift card payout after approval, idempotent, with annual cap enforced
+- [ ] Tremendous sandbox gift card payout after approval, idempotent, with annual cap enforced. Respondent Earnings shows gift card brand choice after the first approved interview, their own payout status and gift card history.
 - [ ] Points ledger, milestone bonuses and receipt UI
 - [ ] **First real study** run on a dedicated, access-controlled preview with hand-recruited respondents (at least 10 completes) and Rachel as researcher. Complete the pre-study checklist below before enrollment.
 
 Integration tests required
-- `IT-2.1` Playwright `gate2-money.spec.ts`, scoping (LLM in fixture-replay mode) to quote to Stripe test checkout to launch to 3 completes to approval to Tremendous sandbox order
+- `IT-2.1` Playwright `gate2-money.spec.ts`, scoping (LLM in fixture-replay mode) to quote to Stripe test checkout to launch to 3 completes to approval to Tremendous sandbox order. Verify gift card selection, status and history in the respondent account
 - `IT-2.2` webhook idempotency, replay every Stripe and Tremendous webhook 3 times, assert one effect
 - `IT-2.3` pricing tests, price equals core questions × respondents × unit price in integer cents, probes and screeners never billed, 5 questions × 1 respondent = 500 cents, config version stored on every quote
 - `IT-2.4` quality removal triggers replacement invite, and target completes still reached
