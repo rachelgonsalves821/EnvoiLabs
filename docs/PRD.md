@@ -203,7 +203,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 
 | ID | Requirement | Acceptance criteria | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| R-RESP-01 | Respondent account and email sign-in | A one-time link verifies access to the email address. First verified sign-in creates a persistent account and records the 18+ attestation. Return sign-in opens the same account and preserves saved activity. | Agent 2 with Agent 1 | In progress (Platform and Respondent) | |
+| R-RESP-01 | Respondent account and email sign-in | A one-time link verifies access to the email address. First verified sign-in creates a persistent account and records the 18+ attestation. Return sign-in opens the same account and preserves saved activity. | Agent 2 with Agent 1 | Done | [Disposable email and MFA flow](../apps/web/e2e/auth-local.spec.ts) and [hosted evidence](STATUS.md#2026-11-21-platform-gate-0-passed-under-rachels-delegation). [Account continuity test](../packages/db/tests/respondent_auth_provisioning.sql). |
 | R-RESP-02 | Profile of 6 to 8 questions | Answerable by tap or voice. Stored as structured profile attributes. Takes under 2 minutes. | Agent 2 | Not started | |
 | R-RESP-03 | Consent by purpose | Separate consent records for recording, third-party transcription, retention and researcher access. Versioned consent text. | Agent 2 | Not started | |
 | R-RESP-04 | Eligible studies on respondent Home | Signed-in Home shows the respondent's own eligible invites and indicates when a screener is required. Cards show reward, minutes, question count, time left, one-line "why you" and privacy. Accept or "Not for me". Declining never penalizes. | Agent 2 | Not started | |
@@ -222,7 +222,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 
 | ID | Requirement | Acceptance criteria | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| R-RSCH-01 | Sign up and organization | Email magic link plus MFA (TOTP). One organization per researcher in v1. Terms acceptance recorded. | Agent 3 with Agent 1 | In progress | |
+| R-RSCH-01 | Sign up and organization | Email magic link plus MFA (TOTP). One organization per researcher in v1. Terms acceptance recorded. | Agent 3 with Agent 1 | Done | [Disposable email and MFA flow](../apps/web/e2e/auth-local.spec.ts) and [hosted evidence](STATUS.md#2026-11-21-platform-gate-0-passed-under-rachels-delegation). |
 | R-RSCH-02 | Scoping chat | Agent asks one question at a time in order (decision, hypotheses, who, exclusions, how many, stimulus, deadline). Quick-reply chips. Researcher can paste their own questions. | Agent 3 | Not started | |
 | R-RSCH-03 | Live brief | Brief panel fills as the chat progresses. Every change is announced in chat. Researcher can edit fields directly. | Agent 3 | Not started | |
 | R-RSCH-04 | Sizing pushback | When a goal implies market sizing, the agent explains interviews cannot size and reframes. | Agent 3 | Not started | |
