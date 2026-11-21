@@ -7,7 +7,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
 | Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [hosted results](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7069644053) |
-| Gate 1 Vertical slice | End of week 3 | Ready for implementation | [Handoff](GATE_1_HANDOFF.md) |
+| Gate 1 Vertical slice | End of week 3 | Implementation started | [Handoff](GATE_1_HANDOFF.md) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
 | Gate 4 Launch hardening | End of week 8 | Not started | |
@@ -212,3 +212,15 @@ Needs from others. None for Gate 1 kickoff.
 Contract or schema changes. The v1 contract artifact includes respondent email-link start. The new provisioning function verifies the Auth email and preserves the respondent identity and original age confirmation on return.
 
 Risks. The hosted internal check uses Supabase's team-only sender. A dedicated email sender is required before external participant enrollment. The payment and incentive decisions remain scheduled for Gate 2.
+
+## 2026-11-21, Platform, Gate 1 R-PLAT-03
+
+Done. Started Gate 1 after delegated Gate 0 sign-off. Added pure study, invite, session and payout transition functions with audit fields. Test launch requires explicit preview authorization. Invite acceptance and active sessions enforce their deadlines using an injected clock.
+
+Next. Persist transitions and audit evidence atomically. Connect seeded matching, invite acceptance, session services and researcher tracking to the tested transitions.
+
+Needs from others. None for this increment.
+
+Contract or schema changes. None.
+
+Risks. This increment defines transition rules. Database concurrency, expiry jobs and audited retries remain to be verified by IT-1.4 and IT-1.5.
