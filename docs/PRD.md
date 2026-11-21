@@ -103,7 +103,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 
 | Original note | v1 decision | Why |
 | --- | --- | --- |
-| Account with MFA for respondents | Phone number plus one-time code, no password | Fewer steps before first value. MFA stays for researchers |
+| Respondent account with MFA | Persistent respondent account with passwordless phone sign-in | SMS delivers the sign-in code. MFA stays for researchers. |
 | One general survey (age, gender, etc.) | 6 to 8 profile questions, grown over time by confirming screeners | Keeps signup under 2 minutes and avoids re-asking |
 | Waiver sign | Consent by purpose (recording, transcription vendor, retention, researcher access, voice clip sharing) | Voice is sensitive data. One waiver is not enough |
 | WhatsApp messages or in-app | Web app only in v1. WhatsApp waitlist at signup, build in v1.1 if 30%+ opt in | Keeps the first release focused on one interview channel |
@@ -122,13 +122,15 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 
 **Goal.** From link to first paid interview in under 10 minutes. Every later interview takes one tap to start.
 
+The respondent has a persistent account in the Envoi web app. Home shows study invites the respondent can act on, plus any pending screener or in-progress interview. Earnings is where the respondent sees rewards, chooses a gift card brand and checks payout history. The phone code signs the respondent into that same account on return. An optional SMS nudge, if enabled, links back to the app.
+
 | Stage | What Maya sees and does | What the system does | Requirements |
 | --- | --- | --- | --- |
 | 1. Discover | Scans a campus QR code or taps a friend's referral link. Lands on a page that says "Talk for 10 minutes. Get paid." with an approved reward example and one button, "Get started" | Records the source (QR, referral code, ad) | R-RESP-14 |
-| 2. Sign up | Enters her phone number, types the 6-digit code from SMS, confirms she is 18 or older. Optional checkbox "Prefer to answer on WhatsApp? Join the waitlist" | Creates the respondent, hashes and encrypts the phone, blocks duplicates and virtual numbers, stores the waitlist opt-in | R-RESP-01, R-RESP-13, R-PLAT-05 |
+| 2. Sign up | Enters her phone number, types the 6-digit code from SMS, confirms she is 18 or older. Optional checkbox "Prefer to answer on WhatsApp? Join the waitlist" | Creates or retrieves the respondent account, hashes and encrypts the phone, blocks duplicate accounts and virtual numbers, stores the waitlist opt-in | R-RESP-01, R-RESP-13, R-PLAT-05 |
 | 3. Profile | Answers 6 to 8 quick questions by tap or voice. Age range, gender, student status and year, on or off campus, region (ZIP), how often she orders food or shops online, and 2 or 3 interest categories. Takes under 2 minutes | Saves each answer as a profile attribute so it is never asked again | R-RESP-02 |
 | 4. Consent | One screen with plain-language toggles. Recording and transcription for voice answers, retention, researcher access to redacted transcripts and optional per-study voice sharing. Voice sharing is off for the first real study. Link to full terms | Stores one consent record per purpose with the text version | R-RESP-03 |
-| 5. First match | Home shows her first invite card, or "We're finding your first match" with an estimated time | Matching runs on her profile, respecting caps and cooldowns | R-PLAT-02 |
+| 5. First match | Signed-in Home shows her eligible study invites, a pending screener when required, or "We're finding your first match" with an estimated time | Matching runs on her profile, respecting caps and cooldowns | R-PLAT-02 |
 | 6. Confirming screener (sometimes) | When a match is preliminary, a sheet asks 1 to 3 approved questions by typing or voice ("Have you ordered food after 10pm in the last 30 days?"). Paid a small amount if it takes over 60 seconds | Typed answers and consented voice transcripts enter the screening check. Confirmed facts can update her profile. If she does not qualify she sees "Not a fit this time. We'll find you another one" with no penalty | R-RESP-05 |
 | 7. Invite | Invite card shows time left ("Ends in 23 h"), topic in plain words, reward in lime, minutes, number of questions, one line on why she was picked, and the privacy line. Buttons "Start answering" and "Not for me" | Push notification sent if she has installed the app. Invite expires in 24 hours | R-RESP-04, R-RESP-09 |
 | 8. Liveness check | Reads a 4-word phrase out loud ("blue river seven lamp") | Transcript compared to the phrase. A mismatch flags the session for review | R-PLAT-06 |
@@ -136,7 +138,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 | 10. Follow-ups | After some answers the Echo pulses while a follow-up is written, then a short probe appears ("What made you pick that app over walking to the store?"). At most 2 per question | Probe shown within 6 seconds at p95. If none arrives in 8 seconds the interview moves on | R-RESP-08, section 8.2 |
 | 11. Stalls | If she stops halfway, she gets a push showing her progress and the agreed reward and another with 2 hours left. Tapping resumes at the exact question | Nudge jobs run on the session's 24-hour clock | R-RESP-09 |
 | 12. Finish | Receipt screen. The Echo flashes lime once, the amount counts up, "Pending quality check, expected by Friday" | Session enters the quality hold. Score combines specificity, relevance, profile consistency, behavior and liveness | R-RESP-10, R-PLAT-04 |
-| 13. Get paid | After her first approved interview she picks a gift card brand once. Later payouts go automatically. Payout history shows every card | Tremendous order with an idempotency key. Annual cap kept under $2,000 | R-RESP-10, R-PLAT-08 |
+| 13. Get paid | After her first approved interview she picks a gift card brand in Earnings. Later payouts go automatically. Earnings shows the status and history of her gift cards | Tremendous order with an idempotency key. Annual cap kept under $2,000 | R-RESP-10, R-PLAT-08 |
 | 14. Keep coming back | Earnings tab shows total earned, points with cash value (100 points = $1), streak, next milestone bonus (5, 10, 25 completes) and quality level. iPhone users see a 3-step "Add to Home Screen" guide after the first payout so nudges reach them | Points ledger, milestone bonuses, quality levels unlock higher-paying studies | R-RESP-11, R-RESP-09 |
 | 15. Control her data | Settings let her stop invites, withdraw from a study, toggle voice sharing per study, export her data, or delete her account | Deletions honored within 30 days, audio deleted after 60 days | R-RESP-12, R-PLAT-09 |
 
@@ -201,16 +203,16 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 
 | ID | Requirement | Acceptance criteria | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| R-RESP-01 | Phone signup with one-time code | Phone number is the identity. No password. Code arrives by SMS. Duplicate numbers rejected. 18+ attestation captured. | Agent 2 with Agent 1 | In progress | |
+| R-RESP-01 | Respondent account and phone sign-in | An SMS code authenticates the phone number. First sign-in creates a persistent account and records the 18+ attestation. Return sign-in opens the same account and preserves saved activity. | Agent 2 with Agent 1 | In progress | |
 | R-RESP-02 | Profile of 6 to 8 questions | Answerable by tap or voice. Stored as structured profile attributes. Takes under 2 minutes. | Agent 2 | Not started | |
 | R-RESP-03 | Consent by purpose | Separate consent records for recording, third-party transcription, retention and researcher access. Versioned consent text. | Agent 2 | Not started | |
-| R-RESP-04 | Invite card | Shows reward, minutes, question count, time left, one-line "why you", privacy line. Accept or "Not for me". Declining never penalizes. | Agent 2 | Not started | |
+| R-RESP-04 | Eligible studies on respondent Home | Signed-in Home shows the respondent's own eligible invites and indicates when a screener is required. Cards show reward, minutes, question count, time left, one-line "why you" and privacy. Accept or "Not for me". Declining never penalizes. | Agent 2 | Not started | |
 | R-RESP-05 | Confirming screener | 1 to 3 approved questions when a match is preliminary. Accept typed or consented spoken answers. Interpret ambiguous answers using section 8.5. Pays a small amount if over 60 seconds. Save confirmed profile facts. | Agent 2 | Not started | |
 | R-RESP-06 | Interview screen | One question per screen. Progress "3 of 7" and reward chip always visible. Echo is the record button. "Type instead" always available. | Agent 2 | Not started | |
 | R-RESP-07 | Voice capture and resume | Each answer uploads as soon as it is recorded. A nudge link resumes at the exact unanswered question. Re-record last answer allowed. | Agent 2 | Not started | |
 | R-RESP-08 | Live follow-up display | Probe appears within 6 seconds p95 of the answer upload. Echo shows `think` state while waiting. | Agent 2 with Agent 3 | Not started | |
 | R-RESP-09 | Nudges | Web push at the halfway point and with 2 hours left before 24h expiry. Snooze and decline allowed. Install-to-home-screen guide on iPhone after first payout. | Agent 2 | Not started | |
-| R-RESP-10 | Receipt and payout | Instant receipt with amount, "pending quality check", expected date. Gift card choice after first completion. Payout sent after quality hold. | Agent 2 with Agent 1 | Not started | |
+| R-RESP-10 | Receipt and payout | Instant receipt with amount, "pending quality check", expected date. Gift card brand choice in Earnings after the first approved completion. Payout is sent after quality hold. The respondent can view their own payout status and gift card history in Earnings. | Agent 2 with Agent 1 | Not started | |
 | R-RESP-11 | Points and levels | Points ledger with cash value shown. Streaks never claw back money. Milestone bonuses at 5, 10, 25 completes. Quality levels unlock higher-paying studies. | Agent 2 with Agent 1 | Not started | |
 | R-RESP-12 | Privacy controls | Delete account, export data, stop invites, withdraw from a study, per-study voice sharing toggle. | Agent 2 | Not started | |
 | R-RESP-13 | WhatsApp waitlist | Optional checkbox at signup, stored with timestamp. Reported as a demand metric. | Agent 2 | Not started | |
@@ -543,3 +545,4 @@ See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for acceptance and pre-s
 | 2026-11-20 | Rachel via Claude | Added section 6 user journeys (notes-to-v1 map, respondent and researcher journeys with edge cases and metrics, where AI is used), section 13 design guidelines (tokens, type, Echo, components, layout, motion, copy, accessibility) and section 14 open-source building blocks. Renumbered sections 6 onward and updated references in all docs |
 | 2026-11-20 | Envoi Labs | Incorporated the revised kit’s journeys, design and upstream evaluations while preserving live status, Envoi Labs naming and the audited release prerequisites. |
 | 2026-11-21 | Envoi Labs | Added the confirming screener AI specification and mapped both UI journeys, voice transcription and upstream evaluation to gate acceptance. |
+| 2026-11-21 | Rachel via Codex | Clarified the persistent respondent account, eligible studies on Home and gift card management in Earnings. |
