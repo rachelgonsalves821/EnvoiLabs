@@ -1,0 +1,90 @@
+{
+  "recognizer": "Vosk",
+  "recognizer_version": "0.3.45",
+  "model": "vosk-model-small-en-us-0.15",
+  "model_url": "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
+  "model_sha256": "30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498",
+  "model_license": "Apache-2.0",
+  "ffmpeg": "ffmpeg version 9.0.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+  "reference_sha256": "136890d1e4d4646f9dc374e5032a11d3b122916398ca5076ab9570ae6e7a6006",
+  "asr_output_sha256": "eb33587a2cb48c059711bff4c631e803d5578a5981ce503a9f2747665d46b05a",
+  "tts": {
+    "engine": "System.Speech/SAPI desktop",
+    "assembly": "4.0.0.0",
+    "voices": [
+      "Microsoft David Desktop",
+      "Microsoft Zira Desktop"
+    ],
+    "windows": "10.0.26200.0",
+    "sampleRate": 16000,
+    "channels": 1,
+    "bits": 16
+  },
+  "asr_data_egress": false,
+  "asr_session_count": 272,
+  "recognized_cases": 272,
+  "asr_sensitive_cases": 236,
+  "deliberately_clean_cases": 36,
+  "evidence_span_count": 36,
+  "edited_words": 861,
+  "reference_words": 6626,
+  "duration_ms": 2516340,
+  "annotation_adjustments": 7,
+  "annotation_method": "Recorded-time Vosk output, token-aligned to frozen references, with complete review and targeted Unicode offset corrections.",
+  "unique_reference_values": {
+    "address": 36,
+    "email": 140,
+    "employer": 60,
+    "evidence": 36,
+    "person": 60,
+    "phone": 140,
+    "school": 18
+  },
+  "audio_conditions": {
+    "dry": 164,
+    "bandlimited": 54,
+    "mild-noise": 54
+  },
+  "span_counts": {
+    "address": {
+      "retained": 11,
+      "changed": 25,
+      "absent": 0
+    },
+    "email": {
+      "retained": 49,
+      "changed": 91,
+      "absent": 0
+    },
+    "employer": {
+      "retained": 33,
+      "changed": 27,
+      "absent": 0
+    },
+    "evidence": {
+      "retained": 30,
+      "changed": 6,
+      "absent": 0
+    },
+    "person": {
+      "retained": 14,
+      "changed": 46,
+      "absent": 0
+    },
+    "phone": {
+      "retained": 65,
+      "changed": 75,
+      "absent": 0
+    },
+    "school": {
+      "retained": 20,
+      "changed": 16,
+      "absent": 0
+    }
+  },
+  "sha256": {
+    "asr-cases.json": "439cbcd4b105722fc23c25ec0d07329eac4b34ab97e5f76766bb48d769b21724",
+    "reference-text-cases.json": "da5da833c729938225762b7de227a7dc742eed4cac88ea6d1835c2e8c8a02b7e",
+    "paired-reviewed.jsonl": "b06f471259f4d532ddf524809dd6efa2ee2622e489748d82db3fe4484f64d2ea"
+  }
+}
