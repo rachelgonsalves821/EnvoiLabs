@@ -49,3 +49,11 @@ Platform owns this Gate 0 check for R-RESP-01 and R-RSCH-01. Use a dedicated Ver
 5. Append the UTC verification time, deployed commit, preview deployment link and preview project identifier to [STATUS](docs/STATUS.md). Record the two email delivery outcomes separately, along with respondent account provisioning and age attestation, and researcher access before and after MFA. Link the passing CI runs for the tested code. Keep test addresses, links, codes, setup keys, callback query strings, tokens and cookies out of the record.
 
 After both hosted journeys pass, review the remaining [Gate 0 criteria](docs/BUILD_PLAN.md) and [debt register](docs/DEBT.md) before recording delegated sign-off on [goal #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4).
+
+## Scheduled Gate 1 interview expiry
+
+The signed Inngest endpoint `/api/inngest` is disabled by default. The expiry job runs on a five-minute UTC schedule, with the scheduled event timestamp as its database cutoff. Repeated execution of the same cutoff updates each due offer or unfinished interview once. The job returns only counts.
+
+For the dedicated Vercel Preview branch or intentional Production environment, scope `ENVOI_GATE1_EXPIRY_ENABLED=1` and the environment's `INNGEST_SIGNING_KEY` to that target. Point `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` at the same target's Supabase database and apply `20261121221500_expire_gate1_interviews.sql`. Keep `INNGEST_DEV` unset on Vercel. Sync `/api/inngest` to the matching Inngest environment and confirm `gate1-expire-interviews` is registered with `*/5 * * * *`. For protected previews, use the Inngest Vercel integration's deployment protection key field if available. [Inngest Vercel setup](https://www.inngest.com/docs/durable-execution/deploying-functions/platforms/vercel)
+
+To exercise local scheduling, set `ENVOI_GATE1_EXPIRY_ENABLED=1` and `INNGEST_DEV=1` for Next development. Use a disposable Supabase instance on loopback and bind the app to `127.0.0.1`. Run the Inngest Dev Server with `inngest dev -u http://127.0.0.1:3000/api/inngest`, then verify the registered function and a scheduled run. [Local Dev Server](https://www.inngest.com/docs/local-development)
