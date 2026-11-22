@@ -58,7 +58,7 @@ body:has(.respondent-shell) { margin: 0; }
   padding: var(--space-5);
 }
 .respondent-invite h2 { font: var(--text-h2); }
-.respondent-invite-chips, .respondent-invite-facts {
+.respondent-invite-chips, .respondent-invite-facts, .respondent-invite-actions {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -70,6 +70,19 @@ body:has(.respondent-shell) { margin: 0; }
   font-variant-numeric: tabular-nums;
 }
 .respondent-invite-privacy { font: var(--text-body-s); }
+.respondent-interview-form { display: grid; gap: var(--space-4); }
+.respondent-interview-form textarea {
+  background: var(--paper-sunk);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+  color: var(--ink);
+  font: var(--text-body);
+  inline-size: 100%;
+  padding: var(--space-3);
+  resize: vertical;
+}
+.respondent-interview-form textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (min-width: 390px) {
   .respondent-main { padding-block-start: var(--space-8); }
 }
