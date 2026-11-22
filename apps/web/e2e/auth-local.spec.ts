@@ -266,6 +266,16 @@ test.describe("local Auth with synthetic fixtures", () => {
 
       await page.getByRole("link", { name: "Back to your studies" }).click();
       await expect(page.getByText("In progress")).toBeVisible();
+      const resumePath = await page.getByRole("link", { name: "Continue interview" }).getAttribute("href");
+      if (!resumePath?.startsWith("/r/s/")) throw new Error("An active interview must have a signed resume path.");
+      const reopened = await page.context().newPage();
+      try {
+        await reopened.goto(origin + resumePath);
+        await expect(reopened.getByRole("heading", { name: "Private test question 3" })).toBeVisible();
+        await expect(reopened.getByText("3 of 4")).toBeVisible();
+      } finally {
+        await reopened.close();
+      }
       await page.getByRole("link", { name: "Continue interview" }).click();
       for (const position of [3, 4]) {
         await expect(page.getByRole("heading", { name: `Private test question ${position}` })).toBeVisible();

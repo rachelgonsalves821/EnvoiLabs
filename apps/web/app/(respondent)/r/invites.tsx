@@ -1,10 +1,13 @@
 import { Card, Chip } from "@envoi-labs/ui";
 import type { HomeInvite } from "../../../server/respondent/home";
+import { createResumeLink } from "../../../server/respondent/resume-link";
 import { homeCopy as copy } from "./copy";
 import { InviteActions } from "./invite-actions";
 import { formatReward } from "./reward";
 
-export function RespondentInvites({ invites, now }: { invites: HomeInvite[] | null; now: number }) {
+export function RespondentInvites({ invites, now, respondentId }: {
+  invites: HomeInvite[] | null; now: number; respondentId: string;
+}) {
   const firstOffer = invites?.find(({ state }) => state === "invited")?.id;
   return (
     <section className="respondent-studies" aria-labelledby="respondent-studies-heading">
@@ -25,6 +28,8 @@ export function RespondentInvites({ invites, now }: { invites: HomeInvite[] | nu
             const minutesLeft = Math.max(1, Math.ceil((Date.parse(invite.expiresAt) - now) / 60_000));
             const status = invite.state === "screening" ? copy.screeningBadge
               : invite.state === "accepted" ? (invite.resumable ? copy.progressBadge : copy.acceptedBadge) : null;
+            const resumeLink = invite.state === "accepted" && invite.resumable
+              ? createResumeLink(invite.id, respondentId, invite.expiresAt, now) : null;
             return (
               <li key={invite.id}>
                 <Card className="respondent-invite">
@@ -47,7 +52,7 @@ export function RespondentInvites({ invites, now }: { invites: HomeInvite[] | nu
                   <p className="respondent-invite-privacy">{copy.privacy}</p>
                   {invite.state === "invited" && <InviteActions inviteId={invite.id} primary={invite.id === firstOffer} />}
                   {invite.state === "accepted" && (
-                    <a className="ev-button respondent-signup-link" href={`/r/interviews/${invite.id}`} data-variant="secondary">
+                    <a className="ev-button respondent-signup-link" href={resumeLink ?? `/r/interviews/${invite.id}`} data-variant="secondary">
                       {invite.resumable ? copy.continue : copy.start}
                     </a>
                   )}

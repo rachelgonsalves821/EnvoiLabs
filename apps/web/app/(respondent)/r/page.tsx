@@ -5,8 +5,9 @@ import { respondentCopy as copy } from "./copy";
 import { RespondentInvites } from "./invites";
 
 export default async function RespondentHome() {
-  if (await getRespondent()) {
-    return <RespondentInvites invites={await loadHomeInvites()} now={Date.now()} />;
+  const respondent = await getRespondent();
+  if (respondent) {
+    return <RespondentInvites invites={await loadHomeInvites()} now={Date.now()} respondentId={respondent.id} />;
   }
 
   return (
