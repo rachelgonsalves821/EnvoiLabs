@@ -1353,6 +1353,10 @@ export type Database = {
         }
         Returns: Json
       }
+      expire_gate1_interviews: {
+        Args: { supplied_cutoff: string }
+        Returns: Json
+      }
       get_gate1_study_tracking: {
         Args: { supplied_study_id: string }
         Returns: Json
@@ -1380,6 +1384,14 @@ export type Database = {
       }
       save_gate1_consent: { Args: { decisions: Json }; Returns: boolean }
       save_gate1_profile: { Args: { attributes: Json }; Returns: boolean }
+      start_gate1_session: {
+        Args: { supplied_invite_id: string }
+        Returns: Json
+      }
+      update_gate1_invite: {
+        Args: { supplied_action: string; supplied_invite_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
