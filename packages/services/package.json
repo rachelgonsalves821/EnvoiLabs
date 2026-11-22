@@ -2,7 +2,12 @@
   "name": "@envoi-labs/services",
   "private": true,
   "type": "module",
+  "exports": {
+    "./study-draft": "./src/study-draft.ts",
+    "./study-draft-criteria": "./src/study-draft-criteria.ts"
+  },
   "scripts": {
     "lint": "cd ../.. && eslint --no-error-on-unmatched-pattern packages/services"
-  }
+  },
+  "dependencies": { "@envoi-labs/contracts": "workspace:*" }
 }
