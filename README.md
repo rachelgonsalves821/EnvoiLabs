@@ -60,6 +60,8 @@ To exercise local scheduling, set `ENVOI_GATE1_EXPIRY_ENABLED=1` and `INNGEST_DE
 
 ## Scheduled Gate 1 private answer processing
 
-The private answer worker has a separate server-side opt-in. Set `ENVOI_GATE1_PRIVATE_ANSWERS_ENABLED=1` only in the intended environment after configuring an approved `OPENAI_API_KEY` or `GROQ_API_KEY`. The same signed app sync registers `gate1-drain-private-answers`, which checks for up to four due jobs per minute. Each step reports whether it found work. The run reports a count. Only the worker and database exchange answer data, and the configured worker keeps transcripts private.
+The private answer worker has a separate server-side opt-in. Set `ENVOI_GATE1_PRIVATE_ANSWERS_ENABLED=1` only in the intended environment after configuring an approved `OPENAI_API_KEY` or `GROQ_API_KEY`. The same signed app sync registers `gate1-drain-private-answers`, which checks for up to four due jobs every five minutes. Each step reports whether it found work. The run reports a count. Only the worker and database exchange answer data, and the configured worker keeps transcripts private.
+
+With both five-minute schedules continuously active for 31 days and no worker backlog, Inngest counts 35,712 executions. Each schedule accounts for one run and one step per tick. The Free plan includes 50,000 monthly executions. Processed answers, retries and other functions use the remaining allowance. [Inngest execution limits](https://www.inngest.com/docs/durable-execution/limits)
 
 For BUILD_PLAN IT-1.5, answer confirmation and its pending job commit together. The periodic scan picks up that durable job after an unavailable trigger or worker restart. The database leases jobs and owns retry timing, so duplicate scans converge on one logical completion. This schedule provides recovery within a later poll and does not meet the interactive probe latency target. Immediate delivery for live probes is still required.

@@ -5,7 +5,7 @@ import { runConfiguredGate1AnswerJob } from "../../server/respondent/gate1-worke
 export function gate1PrivateAnswersFunction(client: Inngest) {
   return client.createFunction({
     id: "gate1-drain-private-answers",
-    triggers: [cron("* * * * *")],
+    triggers: [cron("*/5 * * * *")],
     concurrency: { limit: 1 },
     retries: 3,
   }, ({ event, step }) => {

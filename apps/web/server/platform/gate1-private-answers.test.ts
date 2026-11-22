@@ -1,4 +1,6 @@
+import { Inngest } from "inngest";
 import { describe, expect, it, vi } from "vitest";
+import { gate1PrivateAnswersFunction } from "../../inngest/platform/gate1-private-answers";
 import { gate1InngestConfig } from "./gate1-inngest-config";
 import { drainPrivateGate1Answers } from "./gate1-private-answers";
 
@@ -8,6 +10,13 @@ const hosted: NodeJS.ProcessEnv = {
 };
 
 describe("private answer scheduling", () => {
+  it("registers a five-minute recovery trigger with one concurrent run and finite retries", () => {
+    const worker = gate1PrivateAnswersFunction(new Inngest({ id: "fixture" }));
+    expect(worker.opts.triggers).toEqual([{ cron: "*/5 * * * *" }]);
+    expect(worker.opts.concurrency).toEqual({ limit: 1 });
+    expect(worker.opts.retries).toBe(3);
+  });
+
   it("uses a separate exact opt-in and an approved provider credential in the intended environment", () => {
     expect(gate1InngestConfig(hosted)).toBeNull();
     const voice = { ...hosted, OPENAI_API_KEY: "fixture-openai" };
