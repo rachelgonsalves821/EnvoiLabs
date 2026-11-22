@@ -6,12 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { interviewRequest } from "../../interview-request";
 import { formatReward } from "../../reward";
 import { interviewCopy as copy } from "./copy";
-import { TextAnswer } from "./text-answer";
+import { AnswerComposer } from "./answer-composer";
 
 type InterviewState = { kind: "opening" | "submitted" } | { kind: "open"; session: SessionResponse }
   | { kind: "unavailable" | "closed" | "sessionExpired" };
 
-export function InterviewView({ inviteId }: { inviteId: string }) {
+export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRecord: boolean }) {
   const [state, setState] = useState<InterviewState>({ kind: "opening" });
   const [attempt, setAttempt] = useState(0);
   const [pendingSubmit, setPendingSubmit] = useState(false);
@@ -67,7 +67,7 @@ export function InterviewView({ inviteId }: { inviteId: string }) {
           </div>
           <h1 ref={prompt} tabIndex={-1}>{state.session.nextQuestion?.text ?? copy.complete}</h1>
           {state.session.nextQuestion
-            ? <TextAnswer key={state.session.nextQuestion.id} sessionId={state.session.sessionId}
+            ? <AnswerComposer key={state.session.nextQuestion.id} canRecord={canRecord} sessionId={state.session.sessionId}
               questionId={state.session.nextQuestion.id} onSaved={retry} />
             : <Button variant="pulse" aria-disabled={pendingSubmit} onClick={() => void submit(state.session.sessionId)}>
               {copy.submit}

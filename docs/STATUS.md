@@ -320,3 +320,15 @@ Needs from others. The approved redaction and publication path for real provider
 Contract or schema changes. Reuses the frozen transcript list shape and existing access policies. This increment only reads published rows.
 
 Risks. The viewer currently lists published text. Respondent grouping, approved profile descriptors and exports remain open.
+
+## 2026-11-22, Respondent, Gate 1 R-RESP-07
+
+Done. Added a browser recorder that checks consent before offering the microphone. Stopping stages the recording through a signed write URL while local playback is available. Save confirms the staged answer and advances after acknowledgement. Respondents can re-record, retry a failed upload with the same take, or switch to typing.
+
+Next. Run the signed-in disposable browser check against actual private Storage and confirmation. Verify a private, short-lived on-device draft after a crash.
+
+Needs from others. Platform audio reservation and confirmation, and the speech-to-text job.
+
+Contract or schema changes. None. Reused the frozen upload and record-answer schemas.
+
+Risks. Unconfirmed audio survives retry in the current page. Closing the page discards the in-memory recording. Browser-local drafts need verified-account scoping, consent-revocation cleanup and expiry before storing audio beyond the page. The [synthetic browser scenario](../apps/web/e2e/respondent/voice-fixture.ts) uses intercepted failures and a real signed upload to disposable Storage.

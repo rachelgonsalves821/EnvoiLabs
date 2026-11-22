@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { exerciseVoiceRecording, submitSyntheticRecording } from "./respondent/voice-fixture";
 
 const enabled = process.env.ENVOI_TEST_LOCAL_SUPABASE === "1";
 const useDefaultTemplate = process.env.ENVOI_AUTH_TEST_LINK === "pkce";
@@ -235,6 +236,7 @@ test.describe("local Auth with synthetic fixtures", () => {
 
       const answer = page.getByRole("textbox", { name: "Type your answer" });
       const save = page.getByRole("button", { name: "Save answer" });
+      await expect(page.getByRole("button", { name: "Start recording" })).toHaveCount(0);
       await answer.fill("Synthetic answer one");
       await save.click();
       await expect(page.getByRole("main").getByRole("alert")).toHaveText(
@@ -248,6 +250,16 @@ test.describe("local Auth with synthetic fixtures", () => {
       await page.getByRole("link", { name: "Review privacy choices" }).click();
       await page.getByRole("button", { name: "Review privacy choices" }).click();
       await page.getByRole("checkbox", { name: /Keep my study answers/ }).check();
+      await page.getByRole("checkbox", { name: /Record my voice answers/ }).check();
+      await page.getByRole("checkbox", { name: /Turn my voice answers into text/ }).check();
+      await page.getByRole("button", { name: "Save privacy choices" }).click();
+      await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeVisible();
+      await exerciseVoiceRecording(page, origin, ownInviteId);
+
+      await page.goto("/r/onboarding");
+      await page.getByRole("button", { name: "Review privacy choices" }).click();
+      await page.getByRole("checkbox", { name: /Record my voice answers/ }).uncheck();
+      await page.getByRole("checkbox", { name: /Turn my voice answers into text/ }).uncheck();
       await page.getByRole("button", { name: "Save privacy choices" }).click();
       await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeVisible();
       await page.goto("/r/interviews/" + ownInviteId);
@@ -293,6 +305,48 @@ test.describe("local Auth with synthetic fixtures", () => {
       await page.goto("/r/interviews/" + otherInviteId);
       await expect(page.getByRole("main").getByRole("alert")).toHaveText("This interview isn’t available anymore.");
       await expect(page.getByRole("heading", { name: "Private test question 1" })).toHaveCount(0);
+
+      await page.goto("/r/onboarding");
+      await page.getByRole("button", { name: "Review privacy choices" }).click();
+      await page.getByRole("checkbox", { name: /Record my voice answers/ }).check();
+      await page.getByRole("checkbox", { name: /Turn my voice answers into text/ }).check();
+      await page.getByRole("button", { name: "Save privacy choices" }).click();
+      await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeVisible();
+
+      const voiceStudy = await service.from("studies").insert({
+        organization_id: organization.data.id, title: "Private voice fixture", state: "fielding",
+        target_completes: 1, length_minutes: 8,
+      }).select("id").single();
+      if (voiceStudy.error || !voiceStudy.data) throw new Error("Could not create the second synthetic study.");
+      const voiceStudyId = voiceStudy.data.id;
+      const voiceGuide = await service.from("guide_questions").insert([1, 2, 3, 4].map((position) => ({
+        study_id: voiceStudyId, position, text: `Synthetic voice question ${position}`,
+      })));
+      expect(voiceGuide.error).toBeNull();
+      const voiceInvite = await service.from("invites").insert({
+        study_id: voiceStudyId, respondent_id: respondentId, state: "invited",
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), reward_cents: 250,
+      }).select("id").single();
+      if (voiceInvite.error || !voiceInvite.data) throw new Error("Could not create the synthetic voice invitation.");
+
+      await page.goto("/r");
+      await page.getByRole("button", { name: "Start answering" }).click();
+      await expect(page).toHaveURL(origin + "/r/interviews/" + voiceInvite.data.id);
+      await expect(page.getByRole("heading", { name: "Synthetic voice question 1" })).toBeVisible();
+      const spoken = await submitSyntheticRecording(page);
+      await expect(page.getByRole("heading", { name: "Synthetic voice question 2" })).toBeFocused();
+      expect(spoken.kind).toBe("voice");
+      expect(spoken.durationMs).toBeGreaterThanOrEqual(1000);
+
+      const [voiceAnswer, bucket] = await Promise.all([
+        service.from("answers").select("kind,audio_object_id,duration_ms").eq("id", spoken.id).single(),
+        service.storage.getBucket("gate1-interview-audio"),
+      ]);
+      expect(voiceAnswer.error).toBeNull();
+      expect(voiceAnswer.data).toMatchObject({ kind: "voice", duration_ms: spoken.durationMs });
+      expect(voiceAnswer.data?.audio_object_id).toBeTruthy();
+      expect(bucket.error).toBeNull();
+      expect(bucket.data?.public).toBe(false);
     });
   });
 

@@ -6,10 +6,11 @@ import { useRef, useState, type SubmitEvent } from "react";
 import { interviewRequest } from "../../interview-request";
 import { interviewCopy as copy } from "./copy";
 
-export function TextAnswer({ sessionId, questionId, onSaved }: {
+export function TextAnswer({ sessionId, questionId, onSaved, onBusyChange }: {
   sessionId: string;
   questionId: string;
   onSaved: () => void;
+  onBusyChange: (busy: boolean) => void;
 }) {
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
@@ -29,6 +30,7 @@ export function TextAnswer({ sessionId, questionId, onSaved }: {
     }
     sending.current = true;
     setPending(true);
+    onBusyChange(true);
     setError("");
     if (lastAttempt.current?.text !== answer) lastAttempt.current = { id: crypto.randomUUID(), text: answer };
     const answerId = lastAttempt.current.id;
@@ -43,6 +45,7 @@ export function TextAnswer({ sessionId, questionId, onSaved }: {
     }
     sending.current = false;
     setPending(false);
+    onBusyChange(false);
     if (response.status === 401) setError(copy.sessionExpired);
     else if (response.status === 409) setError(copy.answerConflict);
     else setError(copy.saveFailed);
