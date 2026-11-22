@@ -44,6 +44,12 @@ An aggregate diagnostic replayed the locked candidate and grouped each scored sp
 
 Phone recognition changes usually kept the same token count. V2 covered 29/73 of those spans and 0/2 compressed spans. Email changes included compression (4/17 fully covered), expansion (5/20), and changes at the same token count (20/54). Expanded names and employers were particularly difficult, with 5/40 names and 0/7 employers fully masked. The candidate also missed six unchanged names and thirteen unchanged employers, which confirms that better word recognition alone leaves a redaction gap. These groups describe observed recognition output and do not estimate results for a future speech model. [Aggregate failure groups](../../packages/ai/evals/redaction/contextual/spoken_v2/independent-asr-v2-diagnostics.json)
 
+## Development follow-ups
+
+On 60 known Vosk excerpts, adding a second Whisper Base.en speech pass with same-family corroboration raised full masking of names from 4/15 to 5/15 and schools from 7/15 to 11/15. Employers stayed at 8/15. It altered useful evidence in 2/15 clips and edited 3/15 clean clips, matching V2 on both measures. The extra speech pass took 2.30 seconds at p95.
+
+On 24 known excerpts, an offline Qwen2.5-1.5B Instruct pass added one fully masked school to the frozen V2 output, taking schools from 1/6 to 2/6. Full masking for phone, email, name, employer, and address stayed unchanged. The combined result altered useful evidence in 1/6 clips and edited 1/6 clean clips. The additional pass took 5.26 seconds at p95 including per-clip CLI startup. Both comparisons used known development samples. Qualification still requires an independent holdout.
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
