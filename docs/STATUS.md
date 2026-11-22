@@ -260,3 +260,15 @@ Needs from others. Platform launch and tracking services for the next researcher
 Contract or schema changes. The frozen study draft body and response are reused. Creation also requires an idempotency key. The service-only database function verifies organization membership and persists the draft in one transaction.
 
 Risks. The first form offers the supported criteria from the seeded panel. The real scoping chat is planned for Gate 2.
+
+## 2026-11-21, Platform, Gate 1 R-PLAT-02
+
+Done. Added the test-only study launch service. It matches an opted-in preview study against profile criteria, active invitations and participation limits. It creates the first invite batch and records the launch and invite transitions in one transaction.
+
+Next. Connect the respondent Home and invite acceptance to the same seeded study.
+
+Needs from others. None.
+
+Contract or schema changes. Uses the frozen Gate 1 launch contract. The service-only launch function and the disposable seed supply the preview launch and incentive.
+
+Risks. Future invite waves and the historical feasibility estimate remain open. Preview launch has an explicit opt-in and stays disabled in production.
