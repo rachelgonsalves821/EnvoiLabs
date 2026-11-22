@@ -534,3 +534,15 @@ Needs from others. See the [hosted prerequisites in issue #4](https://github.com
 Contract or schema changes. None.
 
 Risks. Recall still falls short of the gate targets, and hosted checks remain unverified.
+
+### 2026-11-22 — Gate 1 spoken email separators
+
+Done. The offline email rule raised full masks from 115/140 to 132/140 on known recognized speech and from 139/140 to 140/140 on paired authored text. On separate development controls, email masks increased from 4/10 to 10/10 while the combined policy continued to edit 9/10 clean clips and 11/34 evidence spans. All 38 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Use the independent controls to diagnose excess masking and run synthetic recordings through the approved live provider.
+
+Needs from others. See the [hosted prerequisites in issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Independent recall and evidence preservation remain below publication readiness.

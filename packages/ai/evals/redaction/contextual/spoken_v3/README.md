@@ -27,6 +27,8 @@ The person-slot comparison also tests fragmented names within bounded naming, si
 
 The contact-slot comparison measures short internal gaps and alternate final digits after explicit phone cues, with separate guards for order and product identifiers.
 
+The email comparison measures split suffixes, missing separators and suffixes fused to host names. It runs on authored or recognized excerpts and checks masks in original source coordinates.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"

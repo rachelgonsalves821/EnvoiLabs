@@ -121,6 +121,12 @@ An explicit callback or phone phrase permits a bounded digit run to keep short r
 
 On 272 known recognized excerpts, the added pass raised full phone coverage from 123/140 to 132/140. Other sensitive categories and control edits matched the preceding policy. On 20 separately authored development clips, it raised full phone coverage from 5/10 to 9/10. Both policies changed 6/10 clean excerpts and 6/29 annotated evidence spans. Those existing edits and the remaining contact misses still require attention before publication. All 32 focused tests passed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Split and misheard email separators
+
+An offline rule uses explicit email language and a bounded address shape to recover missing or misheard separators, letter-by-letter suffixes and a suffix fused to the host. Website and product language limits the use of ambiguous cues. Every mask uses the original source offsets.
+
+On 272 known recognized excerpts, the added pass raised full email masks from 115/140 to 132/140. The other categories, 12/36 edited clean excerpts and 3/36 altered evidence spans matched the preceding policy. Full email masks on the 272 paired authored excerpts rose from 139/140 to 140/140. On 20 separately authored development clips, email masks rose from 4/10 to 10/10. Both combined policies edited 9/10 clean excerpts and 11/34 evidence spans on those controls, leaving a precision gap. All 38 focused tests passed. The independent qualification set remains sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)

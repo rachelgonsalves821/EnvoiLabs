@@ -9,6 +9,7 @@ from time import perf_counter
 
 from asr_casing import LocalCasingModel, MODEL_FILES, MODEL_REVISION
 from candidate import Hit, candidate_hits, mask
+from email_slot_recovery import recover_email_slots
 from evaluate import GLiNER, LABELS, SessionOptions, THRESHOLD, add_contact_patterns, candidate_analyzer, coverage
 from evaluate_v2 import _IDENTITY_LABELS, _ONNX_SHA, digest, model_identities, predict, sources
 from identity_boundaries import complete_identity_boundaries
@@ -61,7 +62,8 @@ def main():
     source = Path(__file__)
     source_sha = digest(source)
     candidates = [source.with_name(name) for name in (
-        "asr_casing.py", "identity_boundaries.py", "person_slot_recovery.py", "phone_slot_recovery.py",
+        "asr_casing.py", "email_slot_recovery.py", "identity_boundaries.py", "person_slot_recovery.py",
+        "phone_slot_recovery.py",
         "product_context.py", "spoken_contacts_recover.py",
     )]
     candidate_hashes = {rule.name: digest(rule) for rule in candidates}
@@ -91,6 +93,7 @@ def main():
         results["v2_plus_contact_product_casing_and_boundaries"] = report_template()
         results["v2_plus_contact_product_casing_boundaries_and_person_slots"] = report_template()
         results["v2_plus_contact_product_casing_boundaries_and_contact_slots"] = report_template()
+    results["with_spoken_email_repairs"] = report_template()
     for row in rows:
         text = row["text"]
         fixed, contextual, explicit = frozen_v2_components(text, analyzer, model)
@@ -105,6 +108,7 @@ def main():
             row, mask(text, (*fixed, *additional, *with_product_context)),
             results["v2_plus_contact_and_product_context"],
         )
+        email_baseline = (*fixed, *additional, *with_product_context)
         if casing:
             began = perf_counter()
             restored = casing.restore(text)
@@ -129,10 +133,15 @@ def main():
                 row, mask(text, person_masks),
                 results["v2_plus_contact_product_casing_boundaries_and_person_slots"],
             )
+            email_baseline = (*person_masks, *recover_number_slots(text))
             coverage(
-                row, mask(text, (*person_masks, *recover_number_slots(text))),
+                row, mask(text, email_baseline),
                 results["v2_plus_contact_product_casing_boundaries_and_contact_slots"],
             )
+        coverage(
+            row, mask(text, (*email_baseline, *recover_email_slots(text))),
+            results["with_spoken_email_repairs"],
+        )
     if (sources() != frozen_sources or {rule.name: digest(rule) for rule in candidates} != candidate_hashes
             or digest(source) != source_sha or digest(opts.cases) != corpus_sha):
         raise RuntimeError("The evaluation sources or corpus changed during the run")
@@ -140,6 +149,7 @@ def main():
         "cases": len(rows), "source_sha256": source_sha,
         "contact_rules_sha256": candidate_hashes["spoken_contacts_recover.py"],
         "product_context_sha256": candidate_hashes["product_context.py"],
+        "email_slots_source_sha256": candidate_hashes["email_slot_recovery.py"],
         "additional_pass_p95_ms": round(1000 * sorted(times)[ceil(0.95 * len(times)) - 1], 3),
         "corpus_sha256": corpus_sha, "v2_sources": frozen_sources, "results": results,
     }
