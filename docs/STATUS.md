@@ -260,3 +260,15 @@ Needs from others. Platform launch and tracking services for the next researcher
 Contract or schema changes. The frozen study draft body and response are reused. Creation also requires an idempotency key. The service-only database function verifies organization membership and persists the draft in one transaction.
 
 Risks. The first form offers the supported criteria from the seeded panel. The real scoping chat is planned for Gate 2.
+
+## 2026-11-21, Researcher and AI, Gate 1 R-RSCH-07 tracking
+
+Done. Added an MFA-protected study tracking page. It reads the draft title and target through existing tenant policies and refreshes invited, accepted, completed and removed counts while the page is visible. A caller from another organization sees no row.
+
+Next. Connect test launch to tracking when the Platform launch service is ready. Add consent-scoped redacted transcript display and exercise IT-1.1 with the respondent journey.
+
+Needs from others. Test launch and the redacted transcript publication path.
+
+Contract or schema changes. Reused the frozen tracking response. The read function checks organization scope and returns aggregates without granting researcher access to individual invite or session rows.
+
+Risks. Tracking displays confirmed counts. Sample composition and a projected finish still need their own data sources.

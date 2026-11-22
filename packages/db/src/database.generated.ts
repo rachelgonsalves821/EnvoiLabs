@@ -1353,6 +1353,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_gate1_study_tracking: {
+        Args: { supplied_study_id: string }
+        Returns: Json
+      }
       provision_email_respondent: {
         Args: { supplied_user_id: string }
         Returns: string

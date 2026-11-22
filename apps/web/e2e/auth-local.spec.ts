@@ -178,7 +178,7 @@ test.describe("local Auth with synthetic fixtures", () => {
     });
   });
 
-  test("researcher email and TOTP unlock persistent study drafts", async ({ page, baseURL }) => {
+  test("researcher email and TOTP unlock study drafts and live tracking", async ({ page, baseURL }) => {
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `auth-smoke-${randomUUID()}@example.test`;
@@ -251,5 +251,29 @@ test.describe("local Auth with synthetic fixtures", () => {
     expect(study.data).toEqual({ organization_id: organization.data.id, state: "draft", target_completes: 3 });
     expect(guide.data).toEqual(questions.map((text) => ({ text, max_probes: 0 })));
     expect(createdEvents.data).toEqual([{ name: "study.created" }]);
+
+    await page.goto(`/app/studies/${studyId}`);
+    await expect(page.getByRole("heading", { name: "Late-night ordering study" })).toBeVisible();
+    await expect(page.getByText("0 of 3", { exact: true })).toBeVisible();
+
+    const participant = await service.auth.admin.createUser({
+      email: `tracking-participant-${randomUUID()}@example.test`, email_confirm: true,
+    });
+    if (!participant.data.user) throw new Error("Could not create the tracking fixture user.");
+    const respondent = await service.rpc("provision_email_respondent", { supplied_user_id: participant.data.user.id });
+    expect(respondent.error).toBeNull();
+    const fielding = await service.from("studies").update({ state: "fielding" }).eq("id", studyId);
+    expect(fielding.error).toBeNull();
+    const invite = await service.from("invites").insert({
+      study_id: studyId, respondent_id: respondent.data, state: "accepted", reward_cents: 100,
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+    }).select("id").single();
+    expect(invite.error).toBeNull();
+    const session = await service.from("sessions").insert({
+      study_id: studyId, invite_id: invite.data?.id, state: "quality_hold", submitted_at: new Date().toISOString(),
+      started_at: new Date(Date.now() - 60_000).toISOString(),
+    });
+    expect(session.error).toBeNull();
+    await expect(page.getByText("1 of 3", { exact: true })).toBeVisible({ timeout: 12_000 });
   });
 });
