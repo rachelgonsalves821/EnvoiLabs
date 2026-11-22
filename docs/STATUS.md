@@ -522,3 +522,15 @@ Needs from others. See the hosted prerequisites in [issue #4](https://github.com
 Contract or schema changes. None.
 
 Risks. The independent recall thresholds and hosted speech and scheduler checks remain open.
+
+### 2026-11-22 — Gate 1 spoken phone gaps
+
+Done. Adding bounded phone spans raised full phone masks from 123/140 to 132/140 on 272 known recognized excerpts and from 5/10 to 9/10 on independent development controls. Clean and evidence edits matched the baseline in both comparisons. All 32 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Run the approved live speech check and evaluate a frozen policy against independent recognition.
+
+Needs from others. See the [hosted prerequisites in issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Recall still falls short of the gate targets, and hosted checks remain unverified.

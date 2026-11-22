@@ -115,6 +115,12 @@ A bounded person-slot rule uses naming, signing and attribution cues to keep fra
 
 On the 272 known recognized excerpts, adding this rule increased full name masks from 27/60 to 34/60. Coverage across the other categories matched the boundary baseline, as did edits to clean excerpts (12/36) and evidence spans (3/36). On a separate 18-excerpt fictional development set, both policies fully masked nine names, edited 6/9 clean clips and edited 7/27 evidence spans. Those remaining evidence edits matter to researcher usability. The independent qualification set remains sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Bounded phone-number gaps and alternate digits
+
+An explicit callback or phone phrase permits a bounded digit run to keep short recognition gaps and alternate final digits in the same source mask. Order, tracking, account and product identifiers are guarded separately. The policy keeps the original text offsets.
+
+On 272 known recognized excerpts, the added pass raised full phone coverage from 123/140 to 132/140. Other sensitive categories and control edits matched the preceding policy. On 20 separately authored development clips, it raised full phone coverage from 5/10 to 9/10. Both policies changed 6/10 clean excerpts and 6/29 annotated evidence spans. Those existing edits and the remaining contact misses still require attention before publication. All 32 focused tests passed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
