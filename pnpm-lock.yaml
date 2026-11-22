@@ -29,6 +29,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@envoi-labs/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@envoi-labs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
