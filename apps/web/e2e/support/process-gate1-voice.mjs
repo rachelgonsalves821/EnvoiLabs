@@ -34,4 +34,4 @@ for (const answerId of audioIds) {
     throw new Error("The disposable worker did not publish the expected synthetic result.");
   }
 }
-console.log(audioIds.length);
+process.stdout.write(`${audioIds.length}\n`);
