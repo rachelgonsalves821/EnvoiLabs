@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { exerciseVoiceRecording } from "./respondent/voice-fixture";
 
 const enabled = process.env.ENVOI_TEST_LOCAL_SUPABASE === "1";
 const useDefaultTemplate = process.env.ENVOI_AUTH_TEST_LINK === "pkce";
@@ -235,6 +236,7 @@ test.describe("local Auth with synthetic fixtures", () => {
 
       const answer = page.getByRole("textbox", { name: "Type your answer" });
       const save = page.getByRole("button", { name: "Save answer" });
+      await expect(page.getByRole("button", { name: "Start recording" })).toHaveCount(0);
       await answer.fill("Synthetic answer one");
       await save.click();
       await expect(page.getByRole("main").getByRole("alert")).toHaveText(
@@ -248,6 +250,16 @@ test.describe("local Auth with synthetic fixtures", () => {
       await page.getByRole("link", { name: "Review privacy choices" }).click();
       await page.getByRole("button", { name: "Review privacy choices" }).click();
       await page.getByRole("checkbox", { name: /Keep my study answers/ }).check();
+      await page.getByRole("checkbox", { name: /Record my voice answers/ }).check();
+      await page.getByRole("checkbox", { name: /Turn my voice answers into text/ }).check();
+      await page.getByRole("button", { name: "Save privacy choices" }).click();
+      await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeVisible();
+      await exerciseVoiceRecording(page, origin, ownInviteId);
+
+      await page.goto("/r/onboarding");
+      await page.getByRole("button", { name: "Review privacy choices" }).click();
+      await page.getByRole("checkbox", { name: /Record my voice answers/ }).uncheck();
+      await page.getByRole("checkbox", { name: /Turn my voice answers into text/ }).uncheck();
       await page.getByRole("button", { name: "Save privacy choices" }).click();
       await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeVisible();
       await page.goto("/r/interviews/" + ownInviteId);
