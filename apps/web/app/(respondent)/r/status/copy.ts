@@ -3,4 +3,5 @@ export const statusCopy = {
   title: "You’re signed in",
   instruction: "Your Envoi account is ready.",
   action: "Back to Envoi",
+  profile: "Profile and privacy choices",
 };
