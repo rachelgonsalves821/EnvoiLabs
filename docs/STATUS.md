@@ -388,3 +388,15 @@ Needs from others. An approved transcription project key in GitHub Actions and a
 Contract or schema changes. None in this verification. The request and response shapes remain those used by the tested preview.
 
 Risks. The independent redaction trial on 272 recognized synthetic excerpts missed publication thresholds. Gate 1 remains open for live processing and redaction qualification. [Frozen independent redaction results](https://github.com/rachelgonsalves821/EnvoiLabs/pull/75)
+
+## 2026-11-22, Platform, Gate 1 live speech verification
+
+Done. The live synthetic workflow now requires two fixture-specific speech terms from each recording. A local run used an actual Chromium capture and mocked provider responses. All six files passed. The evidence reports the provider, model, latency, estimated cost and term counts. It excludes transcript text.
+
+Next. Dispatch the workflow with an approved provider credential and record its exact result.
+
+Needs from others. Add an approved OpenAI or Groq project key to GitHub Actions.
+
+Contract or schema changes. None.
+
+Risks. The hosted provider and the output it produces for independent redaction qualification still need verification.

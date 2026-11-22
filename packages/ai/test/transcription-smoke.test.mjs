@@ -47,10 +47,13 @@ describe("Gate 1 transcription smoke", () => {
     ["openai", "OPENAI_API_KEY", "gpt-transcribe", "https://api.openai.com/v1/audio/transcriptions", 150],
     ["groq", "GROQ_API_KEY", "whisper-large-v3-turbo", "https://api.groq.com/openai/v1/audio/transcriptions", 112],
   ])("uses the %s adapter and leaves transcripts out of the evidence", async (mode, key, model, endpoint, cost) => {
+    const fixtureResults = ["SOUP came from the store.", "Two dollars before class.", "Phone and sandwich.",
+      "Not sure until lunch.", "The NAME and e-mail are synthetic."];
+    let index = 0;
     const fetch = vi.fn(async (_url, request) => {
       expect(request.body.get("model")).toBe(model);
       expect(request.body.get("file")).toBeInstanceOf(Blob);
-      return Response.json({ text: "synthetic transcript content", usage: { type: "duration", seconds: 2 } });
+      return Response.json({ text: fixtureResults[index++], usage: { type: "duration", seconds: 2 } });
     });
 
     const report = await transcriptionSmoke({ mode, env: { [key]: "test-secret" }, fetch });
@@ -58,6 +61,16 @@ describe("Gate 1 transcription smoke", () => {
     expect(fetch).toHaveBeenCalledTimes(5);
     expect(fetch.mock.calls.every(([url]) => url === endpoint)).toBe(true);
     expect(report.files.every((entry) => entry.model === model && entry.estimatedCostMicros === cost)).toBe(true);
-    expect(JSON.stringify(report)).not.toMatch(/synthetic transcript content|test-secret/);
+    expect(report.files.every((entry) => entry.matchedResearchTerms === 2 && entry.expectedResearchTerms === 2)).toBe(true);
+    expect(JSON.stringify(report)).not.toMatch(/SOUP|synthetic\.|test-secret/);
+  });
+
+  it("rejects a nonempty response missing an expected speech term without leaking its text", async () => {
+    const fetch = vi.fn(async () => Response.json({ text: "The store sold an unrelated answer." }));
+    const run = transcriptionSmoke({ mode: "openai", env: { OPENAI_API_KEY: "test-secret" }, fetch });
+
+    await expect(run).rejects.toThrow("01-delivery.webm (1/2 terms)");
+    await expect(run).rejects.not.toThrow(/unrelated answer|test-secret/);
+    expect(fetch).toHaveBeenCalledOnce();
   });
 });
