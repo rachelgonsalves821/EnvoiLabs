@@ -23,6 +23,8 @@ Stage `config.json`, `tokenizer.json` and `onnx/model_quantized.onnx` together i
 
 The comparison reports a boundary policy that can complete a detected identity with adjacent cased words or a corroborated explicit identity span. It keeps the individual casing policies available as baselines.
 
+The person-slot comparison also tests fragmented names within bounded naming, signing and attribution phrases. Ambiguous slots need casing or a corroborating person detection. The resulting masks keep the original speech offsets.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"
