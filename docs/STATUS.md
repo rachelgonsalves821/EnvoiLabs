@@ -412,3 +412,15 @@ Needs from others. See [Gate 1 evidence and hosted prerequisites](https://github
 Contract or schema changes. None.
 
 Risks. Live speech recognition and independent redaction qualification remain open.
+
+### 2026-11-22 — Gate 1 transcription formatting and classifier evaluation
+
+Done. Paired local tests on 60 known synthetic recordings found no contact-format improvement from a Whisper prompt. The local PII classifier added some fully masked spans to V2 and also increased alterations to useful evidence and clean text. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Run the approved provider check on synthetic audio and use representative recognized speech to evaluate the next private redaction candidate.
+
+Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Real-provider audio and independent publication qualification remain outstanding.
