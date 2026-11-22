@@ -18,10 +18,11 @@ _PHONE_AFTER = re.compile(r"^\s*(?:for (?:the )?(?:calls?|texts?)|when (?:they|y
 _LOCAL_START = re.compile(
     r"\b(?:the receipt goes to|replies? (?:go|goes) to|updates? (?:go|goes) to|sent to|"
     r"inbox (?:as|is|was)|(?:email|address) (?:is|was|as)|"
-    r"say the emails?(?: slowly)?|says|said|"
-    r"i (?:put|used|entered|gave|typed|wrote|use)|(?:write|send|mail) (?:it |a copy )?to|"
-    r"have it sent(?: to)?|and then|now use|(?:it's|it is)|use|to|as)\s+", re.I,
+    r"say the emails?(?: slowly)?|(?:i|we) spell it|mailing list (?:uses|used)|says|said|"
+    r"(?:i|we) (?:put|used|entered|gave|typed|wrote|use)|(?:write|send|mail) (?:it |a copy )?to|"
+    r"have it sent(?: to)?|and then|now use|(?:it's|it is)|use|to|as)(?:\s*:\s*|\s+)", re.I,
 )
+_HANDLE_ACTION = re.compile(r"\b(?:try|i (?:(?:don't|don’t) )?(?:check|read))\s+", re.I)
 _EMAIL_INTENT = re.compile(
     r"\b(?:e-?mail|inbox|written repl(?:y|ies)|written updates?|"
     r"mailing list|address|spell it|send a copy|confirmation|account|profile)\b", re.I,
@@ -147,17 +148,29 @@ def _email_runs(text, tokens):
             handle_end -= 1
         if handle_end < 1:
             continue
-        left_first = max(0, handle_end - 8)
+        left_limit = 12 if strict else 8
+        left_first = max(0, handle_end - left_limit)
         left = text[tokens[left_first].start:tokens[handle_end - 1].end]
         cue = tuple(_LOCAL_START.finditer(left))
         if cue:
             lower = tokens[left_first].start + cue[-1].end()
             first = next((i for i in range(left_first, handle_end) if tokens[i].start >= lower), handle_end)
         else:
-            operators = [i for i in range(max(left_first + 1, handle_end - 6), handle_end) if tokens[i].word in _HANDLE_BREAK]
-            if not operators:
-                continue
-            first = operators[0] - 1
+            action = tuple(_HANDLE_ACTION.finditer(left))
+            if strict and action:
+                lower = tokens[left_first].start + action[-1].end()
+                first = next((i for i in range(left_first, handle_end) if tokens[i].start >= lower), handle_end)
+                tail = tokens[first + 1:handle_end]
+                if not tail or not all(
+                    token.word.isalnum() and (len(token.word) == 1 or token.word.isdigit() or token.word in _NATIVE)
+                    for token in tail
+                ):
+                    continue
+            else:
+                operators = [i for i in range(max(left_first + 1, handle_end - 6), handle_end) if tokens[i].word in _HANDLE_BREAK]
+                if not operators:
+                    continue
+                first = operators[0] - 1
         while first < handle_end and tokens[first].word in _HANDLE_START_BLOCK:
             first += 1
         if not first < handle_end or any(token.word in {",", ":", "!", "?", ";"} for token in tokens[first:handle_end]):

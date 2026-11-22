@@ -12,6 +12,7 @@ export PYTHONHASHSEED=0
 python -B -m unittest discover -v
 python -B compare_contact_recovery.py ../independent-asr-cases.json contact-recovery-first.json
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" contact-recovery-known.json
+python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/reference-text-cases.json" contact-recovery-authored.json
 ```
 
 The output path must be unused. The evaluator checks the corpus and records source checksums, latency and aggregate coverage. Use fresh independently annotated speech for qualification after the next candidate is frozen.
