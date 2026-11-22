@@ -50,6 +50,27 @@ On 60 known Vosk excerpts, adding a second Whisper Base.en speech pass with same
 
 On 24 known excerpts, an offline Qwen2.5-1.5B Instruct pass added one fully masked school to the frozen V2 output, taking schools from 1/6 to 2/6. Full masking for phone, email, name, employer, and address stayed unchanged. The combined result altered useful evidence in 1/6 clips and edited 1/6 clean clips. The additional pass took 5.26 seconds at p95 including per-clip CLI startup. Both comparisons used known development samples. Qualification still requires an independent holdout.
 
+### Contact formatting during speech recognition
+
+A paired run on 60 known synthetic clips compared Whisper Base.en with and without instructions to format phone numbers as digits and email addresses with standard symbols while preserving the spoken words. Among the 15 clips with each contact type, the recognizer emitted a regex-detectable phone number in 3 clips with the prompt and 4 without it. Neither run emitted a regex-detectable email address. Neither emitted either patterned contact in clips without the corresponding annotation. Contact-clip word edits were 201 with the prompt and 199 without, out of 458 reference words. The p95 decoding time was 2.95 seconds with the prompt and 2.37 seconds without.
+
+This test measured formatting and word edits. It did not verify the correctness of any formed contact value or measure redaction recall. Leave the speech adapter unchanged. This prompt showed no gain on the contact formats that were hardest for V2 to mask.
+
+### Local token classifier
+
+A separate run tested Horizon Labs' Apache-2.0 PII Redactor Base on the same 60 known Vosk transcripts. The pinned ONNX file had SHA-256 `ceaeb170adb26d595d9061fe6be8a63239dd5bbffd23bb135ebd308ea8ceac35`. The model ran locally using two CPU threads, with a 6.18-second load and a p95 of 151.5 ms for tokenization, inference and decoding. [Pinned model](https://huggingface.co/Horizon-Labs/pii-redactor-base/tree/ef0eff8e63c1711ec0c997c5ca9ea3b78a068684)
+
+| Entity | V2 fully masked | Classifier fully masked | Union fully masked |
+| --- | ---: | ---: | ---: |
+| Phone | 7/15 | 4/15 | 9/15 |
+| Email | 8/15 | 0/15 | 8/15 |
+| Person | 4/15 | 6/15 | 7/15 |
+| Employer | 8/15 | 0/15 | 8/15 |
+| Address | 10/15 | 11/15 | 13/15 |
+| School | 7/15 | 2/15 | 10/15 |
+
+Address detections incidentally covered some phone fragments. The classifier emitted zero phone labels and one email label. The union modified useful evidence in 3/15 clips and edited 4/15 clean clips, up from 2/15 and 3/15 with V2. These development results leave the contact and identity misses unresolved and do not support adding the classifier to the hosted pipeline.
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
