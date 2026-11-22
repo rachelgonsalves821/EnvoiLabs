@@ -1,0 +1,36 @@
+name: Gate 1 live synthetic transcription
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Approved provider for synthetic audio
+        type: choice
+        options: [openai, groq]
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  transcribe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - name: Record synthetic speech and verify live transcription
+        env:
+          PROVIDER: ${{ inputs.provider }}
+          OPENAI_API_KEY: ${{ inputs.provider == 'openai' && secrets.OPENAI_API_KEY || '' }}
+          GROQ_API_KEY: ${{ inputs.provider == 'groq' && secrets.GROQ_API_KEY || '' }}
+        run: pnpm --filter @envoi-labs/ai transcription:smoke --live "$PROVIDER" --browser

@@ -82,6 +82,7 @@ test.describe("local Auth with synthetic fixtures", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Uses the disposable local Chromium project.");
 
   test("delivered email provisions the respondent and persists age attestation", async ({ browser, page, baseURL }) => {
+    test.setTimeout(90_000);
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `respondent-${randomUUID()}@example.test`;
@@ -177,7 +178,7 @@ test.describe("local Auth with synthetic fixtures", () => {
       await expect(researcher).toBeChecked();
     });
 
-    await test.step("signed-in Home shows only the respondent's current invitation", async () => {
+    await test.step("the respondent can open and complete only their own interview", async () => {
       await page.goto("/r");
       await expect(page.getByRole("heading", { name: "Your studies" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "No study invitations yet" })).toBeVisible();
@@ -205,8 +206,11 @@ test.describe("local Auth with synthetic fixtures", () => {
           reward_cents: 250, why_you_text: "Matched on delivery habits" },
         { study_id: studyId, respondent_id: other.data, state: "invited", expires_at: expiresAt,
           reward_cents: 999, why_you_text: "Another respondent’s reason" },
-      ]);
+      ]).select("id,respondent_id");
       expect(invites.error).toBeNull();
+      const ownInviteId = invites.data?.find(({ respondent_id }) => respondent_id === respondentId)?.id;
+      const otherInviteId = invites.data?.find(({ respondent_id }) => respondent_id === other.data)?.id;
+      if (!ownInviteId || !otherInviteId) throw new Error("The synthetic invitations are missing.");
 
       await page.reload();
       await expect(page.getByRole("heading", { name: "Research interview" })).toHaveCount(1);
@@ -218,6 +222,67 @@ test.describe("local Auth with synthetic fixtures", () => {
       await expect(page.getByText("Internal project planning")).toHaveCount(0);
       await expect(page.getByText("Private test question 1")).toHaveCount(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+      await page.getByRole("button", { name: "Start answering" }).click();
+      await expect(page).toHaveURL(origin + "/r/interviews/" + ownInviteId);
+      await expect(page.getByRole("heading", { name: "Private test question 1" })).toBeFocused();
+      await expect(page.getByText("1 of 4")).toBeVisible();
+
+      const session = await service.from("sessions").select("id,state").eq("invite_id", ownInviteId).single();
+      expect(session.error).toBeNull();
+      expect(session.data?.state).toBe("in_progress");
+      if (!session.data) throw new Error("The synthetic interview session is missing.");
+
+      const answer = page.getByRole("textbox", { name: "Type your answer" });
+      const save = page.getByRole("button", { name: "Save answer" });
+      await answer.fill("Synthetic answer one");
+      await save.click();
+      await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+        "This answer couldn’t be saved. Review your privacy choices or reopen the interview.",
+      );
+      await expect(answer).toHaveValue("Synthetic answer one");
+      const denied = await service.from("answers").select("id", { count: "exact", head: true }).eq("session_id", session.data.id);
+      expect(denied.error).toBeNull();
+      expect(denied.count).toBe(0);
+
+      await page.getByRole("link", { name: "Review privacy choices" }).click();
+      await page.getByRole("button", { name: "Review privacy choices" }).click();
+      await page.getByRole("checkbox", { name: /Keep my study answers/ }).check();
+      await page.getByRole("button", { name: "Save privacy choices" }).click();
+      await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeVisible();
+      await page.goto("/r/interviews/" + ownInviteId);
+      await expect(page.getByRole("heading", { name: "Private test question 1" })).toBeVisible();
+
+      for (const position of [1, 2]) {
+        await expect(page.getByRole("heading", { name: `Private test question ${position}` })).toBeVisible();
+        await answer.fill(`Synthetic answer ${position}`);
+        await save.click();
+        await expect(page.getByRole("heading", { name: `Private test question ${position + 1}` })).toBeFocused();
+      }
+
+      await page.reload();
+      await expect(page.getByRole("heading", { name: "Private test question 3" })).toBeFocused();
+      await expect(page.getByText("3 of 4")).toBeVisible();
+
+      await page.getByRole("link", { name: "Back to your studies" }).click();
+      await expect(page.getByText("In progress")).toBeVisible();
+      await page.getByRole("link", { name: "Continue interview" }).click();
+      for (const position of [3, 4]) {
+        await expect(page.getByRole("heading", { name: `Private test question ${position}` })).toBeVisible();
+        await answer.fill(`Synthetic answer ${position}`);
+        await save.click();
+      }
+      await expect(page.getByRole("heading", { name: "You’ve answered every question" })).toBeFocused();
+      await page.getByRole("button", { name: "Submit interview" }).click();
+      await expect(page.getByRole("heading", { name: "Interview submitted" })).toBeFocused();
+      await expect(page.getByText("Pending quality check")).toBeVisible();
+      const completed = await service.from("sessions").select("state").eq("id", session.data.id).single();
+      expect(completed.error).toBeNull();
+      expect(completed.data?.state).toBe("quality_hold");
+
+      await page.goto("/r/interviews/" + otherInviteId);
+      await expect(page.getByRole("main").getByRole("alert")).toHaveText("This interview isn’t available anymore.");
+      await expect(page.getByRole("heading", { name: "Private test question 1" })).toHaveCount(0);
     });
   });
 

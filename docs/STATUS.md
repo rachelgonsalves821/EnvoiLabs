@@ -297,6 +297,18 @@ Contract or schema changes. Reused the frozen tracking response. The read functi
 
 Risks. Tracking displays confirmed counts. Sample composition and a projected finish still need their own data sources.
 
+## 2026-11-21, Respondent, Gate 1 R-RESP-04 and R-RESP-06
+
+Done. Connected Start answering, Not for me and Continue interview to the scoped invitation and session operations. The interview shows the first unanswered question, progress and reward. The typed path validates saves before advancing, keeps the same answer ID for a retry with unchanged text, and shows a pending quality check after submission confirms.
+
+Next. Verify against disposable Supabase. Add browser recording, private upload and transcription through the Gate 1 voice contract.
+
+Needs from others. Platform invitation, answer and submit endpoints and the voice upload implementation.
+
+Contract or schema changes. None. The UI uses frozen request and response schemas.
+
+Risks. This increment exercises typed answers. The [disposable scenario](../apps/web/e2e/auth-local.spec.ts) covers consent denial, reload after two answers, four typed saves, quality hold and a different respondent’s invitation.
+
 ## 2026-11-22, Researcher and AI, Gate 1 R-RSCH-10 transcript viewer
 
 Done. Study tracking fetches published redacted text through the current researcher's authenticated session. The database enforces organization and current consent, and the response returns only the transcript identifier and redacted text. The browser clears previously rendered text after a denial, a failed refresh or when the tab is hidden.
