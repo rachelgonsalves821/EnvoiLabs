@@ -3,6 +3,10 @@
 do $seed$
 begin
     for attempt in 1..2 loop
+        insert into public.pricing_configs (version, params_json, active)
+        values (100, '{"unitPriceCents":100,"incentivePerQuestionCents":40}', true)
+        on conflict do nothing;
+
         insert into public.organizations (id, name, design_partner)
         values ('90100000-0000-4000-8000-000000000001', 'Fixture research organization', true)
         on conflict (id) do nothing;

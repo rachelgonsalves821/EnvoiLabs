@@ -236,3 +236,15 @@ Needs from others. None.
 Contract or schema changes. None.
 
 Risks. Upstream behavior varies by mode. Envoi's limits, consent and publication rules are authoritative.
+
+## Platform, Gate 1 R-PLAT-02
+
+Done. Added the test-only study launch service. It matches an opted-in preview study against profile criteria, active invitations and participation limits. It creates the first invite batch and records the launch and invite transitions in one transaction.
+
+Next. Connect the launch control to the researcher draft form and verify a concurrent launch through the app. Connect the respondent Home and invite acceptance to the same seeded study.
+
+Needs from others. None.
+
+Contract or schema changes. Uses the frozen Gate 1 launch contract. The service-only launch function and the disposable seed supply the preview launch and incentive.
+
+Risks. Future invite waves and the historical feasibility estimate remain open. Preview launch has an explicit opt-in and stays disabled in production.
