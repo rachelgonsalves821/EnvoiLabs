@@ -1,10 +1,12 @@
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+import { promisify } from "node:util";
 import { devices, expect, test, type Page } from "@playwright/test";
-import { runGate1AnswerJob, type Gate1ProcessingPorts } from "@envoi-labs/ai";
-import { FakeTranscriber } from "../../../packages/testing/fakes/ai";
 import { deliveredEmail, localService, loopbackOrigin, totp, useDefaultTemplate } from "./support/disposable-auth";
 import { installSyntheticMicrophone, submitSyntheticRecording } from "./respondent/voice-fixture";
 
+const runNode = promisify(execFile);
 const questions = [
   "What led you to open a food ordering app?",
   "What did you look for in the menu?",
@@ -194,29 +196,9 @@ test.describe("Gate 1 seeded study", () => {
       await expect(researcher.getByText("1 of 2", { exact: true })).toBeVisible({ timeout: 12_000 });
       const panel = researcher.getByRole("region", { name: "Redacted transcripts" });
       await expect(panel.getByText("No redacted transcripts are available yet.")).toBeVisible();
-      const workerPath = "../server/respondent/gate1-worker.mjs";
-      const { createGate1DatabasePorts } = await import(workerPath) as {
-        createGate1DatabasePorts: (client: typeof db, options: {
-          answerId: string;
-          createTranscriber: () => FakeTranscriber;
-          redact: (input: string) => Promise<string | null>;
-        }) => Gate1ProcessingPorts;
-      };
-      for (const { id } of answers) {
-        const transcripts = new Map<string, string>();
-        const ports = createGate1DatabasePorts(db, {
-          answerId: id, createTranscriber: () => new FakeTranscriber(transcripts),
-          redact: async (input) => input === sensitiveFixture ? redactedFixture : null,
-        });
-        const claim = ports.claim;
-        ports.claim = async () => {
-          const item = await claim();
-          if (item?.kind !== "voice") throw new Error("The worker did not claim the expected browser recording.");
-          transcripts.set(item.audio.sha256, sensitiveFixture);
-          return item;
-        };
-        expect(await runGate1AnswerJob(ports)).toBe("published");
-      }
+      const workerPath = resolve(__dirname, "support", "process-gate1-voice.mjs");
+      const result = await runNode(process.execPath, [workerPath, ...answers.map(({ id }) => id)], { timeout: 30_000 });
+      expect(result.stdout.trim()).toBe("4");
       await expect(panel.getByText(redactedFixture, { exact: true })).toHaveCount(4, { timeout: 12_000 });
       await expect(panel.getByText(sensitiveFixture, { exact: true })).toHaveCount(0);
     } finally {
