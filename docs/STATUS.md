@@ -358,3 +358,17 @@ Needs from others. Live synthetic transcription requires an approved OpenAI or G
 Contract or schema changes. Applied ten existing Gate 1 migrations on the dedicated preview database.
 
 Risks. Gate 1 remains open. Researcher transcript publication requires qualified redaction. The disposable integration uses synthetic redaction results and fake transcription.
+
+## 2026-11-22, Platform, Gate 1 worker acceptance
+
+Done. The native worker verified all five checked-in synthetic recordings through private Storage, digest validation, the primary transcription fake, deterministic redaction and saved provider metadata. The typed case passed without recording or vendor consent and used the same redaction step. [IT-1.2 fixture evidence](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45035427938)
+
+Done. The answer queue drain recovered committed work in a real local Inngest schedule after a simulated outage. The database integration raced two workers and verified one private result, then an idle replay. [IT-1.5 integration and schedule](https://github.com/rachelgonsalves821/EnvoiLabs/pull/73)
+
+Next. Finish the signed-in hosted study, run transcription against an approved provider on synthetic recordings, and qualify redaction on independent recognized speech. Verify hosted job scheduling once its Inngest environment is connected.
+
+Needs from others. An approved transcription project key for the GitHub Actions synthetic run.
+
+Contract or schema changes. The scheduled drain uses the existing durable answer queue and lease RPCs.
+
+Risks. Researcher publication of genuine transcripts remains disabled. The hosted queue drain requires explicit configuration.
