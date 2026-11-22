@@ -71,6 +71,16 @@ A separate run tested Horizon Labs' Apache-2.0 PII Redactor Base on the same 60 
 
 Address detections incidentally covered some phone fragments. The classifier emitted zero phone labels and one email label. The union modified useful evidence in 3/15 clips and edited 4/15 clean clips, up from 2/15 and 3/15 with V2. These development results leave the contact and identity misses unresolved and do not support adding the classifier to the hosted pipeline.
 
+### Official OpenAI Privacy Filter
+
+The pinned Apache-2.0 Q4 ONNX model ran locally with the publisher's constrained decoder and default calibration. On 272 known Vosk transcripts, adding its detected spans to V2 raised full email masks from 68/140 to 73/140, names from 15/60 to 16/60, and employers from 29/60 to 31/60. Phone, address and school coverage stayed the same. Evidence alterations stayed at 6/36 and clean edits at 14/36. The filter has no dedicated employer or school label. It took 621 ms p95 on two CPU threads and used about 1.25 GB of peak process memory. These development results leave all four recall thresholds unmet. [Pinned model](https://huggingface.co/openai/privacy-filter/tree/7ffa9a043d54d1be65afb281eddf0ffbe629385b) · [Pinned decoder](https://github.com/openai/privacy-filter/blob/f7f00ca7fb869683eb732c010299d901457f19c3/opf/_core/decoding.py)
+
+### Spoken contact recovery
+
+Adding the contact rules to V2 raised full phone masking from 82/140 to 123/140 and full email masking from 68/140 to 112/140 on the same 272 known excerpts. The combined policy edited 6/36 evidence spans and 14/36 clean excerpts, the same counts as V2. The added pass took 1.25 ms p95. On the earlier 150-excerpt corpus, both policies fully masked 22/22 phones and 22/22 emails and altered 5/43 evidence spans and 11/24 clean excerpts. Seven focused tests cover international and repeated digits, contact separators, order references and website context.
+
+Contact coverage remains below the 99% threshold. The development run leaves the independent qualification set available for a future frozen candidate. [Offline evaluator and replay instructions](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
