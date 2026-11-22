@@ -1361,6 +1361,19 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_gate1_voice_answer: {
+        Args: {
+          supplied_answer_id: string
+          supplied_audio_id: string
+          supplied_duration_ms: number
+          supplied_owner_id: string
+          supplied_question_id: string
+          supplied_replace_answer_id?: string
+          supplied_session_id: string
+          supplied_sha256: string
+        }
+        Returns: Json
+      }
       create_gate1_study: {
         Args: {
           draft: Json
@@ -1400,6 +1413,14 @@ export type Database = {
         }
         Returns: string
       }
+      read_gate1_audio_reservation: {
+        Args: {
+          supplied_audio_id: string
+          supplied_question_id: string
+          supplied_session_id: string
+        }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -1413,6 +1434,15 @@ export type Database = {
       requeue_gate1_answer_job: {
         Args: { supplied_answer_id: string }
         Returns: boolean
+      }
+      reserve_gate1_audio: {
+        Args: {
+          supplied_bytes: number
+          supplied_mime: string
+          supplied_question_id: string
+          supplied_session_id: string
+        }
+        Returns: Json
       }
       retry_gate1_answer_job: {
         Args: {

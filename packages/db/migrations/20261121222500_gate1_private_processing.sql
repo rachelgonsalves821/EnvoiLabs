@@ -47,8 +47,7 @@ as $$
             (answer.kind = 'text' and coalesce(btrim(raw.raw_text), '') <> '')
             or (answer.kind = 'voice' and audio.id is not null
                 and (audio.delete_after is null or audio.delete_after > clock_timestamp())
-                and internal.gate1_consent(respondent.id, answer.study_id, 'recording')
-                and internal.gate1_consent(respondent.id, answer.study_id, 'transcription_vendor'))
+                and internal.gate1_voice_allowed(respondent.id, answer.study_id))
         );
 $$;
 
