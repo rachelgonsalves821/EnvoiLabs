@@ -97,6 +97,12 @@ The paired replay reproduced all frozen V2 counts on the 272 known authored and 
 
 The current policy fully masked 60/60 authored names and 15/60 recognized names, 59/60 authored employers and 29/60 recognized employers, and 140/140 authored phones and 123/140 recognized phones. The recognized-text policy remains below the gate thresholds. Qualification needs a frozen pipeline and independent speech. [Replay instructions](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Learned speech casing
+
+The pinned Apache-2.0 model supplies casing and punctuation to a separate contextual input. Every detection is projected onto the original character offsets. On 272 known Vosk excerpts, adding the casing view raised full masks for names from 15/60 to 22/60, employers from 29/60 to 46/60, schools from 19/36 to 27/36 and addresses from 20/36 to 21/36. Full phone and email masks stayed at 123/140 and 115/140. Useful evidence edits increased from 2/36 to 3/36, and clean excerpts edited increased from 10/36 to 12/36. The added pass took 234 ms p95.
+
+Using only the learned casing view for contextual predictions fully masked 18/60 names and edited 7/36 clean excerpts and 3/36 evidence spans. On the matched 60-excerpt subset, combining the larger GLiNER Base with the learned casing added one employer and one school mask compared with the smaller casing combination. It also edited four additional clean excerpts, taking those edits from 4/15 to 8/15. Neither approach reaches the gate thresholds. The independent holdout remains available for a later frozen candidate. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)

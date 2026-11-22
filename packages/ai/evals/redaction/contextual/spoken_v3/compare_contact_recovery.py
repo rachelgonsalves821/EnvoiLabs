@@ -7,9 +7,10 @@ import os
 from pathlib import Path
 from time import perf_counter
 
+from asr_casing import LocalCasingModel, MODEL_FILES, MODEL_REVISION
 from candidate import Hit, candidate_hits, mask
 from evaluate import GLiNER, LABELS, SessionOptions, THRESHOLD, add_contact_patterns, candidate_analyzer, coverage
-from evaluate_v2 import _ONNX_SHA, digest, model_identities, predict, sources
+from evaluate_v2 import _IDENTITY_LABELS, _ONNX_SHA, digest, model_identities, predict, sources
 from product_context import is_product_title
 from speech_context import explicit_identities
 from spoken_contact import spoken_contact_hits
@@ -49,13 +50,14 @@ def main():
     args = argparse.ArgumentParser(description=__doc__)
     args.add_argument("cases", type=Path)
     args.add_argument("output", type=Path)
+    args.add_argument("--casing-model", type=Path, help="Run the pinned offline casing experiment on recognized text.")
     opts = args.parse_args()
     corpus_sha = digest(opts.cases)
     if corpus_sha not in _KNOWN_CORPORA:
         raise ValueError("Expected the already evaluated, known synthetic corpus")
     source = Path(__file__)
     source_sha = digest(source)
-    candidates = [source.with_name(name) for name in ("product_context.py", "spoken_contacts_recover.py")]
+    candidates = [source.with_name(name) for name in ("asr_casing.py", "product_context.py", "spoken_contacts_recover.py")]
     candidate_hashes = {rule.name: digest(rule) for rule in candidates}
     rows = json.loads(opts.cases.read_text(encoding="utf-8-sig"))["cases"]
     model_root = Path(os.environ["ENVOI_GLINER_MODEL"]).resolve(strict=True)
@@ -75,7 +77,11 @@ def main():
     results = {mode: report_template() for mode in (
         "frozen_v2", "v2_plus_contact_recovery", "v2_plus_contact_and_product_context",
     )}
-    times = []
+    times, casing_times = [], []
+    casing = LocalCasingModel(opts.casing_model) if opts.casing_model else None
+    if casing:
+        results["v2_plus_contact_product_and_casing"] = report_template()
+        results["v2_plus_contact_product_casing_only"] = report_template()
     for row in rows:
         text = row["text"]
         fixed, contextual, explicit = frozen_v2_components(text, analyzer, model)
@@ -90,6 +96,18 @@ def main():
             row, mask(text, (*fixed, *additional, *with_product_context)),
             results["v2_plus_contact_and_product_context"],
         )
+        if casing:
+            began = perf_counter()
+            restored = casing.restore(text)
+            additional_identities = []
+            for detection in predict(model, restored.text, _IDENTITY_LABELS):
+                hit = restored.project(detection.start, detection.end, detection.label)
+                if hit and not is_product_title(text, hit, explicit):
+                    additional_identities.append(hit)
+            casing_times.append(perf_counter() - began)
+            with_casing = (*fixed, *additional, *additional_identities)
+            coverage(row, mask(text, (*with_casing, *with_product_context)), results["v2_plus_contact_product_and_casing"])
+            coverage(row, mask(text, with_casing), results["v2_plus_contact_product_casing_only"])
     if (sources() != frozen_sources or {rule.name: digest(rule) for rule in candidates} != candidate_hashes
             or digest(source) != source_sha or digest(opts.cases) != corpus_sha):
         raise RuntimeError("The evaluation sources or corpus changed during the run")
@@ -100,6 +118,12 @@ def main():
         "additional_pass_p95_ms": round(1000 * sorted(times)[ceil(0.95 * len(times)) - 1], 3),
         "corpus_sha256": corpus_sha, "v2_sources": frozen_sources, "results": results,
     }
+    if casing:
+        report["casing_model"] = {
+            "revision": MODEL_REVISION, "asset_sha256": MODEL_FILES,
+            "casing_source_sha256": candidate_hashes["asr_casing.py"],
+            "p95_ms": round(1000 * sorted(casing_times)[ceil(0.95 * len(casing_times)) - 1], 3),
+        }
     with opts.output.open("x", encoding="utf8") as stream:
         stream.write(json.dumps(report, indent=2) + "\n")
 
