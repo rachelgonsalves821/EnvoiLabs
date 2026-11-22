@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import { ProviderError, runGate1AnswerJob, withTranscriptionFallback } from "@envoi-labs/ai";
-import { createGate1DatabasePorts } from "./gate1-worker.mjs";
+import { drainPrivateGate1Answers } from "../platform/gate1-private-answers.ts";
+import { createGate1DatabasePorts, runConfiguredGate1AnswerJob } from "./gate1-worker.mjs";
 
 const endpoint = "http://127.0.0.1:54321";
 const bucket = "gate1-interview-audio";
@@ -174,4 +175,42 @@ test("leased worker retries, withholds withdrawn voice and publishes only the qu
     { provider: "synthetic-fallback", model: "fixture", cost_micros: 0 },
   ]);
   assert.ok((await researcher.browser.schema("pii").from("transcript_raw").select("raw_text")).error, "Private schema remains closed to researchers");
+
+  const typedQuestionId = randomUUID();
+  const typedAnswerId = randomUUID();
+  checked(await service.from("guide_questions").insert({
+    id: typedQuestionId, study_id: studyId, position: 2, text: "What would you order next?",
+  }), "Add typed fixture question");
+  const typedInput = {
+    supplied_session_id: sessionId, supplied_question_id: typedQuestionId,
+    supplied_answer_id: typedAnswerId, supplied_text: "I would order berries.",
+  };
+  for (let confirmation = 0; confirmation < 2; confirmation++) {
+    assert.equal(checked(await respondent.browser.rpc("record_gate1_text_answer", typedInput), "Confirm queued text").answer.id, typedAnswerId);
+  }
+
+  const runNext = () => runConfiguredGate1AnswerJob({
+    SUPABASE_URL: endpoint, SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  }, typedAnswerId); // This disposable stack also holds pending jobs from the browser scenarios.
+  await assert.rejects(drainPrivateGate1Answers(async () => {
+    throw new Error("Simulated scheduler failure after answer commit.");
+  }, runNext), /Simulated scheduler failure after answer commit/);
+  assert.deepEqual(checked(await researcher.browser.from("transcripts").select("redacted_text")
+    .eq("answer_id", typedAnswerId), "Check undispatched text is private"), []);
+
+  let privateCompletions = 0;
+  const runStep = (_id, operation) => operation();
+  const runDrain = () => drainPrivateGate1Answers(runStep, async () => {
+    const status = await runNext();
+    if (status === "private") privateCompletions++;
+    return status;
+  });
+  const recovered = await Promise.all([runDrain(), runDrain()]);
+  assert.deepEqual(recovered.map(({ examined }) => examined).sort(), [0, 1]);
+  assert.equal(privateCompletions, 1);
+  assert.deepEqual(await runDrain(), { examined: 0 });
+  assert.deepEqual(checked(await service.from("transcripts").select("redacted_text")
+    .eq("answer_id", typedAnswerId), "Check exactly one private text transcript"), [{ redacted_text: null }]);
+  assert.deepEqual(checked(await researcher.browser.from("transcripts").select("redacted_text")
+    .eq("answer_id", typedAnswerId), "Check recovered text remains private"), []);
 });

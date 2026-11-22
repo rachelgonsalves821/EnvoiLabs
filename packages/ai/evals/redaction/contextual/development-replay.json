@@ -1,0 +1,136 @@
+{
+  "model": "knowledgator/gliner-pii-small-v1.0",
+  "revision": "d21aad5b4a7ec82b3d0970fd1ac74a12c087d85e",
+  "artifacts": {
+    "gliner_config.json": "c10803bade021f40072b194bc78bc2edd2bf3e60637a6f34cc9b00705bf3c168",
+    "model_quint8.onnx": "891589426ee96f2748b16439f44fad8c3f97e198e002a6637e58dee989500216",
+    "special_tokens_map.json": "ea97ecdbcc73713039d8d64dbb05e3689495c96657fbd9a18f5bed381be81049",
+    "tokenizer.json": "84b3a9b18f04a0ccd03b72d9f871b7e0bec40fd7021ef50bc30a7c3693c11205",
+    "tokenizer_config.json": "3398f6d1ad4b4c4f9874d390d060a75c58cad5e5ce9b22841b3e40643b4ada27"
+  },
+  "packages": {
+    "gliner": "0.2.30",
+    "onnxruntime": "1.32.0",
+    "transformers": "5.22.2",
+    "torch": "2.15.0",
+    "presidio-analyzer": "2.2.366",
+    "presidio-anonymizer": "2.2.366",
+    "spacy": "3.8.18",
+    "en-core-web-sm": "3.8.0",
+    "phonenumbers": "9.0.44",
+    "tldextract": "5.4.0"
+  },
+  "candidate_sha256": "718e85b79a92e208904e799de95aabc86e50ec3a719a289ff415067a64d2dc08",
+  "evaluator_sha256": "edc617fd158d44ac21b856f974084cbf3a89d6a83ea3f76afea22ac2b762c688",
+  "text_corpus_sha256": "825d6780f48d4750b8fa59de957cc39c216593185398ac9d1843ed521f9d5386",
+  "transcripts": 100,
+  "model_labels": [
+    "person",
+    "organization",
+    "phone number",
+    "email address",
+    "address"
+  ],
+  "model_threshold": 0.5,
+  "deterministic_threshold": 0.35,
+  "contextual_p95_ms": 635.6,
+  "prd_numeric_targets": {
+    "phone": 0.99,
+    "email": 0.99,
+    "person": 0.95,
+    "employer": 0.95
+  },
+  "previous_contact_ensemble": {
+    "entities": {
+      "employer": {
+        "planted": 80,
+        "fully_masked": 67,
+        "partially_masked": 0,
+        "recall": 0.8375
+      },
+      "address": {
+        "planted": 80,
+        "fully_masked": 50,
+        "partially_masked": 27,
+        "recall": 0.625
+      },
+      "email": {
+        "planted": 80,
+        "fully_masked": 50,
+        "partially_masked": 10,
+        "recall": 0.625
+      },
+      "phone": {
+        "planted": 80,
+        "fully_masked": 70,
+        "partially_masked": 0,
+        "recall": 0.875
+      },
+      "person": {
+        "planted": 80,
+        "fully_masked": 78,
+        "partially_masked": 1,
+        "recall": 0.975
+      },
+      "school": {
+        "planted": 20,
+        "fully_masked": 20,
+        "partially_masked": 0,
+        "recall": 1.0
+      }
+    },
+    "clean_transcripts": 20,
+    "clean_transcripts_altered": 8,
+    "evidence_spans": 100,
+    "evidence_spans_altered": 13,
+    "research_evidence_altered": 13,
+    "meets_prd_numeric_targets": false
+  },
+  "candidate": {
+    "entities": {
+      "employer": {
+        "planted": 80,
+        "fully_masked": 80,
+        "partially_masked": 0,
+        "recall": 1.0
+      },
+      "address": {
+        "planted": 80,
+        "fully_masked": 80,
+        "partially_masked": 0,
+        "recall": 1.0
+      },
+      "email": {
+        "planted": 80,
+        "fully_masked": 80,
+        "partially_masked": 0,
+        "recall": 1.0
+      },
+      "phone": {
+        "planted": 80,
+        "fully_masked": 80,
+        "partially_masked": 0,
+        "recall": 1.0
+      },
+      "person": {
+        "planted": 80,
+        "fully_masked": 80,
+        "partially_masked": 0,
+        "recall": 1.0
+      },
+      "school": {
+        "planted": 20,
+        "fully_masked": 20,
+        "partially_masked": 0,
+        "recall": 1.0
+      }
+    },
+    "clean_transcripts": 20,
+    "clean_transcripts_altered": 7,
+    "evidence_spans": 100,
+    "evidence_spans_altered": 11,
+    "research_evidence_altered": 11,
+    "meets_prd_numeric_targets": true
+  },
+  "corpus": "previous-fresh"
+}

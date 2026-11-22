@@ -1,0 +1,80 @@
+{
+  "recognizer": "Vosk",
+  "recognizer_version": "0.3.45",
+  "model": "vosk-model-small-en-us-0.15",
+  "model_url": "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
+  "model_sha256": "30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498",
+  "model_license": "Apache-2.0",
+  "ffmpeg": "ffmpeg version 9.0.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+  "reference_sha256": "cdf04a8aa2453cdbecf956b18fb822ffac30f243f76d379b2c4c13513e8504f4",
+  "asr_output_sha256": "98f312501a918649d11bb088e6e36853885a929879c33bd828d3571540d2cb3c",
+  "tts": {
+    "engine": "System.Speech/SAPI desktop",
+    "assembly": "4.0.0.0",
+    "voices": [
+      "Microsoft David Desktop",
+      "Microsoft Zira Desktop"
+    ],
+    "windows": "10.0.26200.0",
+    "sampleRate": 16000,
+    "channels": 1,
+    "bits": 16
+  },
+  "asr_data_egress": false,
+  "asr_session_count": 150,
+  "recognized_cases": 150,
+  "asr_sensitive_cases": 126,
+  "deliberately_clean_cases": 24,
+  "evidence_span_count": 43,
+  "edited_words": 224,
+  "reference_words": 2081,
+  "duration_ms": 787755,
+  "annotation_adjustments": 4,
+  "audio_conditions": {
+    "dry": 75,
+    "bandlimited": 38,
+    "mild-noise": 37
+  },
+  "span_counts": {
+    "address": {
+      "retained": 12,
+      "changed": 9,
+      "absent": 0
+    },
+    "email": {
+      "retained": 10,
+      "changed": 12,
+      "absent": 0
+    },
+    "employer": {
+      "retained": 16,
+      "changed": 6,
+      "absent": 0
+    },
+    "evidence": {
+      "retained": 37,
+      "changed": 6,
+      "absent": 2
+    },
+    "person": {
+      "retained": 9,
+      "changed": 14,
+      "absent": 0
+    },
+    "phone": {
+      "retained": 12,
+      "changed": 10,
+      "absent": 0
+    },
+    "school": {
+      "retained": 14,
+      "changed": 8,
+      "absent": 0
+    }
+  },
+  "sha256": {
+    "asr-cases.json": "2057f7214368b047d9bb27b87b91cfd41e634182ab3f1feb3135f4d838d6ce85",
+    "reference-text-cases.json": "ac034b03d3be2cccec2840d1bbe124a0f7b239eb9ac6342c49d441d3e11af681",
+    "paired-reviewed.jsonl": "a0973ae6b2715542f247167b7629c3fac6f7c0307859177c9c0beeb7e7712ef9"
+  }
+}

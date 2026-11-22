@@ -133,7 +133,7 @@ The [PRD user journeys](PRD.md#6-user-journeys) describe the two paths in full. 
 | Gate | Respondent UI | Researcher UI |
 | --- | --- | --- |
 | 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [email signup and sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation and respondent account provisioning. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
-| 1 · Seeded study | Signed-in Home for eligible invites and in-progress studies, profile and consent screens, one-question interview with record or type, upload and retry states, resume and submission confirmation. | Minimal four-question study form, review and test launch, live counts and redacted transcript viewer. |
+| 1 · Seeded study preview | [Respondent Home](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) opens eligible invites and in-progress studies after sign-in. [Profile and privacy choices](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/onboarding) precede the interview, which supports recording, typing, retry, resume and submission. | [Researcher workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) opens the four-question study form after email and MFA. Launch a test study to reach live tracking and the redacted transcript panel. |
 | 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt, and Earnings with gift card brand selection, payout status and history. | Scoping chat beside the live brief, review of screening criteria and guide, quote, checkout, and live tracking. |
 | 3 · Pilot | Liveness, full Echo states, privacy and withdrawal controls. | Report and findings, verified quotes, hypothesis evidence and next-study proposal. |
 | 4 · Launch | Accessible and resilient interview on mobile. | Export and launch hardening. |
@@ -143,15 +143,17 @@ Record browser evidence against the paths for the applicable gate. Include the s
 ### Gate 0. Foundations (end of week 1)
 
 Exit criteria
-- [ ] Monorepo builds, CI runs typecheck, lint, unit tests, integration tests and Playwright on every PR in under 12 minutes
-- [ ] Supabase local runs in CI. Migrations apply from zero. Seed script creates 1 organization, 2 researchers, 60 respondents with varied profiles and 1 draft study
-- [ ] `packages/contracts` v1 published with schemas for every entity, every API request and response in Gate 1 scope, every event in PRD section 12, `BriefPatch`, `ProbeDecision`, `ThemeSet`
-- [ ] RLS policies on every table, with tests that a respondent cannot read another respondent's data and a researcher cannot read PII
-- [ ] Auth works for both user types locally and on the dedicated hosted preview. Use the [hosted sign-in procedure](../README.md#verify-sign-in-on-the-hosted-preview). Record the deployment commit and both outcomes before sign-off. Platform owns execution and tracks preview access and controlled test identities on [goal #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4).
-- [ ] `packages/ui` exports tokens (CSS variables generated from the design system `tokens.json`), Button, Chip, EarningsChip, and an Echo stub that renders the static fallback
-- [ ] `packages/ai` exposes provider interfaces with fake implementations, plus a recorded-fixture mode for tests
-- [ ] Fakes for Stripe, Tremendous, LLM and transcription in `packages/testing/fakes`. Disposable Auth email is delivered to Mailpit in CI.
-- [ ] Lint rules for the PII boundary, no `any`, no floats for money (named `cents` fields), and no cross-agent imports into app route folders
+- [x] Monorepo builds, CI runs typecheck, lint, unit tests, integration tests and Playwright on every PR in under 12 minutes
+- [x] Supabase local runs in CI. Migrations apply from zero. Seed script creates 1 organization, 2 researchers, 60 respondents with varied profiles and 1 draft study
+- [x] `packages/contracts` v1 published with schemas for every entity, every API request and response in Gate 1 scope, every event in PRD section 12, `BriefPatch`, `ProbeDecision`, `ThemeSet`
+- [x] RLS policies on every table, with tests that a respondent cannot read another respondent's data and a researcher cannot read PII
+- [x] Auth works for both user types locally and on the dedicated hosted preview. Use the [hosted sign-in procedure](../README.md#verify-sign-in-on-the-hosted-preview). Record the deployment commit and both outcomes before sign-off. Platform owns execution and tracks preview access and controlled test identities on [goal #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4).
+- [x] `packages/ui` exports tokens (CSS variables generated from the design system `tokens.json`), Button, Chip, EarningsChip, and an Echo stub that renders the static fallback
+- [x] `packages/ai` exposes provider interfaces with fake implementations, plus a recorded-fixture mode for tests
+- [x] Fakes for Stripe, Tremendous, LLM and transcription in `packages/testing/fakes`. Disposable Auth email is delivered to Mailpit in CI.
+- [x] Lint rules for the PII boundary, no `any`, no floats for money (named `cents` fields), and no cross-agent imports into app route folders
+
+Gate 0 has delegated sign-off. The record links the CI checks, contracts distribution, database coverage and both hosted sign-ins. [Gate 0 evidence](STATUS.md#gate-checklist-tracker)
 
 Use merged CI and the existing auth, database, contract, UI and AI foundations as the starting point. In the gate evidence, link the local checks and mark hosted checks separately. Confirm coverage against each criterion, including any gap in the access matrix or eval harness. While preview access is pending, complete Gate 0 evidence and prepare Gate 1 contract and acceptance scenarios. See the [Gate 1 handoff](GATE_1_HANDOFF.md) for ownership, merge order and test coverage.
 
@@ -162,17 +164,17 @@ Integration tests required
 
 ### Gate 1. Vertical slice (end of week 3)
 
-One study runs end to end with seeded data and fakes for paid vendors.
+One study runs end to end with seeded data and fakes for paid vendors. The checked items have evidence from the disposable study and database tests. Follow the [current status](STATUS.md#gate-checklist-tracker) for hosted acceptance, live transcription and redaction qualification.
 
 Exit criteria
-- [ ] Researcher can create a study from a minimal form (scoping chat not required yet), add 4 core guide questions (the PRD billing minimum) and launch without payment (flagged `skip_payment` in non-prod)
-- [ ] Matching selects eligible seeded respondents, creates invites and respects caps
-- [ ] Respondent signs up via a one-time email link (Mailpit in CI), completes profile and consent, and sees their own eligible invite on signed-in Home. They accept, record 4 answers in the browser, and submit. Return sign-in restores the same account, study access and saved progress.
+- [x] Researcher can create a study from a minimal form (scoping chat not required yet), add 4 core guide questions (the PRD billing minimum) and launch without payment (flagged `skip_payment` in non-prod)
+- [x] Matching selects eligible seeded respondents, creates invites and respects caps
+- [x] Respondent signs up via a one-time email link (Mailpit in CI), completes profile and consent, and sees their own eligible invite on signed-in Home. They accept, record 4 answers in the browser, and submit. Return sign-in restores the same account, study access and saved progress.
 - [ ] Consented voice answers upload privately and a job calls the primary speech-to-text adapter with a bounded fallback. Record provider, model, latency and cost. Confirm a real-provider run on synthetic browser recordings and keep CI deterministic. Typed answers reach the same redaction path.
-- [ ] Session moves `started` to `submitted` to `quality_hold`
+- [x] Session moves `started` to `submitted` to `quality_hold`
 - [ ] Researcher tracking shows live counts and only redacted transcripts. Record the Presidio benchmark and adoption decision before publication.
-- [ ] Record the OpenInterviewer review before the Gate 2 probe work. See section 11 for the upstream checks.
-- [ ] State machine transitions are audited
+- [x] Record the OpenInterviewer review before the Gate 2 probe work. See section 11 for the upstream checks.
+- [x] State machine transitions are audited
 
 Integration tests required
 - `IT-1.1` Playwright E2E `gate1-slice.spec.ts`, desktop researcher and mobile respondent, full flow above. Verify Home shows the respondent's eligible invites and excludes another respondent's invites. Return sign-in must open the same account.
