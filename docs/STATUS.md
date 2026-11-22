@@ -486,3 +486,15 @@ Needs from others. See the hosted prerequisites in [issue #4](https://github.com
 Contract or schema changes. None.
 
 Risks. Recognized phone, email and identity coverage remain below the redaction thresholds.
+
+### 2026-11-22 — Gate 1 speech casing comparison
+
+Done. The offline evaluator now measures learned capitalization and punctuation for contextual redaction and keeps masks aligned to the original text. In the 272-excerpt known speech replay, it raised full employer masks from 29/60 to 46/60 and names from 15/60 to 22/60. It altered one additional evidence span and two additional clean excerpts. Sixteen focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Run the configured live provider on controlled synthetic recordings and qualify a frozen private policy against independent speech.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for the hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. Publication stays gated on independent recall and evidence preservation.

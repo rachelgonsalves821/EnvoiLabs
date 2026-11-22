@@ -16,3 +16,12 @@ python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/reference-text-cases.
 ```
 
 The output path must be unused. The evaluator checks the corpus and records source checksums, latency and aggregate coverage. Use fresh independently annotated speech for qualification after the next candidate is frozen.
+
+### Casing and punctuation comparison
+
+Stage `config.json`, `tokenizer.json` and `onnx/model_quantized.onnx` together in a local folder, placing the ONNX file at the folder root. The evaluator verifies all three checksums from the pinned Apache-2.0 release. The extra pass runs locally and projects model detections back to the original transcript positions. [Pinned model files](https://huggingface.co/Horizon-Labs/multilingual-punctuation-truecase-small/tree/a527b62e5a3e16de7e316f03234c99422b1c8814)
+
+```sh
+python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
+  contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"
+```
