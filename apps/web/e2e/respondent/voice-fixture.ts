@@ -25,8 +25,8 @@ async function stopRecordedTone(page: Page) {
   return url;
 }
 
-/** Uses a synthetic tone in Chromium and intercepts every request carrying it. */
-export async function exerciseVoiceRecording(page: Page, origin: string, inviteId: string) {
+/** Replaces microphone input with a generated tone on the next navigation. */
+export async function installSyntheticMicrophone(page: Page) {
   await page.addInitScript(() => {
     const test = Object.assign(window, { syntheticMicrophone: { requests: 0, allowed: false, revoked: [] as string[] } });
     const revoke = URL.revokeObjectURL.bind(URL);
@@ -54,7 +54,11 @@ export async function exerciseVoiceRecording(page: Page, origin: string, inviteI
       },
     });
   });
+}
 
+/** Exercises permission, retry and recording controls with intercepted transfers. */
+export async function exerciseVoiceRecording(page: Page, origin: string, inviteId: string) {
+  await installSyntheticMicrophone(page);
   const reservations: { sessionId: string; guideQuestionId: string; bytes: number; mime: string }[] = [];
   const confirmations: { answerId: string; audioObjectId: string; durationMs: number; sessionId: string; guideQuestionId: string }[] = [];
   const puts: number[] = [];

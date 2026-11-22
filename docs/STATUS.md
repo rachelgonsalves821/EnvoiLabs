@@ -309,6 +309,18 @@ Contract or schema changes. None. The UI uses frozen request and response schema
 
 Risks. This increment exercises typed answers. The [disposable scenario](../apps/web/e2e/auth-local.spec.ts) covers consent denial, reload after two answers, four typed saves, quality hold and a different respondent’s invitation.
 
+## 2026-11-22, Researcher and AI, Gate 1 R-RSCH-10 transcript viewer
+
+Done. Study tracking fetches published redacted text through the current researcher's authenticated session. The database enforces organization and current consent, and the response returns only the transcript identifier and redacted text. The browser clears previously rendered text after a denial, a failed refresh or when the tab is hidden.
+
+Next. Run IT-1.1 through answer publication and exercise the publication worker's pending, failed and consent-withdrawal cases.
+
+Needs from others. The approved redaction and publication path for real provider results.
+
+Contract or schema changes. Reuses the frozen transcript list shape and existing access policies. This increment only reads published rows.
+
+Risks. The viewer currently lists published text. Respondent grouping, approved profile descriptors and exports remain open.
+
 ## 2026-11-22, Respondent, Gate 1 R-RESP-07
 
 Done. Added a browser recorder that checks consent before offering the microphone. Stopping stages the recording through a signed write URL while local playback is available. Save confirms the staged answer and advances after acknowledgement. Respondents can re-record, retry a failed upload with the same take, or switch to typing.
