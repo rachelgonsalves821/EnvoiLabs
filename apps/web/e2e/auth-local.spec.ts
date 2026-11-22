@@ -178,7 +178,7 @@ test.describe("local Auth with synthetic fixtures", () => {
     });
   });
 
-  test("a local magic link needs TOTP before the researcher workspace renders", async ({ page, baseURL }) => {
+  test("researcher email and TOTP unlock persistent drafts and idempotent preview launch", async ({ page, baseURL }) => {
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `auth-smoke-${randomUUID()}@example.test`;
@@ -203,6 +203,10 @@ test.describe("local Auth with synthetic fixtures", () => {
     await page.goto("/app");
     await expect(page).toHaveURL(/\/app\/mfa$/);
     await expect(page.locator("#new-study")).toHaveCount(0);
+    const denied = await page.request.post("/api/researcher/studies", {
+      headers: { origin, "idempotency-key": randomUUID() }, data: {},
+    });
+    expect(denied.status()).toBe(403);
 
     await page.getByRole("button", { name: "Show setup key" }).click();
     const setupKey = page.locator("main code");
@@ -213,5 +217,77 @@ test.describe("local Auth with synthetic fixtures", () => {
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(page).toHaveURL(/\/app$/);
     await expect(page.getByRole("heading", { name: "New study" })).toBeVisible();
+
+    await page.getByLabel("Study title").fill("Late-night ordering study");
+    await page.getByLabel("Target completes").fill("3");
+    await page.getByLabel("Criterion 1", { exact: true }).selectOption("Ordered food after 10 pm in the last 30 days");
+    await page.getByLabel("Criterion 2", { exact: true }).selectOption("Prefers ordering food in an app");
+    const questions = [
+      "When did you last order food after 10 pm?", "How did you choose what to order?",
+      "What happened when you checked out?", "What made you use that app the next time?",
+    ];
+    for (const [index, question] of questions.entries()) {
+      await page.getByLabel(`Question ${index + 1}`, { exact: true }).fill(question);
+    }
+    const [response] = await Promise.all([
+      page.waitForResponse((item) => item.url().endsWith("/api/researcher/studies") && item.request().method() === "POST"),
+      page.getByRole("button", { name: "Create draft" }).click(),
+    ]);
+    expect(response.status()).toBe(201);
+    await expect(page.getByRole("heading", { name: "Study draft created" })).toBeVisible();
+    const { studyId } = await response.json();
+    expect(studyId).toBe(response.request().headers()["idempotency-key"]);
+    const repeated = await page.request.post("/api/researcher/studies", {
+      data: response.request().postDataJSON(), headers: { origin, "idempotency-key": studyId },
+    });
+    expect(repeated.status()).toBe(201);
+    expect(await repeated.json()).toEqual({ studyId, state: "draft" });
+
+    const [study, guide, createdEvents] = await Promise.all([
+      service.from("studies").select("organization_id, state, target_completes").eq("id", studyId).single(),
+      service.from("guide_questions").select("text, max_probes").eq("study_id", studyId).order("position"),
+      service.from("events").select("name").eq("study_id", studyId).eq("name", "study.created"),
+    ]);
+    expect(study.data).toEqual({ organization_id: organization.data.id, state: "draft", target_completes: 3 });
+    expect(guide.data).toEqual(questions.map((text) => ({ text, max_probes: 0 })));
+    expect(createdEvents.data).toEqual([{ name: "study.created" }]);
+
+    const candidate = await service.auth.admin.createUser({
+      email: `launch-candidate-${randomUUID()}@example.test`, email_confirm: true,
+    });
+    if (candidate.error || !candidate.data.user) throw new Error("Could not create the synthetic candidate.");
+    const respondent = await service.from("respondents").insert({
+      auth_user_id: candidate.data.user.id, age_attested_at: new Date().toISOString(),
+    }).select("id").single();
+    if (respondent.error || !respondent.data) throw new Error("Could not provision the synthetic candidate.");
+    const profile = await service.from("profile_attributes").insert({
+      respondent_id: respondent.data.id, key: "ordered_food_after_10pm_last_30_days", value_json: true, source: "signup",
+    });
+    expect(profile.error).toBeNull();
+    const pricing = await service.from("pricing_configs").insert({
+      version: 100, active: true, params_json: { unitPriceCents: 100, incentivePerQuestionCents: 40 },
+    });
+    expect(pricing.error).toBeNull();
+
+    const [launch, retry] = await Promise.all([
+      page.waitForResponse((item) => item.url().endsWith("/api/researcher/studies/launch")),
+      page.request.post("/api/researcher/studies/launch", {
+        headers: { origin }, data: { studyId, skip_payment: true },
+      }),
+      page.getByRole("button", { name: "Launch test study" }).click(),
+    ]);
+    expect(launch.status()).toBe(200);
+    expect(retry.status()).toBe(200);
+    expect(await launch.json()).toEqual({ studyId, state: "fielding" });
+    expect(await retry.json()).toEqual({ studyId, state: "fielding" });
+    await expect(page.getByRole("heading", { name: "Study launched" })).toBeFocused();
+    const [offers, audits, payments] = await Promise.all([
+      service.from("invites").select("respondent_id, state, reward_cents").eq("study_id", studyId),
+      service.from("audit_log").select("id").eq("entity_id", studyId).eq("to_state", "fielding"),
+      service.from("payments").select("id").eq("study_id", studyId),
+    ]);
+    expect(offers.data).toEqual([{ respondent_id: respondent.data.id, state: "invited", reward_cents: 160 }]);
+    expect(audits.data).toHaveLength(1);
+    expect(payments.data).toEqual([]);
   });
 });
