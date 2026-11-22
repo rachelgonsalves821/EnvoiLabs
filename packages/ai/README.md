@@ -17,3 +17,11 @@ The live smoke pins `gpt-transcribe` or `whisper-large-v3-turbo`. A green smoke 
 Run `pnpm --filter @envoi-labs/ai eval` for the offline baseline. Select `scoping`, `sizing-pushback`, `guide`, `probe`, or `evidence` to run one suite. The command prints a JSON report and exits nonzero on a failed check or missing fixture. The package test command also runs the baseline. Full fixture counts, redaction, and live model or judge runs remain tracked in the build plan.
 
 Add prompt revisions under `prompts/<agent>/`. Update `prompts/active.json` and refresh the matching replay fixtures when switching versions.
+
+Gate 1 CI runs the transcription preflight on the five checked-in fixtures and
+a fresh Chromium recording of synthetic speech. An authorized maintainer can run
+the **Gate 1 live synthetic transcription** workflow from `main` after adding
+one scoped repository Actions secret, `OPENAI_API_KEY` or `GROQ_API_KEY`. The
+workflow sends the six synthetic samples to the chosen provider and records
+provider, model, latency and estimated cost. Logs omit transcripts and secrets.
+The study's upload, consent and redacted publication checks run separately.
