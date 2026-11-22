@@ -1363,6 +1363,8 @@ export type Database = {
         }
         Returns: string
       }
+      save_gate1_consent: { Args: { decisions: Json }; Returns: boolean }
+      save_gate1_profile: { Args: { attributes: Json }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

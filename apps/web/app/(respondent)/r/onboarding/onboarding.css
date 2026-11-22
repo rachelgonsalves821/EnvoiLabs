@@ -1,0 +1,52 @@
+.respondent-onboarding-form {
+  display: grid;
+  gap: var(--space-5);
+  min-inline-size: 0;
+}
+.respondent-onboarding-form select {
+  background: var(--paper-sunk);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: var(--text-body);
+  min-block-size: 44px;
+  padding-inline: var(--space-3);
+}
+.respondent-onboarding-form :is(select, input, summary):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.respondent-onboarding-choices {
+  border: 0;
+  display: grid;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+.respondent-onboarding-choices label {
+  align-items: start;
+  display: flex;
+  gap: var(--space-3);
+  min-block-size: 44px;
+  padding-block: var(--space-2);
+}
+.respondent-onboarding-choices input {
+  accent-color: var(--pulse-edge);
+  block-size: 1.25rem;
+  flex: none;
+  inline-size: 1.25rem;
+  margin: 0;
+}
+.respondent-onboarding-choices small {
+  color: var(--ink-muted);
+  display: block;
+  font: var(--text-body-s);
+}
+.respondent-onboarding details summary {
+  align-content: center;
+  cursor: pointer;
+  min-block-size: 44px;
+}
+.respondent-onboarding p.respondent-onboarding-error {
+  color: var(--critical);
+}

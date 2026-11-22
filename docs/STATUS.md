@@ -237,7 +237,19 @@ Contract or schema changes. None.
 
 Risks. Upstream behavior varies by mode. Envoi's limits, consent and publication rules are authoritative.
 
-## Platform, Gate 1 R-PLAT-02
+## 2026-11-21, Respondent, Gate 1 R-RESP-02 and R-RESP-03
+
+Done. Added a signed-in mobile profile and four separate privacy choices. The profile saves typed structured answers. Preview consent records the text version for each purpose and retains a history of changes. The respondent can review saved choices after returning.
+
+Next. Connect eligible studies on Home and enforce current consent in the recording, transcription, retention and researcher access paths. Add optional spoken profile answers after the consented voice path is available.
+
+Needs from others. Platform matching and the consented voice intake path.
+
+Contract or schema changes. Reused the existing profile and consent request contracts. The migration adds two authenticated procedures that derive respondent identity from the session and serialize changes for the active account.
+
+Risks. This is the synthetic preview flow. Production consent text and processing still need the pre-study checks. See the [database checks](../packages/db/tests/respondent_onboarding.sql) and [disposable mobile browser scenario](../apps/web/e2e/auth-local.spec.ts).
+
+## 2026-11-21, Platform, Gate 1 R-PLAT-02
 
 Done. Added the test-only study launch service. It matches an opted-in preview study against profile criteria, active invitations and participation limits. It creates the first invite batch and records the launch and invite transitions in one transaction.
 
