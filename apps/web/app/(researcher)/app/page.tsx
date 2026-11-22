@@ -1,5 +1,6 @@
 import "@envoi-labs/ui/styles.css";
 import { requireResearcher } from "../../../server/auth/identity";
+import { allowsTestLaunch } from "../../../server/studies/launch";
 import { researcherCopy as copy } from "./copy";
 import { StudyDraftForm } from "./study-draft-form";
 import styles from "./researcher.module.css";
@@ -16,7 +17,7 @@ export default async function ResearcherPage() {
       </nav>
       <main className={styles.main} id="new-study" tabIndex={-1}>
         <h1>{copy.title}</h1>
-        <StudyDraftForm />
+        <StudyDraftForm launchEnabled={allowsTestLaunch()} />
       </main>
     </div>
   );

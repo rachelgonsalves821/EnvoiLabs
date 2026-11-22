@@ -261,13 +261,37 @@ Contract or schema changes. The frozen study draft body and response are reused.
 
 Risks. The first form offers the supported criteria from the seeded panel. The real scoping chat is planned for Gate 2.
 
+## 2026-11-21, Platform, Gate 1 R-PLAT-02
+
+Done. Added the test-only study launch service. It matches an opted-in preview study against profile criteria, active invitations and participation limits. It creates the first invite batch and records the launch and invite transitions in one transaction.
+
+Next. Connect the respondent Home and invite acceptance to the same seeded study.
+
+Needs from others. None.
+
+Contract or schema changes. Uses the frozen Gate 1 launch contract. The service-only launch function and the disposable seed supply the preview launch and incentive.
+
+Risks. Future invite waves and the historical feasibility estimate remain open. Preview launch has an explicit opt-in and stays disabled in production.
+
+## 2026-11-21, Respondent, Gate 1 R-RESP-04
+
+Done. Added the signed-in Home list with owned active invitations, screening flags, accepted studies and in-progress status. The projection exposes just the invitation metadata needed for Home. The card shows reward, time, question count, reason and privacy details with a neutral participant label.
+
+Next. Connect accept, decline, and resume to the Platform operations. Add an approved participant-facing topic when the researcher form collects one.
+
+Needs from others. Platform invite actions and session routing.
+
+Contract or schema changes. Added a narrow authenticated query without changing the existing invite mutation contracts.
+
+Risks. Home is a read-only increment. The [database checks](../packages/db/tests/respondent_home_invites.sql) and [disposable browser scenario](../apps/web/e2e/auth-local.spec.ts) cover ownership and disclosure.
+
 ## 2026-11-21, Researcher and AI, Gate 1 R-RSCH-07 tracking
 
-Done. Added an MFA-protected study tracking page. It reads the draft title and target through existing tenant policies and refreshes invited, accepted, completed and removed counts while the page is visible. A caller from another organization sees no row.
+Done. The researcher can open tracking from a successful preview launch. The MFA-protected page reads the study title and target through existing tenant policies and refreshes invited, accepted, completed and removed counts while the page is visible. A caller from another organization sees no row.
 
-Next. Connect test launch to tracking when the Platform launch service is ready. Add consent-scoped redacted transcript display and exercise IT-1.1 with the respondent journey.
+Next. Add consent-scoped redacted transcript display and exercise IT-1.1 with the respondent journey.
 
-Needs from others. Test launch and the redacted transcript publication path.
+Needs from others. The redacted transcript publication path.
 
 Contract or schema changes. Reused the frozen tracking response. The read function checks organization scope and returns aggregates without granting researcher access to individual invite or session rows.
 

@@ -69,6 +69,14 @@
   max-width: 690px;
 }
 
+.savedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.trackingLink { text-decoration: none; }
+
 .draftFields,
 .group {
   min-inline-size: 0;

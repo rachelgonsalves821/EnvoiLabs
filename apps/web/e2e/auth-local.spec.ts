@@ -176,9 +176,52 @@ test.describe("local Auth with synthetic fixtures", () => {
       await expect(voice).not.toBeChecked();
       await expect(researcher).toBeChecked();
     });
+
+    await test.step("signed-in Home shows only the respondent's current invitation", async () => {
+      await page.goto("/r");
+      await expect(page.getByRole("heading", { name: "Your studies" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "No study invitations yet" })).toBeVisible();
+
+      const organization = await service.from("organizations").insert({ name: "Private Home fixture" }).select("id").single();
+      if (organization.error || !organization.data) throw new Error("Could not create the synthetic organization.");
+      const study = await service.from("studies").insert({
+        organization_id: organization.data.id, title: "Internal project planning", state: "fielding",
+        target_completes: 2, length_minutes: 8,
+      }).select("id").single();
+      if (study.error || !study.data) throw new Error("Could not create the synthetic study.");
+      const studyId = study.data.id;
+      const guide = await service.from("guide_questions").insert([1, 2, 3, 4].map((position) => ({
+        study_id: studyId, position, text: `Private test question ${position}`,
+      })));
+      expect(guide.error).toBeNull();
+
+      const otherUser = await service.auth.admin.createUser({ email: `other-${randomUUID()}@example.test`, email_confirm: true });
+      if (otherUser.error || !otherUser.data.user) throw new Error("Could not create the second synthetic respondent.");
+      const other = await service.rpc("provision_email_respondent", { supplied_user_id: otherUser.data.user.id });
+      if (other.error || !other.data) throw new Error("Could not provision the second synthetic respondent.");
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const invites = await service.from("invites").insert([
+        { study_id: studyId, respondent_id: respondentId, state: "invited", expires_at: expiresAt,
+          reward_cents: 250, why_you_text: "Matched on delivery habits" },
+        { study_id: studyId, respondent_id: other.data, state: "invited", expires_at: expiresAt,
+          reward_cents: 999, why_you_text: "Another respondent’s reason" },
+      ]);
+      expect(invites.error).toBeNull();
+
+      await page.reload();
+      await expect(page.getByRole("heading", { name: "Research interview" })).toHaveCount(1);
+      await expect(page.getByText("Matched on delivery habits")).toBeVisible();
+      await expect(page.getByText("$2.50")).toBeVisible();
+      await expect(page.getByText("8 min")).toBeVisible();
+      await expect(page.getByText("4 questions")).toBeVisible();
+      await expect(page.getByText("$9.99")).toHaveCount(0);
+      await expect(page.getByText("Internal project planning")).toHaveCount(0);
+      await expect(page.getByText("Private test question 1")).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+    });
   });
 
-  test("researcher email and TOTP unlock study drafts and live tracking", async ({ page, baseURL }) => {
+  test("researcher email and TOTP unlock drafts, idempotent preview launch and live tracking", async ({ page, baseURL }) => {
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `auth-smoke-${randomUUID()}@example.test`;
@@ -252,25 +295,56 @@ test.describe("local Auth with synthetic fixtures", () => {
     expect(guide.data).toEqual(questions.map((text) => ({ text, max_probes: 0 })));
     expect(createdEvents.data).toEqual([{ name: "study.created" }]);
 
-    await page.goto(`/app/studies/${studyId}`);
+    const candidate = await service.auth.admin.createUser({
+      email: `launch-candidate-${randomUUID()}@example.test`, email_confirm: true,
+    });
+    if (candidate.error || !candidate.data.user) throw new Error("Could not create the synthetic candidate.");
+    const respondent = await service.from("respondents").insert({
+      auth_user_id: candidate.data.user.id, age_attested_at: new Date().toISOString(),
+    }).select("id").single();
+    if (respondent.error || !respondent.data) throw new Error("Could not provision the synthetic candidate.");
+    const profile = await service.from("profile_attributes").insert({
+      respondent_id: respondent.data.id, key: "ordered_food_after_10pm_last_30_days", value_json: true, source: "signup",
+    });
+    expect(profile.error).toBeNull();
+    const pricing = await service.from("pricing_configs").insert({
+      version: 100, active: true, params_json: { unitPriceCents: 100, incentivePerQuestionCents: 40 },
+    });
+    expect(pricing.error).toBeNull();
+
+    const [launch, retry] = await Promise.all([
+      page.waitForResponse((item) => item.url().endsWith("/api/researcher/studies/launch")),
+      page.request.post("/api/researcher/studies/launch", {
+        headers: { origin }, data: { studyId, skip_payment: true },
+      }),
+      page.getByRole("button", { name: "Launch test study" }).click(),
+    ]);
+    expect(launch.status()).toBe(200);
+    expect(retry.status()).toBe(200);
+    expect(await launch.json()).toEqual({ studyId, state: "fielding" });
+    expect(await retry.json()).toEqual({ studyId, state: "fielding" });
+    await expect(page.getByRole("heading", { name: "Study launched" })).toBeFocused();
+    const [offers, audits, payments] = await Promise.all([
+      service.from("invites").select("id, respondent_id, state, reward_cents").eq("study_id", studyId),
+      service.from("audit_log").select("id").eq("entity_id", studyId).eq("to_state", "fielding"),
+      service.from("payments").select("id").eq("study_id", studyId),
+    ]);
+    expect(offers.data).toHaveLength(1);
+    expect(offers.data).toMatchObject([{ respondent_id: respondent.data.id, state: "invited", reward_cents: 160 }]);
+    expect(audits.data).toHaveLength(1);
+    expect(payments.data).toEqual([]);
+
+    await page.getByRole("link", { name: "View tracking" }).click();
+    await expect(page).toHaveURL(`/app/studies/${studyId}`);
     await expect(page.getByRole("heading", { name: "Late-night ordering study" })).toBeVisible();
     await expect(page.getByText("0 of 3", { exact: true })).toBeVisible();
 
-    const participant = await service.auth.admin.createUser({
-      email: `tracking-participant-${randomUUID()}@example.test`, email_confirm: true,
-    });
-    if (!participant.data.user) throw new Error("Could not create the tracking fixture user.");
-    const respondent = await service.rpc("provision_email_respondent", { supplied_user_id: participant.data.user.id });
-    expect(respondent.error).toBeNull();
-    const fielding = await service.from("studies").update({ state: "fielding" }).eq("id", studyId);
-    expect(fielding.error).toBeNull();
-    const invite = await service.from("invites").insert({
-      study_id: studyId, respondent_id: respondent.data, state: "accepted", reward_cents: 100,
-      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
-    }).select("id").single();
-    expect(invite.error).toBeNull();
+    const inviteId = offers.data?.[0]?.id;
+    if (!inviteId) throw new Error("The seeded preview launch did not produce an invite.");
+    const accepted = await service.from("invites").update({ state: "accepted" }).eq("id", inviteId);
+    expect(accepted.error).toBeNull();
     const session = await service.from("sessions").insert({
-      study_id: studyId, invite_id: invite.data?.id, state: "quality_hold", submitted_at: new Date().toISOString(),
+      study_id: studyId, invite_id: inviteId, state: "quality_hold", submitted_at: new Date().toISOString(),
       started_at: new Date(Date.now() - 60_000).toISOString(),
     });
     expect(session.error).toBeNull();

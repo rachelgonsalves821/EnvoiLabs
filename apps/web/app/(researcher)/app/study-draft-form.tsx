@@ -1,8 +1,9 @@
 "use client";
 
-import { CreateGate1StudyRequestSchema, StudyMutationResponseSchema } from "@envoi-labs/contracts";
+import { CreateGate1StudyRequestSchema, StudyMutationResponseSchema, type StudyMutationResponse } from "@envoi-labs/contracts";
 import { gate1CriterionChoices } from "@envoi-labs/services/study-draft-criteria";
 import { Button, Field } from "@envoi-labs/ui";
+import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { researcherCopy as copy } from "./copy";
 import styles from "./researcher.module.css";
@@ -10,8 +11,8 @@ import styles from "./researcher.module.css";
 const criterionNumbers = [1, 2];
 const questionNumbers = [1, 2, 3, 4];
 
-export function StudyDraftForm() {
-  const [savedTitle, setSavedTitle] = useState<string>();
+export function StudyDraftForm({ launchEnabled }: { launchEnabled: boolean }) {
+  const [saved, setSaved] = useState<{ title: string; study: StudyMutationResponse }>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const attempt = useRef<{ body: string; id: string } | null>(null);
@@ -50,11 +51,12 @@ export function StudyDraftForm() {
         setError(copy.signInAgain);
         return;
       }
-      if (response.status !== 201 || !StudyMutationResponseSchema.safeParse(await response.json()).success) {
+      const result = response.status === 201 ? StudyMutationResponseSchema.safeParse(await response.json()) : null;
+      if (!result?.success) {
         setError(copy.saveFailed);
         return;
       }
-      setSavedTitle(draft.data.title);
+      setSaved({ title: draft.data.title, study: result.data });
       attempt.current = null;
     } catch {
       setError(copy.saveFailed);
@@ -64,12 +66,61 @@ export function StudyDraftForm() {
     }
   }
 
-  if (savedTitle !== undefined) {
+  async function launch() {
+    if (!launchEnabled || !saved || inFlight.current) return;
+    inFlight.current = true;
+    setSaving(true);
+    setError(undefined);
+    try {
+      const response = await fetch("/api/researcher/studies/launch", {
+        method: "POST",
+        body: JSON.stringify({ studyId: saved.study.studyId, skip_payment: true }),
+        headers: { "content-type": "application/json" },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (response.status === 403) {
+        setError(copy.signInAgain);
+        return;
+      }
+      if (response.status === 409) {
+        setError(copy.launchConflict);
+        return;
+      }
+      const outcome = response.ok ? StudyMutationResponseSchema.safeParse(await response.json()) : null;
+      if (!outcome?.success || outcome.data.studyId !== saved.study.studyId || outcome.data.state !== "fielding") {
+        setError(copy.launchFailed);
+        return;
+      }
+      setSaved({ ...saved, study: outcome.data });
+    } catch {
+      setError(copy.launchFailed);
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
+  }
+
+  if (saved !== undefined) {
+    const fielding = saved.study.state === "fielding";
     return (
       <section className={styles.saved} aria-labelledby="draft-created">
-        <h2 id="draft-created" tabIndex={-1} ref={(heading) => { heading?.focus(); }}>{copy.saved}</h2>
-        <p>{savedTitle}</p>
-        <Button variant="secondary" onClick={() => setSavedTitle(undefined)}>{copy.another}</Button>
+        <h2 key={saved.study.state} id="draft-created" tabIndex={-1} ref={(heading) => { heading?.focus(); }}>
+          {fielding ? copy.launched : copy.saved}
+        </h2>
+        <p>{saved.title}</p>
+        {error && <p role="alert" className={styles.error}>{error}</p>}
+        <div className={styles.savedActions}>
+          {launchEnabled && saved.study.state === "draft" &&
+            <Button onClick={launch} disabled={saving}>{saving ? copy.launching : copy.launch}</Button>}
+          {fielding && (
+            <Link href={`/app/studies/${saved.study.studyId}`} className={`ev-button ${styles.trackingLink}`}>
+              {copy.viewTracking}
+            </Link>
+          )}
+          <Button variant="secondary" disabled={saving} onClick={() => { setError(undefined); setSaved(undefined); }}>
+            {copy.another}
+          </Button>
+        </div>
       </section>
     );
   }
