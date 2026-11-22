@@ -231,7 +231,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 | R-RSCH-07 | Tracking page | Invited, accepted, completed, removed counts. Sample composition against spec. Projected finish. Live updates without reload. | Agent 3 | In progress (Researcher and AI) | [Tracking counts and tenant scope](../packages/db/tests/study_tracking.sql) |
 | R-RSCH-08 | Report | Executive answer, themes with counts ("11 of 20"), confidence per finding, quotes linked to transcripts and grounded to exact spans (OpenVerbatim approach), quality scores, segment cuts, methods appendix, hypothesis scores. | Agent 3 | Not started | |
 | R-RSCH-09 | Next study proposal | Report ends with one scoped, priced follow-up study the researcher can launch in two clicks. | Agent 3 | Not started | |
-| R-RSCH-10 | Transcripts and export | Redacted transcripts per respondent, audio clips where consented, CSV and PDF export. | Agent 3 | Not started | |
+| R-RSCH-10 | Transcripts and export | Redacted transcripts per respondent, audio clips where consented, CSV and PDF export. | Agent 3 | In progress (Researcher and AI) | [Consent-scoped viewer test](../apps/web/e2e/auth-local.spec.ts) |
 | R-RSCH-11 | Honest labels | Every study and report labeled "Directional qualitative". "Student convenience sample" label when over 50% students. No percentages below 30 completes. | Agent 3 | Not started | |
 
 ### 7.3 Platform, trust and operations

@@ -4,6 +4,7 @@ import { StudyTrackingResponseSchema } from "@envoi-labs/contracts";
 import { Chip } from "@envoi-labs/ui";
 import { useEffect, useState } from "react";
 import { stateLabels, trackingCopy as copy } from "./copy";
+import { StudyTranscriptsPanel } from "./study-transcripts-panel";
 import styles from "./tracking.module.css";
 
 type Tracking = ReturnType<typeof StudyTrackingResponseSchema.parse>;
@@ -55,23 +56,26 @@ export function StudyTrackingPanel({ initial, targetCompletes }: { initial: Trac
 
   if (!snapshot) return <p role="status">{copy.accessEnded}</p>;
   return (
-    <section className={styles.panel} aria-labelledby="tracking-heading">
-      <div className={styles.heading}>
-        <h2 id="tracking-heading">{copy.title}</h2>
-        <Chip tone={snapshot.state === "fielding" ? "tide" : "neutral"}>{stateLabels[snapshot.state]}</Chip>
-      </div>
-      <p className={styles.progress} aria-live="polite">
-        <strong>{snapshot.completed} of {targetCompletes}</strong> {copy.completes}
-      </p>
-      <dl className={styles.counts}>
-        {copy.counts.map(([key, label]) => (
-          <div key={key}><dt>{label}</dt><dd>{snapshot[key]}</dd></div>
-        ))}
-      </dl>
-      {snapshot.projectedFinish && (
-        <p>{copy.estimatedFinish} <time dateTime={snapshot.projectedFinish}>{utcFinish.format(new Date(snapshot.projectedFinish))} UTC</time></p>
-      )}
-      {refreshFailed && <p role="status" className={styles.status}>{copy.refreshFailed}</p>}
-    </section>
+    <>
+      <section className={styles.panel} aria-labelledby="tracking-heading">
+        <div className={styles.heading}>
+          <h2 id="tracking-heading">{copy.title}</h2>
+          <Chip tone={snapshot.state === "fielding" ? "tide" : "neutral"}>{stateLabels[snapshot.state]}</Chip>
+        </div>
+        <p className={styles.progress} aria-live="polite">
+          <strong>{snapshot.completed} of {targetCompletes}</strong> {copy.completes}
+        </p>
+        <dl className={styles.counts}>
+          {copy.counts.map(([key, label]) => (
+            <div key={key}><dt>{label}</dt><dd>{snapshot[key]}</dd></div>
+          ))}
+        </dl>
+        {snapshot.projectedFinish && (
+          <p>{copy.estimatedFinish} <time dateTime={snapshot.projectedFinish}>{utcFinish.format(new Date(snapshot.projectedFinish))} UTC</time></p>
+        )}
+        {refreshFailed && <p role="status" className={styles.status}>{copy.refreshFailed}</p>}
+      </section>
+      <StudyTranscriptsPanel studyId={studyId} />
+    </>
   );
 }
