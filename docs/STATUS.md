@@ -225,6 +225,30 @@ Contract or schema changes. None.
 
 Risks. This increment defines transition rules. Database concurrency, expiry jobs and audited retries remain to be verified by IT-1.4 and IT-1.5.
 
+## 2026-11-21, Researcher and AI, Gate 1 R-RSCH-08 and R-RSCH-09 upstream review
+
+Done. Recorded the [OpenInterviewer design review](adr/0002-openinterviewer-review.md) using the pinned revision and verified license. Adopted the design patterns for clarification, save-before-analysis, grounded quote selection and follow-up study provenance.
+
+Next. Apply the answer persistence and retry pattern in IT-1.5. Use the ADR's checks when implementing probes, reports and next-study proposals.
+
+Needs from others. None.
+
+Contract or schema changes. None.
+
+Risks. Upstream behavior varies by mode. Envoi's limits, consent and publication rules are authoritative.
+
+## 2026-11-21, Respondent, Gate 1 R-RESP-02 and R-RESP-03
+
+Done. Added a signed-in mobile profile and four separate privacy choices. The profile saves typed structured answers. Preview consent records the text version for each purpose and retains a history of changes. The respondent can review saved choices after returning.
+
+Next. Connect eligible studies on Home and enforce current consent in the recording, transcription, retention and researcher access paths. Add optional spoken profile answers after the consented voice path is available.
+
+Needs from others. Platform matching and the consented voice intake path.
+
+Contract or schema changes. Reused the existing profile and consent request contracts. The migration adds two authenticated procedures that derive respondent identity from the session and serialize changes for the active account.
+
+Risks. This is the synthetic preview flow. Production consent text and processing still need the pre-study checks. See the [database checks](../packages/db/tests/respondent_onboarding.sql) and [disposable mobile browser scenario](../apps/web/e2e/auth-local.spec.ts).
+
 ## 2026-11-21, Researcher and AI, Gate 1 study draft
 
 Done. Added the researcher form for a four-question study draft, with two seeded criteria and a target for completed interviews. The server saves the study, brief version, criteria and ordered guide in one organization-scoped transaction, along with an audit entry and a study-created event. The form shows success only after the server confirms the draft. Added route authorization and validation tests, database rollback and retry checks, and delivered-email browser coverage that creates a study after TOTP.

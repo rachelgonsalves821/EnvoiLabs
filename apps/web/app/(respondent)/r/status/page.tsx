@@ -13,7 +13,8 @@ export default async function RespondentStatusPage() {
         <h1>{copy.title}</h1>
         <p>{copy.instruction}</p>
       </div>
-      <a className="ev-button respondent-signup-link" href="/r">{copy.action}</a>
+      <a className="ev-button respondent-signup-link" href="/r/onboarding" data-variant="pulse">{copy.profile}</a>
+      <a className="ev-button respondent-signup-link" href="/r" data-variant="ghost">{copy.action}</a>
     </Card>
   );
 }

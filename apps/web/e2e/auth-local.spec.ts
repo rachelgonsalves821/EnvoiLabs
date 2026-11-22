@@ -120,9 +120,62 @@ test.describe("local Auth with synthetic fixtures", () => {
     const user = listing.data?.users.find((candidate) => candidate.email === email);
     if (!user) throw new Error("Synthetic respondent was not created.");
     expect(user.email_confirmed_at).toBeTruthy();
-    const row = await service.from("respondents").select("age_attested_at").eq("auth_user_id", user.id).single();
+    const row = await service.from("respondents").select("id,age_attested_at").eq("auth_user_id", user.id).single();
     expect(row.error).toBeNull();
     expect(row.data?.age_attested_at).toBeTruthy();
+    if (!row.data) throw new Error("The synthetic respondent account is missing.");
+    const respondentId = row.data.id;
+
+    await test.step("save profile and separate consent choices through the signed-in mobile flow", async () => {
+      await page.setViewportSize({ width: 360, height: 680 });
+      await page.getByRole("link", { name: "Profile and privacy choices" }).click();
+      await expect(page.getByRole("heading", { name: "Find studies that fit" })).toBeVisible();
+      await page.getByLabel("What’s your age range?").selectOption("18-24");
+      await page.getByLabel("How do you describe your gender?").selectOption("undisclosed");
+      await page.getByLabel("Are you currently in school?").selectOption("year_2");
+      await page.getByLabel("Do you live on campus?").selectOption("true");
+      await page.getByLabel("How often do you shop online?").selectOption("weekly");
+      await page.getByLabel("What’s your ZIP code?").fill("02139");
+      await page.getByLabel("How many times do you order food in a typical week?").fill("3");
+      await page.getByRole("checkbox", { name: "Food and drink" }).check();
+      await page.getByRole("checkbox", { name: "Technology" }).check();
+      await page.getByRole("button", { name: "Save and continue" }).click();
+
+      await expect(page.getByRole("heading", { name: "Choose what to share" })).toBeFocused();
+      const voice = page.getByRole("checkbox", { name: /Record my voice answers/ });
+      const researcher = page.getByRole("checkbox", { name: /Share my redacted answers/ });
+      await expect(voice).not.toBeChecked();
+      await expect(researcher).not.toBeChecked();
+      await researcher.check();
+      await page.getByRole("button", { name: "Save privacy choices" }).click();
+      await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeFocused();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+      const profile = await service.from("profile_attributes").select("key,value_json").eq("respondent_id", respondentId);
+      expect(profile.error).toBeNull();
+      expect(profile.data).toHaveLength(9);
+      expect(profile.data).toEqual(expect.arrayContaining([
+        { key: "student", value_json: true },
+        { key: "food_orders_per_week", value_json: 3 },
+        { key: "region_zip", value_json: "02139" },
+      ]));
+      const decisions = await service.from("consents").select("purpose,granted,text_version")
+        .eq("respondent_id", respondentId);
+      expect(decisions.error).toBeNull();
+      expect(decisions.data).toHaveLength(4);
+      expect(decisions.data).toEqual(expect.arrayContaining([
+        { purpose: "recording", granted: false, text_version: "gate1-preview-v1" },
+        { purpose: "transcription_vendor", granted: false, text_version: "gate1-preview-v1" },
+        { purpose: "retention", granted: false, text_version: "gate1-preview-v1" },
+        { purpose: "researcher_access", granted: true, text_version: "gate1-preview-v1" },
+      ]));
+
+      await page.reload();
+      await expect(page.getByRole("heading", { name: "Your account is ready" })).toBeVisible();
+      await page.getByRole("button", { name: "Review privacy choices" }).click();
+      await expect(voice).not.toBeChecked();
+      await expect(researcher).toBeChecked();
+    });
   });
 
   test("researcher email and TOTP unlock persistent study drafts", async ({ page, baseURL }) => {
