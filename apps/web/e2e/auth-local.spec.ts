@@ -237,7 +237,7 @@ test.describe("local Auth with synthetic fixtures", () => {
       const save = page.getByRole("button", { name: "Save answer" });
       await answer.fill("Synthetic answer one");
       await save.click();
-      await expect(page.getByRole("alert")).toHaveText(
+      await expect(page.getByRole("main").getByRole("alert")).toHaveText(
         "This answer couldn’t be saved. Review your privacy choices or reopen the interview.",
       );
       await expect(answer).toHaveValue("Synthetic answer one");
@@ -281,7 +281,7 @@ test.describe("local Auth with synthetic fixtures", () => {
       expect(completed.data?.state).toBe("quality_hold");
 
       await page.goto("/r/interviews/" + otherInviteId);
-      await expect(page.getByRole("alert")).toHaveText("This interview isn’t available anymore.");
+      await expect(page.getByRole("main").getByRole("alert")).toHaveText("This interview isn’t available anymore.");
       await expect(page.getByRole("heading", { name: "Private test question 1" })).toHaveCount(0);
     });
   });
