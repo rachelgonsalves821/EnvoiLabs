@@ -296,3 +296,15 @@ Needs from others. The redacted transcript publication path.
 Contract or schema changes. Reused the frozen tracking response. The read function checks organization scope and returns aggregates without granting researcher access to individual invite or session rows.
 
 Risks. Tracking displays confirmed counts. Sample composition and a projected finish still need their own data sources.
+
+## 2026-11-22, Researcher and AI, Gate 1 R-RSCH-10 transcript viewer
+
+Done. Study tracking fetches published redacted text through the current researcher's authenticated session. The database enforces organization and current consent, and the response returns only the transcript identifier and redacted text. The browser clears previously rendered text after a denial, a failed refresh or when the tab is hidden.
+
+Next. Run IT-1.1 through answer publication and exercise the publication worker's pending, failed and consent-withdrawal cases.
+
+Needs from others. The approved redaction and publication path for real provider results.
+
+Contract or schema changes. Reuses the frozen transcript list shape and existing access policies. This increment only reads published rows.
+
+Risks. The viewer currently lists published text. Respondent grouping, approved profile descriptors and exports remain open.

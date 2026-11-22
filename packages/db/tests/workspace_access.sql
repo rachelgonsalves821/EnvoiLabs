@@ -226,5 +226,33 @@ set local role service_role;
 select is((select count(*) from pii.transcript_raw), 1::bigint, 'Trusted service can read private transcript storage');
 
 reset role;
+insert into public.consents (respondent_id, purpose, granted, text_version, created_at)
+values ('90500000-0000-4000-8000-000000000001', 'researcher_access', true, 'fixture-1', now() + interval '4 seconds');
+insert into public.guide_questions (id, study_id, position, text)
+values ('91000000-0000-4000-8000-000000000003', '90600000-0000-4000-8000-000000000001', 2, 'Pending fixture question'),
+       ('91000000-0000-4000-8000-000000000004', '90600000-0000-4000-8000-000000000001', 3, 'Failed fixture question');
+insert into public.answers (id, study_id, session_id, guide_question_id, kind, sequence)
+values ('91300000-0000-4000-8000-000000000002', '90600000-0000-4000-8000-000000000001',
+    '91200000-0000-4000-8000-000000000001', '91000000-0000-4000-8000-000000000003', 'text', 2),
+       ('91300000-0000-4000-8000-000000000003', '90600000-0000-4000-8000-000000000001',
+    '91200000-0000-4000-8000-000000000001', '91000000-0000-4000-8000-000000000004', 'text', 3);
+insert into public.transcripts (id, answer_id, study_id, redacted_text, provider, model, latency_ms, cost_micros)
+values ('91400000-0000-4000-8000-000000000002', '91300000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001', null, 'fixture', 'fixture', 0, 0),
+       ('91400000-0000-4000-8000-000000000003', '91300000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001', null, 'fixture', 'fixture', 0, 0);
+insert into pii.transcript_raw (transcript_id, raw_text)
+values ('91400000-0000-4000-8000-000000000002', 'Synthetic pending redaction fixture'),
+       ('91400000-0000-4000-8000-000000000003', 'Synthetic failed redaction fixture');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select results_eq(
+    $$select id, redacted_text from public.transcripts
+      where study_id = '90600000-0000-4000-8000-000000000001' order by created_at, id$$,
+    $$values ('91400000-0000-4000-8000-000000000001'::uuid, 'I ordered soup.'::text)$$,
+    'The viewer projection exposes only published text, even with pending or failed raw rows and consent'
+);
+
+reset role;
 select * from finish();
 rollback;

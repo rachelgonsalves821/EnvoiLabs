@@ -17,6 +17,10 @@ export const trackingCopy = {
   unavailable: "Study tracking could not load.",
   refreshFailed: "The latest counts are unavailable. Showing the last confirmed counts.",
   accessEnded: "This study is no longer available in your session.",
+  transcripts: "Redacted transcripts",
+  transcriptsLoading: "Checking for redacted transcripts…",
+  transcriptsEmpty: "No redacted transcripts are available yet.",
+  transcriptsUnavailable: "Redacted transcripts could not be loaded.",
 } as const;
 
 export const stateLabels: Readonly<Record<StudyState, string>> = {

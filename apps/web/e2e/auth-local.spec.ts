@@ -222,6 +222,7 @@ test.describe("local Auth with synthetic fixtures", () => {
   });
 
   test("researcher email and TOTP unlock drafts, idempotent preview launch and live tracking", async ({ page, baseURL }) => {
+    test.setTimeout(45_000);
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `auth-smoke-${randomUUID()}@example.test`;
@@ -250,6 +251,9 @@ test.describe("local Auth with synthetic fixtures", () => {
       headers: { origin, "idempotency-key": randomUUID() }, data: {},
     });
     expect(denied.status()).toBe(403);
+    const preMfaTranscripts = await page.request.get(`/api/researcher/studies/${randomUUID()}/transcripts`);
+    expect(preMfaTranscripts.status()).toBe(403);
+    expect(await preMfaTranscripts.json()).toEqual({ ok: false });
 
     await page.getByRole("button", { name: "Show setup key" }).click();
     const setupKey = page.locator("main code");
@@ -288,11 +292,12 @@ test.describe("local Auth with synthetic fixtures", () => {
 
     const [study, guide, createdEvents] = await Promise.all([
       service.from("studies").select("organization_id, state, target_completes").eq("id", studyId).single(),
-      service.from("guide_questions").select("text, max_probes").eq("study_id", studyId).order("position"),
+      service.from("guide_questions").select("id, text, max_probes").eq("study_id", studyId).order("position"),
       service.from("events").select("name").eq("study_id", studyId).eq("name", "study.created"),
     ]);
     expect(study.data).toEqual({ organization_id: organization.data.id, state: "draft", target_completes: 3 });
-    expect(guide.data).toEqual(questions.map((text) => ({ text, max_probes: 0 })));
+    expect(guide.data).toHaveLength(4);
+    expect(guide.data).toMatchObject(questions.map((text) => ({ text, max_probes: 0 })));
     expect(createdEvents.data).toEqual([{ name: "study.created" }]);
 
     const candidate = await service.auth.admin.createUser({
@@ -346,8 +351,49 @@ test.describe("local Auth with synthetic fixtures", () => {
     const session = await service.from("sessions").insert({
       study_id: studyId, invite_id: inviteId, state: "quality_hold", submitted_at: new Date().toISOString(),
       started_at: new Date(Date.now() - 60_000).toISOString(),
-    });
+    }).select("id").single();
     expect(session.error).toBeNull();
     await expect(page.getByText("1 of 3", { exact: true })).toBeVisible({ timeout: 12_000 });
+
+    const endpoint = `/api/researcher/studies/${studyId}/transcripts`;
+    const empty = { studyId, transcripts: [] };
+    const redactedText = "I ordered [redacted] after class.";
+    const transcriptPanel = page.getByRole("region", { name: "Redacted transcripts" });
+    await expect(transcriptPanel.getByText("No redacted transcripts are available yet.")).toBeVisible();
+    if (!session.data || !guide.data) throw new Error("The interview fixture is missing its session or guide.");
+    const interviewId = session.data.id;
+    const transcriptId = randomUUID();
+    const questionFixtures = guide.data.slice(0, 3).map(({ id }, index) => ({
+      id: randomUUID(), study_id: studyId, session_id: interviewId, guide_question_id: id, kind: "text", sequence: index + 1,
+    }));
+    const answers = await service.from("answers").insert(questionFixtures);
+    expect(answers.error).toBeNull();
+    const transcripts = await service.from("transcripts").insert(questionFixtures.map(({ id }, index) => ({
+      id: index === 0 ? transcriptId : randomUUID(), study_id: studyId, answer_id: id,
+      redacted_text: index === 0 ? redactedText : null, provider: "fixture", model: "fixture", latency_ms: 0, cost_micros: 0,
+    })));
+    expect(transcripts.error).toBeNull();
+    expect(await (await page.request.get(endpoint)).json()).toEqual(empty);
+
+    const consent = { respondent_id: respondent.data.id, study_id: studyId, purpose: "researcher_access", text_version: "fixture" };
+    const grant = await service.from("consents").insert({ ...consent, granted: true });
+    expect(grant.error).toBeNull();
+    const published = await page.request.get(endpoint);
+    expect(published.headers()["cache-control"]).toBe("private, no-store");
+    expect(await published.json()).toEqual({ studyId, transcripts: [{ id: transcriptId, redactedText }] });
+    await expect(transcriptPanel.getByText(redactedText)).toBeVisible({ timeout: 12_000 });
+
+    const withdrawal = await service.from("consents").insert({ ...consent, granted: false });
+    expect(withdrawal.error).toBeNull();
+    expect(await (await page.request.get(endpoint)).json()).toEqual(empty);
+    await expect(transcriptPanel.getByText(redactedText)).toHaveCount(0, { timeout: 12_000 });
+
+    const restore = await service.from("consents").insert({ ...consent, granted: true });
+    expect(restore.error).toBeNull();
+    const other = await service.from("organizations").insert({ name: "Other transcript fixture organization" }).select("id").single();
+    if (other.error || !other.data) throw new Error("The other organization fixture could not be created.");
+    const changeTenant = await service.from("researchers").update({ organization_id: other.data.id }).eq("auth_user_id", created.data.user.id);
+    expect(changeTenant.error).toBeNull();
+    expect(await (await page.request.get(endpoint)).json()).toEqual(empty);
   });
 });
