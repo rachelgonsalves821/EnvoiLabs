@@ -24,4 +24,11 @@ export const homeCopy = {
   timeLeft: (minutes: number) => minutes < 60 ? `Ends in ${minutes} min` : `Ends in ${Math.ceil(minutes / 60)} h`,
   duration: (minutes: number) => `${minutes} min`,
   questionCount: (count: number) => `${count} ${count === 1 ? "question" : "questions"}`,
+  start: "Start answering",
+  decline: "Not for me",
+  continue: "Continue interview",
+  sending: "Updating your invitation…",
+  unavailable: "This invitation isn’t available anymore. Check your other studies.",
+  signInAgain: "Your session expired. Sign in again to update this invitation.",
+  actionFailed: "Your invitation couldn’t be updated. Try again.",
 };

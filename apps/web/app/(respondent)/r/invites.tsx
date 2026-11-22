@@ -1,14 +1,15 @@
 import { Card, Chip } from "@envoi-labs/ui";
 import type { HomeInvite } from "../../../server/respondent/home";
 import { homeCopy as copy } from "./copy";
-
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+import { InviteActions } from "./invite-actions";
+import { formatReward } from "./reward";
 
 export function RespondentInvites({ invites, now }: { invites: HomeInvite[] | null; now: number }) {
+  const firstOffer = invites?.find(({ state }) => state === "invited")?.id;
   return (
     <section className="respondent-studies" aria-labelledby="respondent-studies-heading">
       <div className="respondent-studies-heading">
-        <h1 id="respondent-studies-heading">{copy.title}</h1>
+        <h1 id="respondent-studies-heading" tabIndex={-1}>{copy.title}</h1>
         <a className="ev-button respondent-signup-link" href="/r/onboarding" data-variant="secondary">{copy.profile}</a>
       </div>
       {invites === null && <p role="alert">{copy.loadError}</p>}
@@ -37,13 +38,19 @@ export function RespondentInvites({ invites, now }: { invites: HomeInvite[] | nu
                   <div className="respondent-invite-facts">
                     <strong className="respondent-invite-reward">
                       <span className="ev-sr-only">{copy.rewardLabel} </span>
-                      {currency.format(invite.rewardCents / 100)}
+                      {formatReward(invite.rewardCents)}
                     </strong>
                     <span>{copy.duration(invite.lengthMinutes)}</span>
                     <span>{copy.questionCount(invite.coreQuestionCount)}</span>
                   </div>
                   <p>{invite.state === "screening" ? copy.screening : invite.whyYou ?? copy.matched}</p>
                   <p className="respondent-invite-privacy">{copy.privacy}</p>
+                  {invite.state === "invited" && <InviteActions inviteId={invite.id} primary={invite.id === firstOffer} />}
+                  {invite.state === "accepted" && (
+                    <a className="ev-button respondent-signup-link" href={`/r/interviews/${invite.id}`} data-variant="secondary">
+                      {invite.resumable ? copy.continue : copy.start}
+                    </a>
+                  )}
                 </Card>
               </li>
             );

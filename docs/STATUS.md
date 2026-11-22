@@ -296,3 +296,15 @@ Needs from others. The redacted transcript publication path.
 Contract or schema changes. Reused the frozen tracking response. The read function checks organization scope and returns aggregates without granting researcher access to individual invite or session rows.
 
 Risks. Tracking displays confirmed counts. Sample composition and a projected finish still need their own data sources.
+
+## 2026-11-21, Respondent, Gate 1 R-RESP-04 and R-RESP-06
+
+Done. Connected Start answering, Not for me and Continue interview to the scoped invitation and session operations. The interview shows the first unanswered question, progress and reward. The typed path validates saves before advancing, keeps the same answer ID for a retry with unchanged text, and shows a pending quality check after submission confirms.
+
+Next. Verify against disposable Supabase. Add browser recording, private upload and transcription through the Gate 1 voice contract.
+
+Needs from others. Platform invitation, answer and submit endpoints and the voice upload implementation.
+
+Contract or schema changes. None. The UI uses frozen request and response schemas.
+
+Risks. This increment exercises typed answers. The [disposable scenario](../apps/web/e2e/auth-local.spec.ts) covers consent denial, reload after two answers, four typed saves, quality hold and a different respondent’s invitation.
