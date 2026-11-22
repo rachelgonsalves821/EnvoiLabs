@@ -25,6 +25,8 @@ The comparison reports a boundary policy that can complete a detected identity w
 
 The person-slot comparison also tests fragmented names within bounded naming, signing and attribution phrases. Ambiguous slots need casing or a corroborating person detection. The resulting masks keep the original speech offsets.
 
+The contact-slot comparison measures short internal gaps and alternate final digits after explicit phone cues, with separate guards for order and product identifiers.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"
