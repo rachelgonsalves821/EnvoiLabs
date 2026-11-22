@@ -10,13 +10,13 @@ import { createGate1DatabasePorts } from "./gate1-worker.mjs";
 const endpoint = "http://127.0.0.1:54321";
 const bucket = "gate1-interview-audio";
 const fixtureDirectory = new URL("../../../../packages/testing/fixtures/audio/", import.meta.url);
-const voiceProjections = [
-  "I ordered soup on Tuesday because the store was closed.",
-  "I would pay two dollars if the delivery arrived before my next class.",
-  "I ordered a sandwich.",
-  "I am not sure. I think it was sometime before lunch.",
-  "[Contact details removed.]",
-];
+const voiceProjections = new Map([
+  ["01-delivery.webm", "I ordered soup on Tuesday because the store was closed."],
+  ["02-price.m4a", "I would pay two dollars if the delivery arrived before my next class."],
+  ["03-phone.webm", "I ordered a sandwich."],
+  ["04-unclear.m4a", "I am not sure. I think it was sometime before lunch."],
+  ["05-email.wav", "[Contact details removed.]"],
+]);
 
 function localClient(key) {
   assert.ok(key, "Missing disposable Supabase credential.");
@@ -68,7 +68,8 @@ test("IT-1.2 processes the five checked-in recordings and keeps typed intake ind
   assert.equal(process.env.SUPABASE_URL, endpoint);
   const service = localClient(process.env.SUPABASE_SERVICE_ROLE_KEY);
   const { cases } = JSON.parse(await readFile(new URL("manifest.json", fixtureDirectory), "utf8"));
-  assert.equal(cases.length, voiceProjections.length, "All five reviewed recordings must be represented.");
+  assert.deepEqual(cases.map(({ file }) => file).sort(), [...voiceProjections.keys()].sort(),
+    "All five reviewed recordings must be represented.");
   assert.deepEqual([...new Set(cases.map(({ mime }) => mime))].sort(), ["audio/mp4", "audio/wav", "audio/webm"]);
   const fake = new FakeTranscriber(new Map(cases.map(({ sha256, text }) => [sha256, text])));
   const organizationId = randomUUID();
@@ -91,6 +92,7 @@ test("IT-1.2 processes the five checked-in recordings and keeps typed intake ind
   for (const [index, fixture] of cases.entries()) {
     const { respondentId, sessionId, client } = index < 3 ? first : second;
     const questionId = questionIds[index < 3 ? index : index - 3];
+    const redactedText = voiceProjections.get(fixture.file);
     const bytes = await readFile(new URL(fixture.file, fixtureDirectory));
     assert.equal(createHash("sha256").update(bytes).digest("hex"), fixture.sha256);
     const answerId = randomUUID();
@@ -118,13 +120,13 @@ test("IT-1.2 processes the five checked-in recordings and keeps typed intake ind
           return { ...output, provider: "synthetic-primary", model: "fixture-v1", latencyMs: 20 + index, costMicros: index + 1 };
         } };
       },
-      redact: async (text) => text === fixture.text ? voiceProjections[index] : null,
+      redact: async (text) => text === fixture.text ? redactedText : null,
     });
     assert.equal(await runGate1AnswerJob(ports), "published", fixture.file);
     assert.equal(primaryCalls, 1, fixture.file);
     assert.deepEqual(await projection(answerId), {
       provider: "synthetic-primary", model: "fixture-v1", latency_ms: 20 + index, cost_micros: index + 1,
-      redacted_text: voiceProjections[index],
+      redacted_text: redactedText,
     }, fixture.file);
   }
 
