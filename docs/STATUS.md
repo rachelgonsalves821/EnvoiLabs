@@ -462,3 +462,27 @@ Needs from others. See the hosted prerequisites in [issue #4](https://github.com
 Contract or schema changes. None.
 
 Risks. Hosted provider output and redaction qualification remain outstanding.
+
+### 2026-11-22 — Dedicated Gate 1 preview release
+
+Done. The `preview/gate-0` branch fast-forwarded to `bbb87dda71dc670077bbf61dd4ac7886ccee65f7`, which has the same source tree as main `d91cbab66470f73a0034bdf141f62fabe40c400c`. Vercel deployment `dpl_65bRxBnYAhGRyAWmfxUeSCdQE3th` is Ready. The build log confirms the respondent signup, researcher sign-in and scheduler routes. All three require Vercel sign-in on both preview domains. The completed signed-in study rehearsal remains tied to the earlier immutable build in issue #4. [Dedicated preview](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app) · [Immutable build](https://envoilabs-nfpytpowq-rachelgonsalves821s-projects.vercel.app)
+
+Next. Verify the hosted speech provider and scheduled jobs on the dedicated branch once their credentials are ready.
+
+Needs from others. See [hosted prerequisites in issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Signed-in verification for the latest build and independent publication qualification remain outstanding.
+
+### 2026-11-22 — Gate 1 dictated email formats
+
+Done. The offline redaction comparison now accepts the pinned authored text and its recognized counterpart. The email rule raised full coverage from 128/140 to 139/140 on authored text and from 112/140 to 115/140 on recognized speech. Each of the 13 focused tests passed. [Paired development results](adr/0005-spoken-redaction-v2.md)
+
+Next. Run the credentialed synthetic speech check and evaluate a frozen policy on independent recognition output.
+
+Needs from others. See the hosted prerequisites in [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Recognized phone, email and identity coverage remain below the redaction thresholds.

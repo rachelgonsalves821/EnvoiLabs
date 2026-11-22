@@ -18,6 +18,7 @@ from spoken_contacts_recover import recovered_contacts
 _KNOWN_CORPORA = {
     "2057f7214368b047d9bb27b87b91cfd41e634182ab3f1feb3135f4d838d6ce85",
     "439cbcd4b105722fc23c25ec0d07329eac4b34ab97e5f76766bb48d769b21724",
+    "da5da833c729938225762b7de227a7dc742eed4cac88ea6d1835c2e8c8a02b7e",
 }
 
 

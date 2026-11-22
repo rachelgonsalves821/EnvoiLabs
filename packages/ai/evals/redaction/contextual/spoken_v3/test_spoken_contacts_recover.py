@@ -20,6 +20,15 @@ class SpokenContactRecoveryTests(unittest.TestCase):
         address = "cloud plus fern at sign mailbox dotcom"
         self.assertEqual(masked_spans(f"my inbox is {address} today"), [("email", address)])
 
+    def test_dictated_handle_after_a_punctuated_introduction(self):
+        address = "river a b two at mailbox dot invalid"
+        self.assertEqual(masked_spans(f"I'll say the email slowly: {address}."), [("email", address)])
+
+    def test_letter_and_number_suffix_after_a_lightweight_cue(self):
+        address = "cloud b five at mailbox dot org"
+        self.assertEqual(masked_spans(f"I check {address} at lunch."), [("email", address)])
+        self.assertEqual(masked_spans("Try the new dishes at mailbox dot org."), [])
+
     def test_missing_at_requires_handle_or_direct_contact_structure(self):
         address = "fern plus jay mailbox dot dev"
         self.assertEqual(masked_spans(f"my email is {address} now"), [("email", address)])
