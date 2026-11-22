@@ -424,3 +424,15 @@ Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsa
 Contract or schema changes. None.
 
 Risks. Real-provider audio and independent publication qualification remain outstanding.
+
+### 2026-11-22 — Gate 1 spoken contact recovery
+
+Done. The offline contact pass fully masked 123 of 140 phone spans and 112 of 140 email spans on 272 known speech transcripts, up from 82 and 68 with V2. Evidence and clean edits matched V2 on both known corpora. Seven focused tests passed. The separate official OpenAI Privacy Filter experiment also missed the required thresholds. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Evaluate recognition and redaction using approved live-provider synthetic transcripts. Use the independent holdout after freezing a candidate.
+
+Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Contact and identity coverage remain below the gate thresholds. Publication stays on hold.
