@@ -91,7 +91,9 @@ test.describe("Gate 1 seeded study", () => {
       await respondent.getByLabel("What’s your ZIP code?").fill("02139");
       await respondent.getByLabel("How many times do you order food in a typical week?").fill("3");
       await respondent.getByRole("checkbox", { name: "Food and drink" }).check();
+      await respondent.getByRole("checkbox", { name: "Technology" }).check();
       await respondent.getByRole("button", { name: "Save and continue" }).click();
+      await expect(respondent.getByRole("heading", { name: "Choose what to share" })).toBeVisible();
       for (const name of [
         "Record my voice answers", "Turn my voice answers into text",
         "Keep my study answers", "Share my redacted answers with researchers",
