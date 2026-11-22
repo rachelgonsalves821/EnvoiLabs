@@ -32,6 +32,9 @@ importers:
       '@envoi-labs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@envoi-labs/services':
+        specifier: workspace:*
+        version: link:../../packages/services
       '@envoi-labs/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -83,7 +86,11 @@ importers:
 
   packages/integrations: {}
 
-  packages/services: {}
+  packages/services:
+    dependencies:
+      '@envoi-labs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/testing:
     devDependencies:

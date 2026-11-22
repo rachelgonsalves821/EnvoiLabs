@@ -1343,6 +1343,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_gate1_study: {
+        Args: {
+          draft: Json
+          predicates: Json
+          supplied_organization_id: string
+          supplied_researcher_id: string
+          supplied_study_id: string
+        }
+        Returns: Json
+      }
+      launch_gate1_study: {
+        Args: {
+          supplied_organization_id: string
+          supplied_researcher_id: string
+          supplied_study_id: string
+        }
+        Returns: Json
+      }
       provision_email_respondent: {
         Args: { supplied_user_id: string }
         Returns: string
