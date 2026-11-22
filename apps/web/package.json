@@ -6,9 +6,11 @@
     "build": "next build",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "cd ../.. && eslint apps/web",
-    "test": "vitest run server"
+    "test": "vitest run server",
+    "gate1:process": "pnpm --filter @envoi-labs/ai build && node server/respondent/gate1-worker.mjs"
   },
   "dependencies": {
+    "@envoi-labs/ai": "workspace:*",
     "@envoi-labs/contracts": "workspace:*",
     "@envoi-labs/services": "workspace:*",
     "@envoi-labs/ui": "workspace:*",

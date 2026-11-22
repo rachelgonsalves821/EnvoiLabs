@@ -1,0 +1,109 @@
+import { pathToFileURL } from "node:url";
+import { createClient } from "@supabase/supabase-js";
+import { createGroqTranscriber, createOpenAITranscriber, runGate1AnswerJob, withTranscriptionFallback } from "@envoi-labs/ai";
+
+const audioBucket = "gate1-interview-audio";
+const uuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
+const hash = /^[a-f\d]{64}$/;
+const supportedMime = new Set(["audio/webm", "audio/mp4", "audio/wav", "audio/ogg"]);
+const completionStates = new Set(["published", "private", "stale", "alreadyCompleted"]);
+
+function validClaim(data) {
+  if (!data || !uuid.test(data.answerId) || !uuid.test(data.leaseId)) return false;
+  if (data.kind === "text") return typeof data.rawText === "string" && data.rawText.trim() !== "";
+  const audio = data.audio;
+  if (data.kind !== "voice" || !audio || typeof audio.storagePath !== "string") return false;
+  const path = audio.storagePath.split("/");
+  return path.length === 2 && path.every((part) => uuid.test(part)) && hash.test(audio.sha256) &&
+    supportedMime.has(audio.mime) && Number.isSafeInteger(audio.bytes) && audio.bytes > 0 && audio.bytes <= 20 * 1024 * 1024 &&
+    (audio.durationMs === null || (Number.isSafeInteger(audio.durationMs) && audio.durationMs > 0));
+}
+
+export function createGate1DatabasePorts(client, { answerId, createTranscriber, redact = null }) {
+  let transcriber = null;
+  function leaseArgs({ answerId, leaseId }) {
+    return { supplied_answer_id: answerId, supplied_lease_id: leaseId };
+  }
+  async function rpc(name, args) {
+    const result = await client.rpc(name, args);
+    if (result.error) throw new Error(`Gate 1 worker failed during ${name}.`);
+    return result.data;
+  }
+  return {
+    async claim() {
+      const claim = await rpc("claim_gate1_answer_job", { supplied_answer_id: answerId });
+      if (claim === null) return null;
+      if (!validClaim(claim) || claim.answerId !== answerId) throw new Error("Gate 1 worker received an invalid claim.");
+      if (claim.kind === "voice") transcriber = createTranscriber(claim.audio.durationMs);
+      return claim;
+    },
+    get transcriber() { return transcriber; },
+    async validate(lease) {
+      return await rpc("validate_gate1_answer_job", leaseArgs(lease)) === true;
+    },
+    async readRecording(path) {
+      const { data, error } = await client.storage.from(audioBucket).download(path);
+      if (error || !data || data.size > 20 * 1024 * 1024) throw new Error("Gate 1 recording could not be read.");
+      return new Uint8Array(await data.arrayBuffer());
+    },
+    redact,
+    async complete(lease, { transcription, redactedText }) {
+      const outcome = await rpc("complete_gate1_answer_job", {
+        ...leaseArgs(lease),
+        ...(transcription ? {
+          supplied_raw_text: transcription.text, supplied_provider: transcription.provider,
+          supplied_model: transcription.model, supplied_latency_ms: transcription.latencyMs,
+          supplied_cost_micros: transcription.costMicros,
+        } : {}),
+        ...(redactedText ? { supplied_redacted_text: redactedText, supplied_redaction_passed: true } : {}),
+      });
+      if (!completionStates.has(outcome?.status)) throw new Error("Gate 1 worker received an invalid completion.");
+      return outcome.status;
+    },
+    async retry(lease) {
+      await rpc("retry_gate1_answer_job", leaseArgs(lease));
+    },
+  };
+}
+
+function configuredTranscriber(env, durationMs) {
+  const openaiKey = env.OPENAI_API_KEY?.trim();
+  const groqKey = env.GROQ_API_KEY?.trim();
+  const estimate = (usageSeconds, minimum, microsPerSecond) =>
+    Math.ceil(Math.max(usageSeconds ?? (durationMs ?? 180_000) / 1000, minimum) * microsPerSecond);
+  const openai = openaiKey ? createOpenAITranscriber({
+    apiKey: openaiKey, model: "gpt-transcribe", timeoutMs: 20_000,
+    costMicros: ({ durationSeconds }) => estimate(durationSeconds, 0, 75),
+  }) : null;
+  const groq = groqKey ? createGroqTranscriber({
+    apiKey: groqKey, model: "whisper-large-v3-turbo", timeoutMs: 20_000,
+    costMicros: ({ durationSeconds }) => estimate(durationSeconds, 10, 40_000 / 3600),
+  }) : null;
+  return openai && groq ? withTranscriptionFallback(openai, groq) : openai ?? groq;
+}
+
+async function main(args, env) {
+  if (args.length !== 2 || args[0] !== "--answer" || !uuid.test(args[1])) {
+    throw new Error("Supply exactly one Gate 1 answer ID using --answer.");
+  }
+  const url = new URL(env.SUPABASE_URL);
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (url.origin !== env.SUPABASE_URL || (url.protocol !== "https:" && !(loopback && url.protocol === "http:")) ||
+      !env.SUPABASE_SERVICE_ROLE_KEY?.trim()) throw new Error("Configure the trusted Gate 1 database connection.");
+  const client = createClient(url.origin, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+  });
+  const status = await runGate1AnswerJob(createGate1DatabasePorts(client, {
+    answerId: args[1], createTranscriber: (durationMs) => configuredTranscriber(env, durationMs),
+  }));
+  console.log(JSON.stringify({ status }));
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    await main(process.argv.slice(2), process.env);
+  } catch {
+    console.error(JSON.stringify({ status: "failed", message: "Gate 1 worker could not complete the requested job." }));
+    process.exitCode = 1;
+  }
+}
