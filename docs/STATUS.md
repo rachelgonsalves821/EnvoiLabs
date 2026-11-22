@@ -248,3 +248,15 @@ Needs from others. Platform matching and the consented voice intake path.
 Contract or schema changes. Reused the existing profile and consent request contracts. The migration adds two authenticated procedures that derive respondent identity from the session and serialize changes for the active account.
 
 Risks. This is the synthetic preview flow. Production consent text and processing still need the pre-study checks. See the [database checks](../packages/db/tests/respondent_onboarding.sql) and [disposable mobile browser scenario](../apps/web/e2e/auth-local.spec.ts).
+
+## 2026-11-21, Researcher and AI, Gate 1 study draft
+
+Done. Added the researcher form for a four-question study draft, with two seeded criteria and a target for completed interviews. The server saves the study, brief version, criteria and ordered guide in one organization-scoped transaction, along with an audit entry and a study-created event. The form shows success only after the server confirms the draft. Added route authorization and validation tests, database rollback and retry checks, and delivered-email browser coverage that creates a study after TOTP.
+
+Next. Connect the persisted draft to the test-only launch, matching and tracking services. Expand the browser test to IT-1.1 when the respondent study journey is ready.
+
+Needs from others. Platform launch and tracking services for the next researcher slice.
+
+Contract or schema changes. The frozen study draft body and response are reused. Creation also requires an idempotency key. The service-only database function verifies organization membership and persists the draft in one transaction.
+
+Risks. The first form offers the supported criteria from the seeded panel. The real scoping chat is planned for Gate 2.
