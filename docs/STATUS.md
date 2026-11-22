@@ -424,3 +424,41 @@ Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsa
 Contract or schema changes. None.
 
 Risks. Real-provider audio and independent publication qualification remain outstanding.
+
+### 2026-11-22 — Gate 1 spoken contact recovery
+
+Done. The offline contact pass fully masked 123 of 140 phone spans and 112 of 140 email spans on 272 known speech transcripts, up from 82 and 68 with V2. Evidence and clean edits matched V2 on both known corpora. Seven focused tests passed. The separate official OpenAI Privacy Filter experiment also missed the required thresholds. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Evaluate recognition and redaction using approved live-provider synthetic transcripts. Use the independent holdout after freezing a candidate.
+
+Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Contact and identity coverage remain below the gate thresholds. Publication stays on hold.
+
+### 2026-11-22 — Gate 1 preservation of research labels
+
+Done. The offline redaction evaluator now measures whether explicit menu and shop labels can stay visible. On 272 known excerpts, the policy reduced alterations from six useful spans to two and from 14 clean excerpts to 10. Full masking counts matched the contact-only policy across both known corpora. Eleven focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Verify live-provider speech and score a frozen candidate on the independent holdout once contact and identity coverage improve.
+
+Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Publication stays gated on independent coverage and precision.
+
+### 2026-11-22 — Gate 1 local speech through private storage
+
+Done. A disposable Supabase rehearsal ran the Gate 1 answer worker against the five checked-in synthetic recordings and a fresh Chrome WebM recording. Whisper Base.en CPU int8 with local FFmpeg recognized both expected terms in all six inputs after the worker verified bytes retrieved from private Storage. The worker persisted local model and latency metadata and withheld all six unqualified voice projections. Typed intake bypassed speech recognition when voice permissions were denied. [IT-1.2 evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063)
+
+A separate 60-recording test found that a larger local model recovered some additional names while retaining fewer phone values and returning words on all three negative audio controls. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Run the credentialed workflow and the Vercel worker against synthetic audio.
+
+Needs from others. See the hosted prerequisites in [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Hosted provider output and redaction qualification remain outstanding.
