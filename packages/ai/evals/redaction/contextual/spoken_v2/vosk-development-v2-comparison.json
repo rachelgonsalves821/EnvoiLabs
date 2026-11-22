@@ -1,0 +1,229 @@
+{
+  "corpus_sha256": "2057f7214368b047d9bb27b87b91cfd41e634182ab3f1feb3135f4d838d6ce85",
+  "transcripts": 150,
+  "sources": {
+    "evaluate_v2.py": "ad68c8ad990b6f944b0e09c3884a28183810038800911d1e810cfec1fcf8c8ac",
+    "spoken_contact.py": "ee9e04e34fe0a6798ca474d065cf96bc5806098ac6196dfc9bf888cb787d2f01",
+    "speech_context.py": "e1c2534369dfa7e2e1824eb5cecb01205483ff8a64d477032f0166203c48fad5",
+    "candidate.py": "718e85b79a92e208904e799de95aabc86e50ec3a719a289ff415067a64d2dc08",
+    "evaluate.py": "edc617fd158d44ac21b856f974084cbf3a89d6a83ea3f76afea22ac2b762c688"
+  },
+  "model": "knowledgator/gliner-pii-small-v1.0",
+  "revision": "d21aad5b4a7ec82b3d0970fd1ac74a12c087d85e",
+  "artifacts": {
+    "gliner_config.json": "c10803bade021f40072b194bc78bc2edd2bf3e60637a6f34cc9b00705bf3c168",
+    "model_quint8.onnx": "891589426ee96f2748b16439f44fad8c3f97e198e002a6637e58dee989500216",
+    "special_tokens_map.json": "ea97ecdbcc73713039d8d64dbb05e3689495c96657fbd9a18f5bed381be81049",
+    "tokenizer.json": "84b3a9b18f04a0ccd03b72d9f871b7e0bec40fd7021ef50bc30a7c3693c11205",
+    "tokenizer_config.json": "3398f6d1ad4b4c4f9874d390d060a75c58cad5e5ce9b22841b3e40643b4ada27"
+  },
+  "packages": {
+    "gliner": "0.2.30",
+    "onnxruntime": "1.32.0",
+    "transformers": "5.22.2",
+    "torch": "2.15.0",
+    "presidio-analyzer": "2.2.366",
+    "presidio-anonymizer": "2.2.366",
+    "spacy": "3.8.18",
+    "en-core-web-sm": "3.8.0",
+    "phonenumbers": "9.0.44",
+    "tldextract": "5.4.0"
+  },
+  "threshold": 0.5,
+  "prd_numeric_targets": {
+    "phone": 0.99,
+    "email": 0.99,
+    "person": 0.95,
+    "employer": 0.95
+  },
+  "policy_results": {
+    "v1": {
+      "entities": {
+        "person": {
+          "planted": 23,
+          "fully_masked": 5,
+          "partially_masked": 14,
+          "recall": 0.21739130434782608
+        },
+        "employer": {
+          "planted": 22,
+          "fully_masked": 5,
+          "partially_masked": 13,
+          "recall": 0.22727272727272727
+        },
+        "school": {
+          "planted": 22,
+          "fully_masked": 9,
+          "partially_masked": 12,
+          "recall": 0.4090909090909091
+        },
+        "address": {
+          "planted": 21,
+          "fully_masked": 5,
+          "partially_masked": 7,
+          "recall": 0.23809523809523808
+        },
+        "phone": {
+          "planted": 22,
+          "fully_masked": 13,
+          "partially_masked": 1,
+          "recall": 0.5909090909090909
+        },
+        "email": {
+          "planted": 22,
+          "fully_masked": 8,
+          "partially_masked": 11,
+          "recall": 0.36363636363636365
+        }
+      },
+      "clean_transcripts": 24,
+      "clean_transcripts_altered": 11,
+      "evidence_spans": 43,
+      "evidence_spans_altered": 5,
+      "research_evidence_altered": 5,
+      "meets_prd_numeric_targets": false,
+      "p95_ms": 361.3
+    },
+    "v1_with_spoken_contacts": {
+      "entities": {
+        "person": {
+          "planted": 23,
+          "fully_masked": 5,
+          "partially_masked": 14,
+          "recall": 0.21739130434782608
+        },
+        "employer": {
+          "planted": 22,
+          "fully_masked": 5,
+          "partially_masked": 13,
+          "recall": 0.22727272727272727
+        },
+        "school": {
+          "planted": 22,
+          "fully_masked": 9,
+          "partially_masked": 12,
+          "recall": 0.4090909090909091
+        },
+        "address": {
+          "planted": 21,
+          "fully_masked": 21,
+          "partially_masked": 0,
+          "recall": 1.0
+        },
+        "phone": {
+          "planted": 22,
+          "fully_masked": 22,
+          "partially_masked": 0,
+          "recall": 1.0
+        },
+        "email": {
+          "planted": 22,
+          "fully_masked": 22,
+          "partially_masked": 0,
+          "recall": 1.0
+        }
+      },
+      "clean_transcripts": 24,
+      "clean_transcripts_altered": 11,
+      "evidence_spans": 43,
+      "evidence_spans_altered": 5,
+      "research_evidence_altered": 5,
+      "meets_prd_numeric_targets": false,
+      "p95_ms": 361.8
+    },
+    "v2_selective": {
+      "entities": {
+        "person": {
+          "planted": 23,
+          "fully_masked": 8,
+          "partially_masked": 13,
+          "recall": 0.34782608695652173
+        },
+        "employer": {
+          "planted": 22,
+          "fully_masked": 7,
+          "partially_masked": 12,
+          "recall": 0.3181818181818182
+        },
+        "school": {
+          "planted": 22,
+          "fully_masked": 16,
+          "partially_masked": 6,
+          "recall": 0.7272727272727273
+        },
+        "address": {
+          "planted": 21,
+          "fully_masked": 21,
+          "partially_masked": 0,
+          "recall": 1.0
+        },
+        "phone": {
+          "planted": 22,
+          "fully_masked": 22,
+          "partially_masked": 0,
+          "recall": 1.0
+        },
+        "email": {
+          "planted": 22,
+          "fully_masked": 22,
+          "partially_masked": 0,
+          "recall": 1.0
+        }
+      },
+      "clean_transcripts": 24,
+      "clean_transcripts_altered": 11,
+      "evidence_spans": 43,
+      "evidence_spans_altered": 5,
+      "research_evidence_altered": 5,
+      "meets_prd_numeric_targets": false,
+      "p95_ms": 583.9
+    },
+    "v2_broad": {
+      "entities": {
+        "person": {
+          "planted": 23,
+          "fully_masked": 9,
+          "partially_masked": 13,
+          "recall": 0.391304347826087
+        },
+        "employer": {
+          "planted": 22,
+          "fully_masked": 9,
+          "partially_masked": 12,
+          "recall": 0.4090909090909091
+        },
+        "school": {
+          "planted": 22,
+          "fully_masked": 18,
+          "partially_masked": 4,
+          "recall": 0.8181818181818182
+        },
+        "address": {
+          "planted": 21,
+          "fully_masked": 21,
+          "partially_masked": 0,
+          "recall": 1.0
+        },
+        "phone": {
+          "planted": 22,
+          "fully_masked": 22,
+          "partially_masked": 0,
+          "recall": 1.0
+        },
+        "email": {
+          "planted": 22,
+          "fully_masked": 22,
+          "partially_masked": 0,
+          "recall": 1.0
+        }
+      },
+      "clean_transcripts": 24,
+      "clean_transcripts_altered": 14,
+      "evidence_spans": 43,
+      "evidence_spans_altered": 11,
+      "research_evidence_altered": 11,
+      "meets_prd_numeric_targets": false,
+      "p95_ms": 576.2
+    }
+  }
+}
