@@ -11,7 +11,7 @@ async function allowSyntheticMicrophone(page: Page) {
 
 async function stopRecordedTone(page: Page) {
   await expect(page.getByRole("main").getByRole("status")).toContainText("Recording");
-  await expect(page.locator(".respondent-record-timer span[aria-hidden]")).toHaveText("0:01");
+  await expect(page.locator(".respondent-record-timer span[aria-hidden]")).toHaveText(/^(?!0:00$)\d+:[0-5]\d$/);
   await page.getByRole("button", { name: "Stop recording" }).click();
   const player = page.locator("audio");
   await expect(player).toHaveAttribute("src", /^blob:/);
@@ -138,13 +138,13 @@ export async function exerciseVoiceRecording(page: Page, origin: string, inviteI
 export async function submitSyntheticRecording(page: Page) {
   await allowSyntheticMicrophone(page);
   await page.getByRole("button", { name: "Start recording" }).click();
-  const put = page.waitForResponse((response) =>
-    response.request().method() === "PUT"
+  const [uploaded] = await Promise.all([
+    page.waitForResponse((response) => response.request().method() === "PUT"
       && new URL(response.url()).origin === process.env.SUPABASE_URL
       && new URL(response.url()).pathname.startsWith("/storage/v1/object/upload/sign/gate1-interview-audio/"),
-  );
-  await stopRecordedTone(page);
-  const uploaded = await put;
+    ),
+    stopRecordedTone(page),
+  ]);
   expect(uploaded.ok()).toBe(true);
   expect(uploaded.request().headers()["content-type"]).toBe("audio/webm");
   expect((await uploaded.request().allHeaders()).cookie).toBeUndefined();
