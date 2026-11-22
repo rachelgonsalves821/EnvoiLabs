@@ -75,6 +75,11 @@ reset role;
 set local role authenticated;
 select is((select redacted_text from research.transcripts), 'Qualified synthetic answer', 'same-tenant MFA researcher sees only the qualified projection');
 reset role;
+update public.sessions set state = 'paid' where id = pg_temp.case_id(11);
+set local role authenticated;
+select is((select redacted_text from research.transcripts), 'Qualified synthetic answer', 'settling the interview retains its qualified projection');
+reset role;
+update public.sessions set state = 'in_progress' where id = pg_temp.case_id(11);
 insert into public.consents (respondent_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001', 'researcher_access', false, 'fixture-v2');
 set local role authenticated;

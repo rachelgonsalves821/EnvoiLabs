@@ -40,7 +40,8 @@ as $$
         where respondent_id = respondent.id and (consents.study_id is null or consents.study_id = answer.study_id)
     ) as revisions
     where answer.id = target_answer and respondent.status = 'active'
-        and offer.state = 'accepted' and interview.state in ('in_progress', 'submitted', 'quality_hold')
+        and offer.state = 'accepted'
+        and interview.state in ('in_progress', 'submitted', 'quality_hold', 'approved', 'paid')
         and internal.gate1_consent(respondent.id, answer.study_id, 'retention')
         and (
             (answer.kind = 'text' and coalesce(btrim(raw.raw_text), '') <> '')
