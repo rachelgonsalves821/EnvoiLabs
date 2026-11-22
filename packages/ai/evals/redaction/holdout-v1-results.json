@@ -1,0 +1,107 @@
+{
+  "corpus": "synthetic-redaction-holdout-v1",
+  "transcripts": 100,
+  "threshold": 0.35,
+  "packages": {
+    "presidio-analyzer": "2.2.366",
+    "presidio-anonymizer": "2.2.366",
+    "spacy": "3.8.18",
+    "en-core-web-sm": "3.8.0",
+    "phonenumbers": "9.0.44",
+    "tldextract": "5.4.0"
+  },
+  "prd_numeric_recall_targets": {
+    "phone": 0.99,
+    "email": 0.99,
+    "person": 0.95,
+    "employer": 0.95
+  },
+  "baseline": {
+    "entities": {
+      "address": {
+        "planted": 80,
+        "fully_masked": 0,
+        "partially_masked": 42,
+        "recall": 0.0
+      },
+      "email": {
+        "planted": 80,
+        "fully_masked": 50,
+        "partially_masked": 23,
+        "recall": 0.625
+      },
+      "employer": {
+        "planted": 80,
+        "fully_masked": 67,
+        "partially_masked": 0,
+        "recall": 0.8375
+      },
+      "person": {
+        "planted": 80,
+        "fully_masked": 67,
+        "partially_masked": 0,
+        "recall": 0.8375
+      },
+      "phone": {
+        "planted": 80,
+        "fully_masked": 53,
+        "partially_masked": 0,
+        "recall": 0.6625
+      },
+      "school": {
+        "planted": 20,
+        "fully_masked": 20,
+        "partially_masked": 0,
+        "recall": 1.0
+      }
+    },
+    "clean_transcripts": 20,
+    "clean_transcripts_altered": 10,
+    "research_evidence_altered": 50,
+    "meets_prd_numeric_targets": false
+  },
+  "supplemented": {
+    "entities": {
+      "address": {
+        "planted": 80,
+        "fully_masked": 40,
+        "partially_masked": 30,
+        "recall": 0.5
+      },
+      "email": {
+        "planted": 80,
+        "fully_masked": 70,
+        "partially_masked": 10,
+        "recall": 0.875
+      },
+      "employer": {
+        "planted": 80,
+        "fully_masked": 67,
+        "partially_masked": 0,
+        "recall": 0.8375
+      },
+      "person": {
+        "planted": 80,
+        "fully_masked": 67,
+        "partially_masked": 0,
+        "recall": 0.8375
+      },
+      "phone": {
+        "planted": 80,
+        "fully_masked": 80,
+        "partially_masked": 0,
+        "recall": 1.0
+      },
+      "school": {
+        "planted": 20,
+        "fully_masked": 20,
+        "partially_masked": 0,
+        "recall": 1.0
+      }
+    },
+    "clean_transcripts": 20,
+    "clean_transcripts_altered": 10,
+    "research_evidence_altered": 50,
+    "meets_prd_numeric_targets": false
+  }
+}

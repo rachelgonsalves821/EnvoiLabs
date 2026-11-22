@@ -1,7 +1,14 @@
 import { Button, Card, Echo, Sheet } from "@envoi-labs/ui";
+import { getRespondent } from "../../../server/auth/identity";
+import { loadHomeInvites } from "../../../server/respondent/home";
 import { respondentCopy as copy } from "./copy";
+import { RespondentInvites } from "./invites";
 
-export default function RespondentHome() {
+export default async function RespondentHome() {
+  if (await getRespondent()) {
+    return <RespondentInvites invites={await loadHomeInvites()} now={Date.now()} />;
+  }
+
   return (
     <Card className="respondent-welcome">
       <div>
