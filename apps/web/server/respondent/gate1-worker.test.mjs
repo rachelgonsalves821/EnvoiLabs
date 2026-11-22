@@ -54,4 +54,22 @@ describe("trusted Gate 1 worker", () => {
     await expect(runGate1AnswerJob(createGate1DatabasePorts(db, { answerId, createTranscriber }))).rejects.toThrow(/invalid claim/);
     expect(db.download).not.toHaveBeenCalled();
   });
+
+  it("processes the next eligible answer when no answer ID is supplied", async () => {
+    const db = database({ answerId, leaseId, kind: "text", rawText: "synthetic queued answer" });
+    const createTranscriber = vi.fn();
+    await expect(runGate1AnswerJob(createGate1DatabasePorts(db, { createTranscriber }))).resolves.toBe("private");
+    expect(db.rpc).toHaveBeenCalledWith("claim_gate1_answer_job", { supplied_answer_id: null });
+    expect(db.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", lease);
+    expect(createTranscriber).not.toHaveBeenCalled();
+  });
+
+  it("returns idle for an empty queue without reading audio or calling a provider", async () => {
+    const db = database(null);
+    const createTranscriber = vi.fn();
+    await expect(runGate1AnswerJob(createGate1DatabasePorts(db, { createTranscriber }))).resolves.toBe("idle");
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+    expect(db.download).not.toHaveBeenCalled();
+    expect(createTranscriber).not.toHaveBeenCalled();
+  });
 });

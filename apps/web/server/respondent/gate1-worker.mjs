@@ -19,7 +19,7 @@ function validClaim(data) {
     (audio.durationMs === null || (Number.isSafeInteger(audio.durationMs) && audio.durationMs > 0));
 }
 
-export function createGate1DatabasePorts(client, { answerId, createTranscriber, redact = null }) {
+export function createGate1DatabasePorts(client, { answerId = null, createTranscriber, redact = null }) {
   let transcriber = null;
   function leaseArgs({ answerId, leaseId }) {
     return { supplied_answer_id: answerId, supplied_lease_id: leaseId };
@@ -33,7 +33,9 @@ export function createGate1DatabasePorts(client, { answerId, createTranscriber, 
     async claim() {
       const claim = await rpc("claim_gate1_answer_job", { supplied_answer_id: answerId });
       if (claim === null) return null;
-      if (!validClaim(claim) || claim.answerId !== answerId) throw new Error("Gate 1 worker received an invalid claim.");
+      if (!validClaim(claim) || (answerId !== null && claim.answerId !== answerId)) {
+        throw new Error("Gate 1 worker received an invalid claim.");
+      }
       if (claim.kind === "voice") transcriber = createTranscriber(claim.audio.durationMs);
       return claim;
     },
@@ -82,10 +84,8 @@ function configuredTranscriber(env, durationMs) {
   return openai && groq ? withTranscriptionFallback(openai, groq) : openai ?? groq;
 }
 
-async function main(args, env) {
-  if (args.length !== 2 || args[0] !== "--answer" || !uuid.test(args[1])) {
-    throw new Error("Supply exactly one Gate 1 answer ID using --answer.");
-  }
+export async function runConfiguredGate1AnswerJob(env, answerId = null) {
+  if (answerId !== null && !uuid.test(answerId)) throw new Error("Supply a valid Gate 1 answer ID.");
   const url = new URL(env.SUPABASE_URL);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.origin !== env.SUPABASE_URL || (url.protocol !== "https:" && !(loopback && url.protocol === "http:")) ||
@@ -93,9 +93,16 @@ async function main(args, env) {
   const client = createClient(url.origin, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
-  const status = await runGate1AnswerJob(createGate1DatabasePorts(client, {
-    answerId: args[1], createTranscriber: (durationMs) => configuredTranscriber(env, durationMs),
+  return runGate1AnswerJob(createGate1DatabasePorts(client, {
+    answerId, createTranscriber: (durationMs) => configuredTranscriber(env, durationMs),
   }));
+}
+
+async function main(args, env) {
+  const next = args.length === 1 && args[0] === "--next";
+  const selected = args.length === 2 && args[0] === "--answer" && uuid.test(args[1]);
+  if (!next && !selected) throw new Error("Use --next or supply one Gate 1 answer ID using --answer.");
+  const status = await runConfiguredGate1AnswerJob(env, next ? null : args[1]);
   console.log(JSON.stringify({ status }));
 }
 
