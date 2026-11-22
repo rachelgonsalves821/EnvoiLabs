@@ -127,6 +127,12 @@ An offline rule uses explicit email language and a bounded address shape to reco
 
 On 272 known recognized excerpts, the added pass raised full email masks from 115/140 to 132/140. The other categories, 12/36 edited clean excerpts and 3/36 altered evidence spans matched the preceding policy. Full email masks on the 272 paired authored excerpts rose from 139/140 to 140/140. On 20 separately authored development clips, email masks rose from 4/10 to 10/10. Both combined policies edited 9/10 clean excerpts and 11/34 evidence spans on those controls, leaving a precision gap. All 38 focused tests passed. The independent qualification set remains sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Explicit public websites and product labels
+
+A guarded contextual comparison retains domains framed as public website references or explicitly named products. Existing fixed contact masks and identities supported by explicit private context remain part of the comparison.
+
+In the 20-clip email development set, the guard reduced clean excerpts edited from 9/10 to 1/10 and evidence spans altered from 11/34 to 2/34. It preserved full masks for all ten emails. All counts matched on the 272 known recognized excerpts. On 16 separately authored public-site and mixed-identity excerpts, both policies fully masked all nine private spans, edited 4/8 clean excerpts and altered 11/35 evidence spans. Those unchanged control counts limit the precision claim to the first development set. All 43 focused tests passed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)

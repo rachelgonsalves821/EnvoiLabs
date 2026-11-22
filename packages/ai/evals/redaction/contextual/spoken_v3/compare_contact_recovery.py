@@ -16,6 +16,7 @@ from identity_boundaries import complete_identity_boundaries
 from person_slot_recovery import detect_person_slots
 from phone_slot_recovery import recover_number_slots
 from product_context import is_product_title
+from public_website_context import preserving_public_ref, public_website_ranges
 from speech_context import explicit_identities
 from spoken_contact import spoken_contact_hits
 from spoken_contacts_recover import recovered_contacts
@@ -64,7 +65,7 @@ def main():
     candidates = [source.with_name(name) for name in (
         "asr_casing.py", "email_slot_recovery.py", "identity_boundaries.py", "person_slot_recovery.py",
         "phone_slot_recovery.py",
-        "product_context.py", "spoken_contacts_recover.py",
+        "product_context.py", "public_website_context.py", "spoken_contacts_recover.py",
     )]
     candidate_hashes = {rule.name: digest(rule) for rule in candidates}
     rows = json.loads(opts.cases.read_text(encoding="utf-8-sig"))["cases"]
@@ -93,6 +94,7 @@ def main():
         results["v2_plus_contact_product_casing_and_boundaries"] = report_template()
         results["v2_plus_contact_product_casing_boundaries_and_person_slots"] = report_template()
         results["v2_plus_contact_product_casing_boundaries_and_contact_slots"] = report_template()
+        results["with_public_website_guard"] = report_template()
     results["with_spoken_email_repairs"] = report_template()
     for row in rows:
         text = row["text"]
@@ -109,6 +111,7 @@ def main():
             results["v2_plus_contact_and_product_context"],
         )
         email_baseline = (*fixed, *additional, *with_product_context)
+        email_slots = tuple(recover_email_slots(text))
         if casing:
             began = perf_counter()
             restored = casing.restore(text)
@@ -133,13 +136,21 @@ def main():
                 row, mask(text, person_masks),
                 results["v2_plus_contact_product_casing_boundaries_and_person_slots"],
             )
-            email_baseline = (*person_masks, *recover_number_slots(text))
+            phone_slots = tuple(recover_number_slots(text))
+            email_baseline = (*person_masks, *phone_slots)
             coverage(
                 row, mask(text, email_baseline),
                 results["v2_plus_contact_product_casing_boundaries_and_contact_slots"],
             )
+            sites = tuple(public_website_ranges(text))
+            guarded = tuple(hit for hit in detections if not preserving_public_ref(text, hit, explicit, sites))
+            guarded_masks = (
+                *fixed, *additional, *guarded, *complete_identity_boundaries(restored, guarded, explicit),
+                *detect_person_slots(text, restored, guarded), *phone_slots, *email_slots,
+            )
+            coverage(row, mask(text, guarded_masks), results["with_public_website_guard"])
         coverage(
-            row, mask(text, (*email_baseline, *recover_email_slots(text))),
+            row, mask(text, (*email_baseline, *email_slots)),
             results["with_spoken_email_repairs"],
         )
     if (sources() != frozen_sources or {rule.name: digest(rule) for rule in candidates} != candidate_hashes
@@ -150,6 +161,7 @@ def main():
         "contact_rules_sha256": candidate_hashes["spoken_contacts_recover.py"],
         "product_context_sha256": candidate_hashes["product_context.py"],
         "email_slots_source_sha256": candidate_hashes["email_slot_recovery.py"],
+        "website_context_source_sha256": candidate_hashes["public_website_context.py"],
         "additional_pass_p95_ms": round(1000 * sorted(times)[ceil(0.95 * len(times)) - 1], 3),
         "corpus_sha256": corpus_sha, "v2_sources": frozen_sources, "results": results,
     }

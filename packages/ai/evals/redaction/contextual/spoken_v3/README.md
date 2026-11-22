@@ -29,6 +29,8 @@ The contact-slot comparison measures short internal gaps and alternate final dig
 
 The email comparison measures split suffixes, missing separators and suffixes fused to host names. It runs on authored or recognized excerpts and checks masks in original source coordinates.
 
+The optional casing replay includes a public-site comparison. It tests whether contextual masks can preserve explicit website and product labels while retaining contact masks and identities supported by private cues.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"
