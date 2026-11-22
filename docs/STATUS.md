@@ -404,3 +404,11 @@ Risks. The hosted provider and the output it produces for independent redaction 
 ### 2026-11-22 — Gate 1 private playback and redaction follow-up
 
 Done. The respondent browser test now starts and pauses the local audio explicitly after a failed upload. It checks that playback keeps the same local recording URL and leaves the upload and confirmation counts unchanged. Both local browser auth cases and both private-answer worker checks passed. Two more offline redaction experiments on known synthetic transcripts provided limited gains and did not qualify answer publication. See [ADR 0005](adr/0005-spoken-redaction-v2.md).
+
+Next. Run the browser checks in GitHub and retain the redaction hold until a candidate passes independently.
+
+Needs from others. See [Gate 1 evidence and hosted prerequisites](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Live speech recognition and independent redaction qualification remain open.

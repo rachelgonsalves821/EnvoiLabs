@@ -117,6 +117,7 @@ export async function exerciseVoiceRecording(page: Page, origin: string, inviteI
     const audio = node as HTMLAudioElement;
     return audio.paused && !audio.ended;
   })).toBe(true);
+  await expect(preview).toHaveAttribute("src", discarded);
   expect(reservations).toHaveLength(1);
   expect(puts).toHaveLength(uploadedBeforePlayback);
   expect(confirmations).toHaveLength(0);
