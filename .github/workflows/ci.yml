@@ -39,6 +39,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - name: Record and verify a synthetic browser audio fixture
+        run: pnpm --filter @envoi-labs/ai transcription:smoke --preflight --browser
       - run: pnpm build
       - run: pnpm e2e
       - name: Pack and verify the contracts distribution
