@@ -1,6 +1,7 @@
 import { NonRetriableError } from "inngest";
 import { describe, expect, it, vi } from "vitest";
-import { expirySchedulerConfig, runGate1Expiry } from "./gate1-expiry";
+import { runGate1Expiry } from "./gate1-expiry";
+import { gate1InngestConfig } from "./gate1-inngest-config";
 
 const hosted: NodeJS.ProcessEnv = {
   NODE_ENV: "production", VERCEL_ENV: "preview", ENVOI_GATE1_EXPIRY_ENABLED: "1",
@@ -13,20 +14,22 @@ const local: NodeJS.ProcessEnv = {
 
 describe("scheduled Gate 1 expiry configuration", () => {
   it("requires explicit opt-in and a signing key in the intended Vercel environments", () => {
-    expect(expirySchedulerConfig(hosted)).toEqual({ isDev: false, signingKey: "fixture-signing" });
-    expect(expirySchedulerConfig({ ...hosted, VERCEL_ENV: "production" })?.isDev).toBe(false);
-    expect(expirySchedulerConfig({ ...hosted, ENVOI_GATE1_EXPIRY_ENABLED: "0" })).toBeNull();
-    expect(expirySchedulerConfig({ ...hosted, INNGEST_SIGNING_KEY: undefined })).toBeNull();
-    expect(expirySchedulerConfig({ ...hosted, VERCEL_ENV: "development" })).toBeNull();
-    expect(expirySchedulerConfig({ ...hosted, INNGEST_DEV: "1" })).toBeNull();
-    expect(expirySchedulerConfig({ ...hosted, SUPABASE_SERVICE_ROLE_KEY: " " })).toBeNull();
+    expect(gate1InngestConfig(hosted)).toEqual({
+      client: { isDev: false, signingKey: "fixture-signing" }, expiryEnabled: true, privateAnswersEnabled: false,
+    });
+    expect(gate1InngestConfig({ ...hosted, VERCEL_ENV: "production" })?.client.isDev).toBe(false);
+    expect(gate1InngestConfig({ ...hosted, ENVOI_GATE1_EXPIRY_ENABLED: "0" })).toBeNull();
+    expect(gate1InngestConfig({ ...hosted, INNGEST_SIGNING_KEY: undefined })).toBeNull();
+    expect(gate1InngestConfig({ ...hosted, VERCEL_ENV: "development" })).toBeNull();
+    expect(gate1InngestConfig({ ...hosted, INNGEST_DEV: "1" })).toBeNull();
+    expect(gate1InngestConfig({ ...hosted, SUPABASE_SERVICE_ROLE_KEY: " " })).toBeNull();
   });
 
   it("permits unsigned Dev Server registration only against a loopback database", () => {
-    expect(expirySchedulerConfig(local)).toEqual({ isDev: true });
-    expect(expirySchedulerConfig({ ...local, NODE_ENV: "production" })).toBeNull();
-    expect(expirySchedulerConfig({ ...local, SUPABASE_URL: "https://hosted.example.test" })).toBeNull();
-    expect(expirySchedulerConfig({ ...local, SUPABASE_URL: "http://127.0.0.1:54321/path" })).toBeNull();
+    expect(gate1InngestConfig(local)).toEqual({ client: { isDev: true }, expiryEnabled: true, privateAnswersEnabled: false });
+    expect(gate1InngestConfig({ ...local, NODE_ENV: "production" })).toBeNull();
+    expect(gate1InngestConfig({ ...local, SUPABASE_URL: "https://hosted.example.test" })).toBeNull();
+    expect(gate1InngestConfig({ ...local, SUPABASE_URL: "http://127.0.0.1:54321/path" })).toBeNull();
   });
 });
 
