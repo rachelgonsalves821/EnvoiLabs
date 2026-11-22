@@ -44,6 +44,32 @@ body:has(.respondent-shell) { margin: 0; }
 .respondent-welcome p { color: var(--ink-muted); font: var(--text-body); margin-block: var(--space-2) 0; }
 .respondent-echo { display: grid; justify-items: center; padding-block: var(--space-8); }
 .respondent-signup-link { text-decoration: none; }
+.respondent-studies, .respondent-studies-heading, .respondent-invite-list, .respondent-invite {
+  display: grid;
+  gap: var(--space-4);
+}
+.respondent-studies-heading { justify-items: start; }
+.respondent-studies h1 { font: var(--text-display-l); margin: 0; }
+.respondent-studies p, .respondent-invite h2 { margin: 0; }
+.respondent-invite-list { list-style: none; margin: 0; padding: 0; }
+.respondent-invite {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+}
+.respondent-invite h2 { font: var(--text-h2); }
+.respondent-invite-chips, .respondent-invite-facts {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.respondent-invite-facts, .respondent-invite-privacy { color: var(--ink-muted); }
+.respondent-invite-reward {
+  color: var(--zest-deep);
+  font-variant-numeric: tabular-nums;
+}
+.respondent-invite-privacy { font: var(--text-body-s); }
 @media (min-width: 390px) {
   .respondent-main { padding-block-start: var(--space-8); }
 }

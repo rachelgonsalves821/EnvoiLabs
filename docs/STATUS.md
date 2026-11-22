@@ -272,3 +272,15 @@ Needs from others. None.
 Contract or schema changes. Uses the frozen Gate 1 launch contract. The service-only launch function and the disposable seed supply the preview launch and incentive.
 
 Risks. Future invite waves and the historical feasibility estimate remain open. Preview launch has an explicit opt-in and stays disabled in production.
+
+## 2026-11-21, Respondent, Gate 1 R-RESP-04
+
+Done. Added the signed-in Home list with owned active invitations, screening flags, accepted studies and in-progress status. The projection exposes just the invitation metadata needed for Home. The card shows reward, time, question count, reason and privacy details with a neutral participant label.
+
+Next. Connect accept, decline, and resume to the Platform operations. Add an approved participant-facing topic when the researcher form collects one.
+
+Needs from others. Platform invite actions and session routing.
+
+Contract or schema changes. Added a narrow authenticated query without changing the existing invite mutation contracts.
+
+Risks. Home is a read-only increment. The [database checks](../packages/db/tests/respondent_home_invites.sql) and [disposable browser scenario](../apps/web/e2e/auth-local.spec.ts) cover ownership and disclosure.
