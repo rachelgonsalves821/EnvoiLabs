@@ -5,11 +5,11 @@ import { createGroqTranscriber, createOpenAITranscriber, ProviderError } from ".
 
 const fixtureRoot = new URL("../../testing/fixtures/audio/", import.meta.url);
 const expectedCases = new Map([
-  ["01-delivery.webm", "audio/webm"],
-  ["02-price.m4a", "audio/mp4"],
-  ["03-phone.webm", "audio/webm"],
-  ["04-unclear.m4a", "audio/mp4"],
-  ["05-email.wav", "audio/wav"],
+  ["01-delivery.webm", { mime: "audio/webm", keywords: ["soup", "store"] }],
+  ["02-price.m4a", { mime: "audio/mp4", keywords: ["dollars", "class"] }],
+  ["03-phone.webm", { mime: "audio/webm", keywords: ["phone", "sandwich"] }],
+  ["04-unclear.m4a", { mime: "audio/mp4", keywords: ["sure", "lunch"] }],
+  ["05-email.wav", { mime: "audio/wav", keywords: ["name", "email"] }],
 ]);
 const maxFixtureBytes = 256 * 1024;
 const providers = {
@@ -33,7 +33,8 @@ async function loadFixtures(root) {
   const pending = new Map(expectedCases);
   const fixtures = [];
   for (const item of manifest.cases) {
-    if (!pending.has(item?.file) || pending.get(item.file) !== item.mime
+    const expected = pending.get(item?.file);
+    if (!expected || expected.mime !== item.mime
       || !Number.isFinite(item.seconds) || item.seconds <= 0 || item.seconds > 10
       || !/^[0-9a-f]{64}$/.test(item.sha256)) {
       throw new SmokeError("Synthetic fixture manifest is invalid.");
@@ -44,7 +45,7 @@ async function loadFixtures(root) {
       || createHash("sha256").update(bytes).digest("hex") !== item.sha256) {
       throw new SmokeError(`Synthetic fixture integrity check failed for ${item.file}.`);
     }
-    fixtures.push({ file: item.file, mime: item.mime, seconds: item.seconds, audio: new Uint8Array(bytes) });
+    fixtures.push({ file: item.file, mime: item.mime, seconds: item.seconds, audio: new Uint8Array(bytes), keywords: expected.keywords });
   }
   return fixtures;
 }
@@ -60,7 +61,8 @@ export async function transcriptionSmoke({ mode, env = process.env, fetch, root 
   if (browser) {
     const source = fixtures.find(({ mime }) => mime === "audio/wav");
     const { captureBrowserAudio } = await import("./browser-audio-fixture.mjs");
-    fixtures.push(await captureBrowserAudio(source.audio, env.ENVOI_SMOKE_CHROMIUM_CHANNEL));
+    const capture = await captureBrowserAudio(source.audio, env.ENVOI_SMOKE_CHROMIUM_CHANNEL);
+    fixtures.push({ ...capture, keywords: source.keywords });
   }
   if (mode === "preflight") {
     return {
@@ -84,10 +86,16 @@ export async function transcriptionSmoke({ mode, env = process.env, fetch, root 
       costMicros: ({ durationSeconds }) => estimatedMicros(options, durationSeconds ?? fixture.seconds),
     });
     const result = await transcriber.transcribe({ audio: fixture.audio, mediaType: fixture.mime });
-    if (!result.text.trim()) throw new SmokeError(`Provider returned empty text for ${fixture.file}.`);
+    const normalized = result.text.normalize("NFKC").toLowerCase().replace(/\be[-\s]mail\b/gu, "email");
+    const words = new Set(normalized.match(/[\p{L}\p{N}]+/gu));
+    const matchedResearchTerms = fixture.keywords.filter((word) => words.has(word)).length;
+    if (matchedResearchTerms !== fixture.keywords.length) {
+      throw new SmokeError(`Provider output did not match the expected synthetic speech for ${fixture.file} (${matchedResearchTerms}/${fixture.keywords.length} terms).`);
+    }
     files.push({
       file: fixture.file, mime: fixture.mime, provider: result.provider,
       model: result.model, latencyMs: result.latencyMs, estimatedCostMicros: result.costMicros,
+      matchedResearchTerms, expectedResearchTerms: fixture.keywords.length,
     });
   }
   return { mode: "live", passed: true, files };
