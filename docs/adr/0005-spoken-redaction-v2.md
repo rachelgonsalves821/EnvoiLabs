@@ -81,6 +81,12 @@ Adding the contact rules to V2 raised full phone masking from 82/140 to 123/140 
 
 Contact coverage remains below the 99% threshold. The development run leaves the independent qualification set available for a future frozen candidate. [Offline evaluator and replay instructions](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Preserving research labels
+
+The two contextual model passes accounted for all 14 altered clean excerpts and all six altered evidence spans on the 272 known transcripts. A product-label check that preserves explicit menu and shop labels without a nearby private identity cue reduced those counts to 10 and two. Full masking counts stayed the same for all six sensitive categories. On the earlier 150 transcripts, all scored counts were the same with and without this check. The four focused tests cover product labels, an explicit identity span, an employment cue and contact detections.
+
+Raising the model threshold across all detections was less selective. At 0.65, full employer masks dropped from 29 to 17 of 60 and full name masks from 15 to 12 of 60, while one evidence span and one clean excerpt were altered. The product check is a development policy. Its effect on ambiguous titles and private affiliations still needs independent evaluation. [Replay instructions](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
