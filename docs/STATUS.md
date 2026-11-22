@@ -7,7 +7,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
 | Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [both hosted sign-ins on the same deployment](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7071655542) |
-| Gate 1 Vertical slice | End of week 3 | Disposable study passed. Hosted checks in progress | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [verification checkpoint](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) |
+| Gate 1 Vertical slice | End of week 3 | Disposable and hosted study rehearsals passed. Live processing and redaction qualification in progress | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [hosted and integration evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
 | Gate 4 Launch hardening | End of week 8 | Not started | |
@@ -372,3 +372,19 @@ Needs from others. An approved transcription project key for the GitHub Actions 
 Contract or schema changes. The scheduled drain uses the existing durable answer queue and lease RPCs.
 
 Risks. Researcher publication of genuine transcripts remains disabled. The hosted queue drain requires explicit configuration.
+
+## 2026-11-22, Platform, Gate 1 hosted study acceptance
+
+Done. Chrome completed the synthetic four-question study on deployment `dpl_DQeipo4fkEvFx3CeMwp88bJPEHAT` at `e2cdfe68`. The MFA researcher launched once without payment. The respondent completed profile and privacy choices, received the matching invite, saved one recording through private Storage and three typed answers, reopened question three in a new tab within the signed-in session, and submitted to quality hold at 15:18 UTC. Researcher tracking moved from zero to one complete with no transcript visible. Scoped database readback verified one accepted invite, four answer rows, four consent grants and zero published transcript rows. Temporary access and TOTP factors were revoked. [Hosted evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063)
+
+Done. Both controlled accounts received and consumed real sign-in emails at 14:14 UTC. The researcher completed a second delivered sign-in with MFA at 15:15 UTC. The respondent request immediately after that retry was rate-limited. The successful hosted study used official one-time Supabase test links for the previously verified accounts. The disposable browser scenario separately proves progress restoration after a fresh delivered sign-in. [Disposable study](https://github.com/rachelgonsalves821/EnvoiLabs/pull/67)
+
+Done. Provisioned the approved $0 Inngest resource. The [five-minute settings](https://github.com/rachelgonsalves821/EnvoiLabs/pull/76) passed a real local tick with both jobs active.
+
+Next. Finish the preview-only hosted Inngest connection, observe the expiry job, run real-provider synthetic transcription, and qualify a redaction configuration before genuine transcript publication.
+
+Needs from others. An approved transcription project key in GitHub Actions and approval to transfer the current non-production Inngest signing key to the dedicated Vercel preview branch.
+
+Contract or schema changes. None in this verification. The request and response shapes remain those used by the tested preview.
+
+Risks. The independent redaction trial on 272 recognized synthetic excerpts missed publication thresholds. Gate 1 remains open for live processing and redaction qualification. [Frozen independent redaction results](https://github.com/rachelgonsalves821/EnvoiLabs/pull/75)
