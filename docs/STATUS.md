@@ -248,3 +248,15 @@ Needs from others. Platform matching and the consented voice intake path.
 Contract or schema changes. Reused the existing profile and consent request contracts. The migration adds two authenticated procedures that derive respondent identity from the session and serialize changes for the active account.
 
 Risks. This is the synthetic preview flow. Production consent text and processing still need the pre-study checks. See the [database checks](../packages/db/tests/respondent_onboarding.sql) and [disposable mobile browser scenario](../apps/web/e2e/auth-local.spec.ts).
+
+## 2026-11-21, Respondent, Gate 1 R-RESP-04
+
+Done. Added the signed-in Home list with owned active invitations, screening flags, accepted studies and in-progress status. The projection exposes just the invitation metadata needed for Home. The card shows reward, time, question count, reason and privacy details with a neutral participant label.
+
+Next. Connect accept, decline, and resume to the Platform operations. Add an approved participant-facing topic when the researcher form collects one.
+
+Needs from others. Platform invite actions and session routing.
+
+Contract or schema changes. Added a narrow authenticated query without changing the existing invite mutation contracts.
+
+Risks. Home is a read-only increment. The [database checks](../packages/db/tests/respondent_home_invites.sql) and [disposable browser scenario](../apps/web/e2e/auth-local.spec.ts) cover ownership and disclosure.

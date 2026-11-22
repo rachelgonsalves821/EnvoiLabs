@@ -1343,6 +1343,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      list_gate1_home_invites: { Args: never; Returns: Json }
       provision_email_respondent: {
         Args: { supplied_user_id: string }
         Returns: string
