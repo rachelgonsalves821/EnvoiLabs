@@ -6,8 +6,8 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
-| Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [hosted results](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7069644053) |
-| Gate 1 Vertical slice | End of week 3 | Implementation started | [Handoff](GATE_1_HANDOFF.md) |
+| Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [both hosted sign-ins on the same deployment](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7071655542) |
+| Gate 1 Vertical slice | End of week 3 | Integration and acceptance in progress | [Handoff](GATE_1_HANDOFF.md), [verification checkpoint](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
 | Gate 4 Launch hardening | End of week 8 | Not started | |
@@ -332,3 +332,15 @@ Needs from others. Platform audio reservation and confirmation, and the speech-t
 Contract or schema changes. None. Reused the frozen upload and record-answer schemas.
 
 Risks. Unconfirmed audio survives retry in the current page. Closing the page discards the in-memory recording. Browser-local drafts need verified-account scoping, consent-revocation cleanup and expiry before storing audio beyond the page. The [synthetic browser scenario](../apps/web/e2e/respondent/voice-fixture.ts) uses intercepted failures and a real signed upload to disposable Storage.
+
+## 2026-11-22, Platform, Gate 1 acceptance
+
+Done. Merged the private-audio worker adapter and signed session resume. Browser checks verified that a signed-in respondent can reopen at the next unanswered question. Added [the full disposable study scenario](../apps/web/e2e/gate1-slice.spec.ts) to connect researcher email and MFA, study launch, respondent email and consent, matching, four private recordings, return sign-in, quality hold and the redacted researcher view.
+
+Next. Verify both disposable email variants, qualify the redaction configuration, run the live synthetic transcription workflow and verify the dedicated hosted study journey.
+
+Needs from others. Configure an approved transcription key for the live synthetic GitHub Actions check. The disposable journey uses a repository transcription fake and a fixed synthetic redaction projection.
+
+Contract or schema changes. None in the full browser scenario.
+
+Risks. The default worker keeps transcripts private until a qualified redaction configuration is available. Live transcription and the hosted Gate 1 journey remain unverified.
