@@ -3,6 +3,7 @@
 import { CreateGate1StudyRequestSchema, StudyMutationResponseSchema, type StudyMutationResponse } from "@envoi-labs/contracts";
 import { gate1CriterionChoices } from "@envoi-labs/services/study-draft-criteria";
 import { Button, Field } from "@envoi-labs/ui";
+import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { researcherCopy as copy } from "./copy";
 import styles from "./researcher.module.css";
@@ -108,11 +109,18 @@ export function StudyDraftForm({ launchEnabled }: { launchEnabled: boolean }) {
         </h2>
         <p>{saved.title}</p>
         {error && <p role="alert" className={styles.error}>{error}</p>}
-        {launchEnabled && saved.study.state === "draft" &&
-          <Button onClick={launch} disabled={saving}>{saving ? copy.launching : copy.launch}</Button>}
-        <Button variant="secondary" disabled={saving} onClick={() => { setError(undefined); setSaved(undefined); }}>
-          {copy.another}
-        </Button>
+        <div className={styles.savedActions}>
+          {launchEnabled && saved.study.state === "draft" &&
+            <Button onClick={launch} disabled={saving}>{saving ? copy.launching : copy.launch}</Button>}
+          {fielding && (
+            <Link href={`/app/studies/${saved.study.studyId}`} className={`ev-button ${styles.trackingLink}`}>
+              {copy.viewTracking}
+            </Link>
+          )}
+          <Button variant="secondary" disabled={saving} onClick={() => { setError(undefined); setSaved(undefined); }}>
+            {copy.another}
+          </Button>
+        </div>
       </section>
     );
   }

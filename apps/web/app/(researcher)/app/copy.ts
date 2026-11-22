@@ -21,6 +21,7 @@ export const researcherCopy = {
   launch: "Launch test study",
   launching: "Launching study…",
   launched: "Study launched",
+  viewTracking: "View tracking",
   launchConflict: "Check the study criteria and preview panel, then try launching again.",
   launchFailed: "The launch could not be confirmed. Try again.",
   another: "Create another study",

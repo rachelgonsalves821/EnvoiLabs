@@ -1357,6 +1357,10 @@ export type Database = {
         Args: { supplied_cutoff: string }
         Returns: Json
       }
+      get_gate1_study_tracking: {
+        Args: { supplied_study_id: string }
+        Returns: Json
+      }
       launch_gate1_study: {
         Args: {
           supplied_organization_id: string

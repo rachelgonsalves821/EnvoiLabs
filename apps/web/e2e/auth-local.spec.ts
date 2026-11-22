@@ -221,7 +221,7 @@ test.describe("local Auth with synthetic fixtures", () => {
     });
   });
 
-  test("researcher email and TOTP unlock persistent drafts and idempotent preview launch", async ({ page, baseURL }) => {
+  test("researcher email and TOTP unlock drafts, idempotent preview launch and live tracking", async ({ page, baseURL }) => {
     const origin = loopbackOrigin(baseURL);
     const service = localService();
     const email = `auth-smoke-${randomUUID()}@example.test`;
@@ -325,12 +325,29 @@ test.describe("local Auth with synthetic fixtures", () => {
     expect(await retry.json()).toEqual({ studyId, state: "fielding" });
     await expect(page.getByRole("heading", { name: "Study launched" })).toBeFocused();
     const [offers, audits, payments] = await Promise.all([
-      service.from("invites").select("respondent_id, state, reward_cents").eq("study_id", studyId),
+      service.from("invites").select("id, respondent_id, state, reward_cents").eq("study_id", studyId),
       service.from("audit_log").select("id").eq("entity_id", studyId).eq("to_state", "fielding"),
       service.from("payments").select("id").eq("study_id", studyId),
     ]);
-    expect(offers.data).toEqual([{ respondent_id: respondent.data.id, state: "invited", reward_cents: 160 }]);
+    expect(offers.data).toHaveLength(1);
+    expect(offers.data).toMatchObject([{ respondent_id: respondent.data.id, state: "invited", reward_cents: 160 }]);
     expect(audits.data).toHaveLength(1);
     expect(payments.data).toEqual([]);
+
+    await page.getByRole("link", { name: "View tracking" }).click();
+    await expect(page).toHaveURL(`/app/studies/${studyId}`);
+    await expect(page.getByRole("heading", { name: "Late-night ordering study" })).toBeVisible();
+    await expect(page.getByText("0 of 3", { exact: true })).toBeVisible();
+
+    const inviteId = offers.data?.[0]?.id;
+    if (!inviteId) throw new Error("The seeded preview launch did not produce an invite.");
+    const accepted = await service.from("invites").update({ state: "accepted" }).eq("id", inviteId);
+    expect(accepted.error).toBeNull();
+    const session = await service.from("sessions").insert({
+      study_id: studyId, invite_id: inviteId, state: "quality_hold", submitted_at: new Date().toISOString(),
+      started_at: new Date(Date.now() - 60_000).toISOString(),
+    });
+    expect(session.error).toBeNull();
+    await expect(page.getByText("1 of 3", { exact: true })).toBeVisible({ timeout: 12_000 });
   });
 });

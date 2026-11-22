@@ -284,3 +284,15 @@ Needs from others. Platform invite actions and session routing.
 Contract or schema changes. Added a narrow authenticated query without changing the existing invite mutation contracts.
 
 Risks. Home is a read-only increment. The [database checks](../packages/db/tests/respondent_home_invites.sql) and [disposable browser scenario](../apps/web/e2e/auth-local.spec.ts) cover ownership and disclosure.
+
+## 2026-11-21, Researcher and AI, Gate 1 R-RSCH-07 tracking
+
+Done. The researcher can open tracking from a successful preview launch. The MFA-protected page reads the study title and target through existing tenant policies and refreshes invited, accepted, completed and removed counts while the page is visible. A caller from another organization sees no row.
+
+Next. Add consent-scoped redacted transcript display and exercise IT-1.1 with the respondent journey.
+
+Needs from others. The redacted transcript publication path.
+
+Contract or schema changes. Reused the frozen tracking response. The read function checks organization scope and returns aggregates without granting researcher access to individual invite or session rows.
+
+Risks. Tracking displays confirmed counts. Sample composition and a projected finish still need their own data sources.
