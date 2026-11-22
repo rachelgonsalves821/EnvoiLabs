@@ -510,3 +510,15 @@ Needs from others. See the hosted prerequisites in [issue #4](https://github.com
 Contract or schema changes. None.
 
 Risks. Independent publication thresholds remain outstanding.
+
+### 2026-11-22 — Gate 1 fragmented person names
+
+Done. The offline evaluator masks fragmented names inside explicitly supported person slots. Across 272 known recognized excerpts, full name masks increased from 27/60 to 34/60, with the same measured edits to research evidence and clean clips. The 18 separate development controls had the same coverage and evidence edits as the baseline. All 26 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Verify live synthetic speech and test a frozen policy against independent recognition output.
+
+Needs from others. See the hosted prerequisites in [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. The independent recall thresholds and hosted speech and scheduler checks remain open.

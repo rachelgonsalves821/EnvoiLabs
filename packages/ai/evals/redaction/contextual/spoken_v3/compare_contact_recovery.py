@@ -12,6 +12,7 @@ from candidate import Hit, candidate_hits, mask
 from evaluate import GLiNER, LABELS, SessionOptions, THRESHOLD, add_contact_patterns, candidate_analyzer, coverage
 from evaluate_v2 import _IDENTITY_LABELS, _ONNX_SHA, digest, model_identities, predict, sources
 from identity_boundaries import complete_identity_boundaries
+from person_slot_recovery import detect_person_slots
 from product_context import is_product_title
 from speech_context import explicit_identities
 from spoken_contact import spoken_contact_hits
@@ -59,7 +60,8 @@ def main():
     source = Path(__file__)
     source_sha = digest(source)
     candidates = [source.with_name(name) for name in (
-        "asr_casing.py", "identity_boundaries.py", "product_context.py", "spoken_contacts_recover.py",
+        "asr_casing.py", "identity_boundaries.py", "person_slot_recovery.py",
+        "product_context.py", "spoken_contacts_recover.py",
     )]
     candidate_hashes = {rule.name: digest(rule) for rule in candidates}
     rows = json.loads(opts.cases.read_text(encoding="utf-8-sig"))["cases"]
@@ -86,6 +88,7 @@ def main():
         results["v2_plus_contact_product_and_casing"] = report_template()
         results["v2_plus_contact_product_casing_only"] = report_template()
         results["v2_plus_contact_product_casing_and_boundaries"] = report_template()
+        results["v2_plus_contact_product_casing_boundaries_and_person_slots"] = report_template()
     for row in rows:
         text = row["text"]
         fixed, contextual, explicit = frozen_v2_components(text, analyzer, model)
@@ -113,10 +116,15 @@ def main():
             combined = (*with_casing, *with_product_context)
             coverage(row, mask(text, combined), results["v2_plus_contact_product_and_casing"])
             coverage(row, mask(text, with_casing), results["v2_plus_contact_product_casing_only"])
-            boundaries = complete_identity_boundaries(restored, (*with_product_context, *additional_identities), explicit)
+            detections = (*with_product_context, *additional_identities)
+            boundary_masks = (*combined, *complete_identity_boundaries(restored, detections, explicit))
             coverage(
-                row, mask(text, (*combined, *boundaries)),
+                row, mask(text, boundary_masks),
                 results["v2_plus_contact_product_casing_and_boundaries"],
+            )
+            coverage(
+                row, mask(text, (*boundary_masks, *detect_person_slots(text, restored, detections))),
+                results["v2_plus_contact_product_casing_boundaries_and_person_slots"],
             )
     if (sources() != frozen_sources or {rule.name: digest(rule) for rule in candidates} != candidate_hashes
             or digest(source) != source_sha or digest(opts.cases) != corpus_sha):
@@ -133,6 +141,7 @@ def main():
             "revision": MODEL_REVISION, "asset_sha256": MODEL_FILES,
             "casing_source_sha256": candidate_hashes["asr_casing.py"],
             "boundaries_source_sha256": candidate_hashes["identity_boundaries.py"],
+            "person_slots_source_sha256": candidate_hashes["person_slot_recovery.py"],
             "p95_ms": round(1000 * sorted(casing_times)[ceil(0.95 * len(casing_times)) - 1], 3),
         }
     with opts.output.open("x", encoding="utf8") as stream:

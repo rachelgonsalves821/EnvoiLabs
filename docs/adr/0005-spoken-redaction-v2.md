@@ -109,6 +109,12 @@ On the 272 known Vosk excerpts, completing detections using adjacent cased words
 
 A separate diagnostic of the original casing policy found that 35 of the 38 incomplete names contained more recognized words than their two-word authored references. The explicit role detector found slots for 11 of 29 partial names and zero of nine untouched names. A virtual role cue recovered one partial name. These results point to fragmented recognition as the next identity issue to address. The independent qualification set remains sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Fragmented names in explicit person slots
+
+A bounded person-slot rule uses naming, signing and attribution cues to keep fragmented words together in the source mask. Ambiguous phrases require a cased word or a corroborating person detection. The rule preserves the original source offsets and limits each slot to the current clause.
+
+On the 272 known recognized excerpts, adding this rule increased full name masks from 27/60 to 34/60. Coverage across the other categories matched the boundary baseline, as did edits to clean excerpts (12/36) and evidence spans (3/36). On a separate 18-excerpt fictional development set, both policies fully masked nine names, edited 6/9 clean clips and edited 7/27 evidence spans. Those remaining evidence edits matter to researcher usability. The independent qualification set remains sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
