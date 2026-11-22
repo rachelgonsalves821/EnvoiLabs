@@ -36,4 +36,5 @@ export interface Transcriber {
 }
 
 export * from "./fixtures.js";
+export * from "./gate1-answer-processor.js";
 export * from "./providers.js";
