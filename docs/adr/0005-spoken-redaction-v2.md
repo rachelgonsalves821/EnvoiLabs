@@ -103,6 +103,12 @@ The pinned Apache-2.0 model supplies casing and punctuation to a separate contex
 
 Using only the learned casing view for contextual predictions fully masked 18/60 names and edited 7/36 clean excerpts and 3/36 evidence spans. On the matched 60-excerpt subset, combining the larger GLiNER Base with the learned casing added one employer and one school mask compared with the smaller casing combination. It also edited four additional clean excerpts, taking those edits from 4/15 to 8/15. Neither approach reaches the gate thresholds. The independent holdout remains available for a later frozen candidate. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Completing detected identity spans
+
+On the 272 known Vosk excerpts, completing detections using adjacent cased words or a corroborated explicit role span raised full name masks from 22/60 to 27/60 and full school masks from 27/36 to 32/36. Masking counts matched the casing baseline for the other four categories. Both policies edited 12/36 clean excerpts and 3/36 evidence spans.
+
+A separate diagnostic of the original casing policy found that 35 of the 38 incomplete names contained more recognized words than their two-word authored references. The explicit role detector found slots for 11 of 29 partial names and zero of nine untouched names. A virtual role cue recovered one partial name. These results point to fragmented recognition as the next identity issue to address. The independent qualification set remains sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
