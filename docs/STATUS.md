@@ -225,11 +225,23 @@ Contract or schema changes. None.
 
 Risks. This increment defines transition rules. Database concurrency, expiry jobs and audited retries remain to be verified by IT-1.4 and IT-1.5.
 
+## 2026-11-21, Researcher and AI, Gate 1 R-RSCH-08 and R-RSCH-09 upstream review
+
+Done. Recorded the [OpenInterviewer design review](adr/0002-openinterviewer-review.md) using the pinned revision and verified license. Adopted the design patterns for clarification, save-before-analysis, grounded quote selection and follow-up study provenance.
+
+Next. Apply the answer persistence and retry pattern in IT-1.5. Use the ADR's checks when implementing probes, reports and next-study proposals.
+
+Needs from others. None.
+
+Contract or schema changes. None.
+
+Risks. Upstream behavior varies by mode. Envoi's limits, consent and publication rules are authoritative.
+
 ## 2026-11-21, Respondent, Gate 1 R-RESP-02 and R-RESP-03
 
 Done. Added a signed-in mobile profile and four separate privacy choices. The profile saves typed structured answers. Preview consent records the text version for each purpose and retains a history of changes. The respondent can review saved choices after returning.
 
-Next. Run the disposable Supabase browser and database checks. Connect eligible studies on Home and enforce current consent in the recording, transcription, retention and researcher access paths. Add optional spoken profile answers after the consented voice path is available.
+Next. Connect eligible studies on Home and enforce current consent in the recording, transcription, retention and researcher access paths. Add optional spoken profile answers after the consented voice path is available.
 
 Needs from others. Platform matching and the consented voice intake path.
 
