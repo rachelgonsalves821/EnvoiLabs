@@ -1,0 +1,2 @@
+# Preserve exact evidence bytes for the freeze and replay checksums.
+*.json -text whitespace=cr-at-eol

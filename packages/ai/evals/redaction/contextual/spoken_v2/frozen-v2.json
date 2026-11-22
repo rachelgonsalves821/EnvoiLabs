@@ -1,0 +1,39 @@
+{
+  "primary": "v2_selective",
+  "controls": ["v1", "v1_with_spoken_contacts"],
+  "selection": "Selective restoration improved all three identity categories on the known development set without altering additional evidence or clean passages. Broad title casing was dropped because it more than doubled evidence loss.",
+  "inference": {
+    "model_revision": "d21aad5b4a7ec82b3d0970fd1ac74a12c087d85e",
+    "raw_labels": ["person", "organization", "phone number", "email address", "address"],
+    "restored_labels": ["name", "organization", "organization educational"],
+    "model_threshold": 0.5,
+    "deterministic_threshold": 0.35,
+    "mask": "union of validated spans projected to unchanged original code point coordinates"
+  },
+  "scoring": {
+    "phone_min_recall": 0.99,
+    "email_min_recall": 0.99,
+    "person_min_recall": 0.95,
+    "employer_min_recall": 0.95,
+    "report": ["full and partial sensitive span coverage by category", "counts of evidence spans and excerpts altered", "intentionally clean excerpts altered", "ASR word error rate and absent sensitive or useful spans separately", "candidate latency"],
+    "publication": "disabled pending independently passing complete qualification"
+  },
+  "known_development_corpus_sha256": "2057f7214368b047d9bb27b87b91cfd41e634182ab3f1feb3135f4d838d6ce85",
+  "development_report_sha256": "2a5f0f987a3b1ee1a862ebc56dee006faa0fdde2e68f0738c56b6acd944ca74e",
+  "sources_sha256": {
+    "evaluate_v2.py": "ad68c8ad990b6f944b0e09c3884a28183810038800911d1e810cfec1fcf8c8ac",
+    "spoken_contact.py": "ee9e04e34fe0a6798ca474d065cf96bc5806098ac6196dfc9bf888cb787d2f01",
+    "speech_context.py": "e1c2534369dfa7e2e1824eb5cecb01205483ff8a64d477032f0166203c48fad5",
+    "candidate.py": "718e85b79a92e208904e799de95aabc86e50ec3a719a289ff415067a64d2dc08",
+    "evaluate.py": "edc617fd158d44ac21b856f974084cbf3a89d6a83ea3f76afea22ac2b762c688",
+    "benchmark.py": "6baa335b31eea7d9d0aaa186b7e590af38216e00128ec0ad60e460ae95357673",
+    "test_redaction_v2.py": "1f87fe0ad2d7a4a35093f2611bf6949388d5bda5cef6b39c9157b6d0737d4e94"
+  },
+  "artifacts_sha256": {
+    "gliner_config.json": "c10803bade021f40072b194bc78bc2edd2bf3e60637a6f34cc9b00705bf3c168",
+    "model_quint8.onnx": "891589426ee96f2748b16439f44fad8c3f97e198e002a6637e58dee989500216",
+    "special_tokens_map.json": "ea97ecdbcc73713039d8d64dbb05e3689495c96657fbd9a18f5bed381be81049",
+    "tokenizer.json": "84b3a9b18f04a0ccd03b72d9f871b7e0bec40fd7021ef50bc30a7c3693c11205",
+    "tokenizer_config.json": "3398f6d1ad4b4c4f9874d390d060a75c58cad5e5ce9b22841b3e40643b4ada27"
+  }
+}

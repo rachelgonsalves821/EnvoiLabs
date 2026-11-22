@@ -1,0 +1,182 @@
+{
+  "corpus_sha256": "439cbcd4b105722fc23c25ec0d07329eac4b34ab97e5f76766bb48d769b21724",
+  "transcripts": 272,
+  "sources": {
+    "evaluate_v2.py": "ad68c8ad990b6f944b0e09c3884a28183810038800911d1e810cfec1fcf8c8ac",
+    "spoken_contact.py": "ee9e04e34fe0a6798ca474d065cf96bc5806098ac6196dfc9bf888cb787d2f01",
+    "speech_context.py": "e1c2534369dfa7e2e1824eb5cecb01205483ff8a64d477032f0166203c48fad5",
+    "candidate.py": "718e85b79a92e208904e799de95aabc86e50ec3a719a289ff415067a64d2dc08",
+    "evaluate.py": "edc617fd158d44ac21b856f974084cbf3a89d6a83ea3f76afea22ac2b762c688"
+  },
+  "model": "knowledgator/gliner-pii-small-v1.0",
+  "revision": "d21aad5b4a7ec82b3d0970fd1ac74a12c087d85e",
+  "artifacts": {
+    "gliner_config.json": "c10803bade021f40072b194bc78bc2edd2bf3e60637a6f34cc9b00705bf3c168",
+    "model_quint8.onnx": "891589426ee96f2748b16439f44fad8c3f97e198e002a6637e58dee989500216",
+    "special_tokens_map.json": "ea97ecdbcc73713039d8d64dbb05e3689495c96657fbd9a18f5bed381be81049",
+    "tokenizer.json": "84b3a9b18f04a0ccd03b72d9f871b7e0bec40fd7021ef50bc30a7c3693c11205",
+    "tokenizer_config.json": "3398f6d1ad4b4c4f9874d390d060a75c58cad5e5ce9b22841b3e40643b4ada27"
+  },
+  "packages": {
+    "gliner": "0.2.30",
+    "onnxruntime": "1.32.0",
+    "transformers": "5.22.2",
+    "torch": "2.15.0",
+    "presidio-analyzer": "2.2.366",
+    "presidio-anonymizer": "2.2.366",
+    "spacy": "3.8.18",
+    "en-core-web-sm": "3.8.0",
+    "phonenumbers": "9.0.44",
+    "tldextract": "5.4.0"
+  },
+  "threshold": 0.5,
+  "prd_numeric_targets": {
+    "phone": 0.99,
+    "email": 0.99,
+    "person": 0.95,
+    "employer": 0.95
+  },
+  "policy_results": {
+    "v2_selective": {
+      "entities": {
+        "phone": {
+          "planted": 140,
+          "fully_masked": 82,
+          "partially_masked": 19,
+          "recall": 0.5857142857142857
+        },
+        "email": {
+          "planted": 140,
+          "fully_masked": 68,
+          "partially_masked": 32,
+          "recall": 0.4857142857142857
+        },
+        "school": {
+          "planted": 36,
+          "fully_masked": 19,
+          "partially_masked": 15,
+          "recall": 0.5277777777777778
+        },
+        "address": {
+          "planted": 36,
+          "fully_masked": 20,
+          "partially_masked": 9,
+          "recall": 0.5555555555555556
+        },
+        "employer": {
+          "planted": 60,
+          "fully_masked": 29,
+          "partially_masked": 23,
+          "recall": 0.48333333333333334
+        },
+        "person": {
+          "planted": 60,
+          "fully_masked": 15,
+          "partially_masked": 26,
+          "recall": 0.25
+        }
+      },
+      "clean_transcripts": 36,
+      "clean_transcripts_altered": 14,
+      "evidence_spans": 36,
+      "evidence_spans_altered": 6,
+      "research_evidence_altered": 6,
+      "meets_prd_numeric_targets": false,
+      "p95_ms": 117.2
+    },
+    "v1": {
+      "entities": {
+        "phone": {
+          "planted": 140,
+          "fully_masked": 55,
+          "partially_masked": 20,
+          "recall": 0.39285714285714285
+        },
+        "email": {
+          "planted": 140,
+          "fully_masked": 42,
+          "partially_masked": 48,
+          "recall": 0.3
+        },
+        "school": {
+          "planted": 36,
+          "fully_masked": 14,
+          "partially_masked": 15,
+          "recall": 0.3888888888888889
+        },
+        "address": {
+          "planted": 36,
+          "fully_masked": 3,
+          "partially_masked": 6,
+          "recall": 0.08333333333333333
+        },
+        "employer": {
+          "planted": 60,
+          "fully_masked": 25,
+          "partially_masked": 17,
+          "recall": 0.4166666666666667
+        },
+        "person": {
+          "planted": 60,
+          "fully_masked": 8,
+          "partially_masked": 21,
+          "recall": 0.13333333333333333
+        }
+      },
+      "clean_transcripts": 36,
+      "clean_transcripts_altered": 12,
+      "evidence_spans": 36,
+      "evidence_spans_altered": 6,
+      "research_evidence_altered": 6,
+      "meets_prd_numeric_targets": false,
+      "p95_ms": 71.3
+    },
+    "v1_with_spoken_contacts": {
+      "entities": {
+        "phone": {
+          "planted": 140,
+          "fully_masked": 82,
+          "partially_masked": 19,
+          "recall": 0.5857142857142857
+        },
+        "email": {
+          "planted": 140,
+          "fully_masked": 68,
+          "partially_masked": 26,
+          "recall": 0.4857142857142857
+        },
+        "school": {
+          "planted": 36,
+          "fully_masked": 14,
+          "partially_masked": 15,
+          "recall": 0.3888888888888889
+        },
+        "address": {
+          "planted": 36,
+          "fully_masked": 20,
+          "partially_masked": 9,
+          "recall": 0.5555555555555556
+        },
+        "employer": {
+          "planted": 60,
+          "fully_masked": 25,
+          "partially_masked": 17,
+          "recall": 0.4166666666666667
+        },
+        "person": {
+          "planted": 60,
+          "fully_masked": 8,
+          "partially_masked": 21,
+          "recall": 0.13333333333333333
+        }
+      },
+      "clean_transcripts": 36,
+      "clean_transcripts_altered": 12,
+      "evidence_spans": 36,
+      "evidence_spans_altered": 6,
+      "research_evidence_altered": 6,
+      "meets_prd_numeric_targets": false,
+      "p95_ms": 71.6
+    }
+  }
+}
