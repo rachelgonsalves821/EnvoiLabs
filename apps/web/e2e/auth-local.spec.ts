@@ -176,6 +176,49 @@ test.describe("local Auth with synthetic fixtures", () => {
       await expect(voice).not.toBeChecked();
       await expect(researcher).toBeChecked();
     });
+
+    await test.step("signed-in Home shows only the respondent's current invitation", async () => {
+      await page.goto("/r");
+      await expect(page.getByRole("heading", { name: "Your studies" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "No study invitations yet" })).toBeVisible();
+
+      const organization = await service.from("organizations").insert({ name: "Private Home fixture" }).select("id").single();
+      if (organization.error || !organization.data) throw new Error("Could not create the synthetic organization.");
+      const study = await service.from("studies").insert({
+        organization_id: organization.data.id, title: "Internal project planning", state: "fielding",
+        target_completes: 2, length_minutes: 8,
+      }).select("id").single();
+      if (study.error || !study.data) throw new Error("Could not create the synthetic study.");
+      const studyId = study.data.id;
+      const guide = await service.from("guide_questions").insert([1, 2, 3, 4].map((position) => ({
+        study_id: studyId, position, text: `Private test question ${position}`,
+      })));
+      expect(guide.error).toBeNull();
+
+      const otherUser = await service.auth.admin.createUser({ email: `other-${randomUUID()}@example.test`, email_confirm: true });
+      if (otherUser.error || !otherUser.data.user) throw new Error("Could not create the second synthetic respondent.");
+      const other = await service.rpc("provision_email_respondent", { supplied_user_id: otherUser.data.user.id });
+      if (other.error || !other.data) throw new Error("Could not provision the second synthetic respondent.");
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const invites = await service.from("invites").insert([
+        { study_id: studyId, respondent_id: respondentId, state: "invited", expires_at: expiresAt,
+          reward_cents: 250, why_you_text: "Matched on delivery habits" },
+        { study_id: studyId, respondent_id: other.data, state: "invited", expires_at: expiresAt,
+          reward_cents: 999, why_you_text: "Another respondent’s reason" },
+      ]);
+      expect(invites.error).toBeNull();
+
+      await page.reload();
+      await expect(page.getByRole("heading", { name: "Research interview" })).toHaveCount(1);
+      await expect(page.getByText("Matched on delivery habits")).toBeVisible();
+      await expect(page.getByText("$2.50")).toBeVisible();
+      await expect(page.getByText("8 min")).toBeVisible();
+      await expect(page.getByText("4 questions")).toBeVisible();
+      await expect(page.getByText("$9.99")).toHaveCount(0);
+      await expect(page.getByText("Internal project planning")).toHaveCount(0);
+      await expect(page.getByText("Private test question 1")).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+    });
   });
 
   test("researcher email and TOTP unlock persistent drafts and idempotent preview launch", async ({ page, baseURL }) => {
