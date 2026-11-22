@@ -1343,6 +1343,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_gate1_answer_job: {
+        Args: { supplied_answer_id?: string }
+        Returns: Json
+      }
+      complete_gate1_answer_job: {
+        Args: {
+          supplied_answer_id: string
+          supplied_cost_micros?: number
+          supplied_latency_ms?: number
+          supplied_lease_id: string
+          supplied_model?: string
+          supplied_provider?: string
+          supplied_raw_text?: string
+          supplied_redacted_text?: string
+          supplied_redaction_passed?: boolean
+        }
+        Returns: Json
+      }
       create_gate1_study: {
         Args: {
           draft: Json
@@ -1392,6 +1410,18 @@ export type Database = {
         }
         Returns: Json
       }
+      requeue_gate1_answer_job: {
+        Args: { supplied_answer_id: string }
+        Returns: boolean
+      }
+      retry_gate1_answer_job: {
+        Args: {
+          supplied_answer_id: string
+          supplied_delay_seconds?: number
+          supplied_lease_id: string
+        }
+        Returns: boolean
+      }
       save_gate1_consent: { Args: { decisions: Json }; Returns: boolean }
       save_gate1_profile: { Args: { attributes: Json }; Returns: boolean }
       start_gate1_session: {
@@ -1405,6 +1435,10 @@ export type Database = {
       update_gate1_invite: {
         Args: { supplied_action: string; supplied_invite_id: string }
         Returns: Json
+      }
+      validate_gate1_answer_job: {
+        Args: { supplied_answer_id: string; supplied_lease_id: string }
+        Returns: boolean
       }
     }
     Enums: {
