@@ -1,0 +1,1915 @@
+{
+  "cases": [
+    {
+      "id": "envoi-spoken-001",
+      "text": "The person who answered was Nadia Fallowmere. She read back the six dollar delivery fee.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 28,
+          "end": 44
+        }
+      ],
+      "evidence": [
+        {
+          "start": 64,
+          "end": 87
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-002",
+      "text": "It was Lena Mossbridge who called after I had already put the groceries away.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 7,
+          "end": 22
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-003",
+      "text": "My account says Owen Threadwell, but the app left the receipt under the wrong order.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 16,
+          "end": 31
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-004",
+      "text": "I think their name was Anika Cedarwick. Anyway, the cinnamon rolls were still warm.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 23,
+          "end": 38
+        }
+      ],
+      "evidence": [
+        {
+          "start": 52,
+          "end": 66
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-005",
+      "text": "Put it under Martin Bluewick. That is the name I gave at the counter.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 13,
+          "end": 28
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-006",
+      "text": "Imani Stonevale was the rep I spoke with, around quarter past eight.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 0,
+          "end": 15
+        }
+      ],
+      "evidence": [
+        {
+          "start": 49,
+          "end": 67
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-007",
+      "text": "Oh, I should have said, my roommate Daria Finchgrove did the rest of the order.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 36,
+          "end": 52
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-008",
+      "text": "She said to ask for Tessa Northbrook if I needed another receipt.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 20,
+          "end": 36
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-009",
+      "text": "The tracking page called me Jonah Brookstone, which is actually my name.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 28,
+          "end": 44
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-010",
+      "text": "I told Priya Calderwood I would send her the invoice in the morning.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 7,
+          "end": 23
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-011",
+      "text": "My partner, Elliot Lanternwood, found the family dinner bundle after I gave up.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 12,
+          "end": 30
+        }
+      ],
+      "evidence": [
+        {
+          "start": 42,
+          "end": 62
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-012",
+      "text": "I signed my real name, Beatrice Hushfield, on the tablet.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 23,
+          "end": 41
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-013",
+      "text": "The cashier introduced himself as Colin Windmere right before the scanner stopped.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 34,
+          "end": 48
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-014",
+      "text": "The order carries my brother's name, Aaron Driftwell.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 37,
+          "end": 52
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-015",
+      "text": "I'd rather they call Tariq Elmwater. He's usually around when the food comes.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 21,
+          "end": 35
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-016",
+      "text": "I checked with Julia Copperfield before buying a second three dollar coffee.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 15,
+          "end": 32
+        }
+      ],
+      "evidence": [
+        {
+          "start": 56,
+          "end": 75
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-017",
+      "text": "On the form, for contact person, I wrote Sofia Amberlark.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 41,
+          "end": 56
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-018",
+      "text": "It was a neighbour named Daniel Pineridge who got the bag off the porch.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 25,
+          "end": 41
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-019",
+      "text": "I picked it up for Rina Glassbrook, from the locker nearest the lift.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 19,
+          "end": 34
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-020",
+      "text": "I'm Maya Senwick. I switched the ten minute pickup to delivery.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 4,
+          "end": 16
+        }
+      ],
+      "evidence": [
+        {
+          "start": 33,
+          "end": 50
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-021",
+      "text": "I work at Blue Lantern Supply, so most weekday orders go to our loading dock.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 10,
+          "end": 29
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-022",
+      "text": "For work I do scheduling for Ivory Heron Logistics, mostly in the evenings.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 29,
+          "end": 50
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-023",
+      "text": "My employer is Silver Orchard Printworks. I was wrapping up the late shift.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 15,
+          "end": 40
+        }
+      ],
+      "evidence": [
+        {
+          "start": 64,
+          "end": 74
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-024",
+      "text": "I just clocked out of Cobalt Finch Workshop when I opened the menu.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 22,
+          "end": 43
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-025",
+      "text": "I am on the payroll at Amber Harbor Bakery. That shift starts early.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 23,
+          "end": 42
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-026",
+      "text": "My paychecks come from Frost Lantern Media. Fridays I usually get the small soup.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 23,
+          "end": 42
+        }
+      ],
+      "evidence": [
+        {
+          "start": 66,
+          "end": 80
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-027",
+      "text": "I'm a cashier with Maple Kettle Hardware, so I only get half an hour for lunch.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 19,
+          "end": 40
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-028",
+      "text": "I was on the way back to my job at Meadow Kite Dispatch with everybody's sandwiches.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 35,
+          "end": 55
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-029",
+      "text": "At Paper Juniper Studio, where I work, we share one company ordering account.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 3,
+          "end": 23
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-030",
+      "text": "The business on my name tag is River Moth Services.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 31,
+          "end": 50
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-031",
+      "text": "My shift lead at Olive Sparrow Repairs said I could run down and get the order.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 17,
+          "end": 38
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-032",
+      "text": "Before this job I was employed by Night Finch Copy Center, and deliveries there took longer.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 34,
+          "end": 57
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-033",
+      "text": "I work for Copper Lantern Freight, in the office right off the warehouse floor.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 11,
+          "end": 33
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-034",
+      "text": "The restaurant receipts get filed with my employer, Birch Ferry Gardens.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 52,
+          "end": 71
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-035",
+      "text": "I have a summer job at Marsh Bell Theatre. I used the student meal deal after work.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 23,
+          "end": 41
+        }
+      ],
+      "evidence": [
+        {
+          "start": 54,
+          "end": 71
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-036",
+      "text": "My company, Still Pine Kitchens, sent a voucher to use for lunch.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 12,
+          "end": 31
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-037",
+      "text": "I teach for Grey Heron Language Services. I order if I have two lessons back to back.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 12,
+          "end": 40
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-038",
+      "text": "I do delivery planning at Fox Meadow Parcel Works.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 26,
+          "end": 49
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-039",
+      "text": "At work, that's Quiet Harbor Fabrics, the staff room has only one microwave.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 16,
+          "end": 36
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-040",
+      "text": "I started working for Hollow Finch Textile Company last month.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 22,
+          "end": 50
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-041",
+      "text": "I go to Lantern Falls College. The eight o'clock seminar ended a bit late.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 8,
+          "end": 29
+        }
+      ],
+      "evidence": [
+        {
+          "start": 35,
+          "end": 56
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-042",
+      "text": "I'm a second year student at Silver Marsh University, and I paid on my way to class.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 29,
+          "end": 52
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-043",
+      "text": "My school is Cedar Falls Technical Institute. The locker by the shop was full.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 13,
+          "end": 44
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-044",
+      "text": "At Blue Finch Community College, where I study, deliveries have to go to the desk.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 3,
+          "end": 31
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-045",
+      "text": "I'm enrolled at River Lantern School of Design.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 16,
+          "end": 46
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-046",
+      "text": "Between classes at Amber Marsh College, I use the meal bundle a lot.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 19,
+          "end": 38
+        }
+      ],
+      "evidence": [
+        {
+          "start": 46,
+          "end": 61
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-047",
+      "text": "The package was for my dorm at North Birch University.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 31,
+          "end": 53
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-048",
+      "text": "I picked it up near the student centre at Maple Tide College.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 42,
+          "end": 60
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-049",
+      "text": "My evening class is at Copper Orchard School of Arts.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 23,
+          "end": 52
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-050",
+      "text": "I live just beyond my campus, Pine Harbor State College.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 30,
+          "end": 55
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-051",
+      "text": "We had study group at Clover Ridge Community College, and the app showed fifteen minutes.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 22,
+          "end": 52
+        }
+      ],
+      "evidence": [
+        {
+          "start": 73,
+          "end": 88
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-052",
+      "text": "My campus is Willow Wharf University; delivery is different during winter term.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 13,
+          "end": 36
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-053",
+      "text": "I transferred to Glass Lantern Institute last semester.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 17,
+          "end": 40
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-054",
+      "text": "I had a lab at Juniper Lock College before I could go get it.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 15,
+          "end": 35
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-055",
+      "text": "My classes meet at Dove Meadow Technical College, not the downtown location.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 19,
+          "end": 48
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-056",
+      "text": "I used my student card from Sparrow Hill Polytechnic to get the five dollar discount.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 28,
+          "end": 52
+        }
+      ],
+      "evidence": [
+        {
+          "start": 64,
+          "end": 84
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-057",
+      "text": "The campus I attend is called Salt Birch Arts College.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 30,
+          "end": 53
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-058",
+      "text": "I did my first year at Low Meadow University. Food delivery there was pretty reliable.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 23,
+          "end": 44
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-059",
+      "text": "When I was enrolled at Starling Harbor Institute, checkout took even longer.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 23,
+          "end": 48
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-060",
+      "text": "I take the bus over from my school, Elm Ferry College, to pick up my order.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 36,
+          "end": 53
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-061",
+      "text": "Leave the order at twelve Lantern Maple Lane. The red tote bag is beside the door.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 19,
+          "end": 44
+        }
+      ],
+      "evidence": [
+        {
+          "start": 50,
+          "end": 62
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-062",
+      "text": "I used my home address, forty seven Finchwater Road apartment six.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 24,
+          "end": 65
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-063",
+      "text": "The door is at three hundred Pine Lantern Avenue. It says to go round back.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 15,
+          "end": 48
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-064",
+      "text": "I sent it to eighty two Willow Harbor Street unit three instead of the office.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 13,
+          "end": 55
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-065",
+      "text": "The map pin was off, but I live at sixteen Birch Moth Way.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 35,
+          "end": 57
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-066",
+      "text": "My address is nine hundred five Glass Meadow Drive apartment two B.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 14,
+          "end": 66
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-067",
+      "text": "The delivery driver went to eleven Copper Finch Court, which is where I was waiting.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 28,
+          "end": 53
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-068",
+      "text": "I told the driver to go to twenty six Sparrow Lake Road, suite thirteen.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 27,
+          "end": 71
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-069",
+      "text": "My mailing address on that order was P O box fourteen two six.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 37,
+          "end": 61
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-070",
+      "text": "Our place is sixty three Lantern Harbor Boulevard, on the south side.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 13,
+          "end": 49
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-071",
+      "text": "I put eight Elm Kite Place in the address field, then chose pickup at noon.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 6,
+          "end": 26
+        }
+      ],
+      "evidence": [
+        {
+          "start": 60,
+          "end": 74
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-072",
+      "text": "For delivery I typed two zero nine Gannet Moth Lane.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 21,
+          "end": 51
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-073",
+      "text": "The receipt gives my old address as one hundred twelve Amber Kite Avenue unit five.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 36,
+          "end": 82
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-074",
+      "text": "We were staying at sixty four Cedar Orchard Street, apartment four.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 19,
+          "end": 66
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-075",
+      "text": "She asked for a street address, so I said twenty nine Willow Finch Crescent.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 42,
+          "end": 75
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-076",
+      "text": "The box number I use for mail is post office box five zero one seven.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 33,
+          "end": 68
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-077",
+      "text": "He brought the bag to my apartment, fourteen Quiet Harbor Road unit eleven.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 36,
+          "end": 74
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-078",
+      "text": "It's one seven eight North Heron Drive; that's the address I submitted.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 5,
+          "end": 38
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-079",
+      "text": "I left a note that my house is seventy one Marsh Lantern Way.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 31,
+          "end": 60
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-080",
+      "text": "They dropped the order at one hundred one Olive Finch Square, apartment seven.",
+      "sensitive": [
+        {
+          "entity": "address",
+          "start": 26,
+          "end": 77
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-081",
+      "text": "The callback number I gave was two oh two, five five five, oh one two four.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 31,
+          "end": 74
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-082",
+      "text": "For the driver, my number is six one three five five five zero one seven six.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 29,
+          "end": 76
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-083",
+      "text": "Call me at four one six, five five five, oh one six four if the bell doesn't work.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 11,
+          "end": 56
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-084",
+      "text": "I put one nine one seven, five five five, zero one three six on the receipt as my phone.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 6,
+          "end": 60
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-085",
+      "text": "two one two five five five oh one three nine is the number that should get the text.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 0,
+          "end": 44
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-086",
+      "text": "My alternate number is five one nine, five five five, zero one two seven.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 23,
+          "end": 72
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-087",
+      "text": "The courier still has my old number, four zero eight five five five zero one eight three.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 37,
+          "end": 88
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-088",
+      "text": "Use six four seven, five five five, oh one one two, and I can take the call after lunch.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 4,
+          "end": 50
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-089",
+      "text": "If you are taking a callback number, that's two oh six, five five five, zero one two six.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 44,
+          "end": 88
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-090",
+      "text": "I left my cell as five one four five five five zero one six seven.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 18,
+          "end": 65
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-091",
+      "text": "My work line is six oh four, five five five, oh one three two, extension one nine for pickup.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 16,
+          "end": 81
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-092",
+      "text": "They can phone me on nine oh five five five five zero one eight two until I get home.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 21,
+          "end": 67
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-093",
+      "text": "I went to the receipt and updated my phone to three one two, five five five, zero one eight one.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 46,
+          "end": 95
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-094",
+      "text": "The text should go to seven one eight five five five zero one six eight, my cell.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 22,
+          "end": 71
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-095",
+      "text": "I said, for contact, one five oh three, five five five, zero one nine three.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 21,
+          "end": 75
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-096",
+      "text": "Before the driver left, I said my phone number was four zero three five five five zero one six one.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 51,
+          "end": 98
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-097",
+      "text": "I had a ten minute wait. My callback was three oh five five five five oh one seven one.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 41,
+          "end": 86
+        }
+      ],
+      "evidence": [
+        {
+          "start": 8,
+          "end": 23
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-098",
+      "text": "The shop rang me at two oh four five five five zero one nine five with the substitution.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 20,
+          "end": 65
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-099",
+      "text": "My number, for the label, is two five oh, five five five, oh one six three.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 29,
+          "end": 74
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-100",
+      "text": "Oh, by the way, the callback is four two five five five five zero one nine seven.",
+      "sensitive": [
+        {
+          "entity": "phone",
+          "start": 32,
+          "end": 80
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-101",
+      "text": "My email is north dot kettle at example dot com. They sent the three dollar credit there.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 12,
+          "end": 47
+        }
+      ],
+      "evidence": [
+        {
+          "start": 63,
+          "end": 82
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-102",
+      "text": "Send the receipt to green tote at example dot net when you find it.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 20,
+          "end": 49
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-103",
+      "text": "The email I used was sam dot lantern at example dot org.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 21,
+          "end": 55
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-104",
+      "text": "You can email me at meadow dash pickup at example dot com.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 20,
+          "end": 57
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-105",
+      "text": "For checkout I entered kite dot receipts at example dot net.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 23,
+          "end": 59
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-106",
+      "text": "The driver said the confirmation goes to one small bell at example dot org.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 41,
+          "end": 74
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-107",
+      "text": "The account email ends with example dot com. It's night box at example dot com.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 50,
+          "end": 78
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-108",
+      "text": "I wrote extra dot basil at example dot org in the email field.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 8,
+          "end": 42
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-109",
+      "text": "The address I check for order updates is blue pack at example dot net.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 41,
+          "end": 69
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-110",
+      "text": "My contact email, just for the store, is pencil plus orders at example dot com.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 41,
+          "end": 78
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-111",
+      "text": "They can reach me at silver bowl at example dot org, which is my email.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 21,
+          "end": 51
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-112",
+      "text": "Put checkout dot note at example dot net down for a receipt, please.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 4,
+          "end": 40
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-113",
+      "text": "I used a throwaway address, odd carrot at example dot com.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 28,
+          "end": 57
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-114",
+      "text": "The confirmation went to dock dash lunch at example dot org, so I missed it.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 25,
+          "end": 59
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-115",
+      "text": "It's winter dot snack at example dot net, and that's also my account email.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 5,
+          "end": 40
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-116",
+      "text": "Give them my email, willow plus pickup at example dot com.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 20,
+          "end": 57
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-117",
+      "text": "Instead, the invoice needs to go to second box at example dot org.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 36,
+          "end": 65
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-118",
+      "text": "My inbox is paper dot pear at example dot net. The pickup window was seven to eight.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 12,
+          "end": 45
+        }
+      ],
+      "evidence": [
+        {
+          "start": 69,
+          "end": 83
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-119",
+      "text": "For email, the address is side dash bell at example dot com.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 26,
+          "end": 59
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-120",
+      "text": "I want it emailed to after dot shift at example dot org.",
+      "sensitive": [
+        {
+          "entity": "email",
+          "start": 21,
+          "end": 55
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-121",
+      "text": "At eight twenty, the bag was still in the kitchen.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 3,
+          "end": 15
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-122",
+      "text": "The combo was twelve dollars and fifty cents before delivery.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 14,
+          "end": 44
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-123",
+      "text": "Order five five five one nine four is the one with the missing napkins.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 6,
+          "end": 34
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-124",
+      "text": "My local store had the Copper Bowl noodle kit in the freezer section.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 23,
+          "end": 45
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-125",
+      "text": "The label said Suite of spice blends, but it was just a trial pack.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 15,
+          "end": 36
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-126",
+      "text": "Please add the two five zero gram bag to the shopping list.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 15,
+          "end": 37
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-127",
+      "text": "I chose the Maple Harbor mint tea instead of the dark tea.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 12,
+          "end": 33
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-128",
+      "text": "It kept asking for email delivery, but I just wanted a printed receipt.",
+      "sensitive": [],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-129",
+      "text": "A phone setting had the notification muted. It saved the ninety second wait for the driver.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 57,
+          "end": 75
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-130",
+      "text": "The app's example says enter address, then displays the range slider on a second screen.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 52,
+          "end": 68
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-131",
+      "text": "Number one eighty two is a coupon code, not my order number.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 0,
+          "end": 21
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-132",
+      "text": "The quarter past nine pick up was cheaper than the earlier slot.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 4,
+          "end": 29
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-133",
+      "text": "The Copper Cart store had a buy two deal that day.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 4,
+          "end": 21
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-134",
+      "text": "That was the blue dot next to the checkout button, on the tracking map.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 13,
+          "end": 21
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-135",
+      "text": "The four dollar service charge mattered more than the delivery fee.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 4,
+          "end": 30
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-136",
+      "text": "My job got busy after the late shift, so I moved checkout to the morning.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 26,
+          "end": 36
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-137",
+      "text": "I had class after the ten thirty pickup. The next slot was much later.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 22,
+          "end": 39
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-138",
+      "text": "For a unit price like three forty nine, I would buy the store brand.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 22,
+          "end": 38
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-139",
+      "text": "The menu called it a Juniper Room dinner set.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 21,
+          "end": 44
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-140",
+      "text": "The number six lunch special was missing the dip.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 4,
+          "end": 28
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-141",
+      "text": "It was the twenty minute estimate, not the service fee, that changed my mind.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 11,
+          "end": 33
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-142",
+      "text": "The flyer literally says example dot com in the sample address box.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 48,
+          "end": 66
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-143",
+      "text": "The price ended in zero one two four cents on the example order, which looked odd.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 19,
+          "end": 42
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-144",
+      "text": "Tapping the contact card let me see the twelve dollar refund.",
+      "sensitive": [],
+      "evidence": [
+        {
+          "start": 36,
+          "end": 60
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-145",
+      "text": "Mira Bellcroft texted my callback, two zero two five five five zero one four two, after the eight dollar lunch.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 0,
+          "end": 14
+        },
+        {
+          "entity": "phone",
+          "start": 35,
+          "end": 80
+        }
+      ],
+      "evidence": [
+        {
+          "start": 92,
+          "end": 110
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-146",
+      "text": "I take classes at Marsh Lantern Community College and sent my receipt to tea plus study at example dot org.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 18,
+          "end": 49
+        },
+        {
+          "entity": "email",
+          "start": 73,
+          "end": 106
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-147",
+      "text": "My employer, Iron Sparrow Supply, sent it straight to twenty four Cedar Kite Terrace apartment nine.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 13,
+          "end": 32
+        },
+        {
+          "entity": "address",
+          "start": 54,
+          "end": 99
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "envoi-spoken-148",
+      "text": "The receipt says Rosa Tarnwood and the forty two dollar total. My email is rose cart at example dot net.",
+      "sensitive": [
+        {
+          "entity": "person",
+          "start": 17,
+          "end": 30
+        },
+        {
+          "entity": "email",
+          "start": 75,
+          "end": 103
+        }
+      ],
+      "evidence": [
+        {
+          "start": 39,
+          "end": 61
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-149",
+      "text": "My campus is Birch Cove Technical College. Call five zero two five five five zero one nine one after four p m.",
+      "sensitive": [
+        {
+          "entity": "school",
+          "start": 13,
+          "end": 41
+        },
+        {
+          "entity": "phone",
+          "start": 48,
+          "end": 94
+        }
+      ],
+      "evidence": [
+        {
+          "start": 101,
+          "end": 109
+        }
+      ]
+    },
+    {
+      "id": "envoi-spoken-150",
+      "text": "I got back to my job at Gannet Kettle Works. Noel Alderwick had already checked the vegetarian bundle.",
+      "sensitive": [
+        {
+          "entity": "employer",
+          "start": 24,
+          "end": 43
+        },
+        {
+          "entity": "person",
+          "start": 45,
+          "end": 59
+        }
+      ],
+      "evidence": [
+        {
+          "start": 84,
+          "end": 101
+        }
+      ]
+    }
+  ]
+}
