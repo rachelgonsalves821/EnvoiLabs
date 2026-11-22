@@ -57,6 +57,7 @@ async function createStudy(page: Page, email: string, origin: string) {
 test.describe("Gate 1 seeded study", () => {
   test.skip(process.env.ENVOI_TEST_LOCAL_SUPABASE !== "1", "Requires the disposable Auth, database and Storage stack.");
   test.skip(({ browserName }) => browserName !== "chromium", "Uses Chromium MediaRecorder with synthetic input.");
+  test.use({ actionTimeout: 12_000, navigationTimeout: 15_000 });
 
   test("IT-1.1 matches a signed-in respondent, resumes four private recordings and shows redacted research", async ({
     browser, page: researcher, baseURL,
@@ -66,8 +67,13 @@ test.describe("Gate 1 seeded study", () => {
     const db = localService();
     const respondentEmail = `slice-respondent-${randomUUID()}@example.test`;
     const researcherEmail = `slice-researcher-${randomUUID()}@example.test`;
-    const respondentContext = await browser.newContext({ ...devices["Pixel 7"], baseURL: origin });
-    const returningContext = await browser.newContext({ ...devices["Pixel 7"], baseURL: origin });
+    const mobile = { ...devices["Pixel 7"], baseURL: origin };
+    const respondentContext = await browser.newContext(mobile);
+    const returningContext = await browser.newContext(mobile);
+    for (const context of [respondentContext, returningContext]) {
+      context.setDefaultTimeout(12_000);
+      context.setDefaultNavigationTimeout(15_000);
+    }
 
     try {
       const respondent = await respondentContext.newPage();
@@ -123,7 +129,8 @@ test.describe("Gate 1 seeded study", () => {
       }, { onConflict: "version" });
       expect(pricing.error).toBeNull();
 
-      const studyId = await createStudy(researcher, researcherEmail, origin);
+      const studyId = await test.step("Launch the study from the researcher workspace", () =>
+        createStudy(researcher, researcherEmail, origin));
       if (!studyId) throw new Error("The launch did not open the seeded study.");
       const selected = await db.from("invites").select("id,respondent_id,state").eq("study_id", studyId).single();
       if (selected.error || !selected.data) throw new Error("Matching did not produce exactly one invite.");
@@ -154,7 +161,7 @@ test.describe("Gate 1 seeded study", () => {
       await respondent.getByRole("link", { name: "Back to your studies" }).click();
       const resumePath = await respondent.getByRole("link", { name: "Continue interview" }).getAttribute("href");
       if (!resumePath?.startsWith("/r/s/")) throw new Error("The in-progress interview has no signed resume link.");
-      await respondentContext.close();
+      await respondent.close();
 
       const returning = await returningContext.newPage();
       await installSyntheticMicrophone(returning);
@@ -211,8 +218,7 @@ test.describe("Gate 1 seeded study", () => {
       await expect(panel.getByText(redactedFixture, { exact: true })).toHaveCount(4, { timeout: 12_000 });
       await expect(panel.getByText(sensitiveFixture, { exact: true })).toHaveCount(0);
     } finally {
-      await respondentContext.close();
-      await returningContext.close();
+      await Promise.allSettled([respondentContext.close(), returningContext.close()]);
     }
   });
 });
