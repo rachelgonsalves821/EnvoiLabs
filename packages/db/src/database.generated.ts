@@ -1353,6 +1353,10 @@ export type Database = {
         }
         Returns: Json
       }
+      expire_gate1_interviews: {
+        Args: { supplied_cutoff: string }
+        Returns: Json
+      }
       launch_gate1_study: {
         Args: {
           supplied_organization_id: string
