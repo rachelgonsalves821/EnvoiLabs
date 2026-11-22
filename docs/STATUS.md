@@ -546,3 +546,15 @@ Needs from others. See the [hosted prerequisites in issue #4](https://github.com
 Contract or schema changes. None.
 
 Risks. Independent recall and evidence preservation remain below publication readiness.
+
+### 2026-11-22 — Gate 1 public website precision
+
+Done. The offline website guard reduced clean edits from 9/10 to 1/10 and evidence edits from 11/34 to 2/34 in the email development controls. The 272 known speech clips and a separate set of 16 public-site and mixed-identity clips produced the same measured results as their baselines. All nine private spans in the mixed set remained fully masked. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Run the approved provider on synthetic recordings and evaluate recall and precision against independent recognized speech.
+
+Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Independent publication qualification remains open.
