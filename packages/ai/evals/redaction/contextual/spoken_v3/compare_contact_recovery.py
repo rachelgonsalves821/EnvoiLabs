@@ -10,6 +10,7 @@ from time import perf_counter
 from candidate import Hit, candidate_hits, mask
 from evaluate import GLiNER, LABELS, SessionOptions, THRESHOLD, add_contact_patterns, candidate_analyzer, coverage
 from evaluate_v2 import _ONNX_SHA, digest, model_identities, predict, sources
+from product_context import is_product_title
 from speech_context import explicit_identities
 from spoken_contact import spoken_contact_hits
 from spoken_contacts_recover import recovered_contacts
@@ -20,16 +21,20 @@ _KNOWN_CORPORA = {
 }
 
 
-def frozen_v2_hits(text, analyzer, model):
+def frozen_v2_components(text, analyzer, model):
     presidio = analyzer.analyze(
         text=text, language="en", score_threshold=THRESHOLD,
         entities=["PHONE_NUMBER", "EMAIL_ADDRESS", "ORGANIZATION"],
     )
     raw = tuple(predict(model, text, LABELS))
-    baseline = tuple(candidate_hits(text, (Hit(hit.entity_type, hit.start, hit.end) for hit in presidio), raw))
     spoken = tuple(spoken_contact_hits(text))
     explicit = tuple(explicit_identities(text))
-    return (*baseline, *spoken, *model_identities(model, text, explicit, broad=False))
+    fixed = tuple(candidate_hits(text, (Hit(hit.entity_type, hit.start, hit.end) for hit in presidio), ()))
+    contextual = (
+        *(hit for hit in candidate_hits(text, (), raw) if hit in raw),
+        *model_identities(model, text, explicit, broad=False),
+    )
+    return (*fixed, *spoken), contextual, explicit
 
 
 def report_template():
@@ -49,8 +54,8 @@ def main():
         raise ValueError("Expected the already evaluated, known synthetic corpus")
     source = Path(__file__)
     source_sha = digest(source)
-    rules = Path(__file__).with_name("spoken_contacts_recover.py")
-    rules_sha = digest(rules)
+    candidates = [source.with_name(name) for name in ("product_context.py", "spoken_contacts_recover.py")]
+    candidate_hashes = {rule.name: digest(rule) for rule in candidates}
     rows = json.loads(opts.cases.read_text(encoding="utf-8-sig"))["cases"]
     model_root = Path(os.environ["ENVOI_GLINER_MODEL"]).resolve(strict=True)
     model_file = model_root / "model_quint8.onnx"
@@ -66,22 +71,31 @@ def main():
     )
     analyzer = candidate_analyzer()
     add_contact_patterns(analyzer)
-    results = {mode: report_template() for mode in ("frozen_v2", "v2_plus_contact_recovery")}
+    results = {mode: report_template() for mode in (
+        "frozen_v2", "v2_plus_contact_recovery", "v2_plus_contact_and_product_context",
+    )}
     times = []
     for row in rows:
         text = row["text"]
-        base = frozen_v2_hits(text, analyzer, model)
+        fixed, contextual, explicit = frozen_v2_components(text, analyzer, model)
         start = perf_counter()
         additional = tuple(recovered_contacts(text))
         times.append(perf_counter() - start)
+        base = (*fixed, *contextual)
+        with_product_context = [hit for hit in contextual if not is_product_title(text, hit, explicit)]
         coverage(row, mask(text, base), results["frozen_v2"])
         coverage(row, mask(text, (*base, *additional)), results["v2_plus_contact_recovery"])
-    if (sources() != frozen_sources or digest(rules) != rules_sha
+        coverage(
+            row, mask(text, (*fixed, *additional, *with_product_context)),
+            results["v2_plus_contact_and_product_context"],
+        )
+    if (sources() != frozen_sources or {rule.name: digest(rule) for rule in candidates} != candidate_hashes
             or digest(source) != source_sha or digest(opts.cases) != corpus_sha):
         raise RuntimeError("The evaluation sources or corpus changed during the run")
     report = {
         "cases": len(rows), "source_sha256": source_sha,
-        "contact_rules_sha256": rules_sha,
+        "contact_rules_sha256": candidate_hashes["spoken_contacts_recover.py"],
+        "product_context_sha256": candidate_hashes["product_context.py"],
         "additional_pass_p95_ms": round(1000 * sorted(times)[ceil(0.95 * len(times)) - 1], 3),
         "corpus_sha256": corpus_sha, "v2_sources": frozen_sources, "results": results,
     }

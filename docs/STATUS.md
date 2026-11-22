@@ -436,3 +436,15 @@ Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsa
 Contract or schema changes. None.
 
 Risks. Contact and identity coverage remain below the gate thresholds. Publication stays on hold.
+
+### 2026-11-22 — Gate 1 preservation of research labels
+
+Done. The offline redaction evaluator now measures whether explicit menu and shop labels can stay visible. On 272 known excerpts, the policy reduced alterations from six useful spans to two and from 14 clean excerpts to 10. Full masking counts matched the contact-only policy across both known corpora. Eleven focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Verify live-provider speech and score a frozen candidate on the independent holdout once contact and identity coverage improve.
+
+Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Publication stays gated on independent coverage and precision.
