@@ -11,6 +11,7 @@ from asr_casing import LocalCasingModel, MODEL_FILES, MODEL_REVISION
 from candidate import Hit, candidate_hits, mask
 from evaluate import GLiNER, LABELS, SessionOptions, THRESHOLD, add_contact_patterns, candidate_analyzer, coverage
 from evaluate_v2 import _IDENTITY_LABELS, _ONNX_SHA, digest, model_identities, predict, sources
+from identity_boundaries import complete_identity_boundaries
 from product_context import is_product_title
 from speech_context import explicit_identities
 from spoken_contact import spoken_contact_hits
@@ -57,7 +58,9 @@ def main():
         raise ValueError("Expected the already evaluated, known synthetic corpus")
     source = Path(__file__)
     source_sha = digest(source)
-    candidates = [source.with_name(name) for name in ("asr_casing.py", "product_context.py", "spoken_contacts_recover.py")]
+    candidates = [source.with_name(name) for name in (
+        "asr_casing.py", "identity_boundaries.py", "product_context.py", "spoken_contacts_recover.py",
+    )]
     candidate_hashes = {rule.name: digest(rule) for rule in candidates}
     rows = json.loads(opts.cases.read_text(encoding="utf-8-sig"))["cases"]
     model_root = Path(os.environ["ENVOI_GLINER_MODEL"]).resolve(strict=True)
@@ -82,6 +85,7 @@ def main():
     if casing:
         results["v2_plus_contact_product_and_casing"] = report_template()
         results["v2_plus_contact_product_casing_only"] = report_template()
+        results["v2_plus_contact_product_casing_and_boundaries"] = report_template()
     for row in rows:
         text = row["text"]
         fixed, contextual, explicit = frozen_v2_components(text, analyzer, model)
@@ -106,8 +110,14 @@ def main():
                     additional_identities.append(hit)
             casing_times.append(perf_counter() - began)
             with_casing = (*fixed, *additional, *additional_identities)
-            coverage(row, mask(text, (*with_casing, *with_product_context)), results["v2_plus_contact_product_and_casing"])
+            combined = (*with_casing, *with_product_context)
+            coverage(row, mask(text, combined), results["v2_plus_contact_product_and_casing"])
             coverage(row, mask(text, with_casing), results["v2_plus_contact_product_casing_only"])
+            boundaries = complete_identity_boundaries(restored, (*with_product_context, *additional_identities), explicit)
+            coverage(
+                row, mask(text, (*combined, *boundaries)),
+                results["v2_plus_contact_product_casing_and_boundaries"],
+            )
     if (sources() != frozen_sources or {rule.name: digest(rule) for rule in candidates} != candidate_hashes
             or digest(source) != source_sha or digest(opts.cases) != corpus_sha):
         raise RuntimeError("The evaluation sources or corpus changed during the run")
@@ -122,6 +132,7 @@ def main():
         report["casing_model"] = {
             "revision": MODEL_REVISION, "asset_sha256": MODEL_FILES,
             "casing_source_sha256": candidate_hashes["asr_casing.py"],
+            "boundaries_source_sha256": candidate_hashes["identity_boundaries.py"],
             "p95_ms": round(1000 * sorted(casing_times)[ceil(0.95 * len(casing_times)) - 1], 3),
         }
     with opts.output.open("x", encoding="utf8") as stream:

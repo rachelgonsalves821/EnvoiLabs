@@ -498,3 +498,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. Publication stays gated on independent recall and evidence preservation.
+
+### 2026-11-22 — Gate 1 identity boundary evaluation
+
+Done. Completing existing detections raised full masks from 22/60 to 27/60 for names and from 27/36 to 32/36 for schools on known recognized speech. Evidence and clean edits matched the casing baseline. All 20 focused tests passed. A separate diagnostic found that 35 of 38 incompletely masked names in the casing baseline contained extra words after recognition. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Verify live synthetic recognition and evaluate a frozen candidate against independent speech.
+
+Needs from others. See the hosted prerequisites in [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. Independent publication thresholds remain outstanding.
