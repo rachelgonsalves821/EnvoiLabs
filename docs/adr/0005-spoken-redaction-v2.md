@@ -87,6 +87,10 @@ The two contextual model passes accounted for all 14 altered clean excerpts and 
 
 Raising the model threshold across all detections was less selective. At 0.65, full employer masks dropped from 29 to 17 of 60 and full name masks from 15 to 12 of 60, while one evidence span and one clean excerpt were altered. The product check is a development policy. Its effect on ambiguous titles and private affiliations still needs independent evaluation. [Replay instructions](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Larger local speech model
+
+On the 60 known recordings, Distil-Whisper Large v3 made 319 edits across 1,286 reference words, compared with 348 for word-timed Whisper Base.en and 178 for Vosk. Distil retained all authored name tokens in 5/15 excerpts and employer tokens in 13/15. Base.en retained 3/15 and 12/15. Under the formatting-normalized comparison, Distil retained 3/15 phone values and 10/15 emails, versus 10/15 for both with Base.en. Distil emitted two words on each of three silence and quiet-noise controls. Decoding took 26.7 seconds p95 with two CPU threads. These development measures describe recognition. They provide no evidence of qualifying redaction or suitability for the hosted worker. [Pinned MIT model](https://huggingface.co/Systran/faster-distil-whisper-large-v3/tree/c3058b475261292e64a0412df1d2681c06260fab)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
