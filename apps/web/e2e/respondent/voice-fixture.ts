@@ -104,7 +104,23 @@ export async function exerciseVoiceRecording(page: Page, origin: string, inviteI
   expect(reservations).toHaveLength(0);
   const discarded = await stopRecordedTone(page);
   await expect(page.getByRole("main").getByRole("alert")).toHaveText("Your recording couldn’t upload. Try again.");
-  await expect(page.locator("audio")).toHaveAttribute("src", discarded);
+  const preview = page.locator("audio");
+  await expect(preview).toHaveAttribute("src", discarded);
+  const uploadedBeforePlayback = puts.length;
+  await preview.press("Space");
+  await expect.poll(() => preview.evaluate((node) => {
+    const audio = node as HTMLAudioElement;
+    return !audio.paused && audio.currentTime > 0;
+  })).toBe(true);
+  await preview.press("Space");
+  await expect.poll(() => preview.evaluate((node) => {
+    const audio = node as HTMLAudioElement;
+    return audio.paused && !audio.ended;
+  })).toBe(true);
+  await expect(preview).toHaveAttribute("src", discarded);
+  expect(reservations).toHaveLength(1);
+  expect(puts).toHaveLength(uploadedBeforePlayback);
+  expect(confirmations).toHaveLength(0);
   await page.getByRole("button", { name: "Retry upload" }).click();
   await expect(page.getByRole("button", { name: "Save recording" })).toBeEnabled();
   expect(confirmations).toHaveLength(0);
