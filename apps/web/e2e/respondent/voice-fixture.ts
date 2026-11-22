@@ -1,6 +1,29 @@
 import { expect, type Page } from "@playwright/test";
+import { RecordAnswerResponseSchema } from "@envoi-labs/contracts";
 
 const fixtureObjects = ["11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111112"];
+
+async function allowSyntheticMicrophone(page: Page) {
+  await page.evaluate(() => {
+    (window as unknown as { syntheticMicrophone: { allowed: boolean } }).syntheticMicrophone.allowed = true;
+  });
+}
+
+async function stopRecordedTone(page: Page) {
+  await expect(page.getByRole("main").getByRole("status")).toContainText("Recording");
+  await expect(page.locator(".respondent-record-timer span[aria-hidden]")).toHaveText("0:01");
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  const player = page.locator("audio");
+  await expect(player).toHaveAttribute("src", /^blob:/);
+  expect(await player.evaluate((node) => {
+    const audio = node as HTMLAudioElement;
+    return audio.paused && !audio.autoplay;
+  })).toBe(true);
+  await expect.poll(() => player.evaluate((audio) => (audio as HTMLAudioElement).readyState)).toBeGreaterThan(0);
+  const url = await player.getAttribute("src");
+  if (!url) throw new Error("The synthetic audio preview is missing.");
+  return url;
+}
 
 /** Uses a synthetic tone in Chromium and intercepts every request carrying it. */
 export async function exerciseVoiceRecording(page: Page, origin: string, inviteId: string) {
@@ -71,29 +94,11 @@ export async function exerciseVoiceRecording(page: Page, origin: string, inviteI
   await expect(page.getByRole("main").getByRole("alert")).toContainText("Microphone access is blocked.");
   await expect(page.getByRole("button", { name: "Type instead" })).toBeVisible();
   expect((await state()).requests).toBe(1);
-  await page.evaluate(() => {
-    (window as unknown as { syntheticMicrophone: { allowed: boolean } }).syntheticMicrophone.allowed = true;
-  });
-
-  async function stopRecordedTone() {
-    await expect(page.getByRole("main").getByRole("status")).toContainText("Recording");
-    await expect(page.locator(".respondent-record-timer span[aria-hidden]")).toHaveText("0:01");
-    await page.getByRole("button", { name: "Stop recording" }).click();
-    const player = page.locator("audio");
-    await expect(player).toHaveAttribute("src", /^blob:/);
-    expect(await player.evaluate((node) => {
-      const audio = node as HTMLAudioElement;
-      return audio.paused && !audio.autoplay;
-    })).toBe(true);
-    await expect.poll(() => player.evaluate((audio) => (audio as HTMLAudioElement).readyState)).toBeGreaterThan(0);
-    const url = await player.getAttribute("src");
-    if (!url) throw new Error("The synthetic audio preview is missing.");
-    return url;
-  }
+  await allowSyntheticMicrophone(page);
 
   await start.click();
   expect(reservations).toHaveLength(0);
-  const discarded = await stopRecordedTone();
+  const discarded = await stopRecordedTone(page);
   await expect(page.getByRole("main").getByRole("alert")).toHaveText("Your recording couldn’t upload. Try again.");
   await expect(page.locator("audio")).toHaveAttribute("src", discarded);
   await page.getByRole("button", { name: "Retry upload" }).click();
@@ -101,7 +106,7 @@ export async function exerciseVoiceRecording(page: Page, origin: string, inviteI
   expect(confirmations).toHaveLength(0);
   await page.getByRole("button", { name: "Record again" }).click();
   await expect.poll(async () => (await state()).revoked.includes(discarded)).toBe(true);
-  const saved = await stopRecordedTone();
+  const saved = await stopRecordedTone(page);
   expect(saved).not.toBe(discarded);
   await expect(page.getByRole("button", { name: "Save recording" })).toBeEnabled();
   expect(confirmations).toHaveLength(0);
@@ -123,4 +128,28 @@ export async function exerciseVoiceRecording(page: Page, origin: string, inviteI
   await page.unroute("**/api/respondent/answers/upload");
   await page.unroute("**/synthetic-voice-put/*");
   await page.unroute("**/api/respondent/answers/record");
+}
+
+/** Records a synthetic take through the real disposable app and Storage routes. */
+export async function submitSyntheticRecording(page: Page) {
+  await allowSyntheticMicrophone(page);
+  await page.getByRole("button", { name: "Start recording" }).click();
+  const put = page.waitForResponse((response) =>
+    response.request().method() === "PUT"
+      && new URL(response.url()).origin === process.env.SUPABASE_URL
+      && new URL(response.url()).pathname.startsWith("/storage/v1/object/upload/sign/gate1-interview-audio/"),
+  );
+  await stopRecordedTone(page);
+  const uploaded = await put;
+  expect(uploaded.ok()).toBe(true);
+  expect(uploaded.request().headers()["content-type"]).toBe("audio/webm");
+  expect((await uploaded.request().allHeaders()).cookie).toBeUndefined();
+  const [confirmation] = await Promise.all([
+    page.waitForResponse((response) => response.request().method() === "POST"
+      && new URL(response.url()).pathname === "/api/respondent/answers/record"),
+    page.getByRole("button", { name: "Save recording" }).click(),
+  ]);
+  expect(confirmation.status()).toBe(200);
+  const result: unknown = await confirmation.json();
+  return RecordAnswerResponseSchema.parse(result).answer;
 }
