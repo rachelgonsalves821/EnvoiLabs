@@ -1382,10 +1382,24 @@ export type Database = {
         }
         Returns: string
       }
+      record_gate1_text_answer: {
+        Args: {
+          supplied_answer_id: string
+          supplied_question_id: string
+          supplied_replace_answer_id?: string
+          supplied_session_id: string
+          supplied_text: string
+        }
+        Returns: Json
+      }
       save_gate1_consent: { Args: { decisions: Json }; Returns: boolean }
       save_gate1_profile: { Args: { attributes: Json }; Returns: boolean }
       start_gate1_session: {
         Args: { supplied_invite_id: string }
+        Returns: Json
+      }
+      submit_gate1_session: {
+        Args: { supplied_session_id: string }
         Returns: Json
       }
       update_gate1_invite: {
