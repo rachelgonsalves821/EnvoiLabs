@@ -7,7 +7,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
 | Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [both hosted sign-ins on the same deployment](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7071655542) |
-| Gate 1 Vertical slice | End of week 3 | Hosted study, scheduling and live speech passed. Independent redaction qualification failed. Researcher publication remains open. | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [live speech](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136), [qualification result](https://github.com/rachelgonsalves821/EnvoiLabs/pull/108) |
+| Gate 1 Vertical slice | End of week 3 | Hosted study, scheduling and live speech passed. The latest independent redaction qualification failed. Researcher publication remains disabled. | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [live speech](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136), [latest qualification result](https://github.com/rachelgonsalves821/EnvoiLabs/pull/112) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
 | Gate 4 Launch hardening | End of week 8 | Not started | |
@@ -786,3 +786,25 @@ Needs from others. None for redaction development.
 Contract or schema changes. None. The manifest fingerprint registers the independent scoring input.
 
 Risks. Publication remains closed. The independent fixture text stays private and is excluded from development.
+
+### 2026-11-23 — Gate 1 second independent redaction result
+
+Done. OpenAI transcribed 242 freshly and independently authored synthetic recordings. The candidate was frozen after the literal-contact, address, employer and name changes. The independent custodian verified all recognized transcripts and annotations before scoring. Full-span masks below use the authored count in each column so recognition omissions count against paired coverage.
+
+| Sensitive span | Required | Authored text | Recognized speech |
+| --- | ---: | ---: | ---: |
+| Phone | 99% | 124/124 | 124/124 |
+| Email | 99% | 125/125 | 58/125 |
+| Person | 95% | 61/61 | 45/61 |
+| Employer | 95% | 57/58 | 42/58 |
+| Address | 100% | 56/58 | 42/58 |
+
+Speech recognition omitted two names and one employer. The policy altered 30 of 258 evidence spans and 17 of 60 clean controls in recognized transcripts. It altered 28 of 258 evidence spans and 18 of 60 clean controls in authored text. It withheld zero answers in both runs. The qualification failed. [Frozen manifest and results](https://github.com/rachelgonsalves821/EnvoiLabs/pull/112)
+
+Next. Reproduce the speech-formatting failures in development, improve full-span recall and evidence preservation, then use a fresh independent test before a hosted publication rehearsal.
+
+Needs from others. None for the current redaction work.
+
+Contract or schema changes. None. The manifest registers test inputs. Publication still requires a passing report and a matching active database policy.
+
+Risks. The current candidate leaves portions of private information visible in synthetic inputs. Researcher transcript publication remains disabled.
