@@ -570,3 +570,15 @@ Needs from others. See the [hosted prerequisites in issue #4](https://github.com
 Contract or schema changes. None.
 
 Risks. The held-out gate and hosted checks remain open.
+
+### 2026-11-22 — Gate 1 confirmed personal names
+
+Done. Explicit name fields and paired confirmation cues raised full name masks from 34/60 to 52/60 on known recognized speech, with the same evidence and clean edits. Separate development controls matched the baseline, including 10/10 full name masks and 11/32 evidence edits. All 55 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Run the hosted synthetic speech test and improve recall and evidence preservation ahead of independent qualification.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for the hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. Independent publication qualification and hosted acceptance remain open.
