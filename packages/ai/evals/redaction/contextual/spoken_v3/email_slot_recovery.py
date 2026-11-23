@@ -4,7 +4,7 @@ import re
 
 from candidate import Hit
 from spoken_contact import tokenize
-from spoken_contacts_recover import _DOMAIN_BREAK, _HANDLE_BREAK, _TLDS, _WEAK_AT, _WEAK_MAIL_BREAK, _WEB_ACTION
+from spoken_contacts_recover import _DOMAIN_BREAK, _HANDLE_BREAK, _TLDS, _WEAK_AT, _WEAK_MAIL_BREAK, _WEB_ACTION, _phone_runs
 
 
 _MAIL_CUE = re.compile(
@@ -34,6 +34,20 @@ _WEBSITE = re.compile(
 )
 _BOUNDARY = {"and", "that", "to", "when", "who", "your", "you"}
 _BLOCK = {"a", "an", "the", "my", "myself", "theirs", "as", "it", "for", "at", "to"}
+_RECEIPT = re.compile(r"\b(?:the|my|our) (?:receipt|confirmation) (?:goes|went) to\s+")
+_ADDRESS_LABEL = re.compile(
+    r"\b(?:e-?mail(?: address)? (?:field (?:please )?(?:enter|use|type)|"
+    r"(?:(?:i|we|you) (?:gave(?: them| you)?|provided(?: them| you)?|verified|confirmed) )?(?:is|was))|"
+    r"(?:send|direct) (?:the|my|our) (?:survey )?(?:reply|receipt) to (?:the|my|our) "
+    r"(?:verified |confirmed )?(?:private |personal )?e-?mail(?: address)?)\s*(?::\s*|\s+)"
+)
+_CONFIRMATION = re.compile(r"^\s+for (?:the|my|our) (?:order |booking |delivery )?confirmation\b")
+_PUBLIC_REFERENCE = re.compile(r"\b(?:public (?:page|site|link|guide)|product (?:label|name)|vendor site)\b")
+_PUBLIC_SUFFIX = re.compile(r"^\s+(?:as|for|on) (?:the |a |this )?(?:public |product |vendor )?(?:website|site|page|catalog|menu)\b")
+_CONFIRMED_AT = _STRONG_AT | {"ad", "add", "an", "and", "et", "said", "set", "at's"}
+_AT_PAIRS = {("as", "an"), ("at", "sign")}
+_CONFIRMED_DOT = _DOMAIN_BREAK | _DISTORTED_DOT | {"dott", "drug"}
+_HOST_WORD = re.compile(r"[^\W\d_]{2,}(?:-[^\W\d_]{2,})*\Z")
 
 
 def _domain_suffix(text, tokens, separator, strong_start):
@@ -134,3 +148,78 @@ def recover_email_slots(text):
         end = _domain_suffix(lower, tokens, index, strong_start)
         if end is not None:
             yield Hit("email", tokens[start].start, tokens[end - 1].end)
+
+
+def _domain_endings(lower, tokens):
+    for index, token in enumerate(tokens):
+        word = token.word
+        if word.startswith("dot") and word[3:] in _TLDS:
+            yield index, index + 1, False
+        elif word.isalpha() and any(len(tld) >= 3 and len(word) >= len(tld) + 3 and word.endswith(tld)
+                                    for tld in _TLDS | {"example"}):
+            yield index + 1, index + 1, True
+        if word not in _CONFIRMED_DOT:
+            continue
+        right = index + 1
+        end = _domain_suffix(lower, tokens, index, False)
+        if end is not None:
+            yield index, end, False
+        elif tuple(item.word for item in tokens[right:right + 2]) == ("and", "valid"):
+            yield index, right + 2, False
+
+
+def _handle_endings(tokens, host_end):
+    for host_length in (1, 2):
+        marker = host_end - host_length - 1
+        if marker < 1:
+            continue
+        host = tokens[marker + 1:host_end]
+        if not all(_HOST_WORD.fullmatch(item.word) and item.word not in _BLOCK for item in host):
+            continue
+        if marker > 1 and (tokens[marker - 1].word, tokens[marker].word) in _AT_PAIRS:
+            yield marker - 1
+        elif tokens[marker].word in _CONFIRMED_AT:
+            yield marker
+
+
+def recover_corroborated_mailboxes(text):
+    """Combine damaged address structure with an explicit or corroborated contact value."""
+    lower = text.casefold()
+    if len(lower) != len(text):
+        return
+    tokens = tokenize(text)
+    phones = tuple(_phone_runs(text, tokens))
+    offsets = {token.start: index for index, token in enumerate(tokens)}
+    for host_end, stop, fused_host in _domain_endings(lower, tokens):
+        end = tokens[stop - 1].end
+        following = lower[end:end + 100]
+        for handle_end in _handle_endings(tokens, host_end):
+            boundary = tokens[handle_end].start
+            before = max(0, boundary - 140)
+            context = lower[before:boundary]
+            labels = tuple(match for pattern in (_MAIL_CUE, _RECEIPT, _ADDRESS_LABEL) for match in pattern.finditer(context))
+            assignments = tuple(_ASSIGNMENT.finditer(context))
+            anchors = labels or assignments
+            if not anchors:
+                continue
+            cue = max(anchors, key=lambda match: match.end())
+            start = before + cue.end()
+            first = offsets.get(start, handle_end)
+            if not 1 <= handle_end - first <= (8 if labels else 6):
+                continue
+            value = lower[start:end]
+            if _WEBSITE.search(value) or _PUBLIC_REFERENCE.search(value) or _PUBLIC_SUFFIX.match(following):
+                continue
+            handle = tokens[first:handle_end]
+            if not all(item.word.isalnum() or item.word in _HANDLE_BREAK for item in handle):
+                continue
+            if fused_host and (not labels or tokens[handle_end].word not in _STRONG_AT):
+                continue
+            if not labels:
+                if following.strip() and not _NEW_CLAUSE.search(following):
+                    continue
+                before_phone = any(0 <= before + cue.start() - phone.end <= 28 for phone in phones)
+                after_phone = _CONFIRMATION.match(following) and any(0 <= phone.start - end <= 95 for phone in phones)
+                if handle[0].word in _BLOCK or not (before_phone or after_phone):
+                    continue
+            yield Hit("email", start, end)
