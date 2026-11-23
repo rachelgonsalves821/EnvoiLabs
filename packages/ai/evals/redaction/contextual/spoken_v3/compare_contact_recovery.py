@@ -9,6 +9,7 @@ from time import perf_counter
 
 from asr_casing import LocalCasingModel, MODEL_FILES, MODEL_REVISION
 from candidate import Hit, candidate_hits, mask
+from confirmed_names import confirmed_name_slots
 from email_slot_recovery import recover_email_slots
 from employer_slot_recovery import employer_slots
 from evaluate import GLiNER, LABELS, SessionOptions, THRESHOLD, add_contact_patterns, candidate_analyzer, coverage
@@ -64,7 +65,8 @@ def main():
     source = Path(__file__)
     source_sha = digest(source)
     candidates = [source.with_name(name) for name in (
-        "asr_casing.py", "email_slot_recovery.py", "employer_slot_recovery.py", "identity_boundaries.py",
+        "asr_casing.py", "confirmed_names.py", "email_slot_recovery.py", "employer_slot_recovery.py",
+        "identity_boundaries.py",
         "person_slot_recovery.py",
         "phone_slot_recovery.py",
         "product_context.py", "public_website_context.py", "spoken_contacts_recover.py",
@@ -98,6 +100,7 @@ def main():
         results["v2_plus_contact_product_casing_boundaries_and_contact_slots"] = report_template()
         results["with_public_website_guard"] = report_template()
         results["with_explicit_employment_spans"] = report_template()
+        results["with_confirmed_names"] = report_template()
     results["with_spoken_email_repairs"] = report_template()
     for row in rows:
         text = row["text"]
@@ -152,9 +155,14 @@ def main():
                 *detect_person_slots(text, restored, guarded), *phone_slots, *email_slots,
             )
             coverage(row, mask(text, guarded_masks), results["with_public_website_guard"])
+            employment_masks = (*guarded_masks, *employer_slots(text))
             coverage(
-                row, mask(text, (*guarded_masks, *employer_slots(text))),
+                row, mask(text, employment_masks),
                 results["with_explicit_employment_spans"],
+            )
+            coverage(
+                row, mask(text, (*employment_masks, *confirmed_name_slots(text))),
+                results["with_confirmed_names"],
             )
         coverage(
             row, mask(text, (*email_baseline, *email_slots)),
@@ -168,6 +176,7 @@ def main():
         "contact_rules_sha256": candidate_hashes["spoken_contacts_recover.py"],
         "product_context_sha256": candidate_hashes["product_context.py"],
         "email_slots_source_sha256": candidate_hashes["email_slot_recovery.py"],
+        "confirmed_names_source_sha256": candidate_hashes["confirmed_names.py"],
         "employer_slots_source_sha256": candidate_hashes["employer_slot_recovery.py"],
         "website_context_source_sha256": candidate_hashes["public_website_context.py"],
         "additional_pass_p95_ms": round(1000 * sorted(times)[ceil(0.95 * len(times)) - 1], 3),

@@ -33,6 +33,8 @@ The optional casing replay includes a public-site comparison. It tests whether c
 
 The employment comparison measures bounded organizations in explicit employment, payroll and workplace-field clauses, with separate cases to distinguish shift times and unrelated businesses.
 
+The confirmed-name comparison measures fragmented personal names bounded by clear record fields or explicit name confirmations.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"
