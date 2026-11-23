@@ -1356,6 +1356,7 @@ export type Database = {
           supplied_model?: string
           supplied_policy_digest?: string
           supplied_provider?: string
+          supplied_qualification_digest?: string
           supplied_raw_text?: string
           supplied_redacted_text?: string
           supplied_redaction_passed?: boolean

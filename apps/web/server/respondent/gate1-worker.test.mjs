@@ -6,6 +6,8 @@ const answerId = "00000000-0000-4000-8000-000000000001";
 const leaseId = "00000000-0000-4000-8000-000000000002";
 const objectId = "00000000-0000-4000-8000-000000000003";
 const lease = { supplied_answer_id: answerId, supplied_lease_id: leaseId };
+const policyDigest = "a".repeat(64);
+const qualificationDigest = "b".repeat(64);
 const audio = {
   storagePath: `${answerId}/${objectId}`, mime: "audio/webm", bytes: 3, durationMs: 1250,
   sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
@@ -48,20 +50,32 @@ describe("trusted Gate 1 worker", () => {
     expect(db.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", lease);
   });
 
-  it("supplies the policy digest alongside redacted output and leaves an unversioned result private", async () => {
+  it("supplies both verified digests alongside the redacted output", async () => {
     const claim = { answerId, leaseId, kind: "text", rawText: "private typed fixture" };
-    const policyDigest = "a".repeat(64);
     const options = { answerId, createTranscriber: vi.fn(), redact: vi.fn(async () => "Redacted output") };
-    const unversioned = database(claim);
-    await expect(runGate1AnswerJob(createGate1DatabasePorts(unversioned, options))).resolves.toBe("private");
-    expect(unversioned.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", lease);
-    const versioned = database(claim);
-    await runGate1AnswerJob(createGate1DatabasePorts(versioned, { ...options, policyDigest }));
-    expect(versioned.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", {
+    const db = database(claim);
+    await runGate1AnswerJob(createGate1DatabasePorts(db, { ...options, policyDigest, qualificationDigest }));
+    expect(db.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", {
       ...lease, supplied_redacted_text: "Redacted output", supplied_redaction_passed: true,
-      supplied_policy_digest: policyDigest,
+      supplied_policy_digest: policyDigest, supplied_qualification_digest: qualificationDigest,
     });
-    expect(() => createGate1DatabasePorts(versioned, { ...options, policyDigest: "invalid" })).toThrow(/policy digest/);
+  });
+
+  it.each([{}, { policyDigest }, { qualificationDigest }])(
+    "completes privately without sending a redacted body for an incomplete receipt %o",
+    async (digests) => {
+      const db = database({ answerId, leaseId, kind: "text", rawText: "private typed fixture" });
+      const ports = createGate1DatabasePorts(db, {
+        answerId, createTranscriber: vi.fn(), redact: async () => "Redacted output", ...digests,
+      });
+      await expect(runGate1AnswerJob(ports)).resolves.toBe("private");
+      expect(db.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", lease);
+    },
+  );
+
+  it.each(["policyDigest", "qualificationDigest"])("rejects an invalid supplied %s", (field) => {
+    const db = database(null);
+    expect(() => createGate1DatabasePorts(db, { createTranscriber: vi.fn(), [field]: "invalid" })).toThrow(/digest/);
   });
 
   it("rejects an out-of-scope storage locator before reading any recording", async () => {

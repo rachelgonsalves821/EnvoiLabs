@@ -750,3 +750,15 @@ Needs from others. The hosted speech and scheduler settings are still tracked in
 Contract or schema changes. Added the scoped read function and wired the version two response. No additional profile-table grants.
 
 Risks. The synthetic publication test uses a test policy solely in the disposable environment.
+
+### 2026-11-23 — Gate 1 exact qualification receipt
+
+Done. Publishing a Gate 1 transcript requires the active policy digest and its registered qualification report digest. The database stores both and checks them again whenever a researcher reads the transcript. Missing or mismatched reports leave the answer private, and replacing a report hides projections made under the previous report.
+
+Next. Use a passing independent report for the protected preview publication rehearsal.
+
+Needs from others. Hosted speech and scheduling credentials are tracked in [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. The worker completion call accepts an optional qualification digest. Existing callers can still complete private processing.
+
+Risks. Earlier job-backed projections without a recorded report digest stay hidden. The preview has no existing published projections or approved report.
