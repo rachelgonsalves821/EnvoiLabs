@@ -654,3 +654,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. The known email result does not establish independent recall. Transcript publication remains closed.
+
+### 2026-11-23 — Gate 1 corroborated spoken phone values
+
+Done. The offline comparison recovers noisy digits using a direct phone label or corroborated contact language. Full masks rose from 132/140 to 140/140 on known speech and from 5/10 to 10/10 on development controls used to revise the cues. A separately authored set matched its previous 5/8 masks. Clean and evidence edit counts matched across the short and long answer comparisons. All 83 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Recover more names and measure contact generalization before freezing the independent publication candidate.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. The known phone result does not establish independent recall. Transcript publication remains closed.

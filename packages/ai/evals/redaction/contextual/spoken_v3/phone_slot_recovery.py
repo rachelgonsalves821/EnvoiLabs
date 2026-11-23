@@ -22,6 +22,100 @@ _BOUNDARY = {
     "after", "and", "before", "because", "but", "during", "for", "from", "he", "i", "if",
     "now", "on", "she", "so", "the", "then", "try", "until", "we", "when", "you",
 }
+_EXPLICIT_NUMBER = re.compile(
+    r"\b(?:(?:the |my |our |your )?number (?:with (?:the|my|our) (?:new )?area code|for (?:calls?|texts?)) (?:is|was)|"
+    r"(?:the |my |our )?(?:phone|mobile|callback|contact number) for (?:pick ?up|delivery|follow[ -]?up|scheduling)(?: is| was)?|"
+    r"(?:my|their|our|your) (?:(?:daytime|evening|international) )?(?:contact|telephone|work|phone|callback|mobile)(?: number)? (?:is|was)|"
+    r"(?:call|dial|ring|text) (?:me|my (?:(?:private|local|work|mobile) )?(?:cell|phone|number))(?: at| on)?|"
+    r"(?:the )?(?:alternate|backup) number to (?:call|dial|text) (?:is|was))\s*(?::\s*|\s+)$"
+)
+_CONTACT_HANDOFF = re.compile(
+    r"\b(?:(?:i|we) (?:used|gave them|left|gave you)|for (?:the )?follow[ -]?up (?:is|at)|"
+    r"(?:reach|call|text) (?:me|us) (?:at|on))\s+$"
+)
+_PHONE_PURPOSE = re.compile(r"^(?:for|four) (?:the )?(?:calls?|texts?|callback)\b")
+_END_PHONE = re.compile(r"^(?:[.!?,;:]|(?:i|we|you|they|he|she|the|my|our|your|their|it)\b|"
+                        r"(?:after|before|because|until|then|and|but|when|for|send|put|keep|leave|please)\b)")
+_LOCAL_PHONE = re.compile(r"\blocal (?:phone|number)\b")
+_EXTRA_HOMOPHONES = {"eve": "8", "own": "1", "free": "3", "fife": "5", "threw": "3", "sicks": "6"}
+_EXTRA_REPEATS = {"trubble": 3}
+
+
+def _phone_end(tokens, start, explicit, local, text):
+    index = start + int(tokens[start].word in _INTERNATIONAL_PREFIX)
+    international = index > start
+    digits, reliable, repeat_groups = "", 0, 0
+    damaged = False
+    best = start
+    while index < len(tokens) and index - start < 22:
+        word = tokens[index].word
+        repeat = _REPEAT.get(word) or _WEAK_REPEAT.get(word) or (_EXTRA_REPEATS.get(word) if explicit else None)
+        following = tokens[index + 1].word if index + 1 < len(tokens) else ""
+        if _PHONE_PURPOSE.match(text[tokens[index].start:].casefold()):
+            break
+        if word in _PIN_SEPARATORS and digits and _piece(following):
+            index += 1
+            continue
+        if word == "or" and explicit and best == index:
+            alternate = _digit(following)[0] or _EXTRA_HOMOPHONES.get(following, "")
+            right = text[tokens[index + 1].end:].lstrip().casefold() if following else ""
+            if len(alternate) == 1 and (not right or _END_PHONE.match(right)):
+                best = index + 2
+            break
+        value, strength = _digit(following if repeat else word)
+        if not value and explicit:
+            value = _EXTRA_HOMOPHONES.get(following if repeat else word, "")
+        if (repeat and not value and explicit and not damaged and len(digits) >= 5
+                and following.isalpha() and following not in _BOUNDARY and len(following) <= 10
+                and index + 2 < len(tokens) and _piece(tokens[index + 2].word)):
+            value, damaged = "0", True
+        if not repeat and not value and explicit and not damaged and word == "i" and len(digits) >= 5:
+            if following in _REPEAT or following in _WEAK_REPEAT:
+                value, damaged = "0", True
+        if not value or (repeat and len(value) != 1):
+            break
+        count = repeat or 1
+        digits += value * count
+        reliable += strength * count
+        repeat_groups += bool(repeat)
+        index += 2 if repeat else 1
+        rest = text[tokens[index - 1].end:].lstrip().casefold()
+        end = not rest or _END_PHONE.match(rest) or _PHONE_PURPOSE.match(rest)
+        valid_count = 10 <= len(digits) <= 15 if international else (
+            len(digits) == 10 or (local and len(digits) == 7) or (len(digits) == 11 and digits.startswith(("0", "1")))
+        )
+        if word != "or" and valid_count and reliable >= 7 and (end or explicit and rest.startswith("or ")) and (
+            explicit or repeat_groups or reliable >= 9
+        ):
+            best = index
+    return best
+
+
+def recover_corroborated_numbers(text, mailboxes):
+    """Recover a bounded phone value without requiring exact recognized digits."""
+    tokens = tokenize(text)
+    for start, token in enumerate(tokens):
+        if not (_piece(token.word) or token.word in _INTERNATIONAL_PREFIX or token.word in _EXTRA_HOMOPHONES):
+            continue
+        before = text[max(0, token.start - 100):token.start].casefold()
+        label = _EXPLICIT_NUMBER.search(before) or next(
+            (match for match in _PHONE_SLOT.finditer(before) if match.end() == len(before)), None,
+        )
+        explicit = label is not None
+        handoff = bool(_CONTACT_HANDOFF.search(before))
+        if not (explicit or handoff):
+            continue
+        if not explicit and (_FALSE_PHONE.search(before) or _REFERENCE.search(before)):
+            continue
+        stop = _phone_end(tokens, start, explicit, bool(label and _LOCAL_PHONE.search(label.group())), text)
+        if stop <= start:
+            continue
+        end = tokens[stop - 1].end
+        corroborated = _PHONE_PURPOSE.match(text[end:].lstrip().casefold()) or any(
+            0 <= mailbox.start - end <= 50 for mailbox in mailboxes
+        )
+        if explicit or corroborated:
+            yield Hit("phone", token.start, end)
 
 
 def _piece(word):

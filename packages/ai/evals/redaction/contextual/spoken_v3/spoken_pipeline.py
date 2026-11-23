@@ -9,7 +9,7 @@ from email_slot_recovery import recover_corroborated_mailboxes, recover_email_sl
 from employer_slot_recovery import employer_slots
 from identity_boundaries import complete_identity_boundaries
 from person_slot_recovery import detect_person_slots
-from phone_slot_recovery import recover_number_slots
+from phone_slot_recovery import recover_corroborated_numbers, recover_number_slots
 from product_context import is_explicit_commercial_reference, is_product_title
 from public_website_context import preserving_public_ref, public_website_ranges
 from redaction_input import RedactionInputTooLong, answer_windows
@@ -20,7 +20,7 @@ from spoken_contacts_recover import recovered_contacts
 
 _LABELS = ["person", "organization", "phone number", "email address", "address"]
 _IDENTITY_LABELS = ["name", "organization", "organization educational"]
-CANDIDATE = "with_corroborated_mailboxes"
+CANDIDATE = "with_corroborated_phone_runs"
 
 
 def _project_identities(view, predict):
@@ -105,7 +105,10 @@ def span_variants(text, deterministic, predict, restore=None, *, timings=None):
     yield "with_commercial_reference_guard", commercial_masks
     address_masks = (*commercial_masks, *recover_address_slots(text))
     yield "with_spoken_address_repairs", address_masks
-    yield CANDIDATE, (*address_masks, *recover_corroborated_mailboxes(text))
+    mailbox_masks = (*address_masks, *recover_corroborated_mailboxes(text))
+    yield "with_corroborated_mailboxes", mailbox_masks
+    mailboxes = tuple(hit for hit in mailbox_masks if hit.label in {"email", "email address", "EMAIL_ADDRESS"})
+    yield CANDIDATE, (*mailbox_masks, *recover_corroborated_numbers(text, mailboxes))
 
 
 def render_redacted(text, spans):
