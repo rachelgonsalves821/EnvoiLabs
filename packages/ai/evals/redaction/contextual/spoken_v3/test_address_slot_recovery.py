@@ -31,6 +31,19 @@ class AddressSlotRecoveryTests(unittest.TestCase):
         value = "six salt nettle dry"
         self.assertEqual(self.corroborated(f"turn in at {value} where i asked them to leave the parcel"), [value])
         self.assertEqual(self.corroborated(f"turn in at {value} cleaners because the leaflet was there"), [])
+
+    def test_private_residence_keeps_qualified_flat_and_its_number(self):
+        value = "three Dovetail Vale crescent rear flat number eight"
+        self.assertEqual(self.corroborated(f"The repair crew should go to my home, {value}, and call in advance."),
+                         [value])
+        self.assertEqual(self.corroborated("The repair crew should go to Dovetail Vale crescent rear public steps."), [])
+
+    def test_private_doorstep_can_recover_split_street_type_and_access(self):
+        value = "eight Sedge Elm boul uh vard bungalow C side entrance"
+        self.assertEqual(self.corroborated(f"My doorstep is {value}. The slot changed twice."), [value])
+        self.assertEqual(self.corroborated("Walk along Sedge Elm boulevard to the side entrance at eight thirty."), [])
+        self.assertEqual(self.corroborated("My doorstep is at eight thirty by the public gate."), [])
+
     def recovered(self, text):
         return [text[hit.start:hit.end] for hit in recover_address_slots(text)]
 
