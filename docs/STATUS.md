@@ -582,3 +582,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. Independent publication qualification and hosted acceptance remain open.
+
+### 2026-11-22 — Gate 1 commercial references in transcripts
+
+Done. The offline comparison preserved known sensitive-span coverage, reduced changes to annotated research evidence from 3/36 to 0/36 across the known speech set, and reduced altered clean excerpts from 12/36 to 6/36. Separate name controls had matching sensitive coverage and fewer evidence and clean edits. All 58 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Recover private names and contact details that are still missed and qualify a frozen policy against independent recognized speech.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. Sensitive-span recall still falls short of the publication thresholds. The independent qualification set remains sealed.

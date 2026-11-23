@@ -21,6 +21,30 @@ _TITLE_SUFFIX = re.compile(
     re.I,
 )
 _IDENTITY_LABELS = {"person", "organization", "name", "organization educational"}
+_PRIVATE_ASSERTION = re.compile(
+    r"\b(?:(?:my|his|her|their|our) (?:full |legal |printed )?name|"
+    r"(?:my|his|her|their|our) (?:employer|workplace|school|university)|"
+    r"(?:i|we) (?:work|worked|study|studied) (?:at|for))\b", re.I,
+)
+_COMMERCIAL_LABEL = re.compile(
+    r"^\s+(?:(?:deal|offer|bundle|model|flavor)\s+)?(?:"
+    r"(?:(?:which|that) (?:is|was)|as) (?:the|a) "
+    r"(?:(?:sample )?(?:item|product|package|basket|bundle) (?:name|label)|"
+    r"(?:\w+ )?model|public supplier)|"
+    r"(?:is|was) the name (?:the (?:shop|store|cafe) gave (?:the|this) (?:blend|item|bundle)|"
+    r"printed on the receipt for (?:the|a) (?:special|(?:\w+ )?special))"
+    r")\b", re.I,
+)
+_DEMO = re.compile(r"\b(?:tutorial|demo|example|walkthrough)\b", re.I)
+_SAMPLE_WORKPLACE = re.compile(r"^\s+as (?:a|the) sample workplace\b", re.I)
+_GENERIC_MENTION = re.compile(r"(?:the |this |that )?(?:shop|store|cafe|host|clerk|cashier)\Z", re.I)
+_DETERMINER = re.compile(r"\b(?:the|this|that)\s+$", re.I)
+_SCHOOL_IDIOM = re.compile(r"(?:the )?school of thought\Z", re.I)
+_MENU_ITEM = re.compile(
+    r"\b(?:menu label (?:was|is)|app called it)\s+[“'\"]*"
+    r"(?P<item>(?:[^\W\d_]+\s+){1,4}?(?:plate|platter|bento|special|sandwich|salad|bowl))\b", re.I,
+)
+_CLAUSE_BOUNDARY = re.compile(r"[.!?;:]|\b(?:and then|but then|afterwards)\b", re.I)
 
 
 def is_product_title(text, hit, explicit_identities):
@@ -33,3 +57,26 @@ def is_product_title(text, hit, explicit_identities):
     ):
         return False
     return bool(_TITLE_PREFIX.search(prefix) or _TITLE_SUFFIX.match(suffix))
+
+
+def is_explicit_commercial_reference(text, hit, private_hits):
+    """Exclude contextual identity guesses for named products and generic roles."""
+    if hit.label not in _IDENTITY_LABELS or any(
+        other.start < hit.end and hit.start < other.end for other in private_hits
+    ):
+        return False
+    before = _CLAUSE_BOUNDARY.split(text[max(0, hit.start - 90):hit.start])[-1]
+    after = _CLAUSE_BOUNDARY.split(text[hit.end:hit.end + 88])[0]
+    if _PRIVATE_ASSERTION.search(before) or _PRIVATE_ASSERTION.search(after):
+        return False
+    if _COMMERCIAL_LABEL.match(after) or (_DEMO.search(before) and _SAMPLE_WORKPLACE.match(after)):
+        return True
+    value = text[hit.start:hit.end]
+    if _SCHOOL_IDIOM.fullmatch(value) or (
+        _GENERIC_MENTION.fullmatch(value) and (" " in value or _DETERMINER.search(before))
+    ):
+        return True
+    return any(
+        item.start("item") <= len(before) and len(before) + len(value) <= item.end("item")
+        for item in _MENU_ITEM.finditer(before + value + after)
+    )
