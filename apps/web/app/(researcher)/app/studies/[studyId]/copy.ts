@@ -21,6 +21,9 @@ export const trackingCopy = {
   transcriptsLoading: "Checking for redacted transcripts…",
   transcriptsEmpty: "No redacted transcripts are available yet.",
   transcriptsUnavailable: "Redacted transcripts could not be loaded.",
+  transcriptRespondent: (number: number) => `Respondent ${number}`,
+  student: "Student",
+  notStudent: "Not a student",
 } as const;
 
 export const stateLabels: Readonly<Record<StudyState, string>> = {

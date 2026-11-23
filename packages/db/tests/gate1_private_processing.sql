@@ -15,6 +15,12 @@ from generate_series(1, 3) as step(n);
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 values (pg_temp.case_id(10), '90600000-0000-4000-8000-000000000001',
     '90500000-0000-4000-8000-000000000001', 'accepted', 160, now() + interval '1 hour');
+insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at, created_at)
+values (pg_temp.case_id(60), '90600000-0000-4000-8000-000000000001',
+    '90500000-0000-4000-8000-000000000002', 'declined', 160, now() + interval '1 hour', now() - interval '1 hour');
+insert into public.organizations (id, name) values (pg_temp.case_id(61), 'Other synthetic organization');
+update public.researchers set organization_id = pg_temp.case_id(61)
+where auth_user_id = '90200000-0000-4000-8000-000000000002';
 insert into public.sessions (id, invite_id, study_id, state)
 values (pg_temp.case_id(11), pg_temp.case_id(10), '90600000-0000-4000-8000-000000000001', 'in_progress');
 insert into pii.audio_objects (id, storage_path, mime, bytes, sha256)
@@ -39,6 +45,9 @@ select ok(not has_function_privilege('authenticated', 'public.claim_gate1_answer
     and not has_table_privilege('service_role', 'internal.gate1_redaction_policies', 'INSERT')
     and not has_function_privilege('service_role', 'internal.gate1_processing_input(uuid)', 'EXECUTE'),
     'only scoped service RPCs expose work and completion');
+select ok(not has_function_privilege('anon', 'public.read_gate1_researcher_transcripts(uuid)', 'EXECUTE')
+    and not has_function_privilege('service_role', 'public.read_gate1_researcher_transcripts(uuid)', 'EXECUTE'),
+    'only authenticated callers can invoke the grouped researcher projection');
 set local role service_role;
 select is(public.claim_gate1_answer_job(), null::jsonb, 'missing retention consent stays unclaimed');
 reset role;
@@ -59,6 +68,8 @@ update public.transcripts set redacted_text = 'Accidental pending projection' wh
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
 select is((select count(*) from research.transcripts), 0::bigint, 'pending or failed jobs stay hidden even if a row already has text');
+select is_empty($$select * from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    'a pending answer exposes neither its text nor its profile descriptor');
 reset role;
 
 set local role service_role;
@@ -84,11 +95,31 @@ select is((select publication_policy_digest from internal.gate1_answer_jobs wher
 update internal.gate1_redaction_policies set revoked_at = now() where policy_digest = repeat('a', 64);
 set local role authenticated;
 select is((select count(*) from research.transcripts), 0::bigint, 'revoked policy immediately hides its projection');
+select is_empty($$select * from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    'revoked policy also removes the grouped researcher projection');
 reset role;
 update internal.gate1_redaction_policies set revoked_at = null where policy_digest = repeat('a', 64);
 
 set local role authenticated;
 select is((select redacted_text from research.transcripts), 'Qualified synthetic answer', 'same-tenant MFA researcher sees only the qualified projection');
+select results_eq(
+    $$select * from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    $$values (pg_temp.case_id(31), 2, true, 'Qualified synthetic answer'::text)$$,
+    'a published answer includes the study-local number and coarse student flag only');
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
+select is_empty($$select * from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    'researcher without MFA cannot read answers or descriptors');
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}';
+select is_empty($$select * from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    'a different organization cannot read answers or descriptors');
+reset role;
+update public.profile_attributes set value_json = '"Synthetic campus"'::jsonb
+where respondent_id = '90500000-0000-4000-8000-000000000001' and key = 'student';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select results_eq(
+    $$select respondent_number, student from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    $$values (2, null::boolean)$$, 'invalid profile values are omitted from otherwise qualified answers');
 reset role;
 update public.sessions set state = 'paid' where id = pg_temp.case_id(11);
 set local role authenticated;
@@ -99,6 +130,8 @@ insert into public.consents (respondent_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001', 'researcher_access', false, 'fixture-v2');
 set local role authenticated;
 select is((select count(*) from research.transcripts), 0::bigint, 'later withdrawal immediately hides publication');
+select is_empty($$select * from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    'withdrawal also removes the grouped researcher projection');
 reset role;
 insert into public.consents (respondent_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001', 'researcher_access', true, 'fixture-v3');

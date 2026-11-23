@@ -1422,6 +1422,15 @@ export type Database = {
         }
         Returns: Json
       }
+      read_gate1_researcher_transcripts: {
+        Args: { supplied_study_id: string }
+        Returns: {
+          id: string
+          redacted_text: string
+          respondent_number: number
+          student: boolean
+        }[]
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
