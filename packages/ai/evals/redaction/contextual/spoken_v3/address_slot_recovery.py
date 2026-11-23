@@ -38,6 +38,33 @@ _NON_ADDRESS = re.compile(
     r"dollars?|cents?|route|mile marker|tracking|order (?:code|number)|receipt (?:code|number))\b",
     re.I,
 )
+_DIRECT_LOCATION = re.compile(
+    r"\b(?:(?:my|our) place (?:is|was) at|(?:the|my|our) (?:final|pickup|drop off) address (?:is|was)|"
+    r"deliver (?:it|the parcel|my order) (?:to|at))\s+", re.I,
+)
+_APPOINTMENT = re.compile(
+    r"\b(?:(?:met|meet) (?:me|us) at|pick (?:me|us) up at|(?:front desk|reception)[^.!?;]{2,63}\bmade me at)\s+",
+    re.I,
+)
+_DELIVERY_TURN = re.compile(r"\b(?:turn|pull) in at\s+", re.I)
+_PARCEL_TRAIL = re.compile(
+    r"\bwhere (?:i|we) (?:asked|told) (?:them|the (?:driver|courier)) to (?:leave|drop|deliver) (?:the |my )?"
+    r"(?:parcel|order|package|box)\b", re.I,
+)
+_ROUTE_ENDPOINT = re.compile(
+    r"\b(?:i|we) (?:started|began) (?:the |our )?(?:walk|trip) (?:beside|near|at|outside)\s+"
+    r"[^.!?;]{4,68}?\band (?:i |we )?ended up (?:at|outside)\s+",
+    re.I,
+)
+_WAYPOINT = re.compile(
+    r"\b(?:bus stop|train station|[a-z]+ entrance|check[ -]?in marker|stop number|map pin|"
+    r"public (?:exhibit|gate|display)|exit (?:sign|number)|platform|locker|aisle|building number|counter|dry cleaners)\b",
+    re.I,
+)
+_CORROBORATED_STREET_TYPES = _STREET_SUFFIXES | _MISHEARD_SUFFIX | {
+    "curt", "dry", "elaine", "plays", "streat", "terrorists", "weigh",
+}
+_STREET_WORD = re.compile(r"[^\W\d_]+(?:[-’'][^\W\d_]+)*\Z")
 
 
 def _house_number_end(tokens, start):
@@ -115,3 +142,49 @@ def recover_address_slots(text):
             else:
                 continue
             yield Hit("address", tokens[start].start, tokens[end - 1].end)
+
+
+def recover_corroborated_addresses(text):
+    """Use stronger location relations when the spoken street type is damaged."""
+    tokens = tokenize(text)
+    offsets = {token.start: index for index, token in enumerate(tokens)}
+    for cue in (_PRIVATE_LOCATION, _DIRECT_LOCATION, _APPOINTMENT, _DELIVERY_TURN, _ROUTE_ENDPOINT):
+        for match in cue.finditer(text):
+            start = offsets.get(match.end())
+            if start is None:
+                continue
+            first, reliable = _house_number_end(tokens, start)
+            house = tokens[start:first]
+            if not 1 <= len(house) <= 5 or reliable < 1:
+                continue
+            end = min(len(text), match.end() + 76)
+            boundary = _CLAUSE_END.search(text, match.end(), end)
+            if cue is _DELIVERY_TURN:
+                boundary = _PARCEL_TRAIL.search(text, match.end(), end)
+                if boundary is None:
+                    continue
+            if boundary:
+                end = boundary.start()
+            street = []
+            for token in tokens[first:first + 5]:
+                if token.end > end or not _STREET_WORD.fullmatch(token.word):
+                    break
+                street.append(token)
+            tail = text[house[-1].end:end]
+            if len(street) < 2 or _NON_ADDRESS.search(tail) or _WAYPOINT.search(tail):
+                continue
+            street_end = next((first + index + 1 for index, token in enumerate(street)
+                               if index and token.word in _CORROBORATED_STREET_TYPES), None)
+            if street_end is None:
+                street_end = next((first + index + 2 for index, _ in enumerate(street[:-1])
+                                   if index and (street[index].word, street[index + 1].word) in {
+                                       ("a", "venue"), ("av", "enue"),
+                                   }), None)
+            if street_end is not None and (cue is not _ROUTE_ENDPOINT or reliable >= 2):
+                last = _unit_end(tokens, street_end)
+            elif (cue is _ROUTE_ENDPOINT and reliable >= 3 and len(house) >= 3 and (boundary or end == len(text))
+                  and 2 <= len(street) <= 4 and not text[street[-1].end:end].strip()):
+                last = first + len(street)
+            else:
+                continue
+            yield Hit("address", tokens[start].start, tokens[last - 1].end)

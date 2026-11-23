@@ -1,9 +1,36 @@
 import unittest
 
-from address_slot_recovery import recover_address_slots
+from address_slot_recovery import recover_address_slots, recover_corroborated_addresses
 
 
 class AddressSlotRecoveryTests(unittest.TestCase):
+    def corroborated(self, text):
+        return [text[hit.start:hit.end] for hit in recover_corroborated_addresses(text)]
+
+    def test_residence_and_appointment_recover_collapsed_street_suffix(self):
+        self.assertEqual(self.corroborated("i stayed at to seven silver grove terrorists before i moved"),
+                         ["to seven silver grove terrorists"])
+        self.assertEqual(self.corroborated("the reception clerk made me at three zero maple spur elaine"),
+                         ["three zero maple spur elaine"])
+        self.assertEqual(self.corroborated("i made me at three zero maple spur elaine"), [])
+
+    def test_linked_landmark_needs_a_house_number_and_whole_bounded_destination(self):
+        value = "five eight three silver path years"
+        self.assertEqual(self.corroborated(f"we started the walk near the school and ended up at {value}"), [value])
+        self.assertEqual(self.corroborated(f"we ended up at {value}"), [])
+        self.assertEqual(self.corroborated("we started the walk near the school and ended up at five eight three public gate"), [])
+
+    def test_single_spoken_house_number_requires_a_private_role_and_street_type(self):
+        self.assertEqual(self.corroborated("my place is at four quartz leaf curt then tap the button"),
+                         ["four quartz leaf curt"])
+        self.assertEqual(self.corroborated("pick me up at four quartz leaf weigh and leave the bag"),
+                         ["four quartz leaf weigh"])
+        self.assertEqual(self.corroborated("pick me up at four quartz leaf marker and leave the bag"), [])
+
+    def test_turn_instruction_needs_a_matching_delivery_clause(self):
+        value = "six salt nettle dry"
+        self.assertEqual(self.corroborated(f"turn in at {value} where i asked them to leave the parcel"), [value])
+        self.assertEqual(self.corroborated(f"turn in at {value} cleaners because the leaflet was there"), [])
     def recovered(self, text):
         return [text[hit.start:hit.end] for hit in recover_address_slots(text)]
 

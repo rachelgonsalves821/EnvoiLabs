@@ -175,6 +175,12 @@ The extra pass recognizes a bounded value paired with personal badge, recipient 
 
 On the 272 known recognized excerpts, full name masks improved from 52/60 to 56/60. Other measures matched. The controls used to refine the cues improved from 8/10 to 9/10. A separate set stayed at 7/8, with the same three clean edits and five evidence edits. Five long development answers matched their prior results. The known name score remains below the 95% requirement and independent qualification is outstanding. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+## Corroborated street address endpoints
+
+The added pass handles lost street-type words after explicit residence, appointment and delivery cues. It can recover a one-digit spoken house number when a street type and private role corroborate it. Generic directions require a bounded origin and destination or an accompanying parcel-delivery clause. Public waypoint and numeric reference language blocks the extra match.
+
+Known speech address coverage rose from 33/36 to 36/36. Controls used to revise the cues rose from 4/8 to 8/8, and a separate six-address set stayed at 2/6. The new pass emitted no masks on the 14 negatives across those two control sets. All 100 focused tests passed. These development results leave independent qualification open. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
