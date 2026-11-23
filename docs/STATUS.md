@@ -762,3 +762,27 @@ Needs from others. Hosted speech and scheduling credentials are tracked in [issu
 Contract or schema changes. The worker completion call accepts an optional qualification digest. Existing callers can still complete private processing.
 
 Risks. Earlier job-backed projections without a recorded report digest stay hidden. The preview has no existing published projections or approved report.
+
+### 2026-11-23 — Gate 1 hosted scheduler and speech verification
+
+Done. The hosted expiry and private answer schedules both completed. The scheduled worker processed three synthetic typed answers privately and transcribed a separate pinned speech fixture with OpenAI `gpt-transcribe`. Both expected fixture terms were present, latency was 611 ms and estimated cost was 300 micros. The voice result stayed private. The separate [live speech smoke](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136) passed all six synthetic recordings, including Chromium audio.
+
+Next. Score the frozen independent redaction policy and rehearse publication only after qualification.
+
+Needs from others. None for the running qualification test.
+
+Contract or schema changes. None.
+
+Risks. A successful private worker run provides no evidence of researcher publication.
+
+### 2026-11-23 — Gate 1 independent redaction result
+
+Done. OpenAI transcribed all 288 independently authored synthetic recordings. The frozen policy was scored against both authored and recognized transcripts. The recognized set fully masked 114/114 phones, 96/113 emails, 43/49 names, 42/49 employers and 37/48 addresses. The authored set fully masked 108/114 phones, 100/113 emails, 48/49 names, 47/49 employers and 44/48 addresses. The policy altered 20/304 recognized evidence spans and 11/24 clean recognized controls. Neither set had withheld answers. The independent qualification failed.
+
+Next. Improve full-span masking and preserve study evidence using separate development fixtures. Freeze the revised policy before another independent qualification and hosted publication rehearsal.
+
+Needs from others. None for redaction development.
+
+Contract or schema changes. None. The manifest fingerprint registers the independent scoring input.
+
+Risks. Publication remains closed. The independent fixture text stays private and is excluded from development.
