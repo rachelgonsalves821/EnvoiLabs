@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import sysconfig
 from time import perf_counter
 
 # The evaluator installs the process-wide offline guard before inference loads.
@@ -56,7 +57,7 @@ def policy_snapshot():
         "context_model_sha256": CONTEXT_FILES,
         "casing_model": {"revision": MODEL_REVISION, "asset_sha256": CASING_FILES},
         "runtime": {
-            "python": platform.python_version(), "os": platform.system(), "machine": platform.machine(),
+            "python": platform.python_version(), "os": platform.system(), "python_platform": sysconfig.get_platform(),
             "hash_seed": os.environ.get("PYTHONHASHSEED"),
             "packages": {name: version(name) for name in (*PACKAGES, "tokenizers", "numpy")},
         },

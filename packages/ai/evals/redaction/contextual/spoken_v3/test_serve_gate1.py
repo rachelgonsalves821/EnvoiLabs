@@ -1,14 +1,21 @@
 from io import BytesIO
 import json
+import os
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
-from qualify import policy_digest
+from qualify import policy_digest, policy_snapshot
 from serve_gate1 import REQUEST_LIMIT, read_text, response, verify_release
 from speech_context import Restored
 
 
 class PrivateBridgeTests(unittest.TestCase):
+    def test_policy_uses_the_interpreter_platform_in_a_minimal_environment(self):
+        platform_id = policy_snapshot()["runtime"]["python_platform"]
+        with patch.dict(os.environ, {"PROCESSOR_ARCHITECTURE": ""}):
+            self.assertEqual(policy_snapshot()["runtime"]["python_platform"], platform_id)
+
     def test_release_requires_approved_independence_and_exact_policy(self):
         policy = {"candidate": "synthetic"}
         sha = "a" * 64
