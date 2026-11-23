@@ -55,6 +55,7 @@ class LocalCasingModel:
                 if file_digest(artifact, "sha256").hexdigest() != expected:
                     raise ValueError(f"Casing asset differs from the pinned model: {name}")
         self._tokenizer = Tokenizer.from_file(str(directory / "tokenizer.json"))
+        self._tokenizer.no_truncation()
         self._labels = json.loads((directory / "config.json").read_text(encoding="utf-8"))["id2label"]
         options = SessionOptions()
         options.intra_op_num_threads = 2

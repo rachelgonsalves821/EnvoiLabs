@@ -618,3 +618,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. The shared policy remains unqualified. The live worker does not render or publish it.
+
+### 2026-11-23 — Gate 1 pinned local redaction models
+
+Done. The scorer and local renderer can use the same Presidio rules, pinned contextual model and casing model. The loader verifies model assets and rejects text beyond the contextual or casing model limits. The synthetic renderer masked a test email while preserving the checkout feedback. All 69 focused tests passed. [Replay instructions](../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
+Next. Close remaining recall gaps and verify how supported long answers are handled before freezing the private publication candidate.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. Inputs beyond the model limits stay private. The live worker remains disconnected and independent qualification is pending.

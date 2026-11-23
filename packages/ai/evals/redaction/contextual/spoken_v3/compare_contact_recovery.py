@@ -1,17 +1,17 @@
 """Replay the frozen V2 pipeline with an additional known-data contact pass."""
 
 import argparse
-from functools import partial
 import json
 from math import ceil
 import os
 from pathlib import Path
 
-
 from asr_casing import LocalCasingModel, MODEL_FILES, MODEL_REVISION
-from candidate import Hit, mask
-from evaluate import GLiNER, SessionOptions, THRESHOLD, add_contact_patterns, candidate_analyzer, coverage
-from evaluate_v2 import _ONNX_SHA, digest, predict, sources
+from candidate import mask
+from evaluate import PACKAGES, coverage, version
+from evaluate_v2 import digest, sources
+import benchmark
+from local_detectors import LocalDetectors, MODEL_FILES as CONTEXT_MODEL_FILES
 from spoken_pipeline import span_variants
 
 _KNOWN_CORPORA = {
@@ -19,14 +19,6 @@ _KNOWN_CORPORA = {
     "439cbcd4b105722fc23c25ec0d07329eac4b34ab97e5f76766bb48d769b21724",
     "da5da833c729938225762b7de227a7dc742eed4cac88ea6d1835c2e8c8a02b7e",
 }
-
-
-def _deterministic(analyzer, text):
-    presidio = analyzer.analyze(
-        text=text, language="en", score_threshold=THRESHOLD,
-        entities=["PHONE_NUMBER", "EMAIL_ADDRESS", "ORGANIZATION"],
-    )
-    yield from (Hit(hit.entity_type, hit.start, hit.end) for hit in presidio)
 
 
 def report_template():
@@ -53,36 +45,23 @@ def main():
     source_sha = digest(source)
     candidates = [source.with_name(name) for name in (
         "address_slot_recovery.py", "asr_casing.py", "confirmed_names.py", "email_slot_recovery.py", "employer_slot_recovery.py",
-        "identity_boundaries.py",
+        "identity_boundaries.py", "local_detectors.py",
         "person_slot_recovery.py",
         "phone_slot_recovery.py",
         "product_context.py", "public_website_context.py", "spoken_contacts_recover.py", "spoken_pipeline.py",
-    )]
+    )] + [Path(benchmark.__file__)]
     candidate_hashes = {rule.name: digest(rule) for rule in candidates}
     rows = json.loads(opts.cases.read_text(encoding="utf-8-sig"))["cases"]
     model_root = Path(os.environ["ENVOI_GLINER_MODEL"]).resolve(strict=True)
-    model_file = model_root / "model_quint8.onnx"
-    if digest(model_file) != _ONNX_SHA:
-        raise ValueError("Expected the frozen V2 model")
     frozen_sources = sources()
-    options = SessionOptions()
-    options.intra_op_num_threads = 2
-    options.inter_op_num_threads = 1
-    model = GLiNER.from_pretrained(
-        model_root, local_files_only=True, map_location="cpu", runtime="onnxruntime",
-        runtime_model_file=model_file.name, runtime_options={"session_options": options},
-    )
-    analyzer = candidate_analyzer()
-    add_contact_patterns(analyzer)
+    detectors = LocalDetectors(model_root)
     timings = {"contacts": [], "casing": []}
     casing = LocalCasingModel(opts.casing_model) if opts.casing_model else None
     restore = casing.restore if casing else None
-    deterministic = partial(_deterministic, analyzer)
-    contextual = partial(predict, model)
     results = {}
     for row in rows:
         text = row["text"]
-        for name, spans in span_variants(text, deterministic, contextual, restore, timings=timings):
+        for name, spans in span_variants(text, detectors.deterministic, detectors.contextual, restore, timings=timings):
             if name not in results:
                 results[name] = report_template()
             coverage(row, mask(text, spans), results[name])
@@ -97,6 +76,11 @@ def main():
         "confirmed_names_source_sha256": candidate_hashes["confirmed_names.py"],
         "address_slots_source_sha256": candidate_hashes["address_slot_recovery.py"],
         "pipeline_source_sha256": candidate_hashes["spoken_pipeline.py"],
+        "detectors_source_sha256": candidate_hashes["local_detectors.py"],
+        "analyzer_source_sha256": candidate_hashes["benchmark.py"],
+        "context_model_asset_sha256": CONTEXT_MODEL_FILES,
+        "policy_sources_sha256": {**frozen_sources, **candidate_hashes},
+        "inference_versions": {name: version(name) for name in (*PACKAGES, "tokenizers", "numpy")},
         "employer_slots_source_sha256": candidate_hashes["employer_slot_recovery.py"],
         "website_context_source_sha256": candidate_hashes["public_website_context.py"],
         "additional_pass_p95_ms": p95(timings["contacts"]),
