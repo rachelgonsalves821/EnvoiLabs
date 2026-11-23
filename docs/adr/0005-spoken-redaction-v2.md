@@ -145,6 +145,12 @@ Names in booking records, badge fields, workshop rosters and pickup contact fiel
 
 On the 272 known recognized excerpts, full person masks rose from 34/60 to 52/60. The other coverage and the 3/36 evidence and 12/36 clean edits matched the employment-span baseline. Both policies fully masked 10/10 names and 1/2 employers on 20 separately authored development clips. Both edited 11/32 evidence spans and 9/10 clean excerpts in that set. All 55 focused tests passed. The remaining name and contact misses and evidence alterations still require independent qualification. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+## Commercial references and common phrases
+
+Attribution traced the three remaining evidence edits on known recognized speech to contextual matches on parts of menu items. On fictional controls the models also classified explicit product labels, sample workplaces and generic store roles as identities. The offline comparison drops those contextual matches when the language directly identifies a commercial reference. Explicit private roles, corroborated identity slots and deterministic masks keep their precedence.
+
+On 272 known recognized excerpts, the comparison preserved all measured sensitive coverage while reducing altered research evidence from 3/36 to 0/36 spans and altered clean excerpts from 12/36 to 6/36. On the 20 separate name controls it kept 10/10 full name masks and 1/2 full employer masks. Clean edits fell from 9/10 to 4/10 and evidence edits from 11/32 to 4/32. All 58 focused tests passed. The improvement is measured on development cases and keeps the independent qualification set sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)

@@ -35,6 +35,8 @@ The employment comparison measures bounded organizations in explicit employment,
 
 The confirmed-name comparison measures fragmented personal names bounded by clear record fields or explicit name confirmations.
 
+The commercial-reference comparison measures whether contextual detections can preserve explicit item labels, generic shop references and ordinary idioms. Deterministic masks and corroborated private identity spans still take precedence.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"

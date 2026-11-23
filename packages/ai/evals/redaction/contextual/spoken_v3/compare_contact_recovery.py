@@ -17,7 +17,7 @@ from evaluate_v2 import _IDENTITY_LABELS, _ONNX_SHA, digest, model_identities, p
 from identity_boundaries import complete_identity_boundaries
 from person_slot_recovery import detect_person_slots
 from phone_slot_recovery import recover_number_slots
-from product_context import is_product_title
+from product_context import is_explicit_commercial_reference, is_product_title
 from public_website_context import preserving_public_ref, public_website_ranges
 from speech_context import explicit_identities
 from spoken_contact import spoken_contact_hits
@@ -101,6 +101,7 @@ def main():
         results["with_public_website_guard"] = report_template()
         results["with_explicit_employment_spans"] = report_template()
         results["with_confirmed_names"] = report_template()
+        results["with_commercial_reference_guard"] = report_template()
     results["with_spoken_email_repairs"] = report_template()
     for row in rows:
         text = row["text"]
@@ -155,15 +156,25 @@ def main():
                 *detect_person_slots(text, restored, guarded), *phone_slots, *email_slots,
             )
             coverage(row, mask(text, guarded_masks), results["with_public_website_guard"])
-            employment_masks = (*guarded_masks, *employer_slots(text))
+            employers = tuple(employer_slots(text))
+            employment_masks = (*guarded_masks, *employers)
             coverage(
                 row, mask(text, employment_masks),
                 results["with_explicit_employment_spans"],
             )
-            coverage(
-                row, mask(text, (*employment_masks, *confirmed_name_slots(text))),
-                results["with_confirmed_names"],
+            names = tuple(confirmed_name_slots(text))
+            coverage(row, mask(text, (*employment_masks, *names)), results["with_confirmed_names"])
+            private_hits = (*explicit, *names, *employers)
+            commercial_guarded = tuple(
+                hit for hit in guarded if not is_explicit_commercial_reference(text, hit, private_hits)
             )
+            commercial_masks = (
+                *fixed, *additional, *commercial_guarded,
+                *complete_identity_boundaries(restored, commercial_guarded, explicit),
+                *detect_person_slots(text, restored, commercial_guarded),
+                *phone_slots, *email_slots, *names, *employers,
+            )
+            coverage(row, mask(text, commercial_masks), results["with_commercial_reference_guard"])
         coverage(
             row, mask(text, (*email_baseline, *email_slots)),
             results["with_spoken_email_repairs"],
