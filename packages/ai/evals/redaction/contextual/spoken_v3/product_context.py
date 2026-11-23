@@ -39,6 +39,18 @@ _DEMO = re.compile(r"\b(?:tutorial|demo|example|walkthrough)\b", re.I)
 _SAMPLE_WORKPLACE = re.compile(r"^\s+as (?:a|the) sample workplace\b", re.I)
 _GENERIC_MENTION = re.compile(r"(?:the |this |that )?(?:shop|store|cafe|host|clerk|cashier)\Z", re.I)
 _DETERMINER = re.compile(r"\b(?:the|this|that)\s+$", re.I)
+_OCCUPATION = re.compile(
+    r"(?:(?:a|an|the|this|that)\s+)?(?:technician|inspector|driver|courier|worker|clerk|cashier)", re.I,
+)
+_OCCUPATION_PREFIX = re.compile(r"\b(?:a|an|the|this|that)\s+$", re.I)
+_PUBLIC_ORGANIZATION = re.compile(
+    r"\b(?:looked up|found|searched for)\s+(?P<directory>[^!?;:\n]{3,85}?)\s+"
+    r"in (?:an? |the )?public (?:[\w-]+ ){0,3}directory\b|"
+    r"\b(?:the )?(?:packing slip|shipping label|delivery notice) (?:lists?|names?|shows?)\s+"
+    r"(?P<carrier>[^!?;:\n]{3,85}?)\s+as (?:the |a )?(?:carrier|delivery service|courier)\b", re.I,
+)
+_ORGANIZATION_LABELS = {"organization", "organization educational"}
+_LEGAL_ORGANIZATION = re.compile(r"\b(?:co|corp|inc|llc|llp|ltd|limited|incorporated)\.?\s*$", re.I)
 _SCHOOL_IDIOM = re.compile(r"(?:the )?school of thought\Z", re.I)
 _MENU_ITEM = re.compile(
     r"\b(?:menu label (?:was|is)|app called it)\s+[“'\"]*"
@@ -80,3 +92,32 @@ def is_explicit_commercial_reference(text, hit, private_hits):
         item.start("item") <= len(before) and len(before) + len(value) <= item.end("item")
         for item in _MENU_ITEM.finditer(before + value + after)
     )
+
+
+def is_generic_occupation_reference(text, hit, private_hits):
+    if hit.label.casefold() not in {"person", "name"} or any(
+        private.start < hit.end and hit.start < private.end for private in private_hits
+    ):
+        return False
+    phrase = text[hit.start:hit.end]
+    if not _OCCUPATION.fullmatch(phrase) or not phrase.split()[-1].islower():
+        return False
+    before = _CLAUSE_BOUNDARY.split(text[max(0, hit.start - 90):hit.start])[-1]
+    if _PRIVATE_ROLE.search(before) or _PRIVATE_ASSERTION.search(before):
+        return False
+    return bool(re.search(r"\s", phrase) or _OCCUPATION_PREFIX.search(before))
+
+
+def public_organization_ranges(text):
+    for match in _PUBLIC_ORGANIZATION.finditer(text):
+        before = _CLAUSE_BOUNDARY.split(text[max(0, match.start() - 90):match.start()])[-1]
+        if _PRIVATE_ROLE.search(before) or _PRIVATE_ASSERTION.search(before):
+            continue
+        if _LEGAL_ORGANIZATION.search(match[match.lastgroup]):
+            yield match.span(match.lastgroup)
+
+
+def is_public_organization_reference(hit, ranges, private_hits):
+    return (hit.label.casefold() in _ORGANIZATION_LABELS
+            and any(start <= hit.start and hit.end <= end for start, end in ranges)
+            and not any(item.start < hit.end and hit.start < item.end for item in private_hits))

@@ -36,6 +36,37 @@ class SpokenPipelineTests(unittest.TestCase):
         self.assertNotIn("hazelwheel", rendered)
         self.assertIn("The filter was clear.", rendered)
 
+    def test_weak_generic_occupation_masks_leave_the_study_observation_readable(self):
+        def guessed_person(text):
+            offset = text.casefold().index("driver")
+            return (Hit("PERSON", offset, offset + len("driver")),)
+
+        observation = "The driver sent three reminders before the pickup."
+        self.assertEqual(redact(observation, guessed_person, no_detections, restore), observation)
+        name = "My last name is Driver. The pickup was smooth."
+        self.assertEqual(redact(name, guessed_person, no_detections, restore),
+                         "My last name is [redacted]. The pickup was smooth.")
+
+    def test_explicit_directory_and_carrier_context_preserves_public_business_references(self):
+        name = "Porch Flint Cooperative LLC"
+
+        def organization(text):
+            offset = text.index(name)
+            return (Hit("ORGANIZATION", offset, offset + len(name)),)
+
+        for text in (
+            f"I found {name} in the public services directory. The lookup was quick.",
+            f"The packing slip lists {name} as the carrier. The packing was neat.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(redact(text, organization, no_detections, restore), text)
+        private = f"I work for {name}. Their packing was neat."
+        self.assertIn("[redacted]", redact(private, organization, no_detections, restore))
+        individual = "I found Vera Finch in the public care directory."
+        offset = individual.index("Vera Finch")
+        guessed_org = lambda _: (Hit("ORGANIZATION", offset, offset + len("Vera Finch")),)
+        self.assertNotIn("Vera Finch", redact(individual, guessed_org, no_detections, restore))
+
     def test_readable_result_and_evaluator_share_the_address_spans(self):
         text = "Please leave the parcel at two tree six Star Peel lain then ring the bell"
         reports = dict(span_variants(text, no_detections, no_detections, restore))

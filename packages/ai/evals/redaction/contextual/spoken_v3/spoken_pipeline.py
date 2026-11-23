@@ -10,7 +10,10 @@ from employer_slot_recovery import employer_slots
 from identity_boundaries import complete_identity_boundaries
 from person_slot_recovery import detect_person_slots
 from phone_slot_recovery import recover_corroborated_numbers, recover_number_slots
-from product_context import is_explicit_commercial_reference, is_product_title
+from product_context import (
+    is_explicit_commercial_reference, is_generic_occupation_reference, is_product_title,
+    is_public_organization_reference, public_organization_ranges,
+)
 from public_website_context import (
     explicit_spoken_locator_ranges, inside_public_locator, preserving_public_ref, public_website_ranges,
 )
@@ -117,7 +120,13 @@ def span_variants(text, deterministic, predict, restore=None, *, timings=None):
     complete = (*name_masks, *recover_corroborated_addresses(text))
     yield "with_corroborated_addresses", complete
     locators = tuple(explicit_spoken_locator_ranges(text, sites))
-    yield CANDIDATE, tuple(hit for hit in complete if not inside_public_locator(hit, locators, private_hits))
+    public_organizations = tuple(public_organization_ranges(text))
+    yield CANDIDATE, tuple(
+        hit for hit in complete
+        if not inside_public_locator(hit, locators, private_hits)
+        and not is_generic_occupation_reference(text, hit, private_hits)
+        and not is_public_organization_reference(hit, public_organizations, private_hits)
+    )
 
 
 def render_redacted(text, spans):

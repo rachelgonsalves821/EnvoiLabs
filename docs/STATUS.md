@@ -7,7 +7,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
 | Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [both hosted sign-ins on the same deployment](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7071655542) |
-| Gate 1 Vertical slice | End of week 3 | Disposable and hosted study rehearsals passed. Live processing and redaction qualification in progress | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [hosted and integration evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) |
+| Gate 1 Vertical slice | End of week 3 | Hosted study, scheduling and live speech passed. Independent redaction qualification failed. Researcher publication remains open. | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [live speech](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136), [qualification result](https://github.com/rachelgonsalves821/EnvoiLabs/pull/108) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
 | Gate 4 Launch hardening | End of week 8 | Not started | |

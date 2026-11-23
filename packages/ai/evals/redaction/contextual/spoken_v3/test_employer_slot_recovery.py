@@ -31,3 +31,33 @@ class EmployerSlotRecoveryTests(unittest.TestCase):
     def test_public_merchant_and_workplace_description_remain_available(self):
         self.assertEqual(spans("our package came by willow grove delivery and i opened it at work"), [])
         self.assertEqual(spans("i work at the front desk"), [])
+
+    def test_legal_suffix_completes_compound_payroll_value(self):
+        text = "The firm on my payslip is Bracken Vale Cartage and Cold Storage Ltd., but I stop at Orchard Grain Market."
+        self.assertEqual(spans(text), ["Bracken Vale Cartage and Cold Storage Ltd."])
+
+    def test_shift_assignment_recovers_spelled_initials_without_casing(self):
+        text = "my shifts are assigned by maple point s and r accessibility services and the calendar was useful"
+        self.assertEqual(spans(text), ["maple point s and r accessibility services"])
+
+    def test_explicit_hr_or_supervisor_stops_at_legal_suffix(self):
+        self.assertEqual(
+            spans("I file leave with the HR office of Violet Harbor Assisted Living Co. Their portal was difficult."),
+            ["Violet Harbor Assisted Living Co."],
+        )
+        self.assertEqual(
+            spans("my new supervisor at Réserve Stone Packaging Group Inc. offered me a rotating schedule"),
+            ["Réserve Stone Packaging Group Inc."],
+        )
+
+    def test_staffing_prose_and_third_party_evidence_are_preserved(self):
+        for text in (
+            "the packing slip lists Bracken Vale Cartage and Cold Storage Ltd. as the carrier",
+            "my shifts are assigned by temporary staffing services and the calendar sent a reminder",
+            "my shifts are assigned by a supervisor and Bracken Vale Storage Ltd. offers the best prices",
+            "my shifts are assigned by payroll and Bracken Vale Storage Ltd. offers the best prices",
+            "I file leave with the HR office of the staffing agency and the public directory helped",
+            "the community bulletin listed Maple Point S and R Accessibility Services",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(spans(text), [])

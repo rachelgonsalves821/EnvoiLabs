@@ -170,7 +170,7 @@ Exit criteria
 - [x] Researcher can create a study from a minimal form (scoping chat not required yet), add 4 core guide questions (the PRD billing minimum) and launch without payment (flagged `skip_payment` in non-prod)
 - [x] Matching selects eligible seeded respondents, creates invites and respects caps
 - [x] Respondent signs up via a one-time email link (Mailpit in CI), completes profile and consent, and sees their own eligible invite on signed-in Home. They accept, record 4 answers in the browser, and submit. Return sign-in restores the same account, study access and saved progress.
-- [ ] Consented voice answers upload privately and a job calls the primary speech-to-text adapter with a bounded fallback. Record provider, model, latency and cost. Confirm a real-provider run on synthetic browser recordings and keep CI deterministic. Typed answers reach the same redaction path.
+- [x] Consented voice answers upload privately and a job calls the primary speech-to-text adapter with a bounded fallback. Record provider, model, latency and cost. Confirm a real-provider run on synthetic browser recordings and keep CI deterministic. Typed answers reach the same redaction path.
 - [x] Session moves `started` to `submitted` to `quality_hold`
 - [ ] Researcher tracking shows live counts and only redacted transcripts. Record the Presidio benchmark and adoption decision before publication.
 - [x] Record the OpenInterviewer review before the Gate 2 probe work. See section 11 for the upstream checks.
