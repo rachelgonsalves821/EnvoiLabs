@@ -1,6 +1,6 @@
 import unittest
 
-from email_slot_recovery import recover_email_slots
+from email_slot_recovery import recover_corroborated_mailboxes, recover_email_slots
 
 
 def spans(text):
@@ -34,3 +34,37 @@ class EmailSlotRecoveryTests(unittest.TestCase):
     def test_public_website_visit_and_product_label_remain_available(self):
         self.assertEqual(spans("try the new dishes at market dot com"), [])
         self.assertEqual(spans("i used the menu at market dot com and the type was small"), [])
+
+
+class CorroboratedMailboxTests(unittest.TestCase):
+    def recovered(self, text):
+        return {text[hit.start:hit.end] for hit in recover_corroborated_mailboxes(text)}
+
+    def test_explicit_mailbox_supports_split_host_and_two_word_marker(self):
+        address = "ember five as an violet creek dot test"
+        self.assertIn(address, self.recovered(f"my inbox is {address} before the deadline"))
+
+    def test_phone_and_follow_up_wording_support_corrupted_separator(self):
+        address = "windmill pears at violet creek drug test"
+        text = f"you can call one six zero four five five five zero one zero zero try {address} before noon"
+        self.assertIn(address, self.recovered(text))
+        self.assertEqual(self.recovered(f"try {address} before noon"), set())
+
+    def test_fused_separator_and_suffix(self):
+        address = "winter brick at mailbox dotcom"
+        self.assertIn(address, self.recovered(f"my inbox is {address} before noon"))
+
+    def test_verified_mailbox_keeps_unpunctuated_feedback_after_fused_host(self):
+        address = "winter brick at meadowtest"
+        text = f"the email we verified is {address} the chair near the counter was handy"
+        self.assertEqual(self.recovered(text), {address})
+
+    def test_split_suffix_stops_before_feedback(self):
+        address = "ember flight at violet creek dott te st"
+        text = f"in my email field please enter {address} the menu price was easy to find"
+        self.assertIn(address, self.recovered(text))
+
+    def test_explicit_website_language_preserves_research(self):
+        self.assertEqual(self.recovered("my inbox is open and i used the public site at market dot com"), set())
+        text = "call one six zero four five five five zero one zero zero try our product label at market dot com"
+        self.assertEqual(self.recovered(text), set())

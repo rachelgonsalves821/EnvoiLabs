@@ -39,6 +39,8 @@ The commercial-reference comparison measures whether contextual detections can p
 
 The address comparison follows bounded private location and delivery cues. It tests noisy spoken house numbers, missing or fragmented street suffixes and consecutive unit fields. Generic directions require a recognized street suffix. The new masks keep the original transcript offsets.
 
+The corroborated mailbox comparison tests fragmented host names and damaged address separators. An explicit mailbox field can establish the value. A generic assignment needs supporting contact wording and a separately detected phone number. The comparison keeps the preceding address-repair baseline available.
+
 `spoken_pipeline.py` owns the source spans for every comparison. The scorer uses a fixed-width mask for those spans. The private synthetic entry point renders the latest development spans as `[redacted]` and rejects invalid offsets or casing transformations that change source length.
 
 The evaluator and private synthetic renderer can use the same `LocalDetectors` from `local_detectors.py` and `LocalCasingModel` from `asr_casing.py`. The model directory must contain exactly the five pinned contextual files. The loader checks every digest before inference. The evaluator records model hashes, policy source hashes and installed package versions.

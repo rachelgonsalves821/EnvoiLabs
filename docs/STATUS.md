@@ -642,3 +642,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. The long-answer path has synthetic evidence. Researcher publication remains gated.
+
+### 2026-11-23 — Gate 1 corroborated spoken mailboxes
+
+Done. The offline comparison matches broken mail syntax to an explicit mailbox label or a separately detected phone and nearby contact wording. It raised full email masks from 132/140 to 140/140 on known speech. Other coverage and evidence edits matched the baseline. An earlier development set improved from 2/10 to 10/10 after revising the cues. A new set improved from 4/8 to 5/8 with matching clean and evidence edits. The five long-answer controls matched their baseline. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Improve recall on fresh mailbox wording, phone numbers and names before freezing a candidate for qualification.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. The known email result does not establish independent recall. Transcript publication remains closed.
