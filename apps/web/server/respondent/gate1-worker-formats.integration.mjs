@@ -9,6 +9,7 @@ import { createGate1DatabasePorts } from "./gate1-worker.mjs";
 
 const endpoint = "http://127.0.0.1:54321";
 const bucket = "gate1-interview-audio";
+const policyDigest = "a".repeat(64);
 const fixtureDirectory = new URL("../../../../packages/testing/fixtures/audio/", import.meta.url);
 const voiceProjections = new Map([
   ["01-delivery.webm", "I ordered soup on Tuesday because the store was closed."],
@@ -120,6 +121,7 @@ test("IT-1.2 processes the five checked-in recordings and keeps typed intake ind
           return { ...output, provider: "synthetic-primary", model: "fixture-v1", latencyMs: 20 + index, costMicros: index + 1 };
         } };
       },
+      policyDigest,
       redact: async (text) => text === fixture.text ? redactedText : null,
     });
     assert.equal(await runGate1AnswerJob(ports), "published", fixture.file);
@@ -146,6 +148,7 @@ test("IT-1.2 processes the five checked-in recordings and keeps typed intake ind
   const typed = createGate1DatabasePorts(service, {
     answerId: typedId,
     createTranscriber: () => assert.fail("Typed intake must bypass speech recognition."),
+    policyDigest,
     redact: async (text) => {
       redactionCalls++;
       return text === typedText ? "I chose pickup." : null;

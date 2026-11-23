@@ -135,6 +135,7 @@ test("leased worker retries, withholds withdrawn voice and publishes only the qu
           },
         });
       },
+      policyDigest: qualify ? "a".repeat(64) : null,
       redact: qualify ? async (text) => {
         redactionCalls++;
         return text === raw ? redacted : null;

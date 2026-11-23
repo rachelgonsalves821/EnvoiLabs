@@ -702,3 +702,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. Full coverage on the known address set does not establish independent coverage. The independent corpus remains sealed.
+
+### 2026-11-23 — Gate 1 publication policy boundary
+
+Done. Gate 1 completion requires a matching active redaction policy digest to publish a researcher projection. The database stores the policy alongside the completion, checks it again at read time and keeps the existing consent, lease and source-version checks. Legacy completion calls can still save private processing. Synthetic fixtures approve a test digest only in the disposable database.
+
+Next. Bind a qualified private redactor to the worker and rehearse actual publication after an independent pass.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. The worker completion call adds an optional policy digest. The internal policy record links active policies to qualification evidence. The migration has no approved policy rows.
+
+Risks. The configured hosted worker still has no redactor and publication remains closed.
