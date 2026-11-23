@@ -1,6 +1,7 @@
 import unittest
 
-from phone_slot_recovery import recover_number_slots
+from candidate import Hit
+from phone_slot_recovery import recover_corroborated_numbers, recover_number_slots
 
 
 def contact_spans(text):
@@ -8,6 +9,43 @@ def contact_spans(text):
 
 
 class PhoneSlotRecoveryTests(unittest.TestCase):
+    def test_spoken_tail_needs_a_complete_corroborated_phone(self):
+        number = "one eight zero eight five five five zero one two eve"
+        text = f"my contact number is {number} and the receipt was legible"
+        self.assertEqual([text[hit.start:hit.end] for hit in recover_corroborated_numbers(text, ())], [number])
+        text = f"my order number is {number} and the receipt was legible"
+        self.assertEqual(list(recover_corroborated_numbers(text, ())), [])
+
+    def test_area_code_number_keeps_spoken_final_homophone(self):
+        number = "zero double seven double zero nine double zero double one to"
+        text = f"the number with the new area code is {number} the survey stayed open"
+        self.assertEqual([text[hit.start:hit.end] for hit in recover_corroborated_numbers(text, ())], [number])
+
+    def test_generic_follow_up_needs_a_corroborating_mailbox(self):
+        number = "zero double seven double zero nine double zero four two six"
+        address = "winter@example.test"
+        text = f"for the follow up at {number} and then {address} for the receipt"
+        self.assertEqual(list(recover_corroborated_numbers(text, ())), [])
+        start = text.index(address)
+        hit = Hit("email", start, start + len(address))
+        self.assertEqual([text[item.start:item.end] for item in recover_corroborated_numbers(text, (hit,))], [number])
+
+    def test_labels_keep_noisy_starts_and_local_values(self):
+        for label, number in (
+            ("call my cell at", "free seven nine five five five zero one nine zero"),
+            ("dial my local phone", "double five five zero one nine three"),
+        ):
+            with self.subTest(label=label):
+                text = f"{label} {number} the signup form was easy to read"
+                self.assertEqual([text[hit.start:hit.end] for hit in recover_corroborated_numbers(text, ())], [number])
+
+    def test_spoken_alternate_must_be_a_digit_in_the_contact_clause(self):
+        stem = "four nine eight five five five zero one double six"
+        phone = f"{stem} or sicks"
+        text = f"please text my number at {phone} and leave the label visible"
+        self.assertEqual([text[hit.start:hit.end] for hit in recover_corroborated_numbers(text, ())], [phone])
+        text = f"please text my number at {stem} or send six labels"
+        self.assertEqual([text[hit.start:hit.end] for hit in recover_corroborated_numbers(text, ())], [stem])
     def test_phone_cue_allows_an_internal_speech_gap(self):
         number = "two one three five five um five zero one three six"
         self.assertEqual(contact_spans(f"call me on {number} because the door was locked"), [number])

@@ -163,6 +163,12 @@ The extra comparison handles split hosts, misheard separators and fused suffixes
 
 On 272 known recognized excerpts, full email masks improved from 132/140 to 140/140. All other entity coverage and clean and evidence counts matched the baseline. A set used to revise the mailbox cues improved from 2/10 to 10/10. A separate set unseen during that revision improved from 4/8 to 5/8, with the same seven clean edits and nine altered evidence spans. Five long development answers matched their previous results. Independent qualification is still outstanding. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+## Corroborated spoken phone values
+
+The comparison recovers noisy repeated groups and final digits in explicit phone fields. A generic handoff requires call wording or a nearby, separately detected mailbox. The result masks the recognized source value without reconstructing a usable phone number. Explicit short local format and alternative final digits have focused coverage.
+
+On 272 known recognized excerpts, full phone masks rose from 132/140 to 140/140, with matching entity, clean and evidence scores elsewhere. A 20-clip set used to refine the cues improved from 5/10 to 10/10. A separate 16-clip set stayed at 5/8 masks, with five clean edits and six altered evidence spans. Five long-answer controls matched their prior scores. All 83 focused tests passed. Generalization and independent qualification remain outstanding. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
