@@ -678,3 +678,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. The known development score remains one fully masked name below the numeric target. The independent qualification corpus remains sealed.
+
+### 2026-11-23 — Gate 1 independent qualification checker
+
+Done. Added a private synthetic scorer for the exact full-answer candidate. It verifies a precommitted manifest, pinned model assets, code, environment and paired transcript annotations. The aggregate report measures recall, clean and evidence edits, ASR omissions and withheld answers. Failed answers and recognition omissions stay in the paired coverage denominator. Independent claims require a repository-approved digest. The known paired replay confirmed the recognized name and address gaps. [Qualification instructions](../packages/ai/evals/redaction/contextual/spoken_v3/README.md#independent-qualification)
+
+Next. Close remaining gaps, freeze the candidate for the custodian's independent data, and verify researcher publication only after qualification.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. The development replay does not qualify publication. The independent corpus remains sealed.
