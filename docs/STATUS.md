@@ -558,3 +558,15 @@ Needs from others. See the [hosted prerequisites](https://github.com/rachelgonsa
 Contract or schema changes. None.
 
 Risks. Independent publication qualification remains open.
+
+### 2026-11-22 — Gate 1 explicit employment spans
+
+Done. The offline employment comparison increased full employer masks from 46/60 to 57/60 on the 272 known recognized excerpts, with the same evidence and clean edits. The 20 separate development controls matched the baseline and still show excess masking. All 49 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Validate hosted speech and improve recall and evidence preservation before freezing an independent publication candidate.
+
+Needs from others. See the [hosted prerequisites in issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. None.
+
+Risks. The held-out gate and hosted checks remain open.

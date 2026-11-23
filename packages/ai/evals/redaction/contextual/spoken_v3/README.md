@@ -31,6 +31,8 @@ The email comparison measures split suffixes, missing separators and suffixes fu
 
 The optional casing replay includes a public-site comparison. It tests whether contextual masks can preserve explicit website and product labels while retaining contact masks and identities supported by private cues.
 
+The employment comparison measures bounded organizations in explicit employment, payroll and workplace-field clauses, with separate cases to distinguish shift times and unrelated businesses.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"

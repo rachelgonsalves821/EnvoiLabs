@@ -133,6 +133,12 @@ A guarded contextual comparison retains domains framed as public website referen
 
 In the 20-clip email development set, the guard reduced clean excerpts edited from 9/10 to 1/10 and evidence spans altered from 11/34 to 2/34. It preserved full masks for all ten emails. All counts matched on the 272 known recognized excerpts. On 16 separately authored public-site and mixed-identity excerpts, both policies fully masked all nine private spans, edited 4/8 clean excerpts and altered 11/35 evidence spans. Those unchanged control counts limit the precision claim to the first development set. All 43 focused tests passed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+### Explicit employment spans
+
+Named employer values can follow payroll, shift, workplace-field and colleague attribution cues. The added comparison masks the supported organization words in their source coordinates and stops at clause boundaries. Separate guards handle clock times and generic workplace descriptions.
+
+On the 272 known recognized excerpts, full employer masks rose from 46/60 to 57/60. Other coverage and edits to clean excerpts and useful evidence matched the website-guard baseline. The 95% employer target was reached on this known development set. On a separate 20-clip employer development set, both policies fully masked 8/10 employers and 2/2 people, edited 10/10 clean excerpts and altered 14/35 evidence spans. All 49 focused tests passed. The independent publication threshold remains unverified. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)
