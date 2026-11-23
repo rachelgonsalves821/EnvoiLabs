@@ -75,7 +75,7 @@ export function StudyTrackingPanel({ initial, targetCompletes }: { initial: Trac
         )}
         {refreshFailed && <p role="status" className={styles.status}>{copy.refreshFailed}</p>}
       </section>
-      <StudyTranscriptsPanel studyId={studyId} />
+      <StudyTranscriptsPanel key={studyId} studyId={studyId} />
     </>
   );
 }

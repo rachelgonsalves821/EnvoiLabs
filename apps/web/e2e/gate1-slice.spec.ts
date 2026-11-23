@@ -196,11 +196,29 @@ test.describe("Gate 1 seeded study", () => {
       await expect(researcher.getByText("1 of 2", { exact: true })).toBeVisible({ timeout: 12_000 });
       const panel = researcher.getByRole("region", { name: "Redacted transcripts" });
       await expect(panel.getByText("No redacted transcripts are available yet.")).toBeVisible();
+      await expect(panel.getByRole("article")).toHaveCount(0);
       const workerPath = resolve(__dirname, "support", "process-gate1-voice.mjs");
       const result = await runNode(process.execPath, [workerPath, ...answers.map(({ id }) => id)], { timeout: 30_000 });
       expect(result.stdout.trim()).toBe("4");
-      await expect(panel.getByText(redactedFixture, { exact: true })).toHaveCount(4, { timeout: 12_000 });
+      const group = panel.getByRole("article", { name: "Respondent 1" });
+      await expect(group.getByText(redactedFixture, { exact: true })).toHaveCount(4, { timeout: 12_000 });
+      await expect(group.getByText("Student", { exact: true })).toBeVisible();
+      await expect(panel.getByRole("article")).toHaveCount(1);
       await expect(panel.getByText(sensitiveFixture, { exact: true })).toHaveCount(0);
+
+      const oldResponse = await researcher.request.get("/api/researcher/studies/" + studyId + "/transcripts");
+      expect(oldResponse.ok()).toBe(true);
+      expect(oldResponse.headers()["cache-control"]).toContain("no-store");
+      const oldPayload = await oldResponse.json();
+      expect(Object.keys(oldPayload).sort()).toEqual(["studyId", "transcripts"]);
+      expect(oldPayload.transcripts).toHaveLength(4);
+
+      const withdrawal = await db.from("consents").insert({
+        respondent_id: respondentId, purpose: "researcher_access", granted: false, text_version: "synthetic-withdrawal",
+      });
+      expect(withdrawal.error).toBeNull();
+      await expect(panel.getByText("No redacted transcripts are available yet.")).toBeVisible({ timeout: 12_000 });
+      await expect(group).toHaveCount(0);
     } finally {
       await Promise.allSettled([respondentContext.close(), returningContext.close()]);
     }

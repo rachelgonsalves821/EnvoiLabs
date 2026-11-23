@@ -738,3 +738,15 @@ Needs from others. Platform and Researcher use the new response for the grouped 
 Contract or schema changes. Added `ResearcherTranscriptListV2Schema`.
 
 Risks. The contract does not grant profile or transcript access. The database projection still needs to be wired and tested before enabling the grouped view.
+
+### 2026-11-23 — Gate 1 researcher transcript grouping
+
+Done. The researcher tracking screen groups redacted answers by a study-local respondent number and shows the student flag when available. The grouped response reuses MFA, organization, consent and active-policy publication checks. It exposes no respondent identifiers or free-form profile values. Older callers retain the flat response.
+
+Next. Rehearse grouped researcher publication on the protected preview after the redactor passes independent qualification.
+
+Needs from others. The hosted speech and scheduler settings are still tracked in [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063).
+
+Contract or schema changes. Added the scoped read function and wired the version two response. No additional profile-table grants.
+
+Risks. The synthetic publication test uses a test policy solely in the disposable environment.
