@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import sysconfig
 from time import perf_counter
 
 # The evaluator installs the process-wide offline guard before inference loads.
@@ -35,13 +36,17 @@ _SOURCES = (
         "address_slot_recovery", "asr_casing", "compare_contact_recovery", "confirmed_names",
         "email_slot_recovery", "employer_slot_recovery", "identity_boundaries", "local_detectors",
         "person_slot_recovery", "phone_slot_recovery", "product_context", "public_website_context",
-        "qualify", "redaction_input", "spoken_contacts_recover", "spoken_pipeline",
+        "qualify", "redaction_input", "serve_gate1", "spoken_contacts_recover", "spoken_pipeline",
     )),
 )
 
 
 def digest(data):
     return sha256(data).hexdigest()
+
+
+def policy_digest(policy):
+    return digest(json.dumps(policy, separators=(",", ":"), sort_keys=True).encode("utf8"))
 
 
 def policy_snapshot():
@@ -52,7 +57,7 @@ def policy_snapshot():
         "context_model_sha256": CONTEXT_FILES,
         "casing_model": {"revision": MODEL_REVISION, "asset_sha256": CASING_FILES},
         "runtime": {
-            "python": platform.python_version(), "os": platform.system(), "machine": platform.machine(),
+            "python": platform.python_version(), "os": platform.system(), "python_platform": sysconfig.get_platform(),
             "hash_seed": os.environ.get("PYTHONHASHSEED"),
             "packages": {name: version(name) for name in (*PACKAGES, "tokenizers", "numpy")},
         },
@@ -211,6 +216,7 @@ def main():
         if policy_snapshot() != policy or _APPROVALS.read_bytes() != approvals:
             raise ValueError("Policy changed during qualification")
         result["manifest_sha256"] = args.manifest_sha256
+        result["policy_digest"] = policy_digest(policy)
         result["approval_record_sha256"] = digest(approvals)
         with args.output.open("x", encoding="utf-8") as stream:
             stream.write(json.dumps(result, indent=2, sort_keys=True) + "\n")

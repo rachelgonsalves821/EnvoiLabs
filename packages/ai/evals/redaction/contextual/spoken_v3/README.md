@@ -67,6 +67,12 @@ python -B qualify.py run --manifest qualification.json --manifest-sha256 "$FROZE
 
 The output contains aggregate counts, withheld answers, ASR omissions and timings. It reports recall on visible spans and coverage against the paired authored spans, so omitted material cannot inflate the qualification score. A `qualified_recall` result requires an approved independent manifest, paired coverage meeting the PRD floors, full address coverage, clean and evidence controls, and zero failed answers. Exit `1` means the report is complete and recall did not qualify. Exit `2` means policy or input verification failed. Review evidence alterations and deployment separately before authorizing any publication. [PRD](../../../../../../docs/PRD.md)
 
+### Private worker handoff
+
+The command-line Gate 1 worker can run `serve_gate1.py` on the same trusted host. The redactor reads an answer from standard input and returns only the rendered text with its policy and qualification digests. The subprocess checks the approved manifest, passing report, source, runtime and models before reading. It exits without a result on a mismatch or processing failure. The worker also checks both digests before forwarding redacted text to the database.
+
+Configure absolute paths in `ENVOI_GATE1_REDACTION_EXECUTABLE`, `ENVOI_GATE1_REDACTION_SCRIPT`, `ENVOI_GATE1_REDACTION_MANIFEST`, `ENVOI_GATE1_REDACTION_REPORT`, `ENVOI_GATE1_REDACTION_CONTEXT_MODEL` and `ENVOI_GATE1_REDACTION_CASING_MODEL`. If the pinned dependencies use separate installation folders, set `ENVOI_GATE1_REDACTION_PYTHONPATH` to their absolute search paths. Set `ENVOI_GATE1_REDACTION_MANIFEST_SHA256` and `ENVOI_GATE1_REDACTION_REPORT_SHA256` from the approved artifacts and `ENVOI_GATE1_REDACTION_POLICY_DIGEST` from the report. The policy approval row pairs that policy digest with the report digest. Omit the executable setting for private-only processing. The scheduled preview worker has no local subprocess config and publication still requires a rehearsal on the trusted deployment.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"

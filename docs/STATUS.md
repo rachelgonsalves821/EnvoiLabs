@@ -714,3 +714,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. The worker completion call adds an optional policy digest. The internal policy record links active policies to qualification evidence. The migration has no approved policy rows.
 
 Risks. The configured hosted worker still has no redactor and publication remains closed.
+
+### 2026-11-23 — Gate 1 private redactor handoff
+
+Done. The explicitly configured command-line worker can pass an answer to the pinned on-host redactor over a bounded process pipe. The redactor verifies the approved manifest, passing report and exact policy before reading the answer. The worker checks the response digests and keeps failures private. [Private worker handoff](../packages/ai/evals/redaction/contextual/spoken_v3/README.md#private-worker-handoff)
+
+Next. Complete independent qualification and run the researcher publication rehearsal on the trusted deployment.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. The qualification report records its canonical policy digest. No database change.
+
+Risks. No independent policy is active. The hosted job has no redactor configuration.
