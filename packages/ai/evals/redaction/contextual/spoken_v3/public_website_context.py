@@ -8,18 +8,22 @@ from spoken_contacts_recover import _DOMAIN_BREAK, _TLDS
 
 
 _IDENTITY = {"person", "name", "organization", "ORGANIZATION", "organization educational"}
+_LOCATOR_LABELS = _IDENTITY | {"email", "email address", "EMAIL_ADDRESS"}
 _HOST = re.compile(r"[^\W_]+(?:-[^\W_]+)*\Z")
 _WEBSITE = re.compile(
     r"\b(?:website|web site|public guide|public page|public url|catalog site|public domain|"
-    r"browser|site address|landing page)\b",
+    r"browser|site address|landing page|(?:public|official|vendor) (?:menu|catalog(?:ue)?|site))\b",
     re.I,
+)
+_PUBLIC_AT = re.compile(
+    r"\b(?:public|official|vendor) (?:website|web site|site|page|menu|catalog(?:ue)?|guide)\s+at\s*$", re.I,
 )
 _SITE_SUFFIX = re.compile(r"^\s+(?:(?:for|as|on) (?:a |the )?)?(?:website|web site|public site|site link|public link)\b", re.I)
 _ROLE = re.compile(
     r"\b(?:(?:my|our|their|the) (?:employer|workplace|school|company|university|personal (?:site|website))|"
     r"(?:i|we) (?:work(?:ed)?|study|studied) (?:at|for)|"
     r"name on (?:my|our)|(?:driver|courier|manager) (?:is|was) named|"
-    r"(?:email|mailbox|inbox)(?: address)? (?:is|was|uses) (?!about\b)|"
+    r"(?:e-?mail|mailbox|inbox)(?: address)? (?:is|was|uses) (?!about\b)|"
     r"(?:write|email) me (?:at|on)|(?:for|by) email to)\b",
     re.I,
 )
@@ -63,6 +67,23 @@ def public_website_ranges(text):
             for tld in _TLDS
         ) and _anchors(text, word.start, word.end):
             yield word.start, word.end
+
+
+def explicit_spoken_locator_ranges(text, site_ranges):
+    for start, end in site_ranges:
+        left = max(0, start - 66)
+        prefix = text[left:start]
+        match = _PUBLIC_AT.search(prefix)
+        if match and not _ROLE.search(_BOUNDARY.split(prefix)[-1]) and "@" not in text[start:end]:
+            yield left + match.start(), end
+
+
+def inside_public_locator(hit, ranges, explicit_identities):
+    return (
+        hit.label in _LOCATOR_LABELS
+        and not any(item.start < hit.end and hit.start < item.end for item in explicit_identities)
+        and any(start <= hit.start and hit.end <= end for start, end in ranges)
+    )
 
 
 def preserving_public_ref(text, hit, explicit_identities, site_ranges):

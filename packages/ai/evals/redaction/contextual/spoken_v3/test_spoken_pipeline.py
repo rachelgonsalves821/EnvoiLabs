@@ -21,6 +21,21 @@ def bounded_restore(text):
 
 
 class SpokenPipelineTests(unittest.TestCase):
+    def test_spoken_public_locator_preserves_evidence_across_all_detectors(self):
+        locator = "public menu at hazelwheel dot test"
+        text = "I checked the " + locator + " before comparing options."
+
+        def detected(source):
+            start = source.index(locator)
+            return (Hit("EMAIL_ADDRESS", start + len("public "), start + len(locator)),)
+
+        self.assertEqual(redact(text, detected, no_detections, restore), text)
+        private = "My e-mail address is " + locator + ". The filter was clear."
+        rendered = redact(private, detected, no_detections, restore)
+        self.assertIn("[redacted]", rendered)
+        self.assertNotIn("hazelwheel", rendered)
+        self.assertIn("The filter was clear.", rendered)
+
     def test_readable_result_and_evaluator_share_the_address_spans(self):
         text = "Please leave the parcel at two tree six Star Peel lain then ring the bell"
         reports = dict(span_variants(text, no_detections, no_detections, restore))

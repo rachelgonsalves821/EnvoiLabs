@@ -28,6 +28,23 @@ class CandidateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mask("abc", [Hit("name", -1, 1)])
 
+    def test_literal_mailboxes_cover_complete_dot_atoms_and_dns_suffixes(self):
+        for local, host in [
+            ("river.o'neil+qa", "invoices.example.co.nz"),
+            ("kite=ops", "a.b.c.d.e.example.test"),
+            ("hazel+exp", "customer.example"),
+        ]:
+            address = f"{local}@{host}"
+            source = f"Set the reply address to {address}. The search filter was easy to find."
+            with self.subTest(address=address):
+                expected = source.replace(address, "\ue000" * len(address))
+                self.assertEqual(mask(source, candidate_hits(source, (), ())), expected)
+
+    def test_spoken_public_website_preserves_evidence_but_explicit_mailbox_stays_private(self):
+        public_ref = "I checked the public menu at hazelwheel dot test before comparing options."
+        self.assertEqual(mask(public_ref, candidate_hits(public_ref, (), ())), public_ref)
+        self.assert_span("My email address is menu at hazelwheel dot test.", "menu at hazelwheel dot test")
+
     def test_evidence_countercue_does_not_override_a_direct_phone_cue(self):
         source = "The receipt order number was 2025550121."
         contact = "2025550121"

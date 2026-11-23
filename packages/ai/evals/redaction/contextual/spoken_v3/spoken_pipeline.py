@@ -11,7 +11,9 @@ from identity_boundaries import complete_identity_boundaries
 from person_slot_recovery import detect_person_slots
 from phone_slot_recovery import recover_corroborated_numbers, recover_number_slots
 from product_context import is_explicit_commercial_reference, is_product_title
-from public_website_context import preserving_public_ref, public_website_ranges
+from public_website_context import (
+    explicit_spoken_locator_ranges, inside_public_locator, preserving_public_ref, public_website_ranges,
+)
 from redaction_input import RedactionInputTooLong, answer_windows
 from speech_context import explicit_identities, restore_for_model
 from spoken_contact import spoken_contact_hits
@@ -20,7 +22,7 @@ from spoken_contacts_recover import recovered_contacts
 
 _LABELS = ["person", "organization", "phone number", "email address", "address"]
 _IDENTITY_LABELS = ["name", "organization", "organization educational"]
-CANDIDATE = "with_corroborated_addresses"
+CANDIDATE = "with_literal_contacts_and_public_locators"
 
 
 def _project_identities(view, predict):
@@ -112,7 +114,10 @@ def span_variants(text, deterministic, predict, restore=None, *, timings=None):
     yield "with_corroborated_phone_runs", phone_masks
     name_masks = (*phone_masks, *record_name_slots(text, commercial))
     yield "with_person_record_cues", name_masks
-    yield CANDIDATE, (*name_masks, *recover_corroborated_addresses(text))
+    complete = (*name_masks, *recover_corroborated_addresses(text))
+    yield "with_corroborated_addresses", complete
+    locators = tuple(explicit_spoken_locator_ranges(text, sites))
+    yield CANDIDATE, tuple(hit for hit in complete if not inside_public_locator(hit, locators, private_hits))
 
 
 def render_redacted(text, spans):
