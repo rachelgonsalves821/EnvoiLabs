@@ -18,6 +18,10 @@ _PHONE_SLOT = re.compile(
 _REFERENCE = re.compile(r"\b(?:stock|product|account|batch|serial|item) (?:number|code|id)\b|\bsku\b", re.I)
 _WEAK_PREFIX_CUE = re.compile(r"\b(?:use|shows?)\s+$")
 _INTERNATIONAL_PREFIX = {"+", "plus"}
+_LITERAL_00 = re.compile(
+    r"00[ \t\u00a0]*[1-9][0-9]*"
+    r"(?:[ \t\u00a0.\-‐‑–]+[0-9]+|[ \t\u00a0]*\([0-9]{1,4}\)[0-9]*){0,10}"
+)
 _BOUNDARY = {
     "after", "and", "before", "because", "but", "during", "for", "from", "he", "i", "if",
     "now", "on", "she", "so", "the", "then", "try", "until", "we", "when", "you",
@@ -39,6 +43,28 @@ _END_PHONE = re.compile(r"^(?:[.!?,;:]|(?:i|we|you|they|he|she|the|my|our|your|t
 _LOCAL_PHONE = re.compile(r"\blocal (?:phone|number)\b")
 _EXTRA_HOMOPHONES = {"eve": "8", "own": "1", "free": "3", "fife": "5", "threw": "3", "sicks": "6"}
 _EXTRA_REPEATS = {"trubble": 3}
+
+
+def _international_length(digits):
+    return 10 <= len(digits) <= 15
+
+
+def _literal_00_end(text, start):
+    match = _LITERAL_00.match(text, start, start + 64)
+    if not match:
+        return None
+    rest = text[match.end():].lstrip().casefold()
+    if rest and not _END_PHONE.match(rest):
+        return None
+
+    from phonenumbers import NumberParseException, is_possible_number, national_significant_number, parse
+
+    try:
+        number = parse("+" + match.group()[2:].lstrip(), None)
+    except NumberParseException:
+        return None
+    digits = str(number.country_code) + national_significant_number(number)
+    return match.end() if _international_length(digits) and is_possible_number(number) else None
 
 
 def _phone_end(tokens, start, explicit, local, text):
@@ -81,7 +107,7 @@ def _phone_end(tokens, start, explicit, local, text):
         index += 2 if repeat else 1
         rest = text[tokens[index - 1].end:].lstrip().casefold()
         end = not rest or _END_PHONE.match(rest) or _PHONE_PURPOSE.match(rest)
-        valid_count = 10 <= len(digits) <= 15 if international else (
+        valid_count = _international_length(digits) if international else (
             len(digits) == 10 or (local and len(digits) == 7) or (len(digits) == 11 and digits.startswith(("0", "1")))
         )
         if word != "or" and valid_count and reliable >= 7 and (end or explicit and rest.startswith("or ")) and (
@@ -95,7 +121,8 @@ def recover_corroborated_numbers(text, mailboxes):
     """Recover a bounded phone value without requiring exact recognized digits."""
     tokens = tokenize(text)
     for start, token in enumerate(tokens):
-        if not (_piece(token.word) or token.word in _INTERNATIONAL_PREFIX or token.word in _EXTRA_HOMOPHONES):
+        literal_00 = token.word.startswith("00")
+        if not (literal_00 or _piece(token.word) or token.word in _INTERNATIONAL_PREFIX or token.word in _EXTRA_HOMOPHONES):
             continue
         before = text[max(0, token.start - 100):token.start].casefold()
         label = _EXPLICIT_NUMBER.search(before) or next(
@@ -107,6 +134,11 @@ def recover_corroborated_numbers(text, mailboxes):
             continue
         if not explicit and (_FALSE_PHONE.search(before) or _REFERENCE.search(before)):
             continue
+        if explicit and literal_00:
+            literal_end = _literal_00_end(text, token.start)
+            if literal_end is not None:
+                yield Hit("phone", token.start, literal_end)
+                continue
         stop = _phone_end(tokens, start, explicit, bool(label and _LOCAL_PHONE.search(label.group())), text)
         if stop <= start:
             continue

@@ -39,7 +39,15 @@ _EMAIL_ATOM = r"[\w%+-]+(?:\.[\w%+-]+)*"
 _EMAIL_PUNCTUATION = r"(?:dot|underscore|dash|hyphen|plus|period|minus)"
 _MAIL_DOMAIN = rf"(?:[a-z0-9](?:[a-z0-9-]{{0,61}}[a-z0-9])?{_DOT}){{1,4}}(?:com|org|net|edu|gov|test|ca|co|io|uk|us|info|me|biz|onmicrosoft)"
 _EMAIL = re.compile(
-    rf"(?<![\w@%+.-]){_EMAIL_ATOM}(?:\s+{_EMAIL_PUNCTUATION}\s+{_EMAIL_ATOM}){{0,6}}{_AT}{_MAIL_DOMAIN}(?![\w-])",
+    rf"(?<![\w@%+.-]){_EMAIL_ATOM}(?:\s+{_EMAIL_PUNCTUATION}\s+{_EMAIL_ATOM}){{0,6}}"
+    rf"(?P<connector>{_AT}){_MAIL_DOMAIN}(?![\w-])",
+    _FLAGS,
+)
+_DOT_ATOM_CHAR = r"[\w!#$%&'*+\-/=?^\x60{|}~]"
+_DNS_LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+_LITERAL_EMAIL = re.compile(
+    rf"(?<![\w!#$%&'*+\-/=?^\x60{{|}}~.@]){_DOT_ATOM_CHAR}+(?:\.{_DOT_ATOM_CHAR}+)*"
+    rf"@(?:{_DNS_LABEL}\.){{1,127}}[a-z][a-z0-9-]{{0,61}}[a-z0-9](?![\w@-]|\.[a-z0-9])",
     _FLAGS,
 )
 _EMAIL_LEFT_CUE = re.compile(
@@ -48,6 +56,10 @@ _EMAIL_LEFT_CUE = re.compile(
     r"(?:i|we) used)\s+(?P<words>[\w%+-]+(?:\s+[\w%+-]+){0,2})\s+$", _FLAGS,
 )
 _MAIL_LEFT_STOP = {"a", "an", "the", "to", "i", "my", "we", "our", "and", "it"}
+_PUBLIC_SITE_CUE = re.compile(
+    r"\b(?:public|official|vendor) (?:website|web site|site|page|menu|catalog(?:ue)?|guide)\s*$", _FLAGS,
+)
+_PRIVATE_MAIL_CUE = re.compile(r"\b(?:e-?mail|inbox|mailbox|reply address)\b", _FLAGS)
 
 _DIRECTION = r"(?:north(?:east|west)?|south(?:east|west)?|east|west|[NSEW]\.?)"
 _STREET_WORD = r"(?:[^\W\d_]+(?:[.'’‐-][^\W\d_]+)*|(?:st|mt)\.)"
@@ -145,9 +157,15 @@ def _phone_hits(text):
 
 
 def _email_hits(text):
+    for match in _LITERAL_EMAIL.finditer(text):
+        yield Hit("email", match.start(), match.end())
     for match in _EMAIL.finditer(text):
         start = match.start()
         preceding = _left(text, start)
+        if "@" not in match["connector"]:
+            phrase = _left(text, match.start("connector"))
+            if _PUBLIC_SITE_CUE.search(phrase) and not _PRIVATE_MAIL_CUE.search(phrase):
+                continue
         supplied = _EMAIL_LEFT_CUE.search(preceding)
         if supplied and not any(word.lower() in _MAIL_LEFT_STOP for word in supplied["words"].split()):
             start -= len(preceding) - supplied.start("words")

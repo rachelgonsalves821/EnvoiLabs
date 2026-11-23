@@ -9,6 +9,26 @@ def contact_spans(text):
 
 
 class PhoneSlotRecoveryTests(unittest.TestCase):
+    def test_literal_international_callback_masks_prefix_and_stops_before_pickup_code(self):
+        for number in ("0044 7700 900272", "00 44 (0) 7700 900272", "00447700900272"):
+            with self.subTest(number=number):
+                text = f"The courier left early. Call me at {number} then keep the pickup code 0044 visible."
+                start = text.index(number)
+                self.assertEqual(list(recover_corroborated_numbers(text, ())), [
+                    Hit("phone", start, start + len(number)),
+                ])
+
+    def test_literal_international_form_requires_a_phone_label_and_valid_country_and_length(self):
+        for text in (
+            "The tracking number is 0044 7700 900272 and the label was easy to read.",
+            "The order number is 00447700900272 and the door was locked.",
+            "I used 0044 7700 900272 for the printed receipt.",
+            "Call me at 0099 900 900272 and keep the pickup instructions visible.",
+            "Call me at 0044 7700 900272 42 and keep both numbers visible.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(list(recover_corroborated_numbers(text, ())), [])
+
     def test_spoken_tail_needs_a_complete_corroborated_phone(self):
         number = "one eight zero eight five five five zero one two eve"
         text = f"my contact number is {number} and the receipt was legible"
