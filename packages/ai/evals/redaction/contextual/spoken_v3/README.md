@@ -37,6 +37,8 @@ The confirmed-name comparison measures fragmented personal names bounded by clea
 
 The commercial-reference comparison measures whether contextual detections can preserve explicit item labels, generic shop references and ordinary idioms. Deterministic masks and corroborated private identity spans still take precedence.
 
+The address comparison follows bounded private location and delivery cues. It tests noisy spoken house numbers, missing or fragmented street suffixes and consecutive unit fields. Generic directions require a recognized street suffix. The new masks keep the original transcript offsets.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"

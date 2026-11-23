@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from time import perf_counter
 
+from address_slot_recovery import recover_address_slots
 from asr_casing import LocalCasingModel, MODEL_FILES, MODEL_REVISION
 from candidate import Hit, candidate_hits, mask
 from confirmed_names import confirmed_name_slots
@@ -65,7 +66,7 @@ def main():
     source = Path(__file__)
     source_sha = digest(source)
     candidates = [source.with_name(name) for name in (
-        "asr_casing.py", "confirmed_names.py", "email_slot_recovery.py", "employer_slot_recovery.py",
+        "address_slot_recovery.py", "asr_casing.py", "confirmed_names.py", "email_slot_recovery.py", "employer_slot_recovery.py",
         "identity_boundaries.py",
         "person_slot_recovery.py",
         "phone_slot_recovery.py",
@@ -102,6 +103,7 @@ def main():
         results["with_explicit_employment_spans"] = report_template()
         results["with_confirmed_names"] = report_template()
         results["with_commercial_reference_guard"] = report_template()
+        results["with_spoken_address_repairs"] = report_template()
     results["with_spoken_email_repairs"] = report_template()
     for row in rows:
         text = row["text"]
@@ -175,6 +177,10 @@ def main():
                 *phone_slots, *email_slots, *names, *employers,
             )
             coverage(row, mask(text, commercial_masks), results["with_commercial_reference_guard"])
+            coverage(
+                row, mask(text, (*commercial_masks, *recover_address_slots(text))),
+                results["with_spoken_address_repairs"],
+            )
         coverage(
             row, mask(text, (*email_baseline, *email_slots)),
             results["with_spoken_email_repairs"],
@@ -188,6 +194,7 @@ def main():
         "product_context_sha256": candidate_hashes["product_context.py"],
         "email_slots_source_sha256": candidate_hashes["email_slot_recovery.py"],
         "confirmed_names_source_sha256": candidate_hashes["confirmed_names.py"],
+        "address_slots_source_sha256": candidate_hashes["address_slot_recovery.py"],
         "employer_slots_source_sha256": candidate_hashes["employer_slot_recovery.py"],
         "website_context_source_sha256": candidate_hashes["public_website_context.py"],
         "additional_pass_p95_ms": round(1000 * sorted(times)[ceil(0.95 * len(times)) - 1], 3),
