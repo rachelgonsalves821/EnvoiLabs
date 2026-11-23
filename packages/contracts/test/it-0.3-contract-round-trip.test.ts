@@ -47,6 +47,22 @@ describe("IT-0.3 public contract round trip", () => {
     }).success).toBe(false);
   });
 
+  it("accepts only study-local respondent numbers and coarse student status in grouped transcripts", () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const group = { number: 1, student: null, transcripts: [{ id, redactedText: "I ordered lunch." }] };
+    const parse = (respondent: object) => contracts.ResearcherTranscriptListV2Schema.safeParse({
+      studyId: id, respondents: [respondent],
+    }).success;
+
+    expect(parse(group)).toBe(true);
+    expect(parse({ ...group, student: false })).toBe(true);
+    expect(parse({ ...group, number: 0 })).toBe(false);
+    expect(parse({ ...group, student: "North Campus" })).toBe(false);
+    expect(parse({ ...group, respondentId: id })).toBe(false);
+    expect(parse({ ...group, transcripts: [] })).toBe(false);
+    expect(parse({ ...group, transcripts: [{ id, redactedText: "Redacted", rawText: "Private" }] })).toBe(false);
+  });
+
   it("rejects unhashed respondent event identifiers and untyped event data", () => {
     const base = {
       event_name: "session.submitted", occurred_at: "2026-11-19T18:00:00.000Z",
