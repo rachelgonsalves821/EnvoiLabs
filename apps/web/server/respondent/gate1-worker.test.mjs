@@ -48,6 +48,22 @@ describe("trusted Gate 1 worker", () => {
     expect(db.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", lease);
   });
 
+  it("supplies the policy digest alongside redacted output and leaves an unversioned result private", async () => {
+    const claim = { answerId, leaseId, kind: "text", rawText: "private typed fixture" };
+    const policyDigest = "a".repeat(64);
+    const options = { answerId, createTranscriber: vi.fn(), redact: vi.fn(async () => "Redacted output") };
+    const unversioned = database(claim);
+    await expect(runGate1AnswerJob(createGate1DatabasePorts(unversioned, options))).resolves.toBe("private");
+    expect(unversioned.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", lease);
+    const versioned = database(claim);
+    await runGate1AnswerJob(createGate1DatabasePorts(versioned, { ...options, policyDigest }));
+    expect(versioned.rpc).toHaveBeenCalledWith("complete_gate1_answer_job", {
+      ...lease, supplied_redacted_text: "Redacted output", supplied_redaction_passed: true,
+      supplied_policy_digest: policyDigest,
+    });
+    expect(() => createGate1DatabasePorts(versioned, { ...options, policyDigest: "invalid" })).toThrow(/policy digest/);
+  });
+
   it("rejects an out-of-scope storage locator before reading any recording", async () => {
     const db = database({ answerId, leaseId, kind: "voice", audio: { ...audio, storagePath: "unscoped/file" } });
     const createTranscriber = vi.fn();

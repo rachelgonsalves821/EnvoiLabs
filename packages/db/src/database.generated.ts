@@ -1354,6 +1354,7 @@ export type Database = {
           supplied_latency_ms?: number
           supplied_lease_id: string
           supplied_model?: string
+          supplied_policy_digest?: string
           supplied_provider?: string
           supplied_raw_text?: string
           supplied_redacted_text?: string

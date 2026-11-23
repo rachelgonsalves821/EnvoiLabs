@@ -63,6 +63,12 @@ if [[ "$SUPABASE_URL" != "http://127.0.0.1:54321" ]]; then
   exit 1
 fi
 
+# Allow only the synthetic redactor on this disposable database.
+docker exec -i "supabase_db_$project_id" psql -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
+values (repeat('a', 64), repeat('b', 64));
+SQL
+
 export SUPABASE_URL SUPABASE_PUBLISHABLE_KEY SUPABASE_SERVICE_ROLE_KEY
 export ENVOI_APP_ORIGIN="http://127.0.0.1:3100"
 export ENVOI_TEST_LOCAL_SUPABASE=1

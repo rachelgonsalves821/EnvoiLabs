@@ -34,7 +34,9 @@ select pg_temp.case_id(n + 20) from generate_series(1, 3) as step(n);
 
 select ok(not has_function_privilege('authenticated', 'public.claim_gate1_answer_job(uuid)', 'EXECUTE')
     and not has_function_privilege('anon', 'public.claim_gate1_answer_job(uuid)', 'EXECUTE')
-    and not has_function_privilege('authenticated', 'public.complete_gate1_answer_job(uuid,uuid,text,text,text,integer,bigint,text,boolean)', 'EXECUTE')
+    and not has_function_privilege('authenticated', 'public.complete_gate1_answer_job(uuid,uuid,text,text,text,integer,bigint,text,boolean,text)', 'EXECUTE')
+    and not has_function_privilege('service_role', 'internal.complete_gate1_answer_job(uuid,uuid,text,text,text,integer,bigint,text,boolean)', 'EXECUTE')
+    and not has_table_privilege('service_role', 'internal.gate1_redaction_policies', 'INSERT')
     and not has_function_privilege('service_role', 'internal.gate1_processing_input(uuid)', 'EXECUTE'),
     'only scoped service RPCs expose work and completion');
 set local role service_role;
@@ -63,14 +65,27 @@ set local role service_role;
 insert into claims values ('second', public.claim_gate1_answer_job(pg_temp.case_id(21)));
 select is((select payload ->> 'attempts' from claims where label = 'second'), '2', 'retry receives a new attempt');
 select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'first')) ->> 'status', 'stale', 'old lease cannot complete a retried job');
-select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'second'), supplied_redacted_text => 'Unqualified output') ->> 'status', 'private', 'default completion remains private even with an output');
+select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'second'), supplied_redacted_text => 'Unqualified output', supplied_redaction_passed => true) ->> 'status', 'private', 'boolean without policy stays private');
 select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'second')) ->> 'status', 'alreadyCompleted', 'exact completion replay dedupes');
 select is((select redacted_text from public.transcripts where answer_id = pg_temp.case_id(21)), null::text, 'private completion clears unqualified output');
 select ok(public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'worker can deliberately requeue private completion');
+insert into claims values ('unapproved-policy', public.claim_gate1_answer_job(pg_temp.case_id(21)));
+select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'unapproved-policy'), supplied_redacted_text => 'Unapproved output', supplied_redaction_passed => true, supplied_policy_digest => repeat('c', 64)) ->> 'status', 'private', 'unapproved policy stays private');
+select ok(public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'unapproved policy completion can be requeued');
+reset role;
+insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
+values (repeat('a', 64), repeat('b', 64));
+set local role service_role;
 insert into claims values ('qualified', public.claim_gate1_answer_job(pg_temp.case_id(21)));
-select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'qualified'), supplied_redacted_text => 'Qualified synthetic answer', supplied_redaction_passed => true) ->> 'status', 'published', 'qualified deterministic fixture publishes under current consent');
+select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'qualified'), supplied_redacted_text => 'Qualified synthetic answer', supplied_redaction_passed => true, supplied_policy_digest => repeat('a', 64)) ->> 'status', 'published', 'approved policy publishes under current consent');
 select ok(not public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'private requeue cannot republish a completed publication');
 reset role;
+select is((select publication_policy_digest from internal.gate1_answer_jobs where answer_id = pg_temp.case_id(21)), repeat('a', 64), 'completion records the active policy digest');
+update internal.gate1_redaction_policies set revoked_at = now() where policy_digest = repeat('a', 64);
+set local role authenticated;
+select is((select count(*) from research.transcripts), 0::bigint, 'revoked policy immediately hides its projection');
+reset role;
+update internal.gate1_redaction_policies set revoked_at = null where policy_digest = repeat('a', 64);
 
 set local role authenticated;
 select is((select redacted_text from research.transcripts), 'Qualified synthetic answer', 'same-tenant MFA researcher sees only the qualified projection');
