@@ -39,6 +39,8 @@ The commercial-reference comparison measures whether contextual detections can p
 
 The address comparison follows bounded private location and delivery cues. It tests noisy spoken house numbers, missing or fragmented street suffixes and consecutive unit fields. Generic directions require a recognized street suffix. The new masks keep the original transcript offsets.
 
+`spoken_pipeline.py` owns the source spans for every comparison. The scorer uses a fixed-width mask for those spans. The private synthetic entry point renders the latest development spans as `[redacted]` and rejects invalid offsets or casing transformations that change source length. The pipeline takes local detector callbacks. The evaluator loads the pinned models and enforces its offline policy. A release must still bind the same models and prove policy parity in a private worker before publication.
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"

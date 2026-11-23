@@ -606,3 +606,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. The new evidence comes from development cases. Private publication remains gated.
+
+### 2026-11-23 — Gate 1 shared redaction pipeline
+
+Done. The offline comparison and the private synthetic entry point share the same span policy. The score continues to use fixed-width masks. The private renderer replaces those exact intervals with readable markers and fails on invalid offsets. The comparison records the shared pipeline's source hash. All 65 focused tests passed. [Replay instructions](../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
+Next. Close the remaining recall gaps, bind the pinned detectors in the private worker, and verify publication with a qualified policy and synthetic inputs.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for the hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. The shared policy remains unqualified. The live worker does not render or publish it.
