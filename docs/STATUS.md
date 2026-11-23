@@ -690,3 +690,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. The development replay does not qualify publication. The independent corpus remains sealed.
+
+### 2026-11-23 — Gate 1 street address endpoints
+
+Done. The offline candidate recognizes damaged street types after residence, appointment and delivery cues. A walk endpoint needs a preceding landmark, and generic turn directions need accompanying delivery language. Full masks rose from 33/36 to 36/36 on known speech and from 4/8 to 8/8 on the development controls used to revise the cues. A separate set stayed at 2/6. The new rule did not fire on any of the 14 public or non-address control examples. All 100 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Resolve remaining name and address generalization gaps and run the independently frozen candidate before researcher publication.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. Full coverage on the known address set does not establish independent coverage. The independent corpus remains sealed.

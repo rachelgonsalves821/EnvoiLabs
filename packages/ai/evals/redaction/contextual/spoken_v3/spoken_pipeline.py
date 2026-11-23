@@ -2,7 +2,7 @@
 
 from time import perf_counter
 
-from address_slot_recovery import recover_address_slots
+from address_slot_recovery import recover_address_slots, recover_corroborated_addresses
 from candidate import Hit, candidate_hits
 from confirmed_names import confirmed_name_slots, record_name_slots
 from email_slot_recovery import recover_corroborated_mailboxes, recover_email_slots
@@ -20,7 +20,7 @@ from spoken_contacts_recover import recovered_contacts
 
 _LABELS = ["person", "organization", "phone number", "email address", "address"]
 _IDENTITY_LABELS = ["name", "organization", "organization educational"]
-CANDIDATE = "with_person_record_cues"
+CANDIDATE = "with_corroborated_addresses"
 
 
 def _project_identities(view, predict):
@@ -110,7 +110,9 @@ def span_variants(text, deterministic, predict, restore=None, *, timings=None):
     mailboxes = tuple(hit for hit in mailbox_masks if hit.label in {"email", "email address", "EMAIL_ADDRESS"})
     phone_masks = (*mailbox_masks, *recover_corroborated_numbers(text, mailboxes))
     yield "with_corroborated_phone_runs", phone_masks
-    yield CANDIDATE, (*phone_masks, *record_name_slots(text, commercial))
+    name_masks = (*phone_masks, *record_name_slots(text, commercial))
+    yield "with_person_record_cues", name_masks
+    yield CANDIDATE, (*name_masks, *recover_corroborated_addresses(text))
 
 
 def render_redacted(text, spans):

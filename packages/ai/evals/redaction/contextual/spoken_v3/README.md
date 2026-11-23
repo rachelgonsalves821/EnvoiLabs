@@ -45,6 +45,8 @@ The corroborated phone comparison handles misheard digits, repeated groups and a
 
 The personal-record comparison tests bounded badge, check-in and recipient fields. Generic receipt fields also need an existing contextual person detection contained in the value. This extra pass blocks explicit public, vendor and product labels and preserves the preceding phone baseline.
 
+The corroborated address endpoint comparison tests short house numbers and damaged street types under stronger residence, handoff or landmark cues. The original address comparison and intervening policy baselines remain available.
+
 `spoken_pipeline.py` owns the source spans for every comparison. The scorer uses a fixed-width mask for those spans. The private synthetic entry point renders the latest development spans as `[redacted]` and rejects invalid offsets or casing transformations that change source length.
 
 The evaluator and private synthetic renderer can use the same `LocalDetectors` from `local_detectors.py` and `LocalCasingModel` from `asr_casing.py`. The model directory must contain exactly the five pinned contextual files. The loader checks every digest before inference. The evaluator records model hashes, policy source hashes and installed package versions.
