@@ -60,6 +60,44 @@ _CONTEXT_WORDS = re.compile(
     r"screen name|under the|at the|it is|name is|it was|their names|my name|what i)\b",
     re.I,
 )
+_CARD_NAME = re.compile(
+    r"\b(?:my|their|his|her|our) (?:(?:staff |work )?(?:badge|card)|bad|name tag) name\s+",
+    re.I,
+)
+_ON_CARD = re.compile(r"\s+(?:on|in) (?:the|my|their|his|her) (?:staff |work )?(?:card|badge|tag)\b", re.I)
+_RECEIPT_VALUE = re.compile(r"\b(?:the |my )?order (?:receipt|recede) (?:uses|lists|shows|says)\s+", re.I)
+_PERSON_RECORD = re.compile(
+    r"\b(?:(?:receipt|check[ -]?in|registration|pickup|order) (?:recipient|collector|attendee|participant|guest)(?: name)?|"
+    r"(?:pickup|registration|check[ -]?in) (?:person|attendee) name|"
+    r"(?:named|registered) (?:recipient|collector|attendee)|"
+    r"the name (?:in|on) (?:the|my) (?:recipient|collector|registration|check[ -]?in) (?:box|field|line))(?: (?:is|was)|\s*:)\s+|"
+    r"\bi signed (?:in with )?my (?:full |legal )?name\s+",
+    re.I,
+)
+_RECORD_END = re.compile(
+    r"[.,!?;:]|\b(?:and|but|then|so) (?:i|we|they|the|it)|\b(?:because|when|before|after|until)|"
+    r"\bthat[’']?s (?:what i|my name|me)\b|"
+    r"(?P<nonperson>\b(?:as|for) (?:the|a) (?:item|product|account|business|vendor|public|signature|check[ -]?in time)\b)",
+    re.I,
+)
+_PUBLIC_RECORD = re.compile(
+    r"\b(?:item name|product name|account id|public (?:store|business|supplier)|signature status|"
+    r"check[ -]?in time|arrival time|pickup slot|shift notes?|approved by|they them)\b",
+    re.I,
+)
+_FIELD_RECORD = re.compile(
+    r"\b(?:my (?:(?:work|workplace|staff|employee) )?(?:card|badge)|"
+    r"the badge (?:clipped|attached) to my (?:lanyard|shirt|card)|"
+    r"the (?:old |new )?(?:employee|staff) card|(?:the |my )?(?:order )?receipt) (?:uses|shows|says|lists|has)\s+",
+    re.I,
+)
+_PERSON_CONFIRMATION = re.compile(
+    r"\s+(?:as (?:my|his|her|their) (?:chosen|preferred|full|legal) name|"
+    r"as the name (?:i|we|they) (?:use|used) (?:for|at) (?:work|shifts|check[ -]?in)|"
+    r"that[’']?s the name (?:the )?(?:shift lead|staff|crew|clerk) (?:uses|knows)|"
+    r"as the person (?:collecting|receiving|picking up) (?:the|my|our) (?:order|pickup))\b",
+    re.I,
+)
 
 
 def _candidate(text, start, end):
@@ -88,3 +126,31 @@ def confirmed_name_slots(text):
         hit = _candidate(text, start, stop.start() if stop else end)
         if hit:
             yield hit
+
+
+def record_name_slots(text, contextual):
+    """Recover name values with a personal record cue and a local boundary."""
+    for prefix, suffix in ((_CARD_NAME, _ON_CARD), (_FIELD_RECORD, _PERSON_CONFIRMATION)):
+        for cue in prefix.finditer(text):
+            end = suffix.search(text, cue.end(), cue.end() + 72)
+            if end:
+                hit = _candidate(text, cue.end(), end.start())
+                if hit and not _PUBLIC_RECORD.search(text[hit.start:hit.end]):
+                    yield hit
+
+    for pattern in (_RECEIPT_VALUE, _PERSON_RECORD):
+        for cue in pattern.finditer(text):
+            start = cue.end()
+            limit = start + 72
+            stop = _RECORD_END.search(text, start, limit)
+            end = stop.start() if stop else len(text)
+            if end > limit or (stop and stop.lastgroup == "nonperson"):
+                continue
+            if _PUBLIC_RECORD.search(text[start:end + 36]):
+                continue
+            hit = _candidate(text, start, end)
+            if hit and (pattern is _PERSON_RECORD or any(
+                other.label in {"person", "name"} and hit.start <= other.start < other.end <= hit.end
+                and other.end - other.start >= 4 for other in contextual
+            )):
+                yield hit

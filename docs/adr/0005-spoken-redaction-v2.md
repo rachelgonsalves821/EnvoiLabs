@@ -169,6 +169,12 @@ The comparison recovers noisy repeated groups and final digits in explicit phone
 
 On 272 known recognized excerpts, full phone masks rose from 132/140 to 140/140, with matching entity, clean and evidence scores elsewhere. A 20-clip set used to refine the cues improved from 5/10 to 10/10. A separate 16-clip set stayed at 5/8 masks, with five clean edits and six altered evidence spans. Five long-answer controls matched their prior scores. All 83 focused tests passed. Generalization and independent qualification remain outstanding. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+## Personal names in badges and records
+
+The extra pass recognizes a bounded value paired with personal badge, recipient or check-in language. A generic order-receipt value requires an existing contextual person detection inside the same field. Explicit product, vendor and signature-status language blocks the added match.
+
+On the 272 known recognized excerpts, full name masks improved from 52/60 to 56/60. Other measures matched. The controls used to refine the cues improved from 8/10 to 9/10. A separate set stayed at 7/8, with the same three clean edits and five evidence edits. Five long development answers matched their prior results. The known name score remains below the 95% requirement and independent qualification is outstanding. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)

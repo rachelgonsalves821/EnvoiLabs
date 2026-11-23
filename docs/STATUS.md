@@ -666,3 +666,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. The known phone result does not establish independent recall. Transcript publication remains closed.
+
+### 2026-11-23 — Gate 1 names in personal records
+
+Done. Bounded badge and receipt cues raised full name masks from 52/60 to 56/60 on known recognized speech. A development set used to refine the cues rose from 8/10 to 9/10. A separate set stayed at 7/8. Other entity coverage and evidence alteration matched, including the five long controls. All 88 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Recover remaining private identity spans and evaluate a frozen candidate independently before the publication rehearsal.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. The known development score remains one fully masked name below the numeric target. The independent qualification corpus remains sealed.
