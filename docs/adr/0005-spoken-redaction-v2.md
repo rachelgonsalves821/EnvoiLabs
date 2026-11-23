@@ -151,6 +151,12 @@ Attribution traced the three remaining evidence edits on known recognized speech
 
 On 272 known recognized excerpts, the comparison preserved all measured sensitive coverage while reducing altered research evidence from 3/36 to 0/36 spans and altered clean excerpts from 12/36 to 6/36. On the 20 separate name controls it kept 10/10 full name masks and 1/2 full employer masks. Clean edits fell from 9/10 to 4/10 and evidence edits from 11/32 to 4/32. All 58 focused tests passed. The improvement is measured on development cases and keeps the independent qualification set sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
 
+## Bounded street-address spans
+
+The previous pass sometimes masked the recognized street while leaving part of the house number or a second unit field visible. The additional offline pass recognizes a bounded value after a private location or delivery cue. It preserves original offsets and rejects time, price and route language inside the proposed span.
+
+On 272 known recognized excerpts, full address coverage rose from 21/36 to 33/36, with two partial masks and one untouched address remaining. The other five sensitive categories and the 6/36 clean and 0/36 evidence edits matched the baseline. Two fictional address development sets went from 8/12 to 12/12 and 6/10 to 10/10 full masks. On 12 additional precision controls, both policies masked 5/6 addresses. Neither policy comparison changed the existing clean or evidence edit counts on the three control sets. All 62 focused tests passed. The policy still misses addresses and the independent qualification data remains sealed. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
 ## Publication conditions
 
 Use the independent failure analysis to prioritize a contextual model or restoration pass that handles unpunctuated identity mentions and a contact recognizer that handles a wider range of spoken separators and digit formats. Compare against a fully private runtime, track false positives that remove evidence, and freeze the next candidate before scoring any new held-out transcripts. Both V2 lanes are now development evidence. Keep publication closed until an independently passing candidate is validated in the exact private answer processing path. [Offline replay](../../packages/ai/evals/redaction/contextual/spoken_v2/README.md)

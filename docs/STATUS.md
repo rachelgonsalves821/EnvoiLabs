@@ -594,3 +594,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. Sensitive-span recall still falls short of the publication thresholds. The independent qualification set remains sealed.
+
+### 2026-11-22 — Gate 1 spoken addresses
+
+Done. Bounded location cues, spoken number recovery and consecutive unit fields increased full address coverage from 21/36 to 33/36 on known speech. Two separate address development sets improved to 12/12 and 10/10. A third precision set remained at 5/6. Clean and evidence edit counts matched the baseline. All 62 focused tests passed. [ADR 0005](adr/0005-spoken-redaction-v2.md)
+
+Next. Recover remaining private spans, then freeze and independently qualify the publication candidate.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. The new evidence comes from development cases. Private publication remains gated.
