@@ -83,10 +83,11 @@ describe("local Gate 1 redactor", () => {
   it("passes only the configured args, allowed environment and stdin payload to one child", async () => {
     vi.stubEnv("ENVOI_SYNTHETIC_PARENT_SECRET", "not-a-real-secret");
     const pythonPath = [join(directory, "first dependency"), join(directory, "second dependency")].join(delimiter);
-    const { policyDigest, redact } = createLocalGate1Redactor({
+    const { policyDigest, qualificationDigest, redact } = createLocalGate1Redactor({
       ...config, manifest: join(directory, "with-python-path.json"), pythonPath,
     });
     expect(policyDigest).toBe(digest);
+    expect(qualificationDigest).toBe(reportDigest);
     await expect(redact(input)).resolves.toBe(result);
     await expect(createLocalGate1Redactor(config).redact(input)).resolves.toBe(result);
   });

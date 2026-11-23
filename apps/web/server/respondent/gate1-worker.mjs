@@ -20,9 +20,14 @@ function validClaim(data) {
     (audio.durationMs === null || (Number.isSafeInteger(audio.durationMs) && audio.durationMs > 0));
 }
 
-export function createGate1DatabasePorts(client, { answerId = null, createTranscriber, redact = null, policyDigest = null }) {
+export function createGate1DatabasePorts(client, {
+  answerId = null, createTranscriber, redact = null, policyDigest = null, qualificationDigest = null,
+}) {
   if (policyDigest !== null && (typeof policyDigest !== "string" || !hash.test(policyDigest))) {
     throw new Error("Configure a valid Gate 1 redaction policy digest.");
+  }
+  if (qualificationDigest !== null && (typeof qualificationDigest !== "string" || !hash.test(qualificationDigest))) {
+    throw new Error("Configure a valid Gate 1 redaction qualification digest.");
   }
   let transcriber = null;
   function leaseArgs({ answerId, leaseId }) {
@@ -61,8 +66,9 @@ export function createGate1DatabasePorts(client, { answerId = null, createTransc
           supplied_model: transcription.model, supplied_latency_ms: transcription.latencyMs,
           supplied_cost_micros: transcription.costMicros,
         } : {}),
-        ...(redactedText && policyDigest ? {
+        ...(redactedText && policyDigest && qualificationDigest ? {
           supplied_redacted_text: redactedText, supplied_redaction_passed: true, supplied_policy_digest: policyDigest,
+          supplied_qualification_digest: qualificationDigest,
         } : {}),
       });
       if (!completionStates.has(outcome?.status)) throw new Error("Gate 1 worker received an invalid completion.");

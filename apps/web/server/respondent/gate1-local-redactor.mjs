@@ -97,5 +97,5 @@ export function createLocalGate1Redactor(config) {
     });
   }
 
-  return { policyDigest, redact };
+  return { policyDigest, qualificationDigest: reportSha256, redact };
 }

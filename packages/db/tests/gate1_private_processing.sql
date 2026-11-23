@@ -40,7 +40,7 @@ select pg_temp.case_id(n + 20) from generate_series(1, 3) as step(n);
 
 select ok(not has_function_privilege('authenticated', 'public.claim_gate1_answer_job(uuid)', 'EXECUTE')
     and not has_function_privilege('anon', 'public.claim_gate1_answer_job(uuid)', 'EXECUTE')
-    and not has_function_privilege('authenticated', 'public.complete_gate1_answer_job(uuid,uuid,text,text,text,integer,bigint,text,boolean,text)', 'EXECUTE')
+    and not has_function_privilege('authenticated', 'public.complete_gate1_answer_job(uuid,uuid,text,text,text,integer,bigint,text,boolean,text,text)', 'EXECUTE')
     and not has_function_privilege('service_role', 'internal.complete_gate1_answer_job(uuid,uuid,text,text,text,integer,bigint,text,boolean)', 'EXECUTE')
     and not has_table_privilege('service_role', 'internal.gate1_redaction_policies', 'INSERT')
     and not has_function_privilege('service_role', 'internal.gate1_processing_input(uuid)', 'EXECUTE'),
@@ -81,17 +81,31 @@ select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload
 select is((select redacted_text from public.transcripts where answer_id = pg_temp.case_id(21)), null::text, 'private completion clears unqualified output');
 select ok(public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'worker can deliberately requeue private completion');
 insert into claims values ('unapproved-policy', public.claim_gate1_answer_job(pg_temp.case_id(21)));
-select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'unapproved-policy'), supplied_redacted_text => 'Unapproved output', supplied_redaction_passed => true, supplied_policy_digest => repeat('c', 64)) ->> 'status', 'private', 'unapproved policy stays private');
+select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'unapproved-policy'), supplied_redacted_text => 'Unapproved output', supplied_redaction_passed => true, supplied_policy_digest => repeat('c', 64), supplied_qualification_digest => repeat('b', 64)) ->> 'status', 'private', 'unapproved policy stays private');
 select ok(public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'unapproved policy completion can be requeued');
 reset role;
 insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
 values (repeat('a', 64), repeat('b', 64));
 set local role service_role;
+insert into claims values ('missing-report', public.claim_gate1_answer_job(pg_temp.case_id(21)));
+select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'missing-report'), supplied_redacted_text => 'No qualification', supplied_redaction_passed => true, supplied_policy_digest => repeat('a', 64)) ->> 'status', 'private', 'older worker with only a policy digest stays private');
+select ok(public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'work without a qualification receipt can be requeued');
+insert into claims values ('wrong-report', public.claim_gate1_answer_job(pg_temp.case_id(21)));
+select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'wrong-report'), supplied_redacted_text => 'Mismatched qualification', supplied_redaction_passed => true, supplied_policy_digest => repeat('a', 64), supplied_qualification_digest => repeat('d', 64)) ->> 'status', 'private', 'an unapproved report cannot publish under an approved policy');
+select ok(public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'work with a mismatched qualification can be requeued');
 insert into claims values ('qualified', public.claim_gate1_answer_job(pg_temp.case_id(21)));
-select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'qualified'), supplied_redacted_text => 'Qualified synthetic answer', supplied_redaction_passed => true, supplied_policy_digest => repeat('a', 64)) ->> 'status', 'published', 'approved policy publishes under current consent');
+select is(public.complete_gate1_answer_job(pg_temp.case_id(21), (select (payload ->> 'leaseId')::uuid from claims where label = 'qualified'), supplied_redacted_text => 'Qualified synthetic answer', supplied_redaction_passed => true, supplied_policy_digest => repeat('a', 64), supplied_qualification_digest => repeat('b', 64)) ->> 'status', 'published', 'exact approved policy and report publish under current consent');
 select ok(not public.requeue_gate1_answer_job(pg_temp.case_id(21)), 'private requeue cannot republish a completed publication');
 reset role;
 select is((select publication_policy_digest from internal.gate1_answer_jobs where answer_id = pg_temp.case_id(21)), repeat('a', 64), 'completion records the active policy digest');
+select is((select publication_qualification_digest from internal.gate1_answer_jobs where answer_id = pg_temp.case_id(21)), repeat('b', 64), 'completion records the approved report digest');
+update internal.gate1_redaction_policies set qualification_digest = repeat('d', 64) where policy_digest = repeat('a', 64);
+set local role authenticated;
+select is((select count(*) from research.transcripts), 0::bigint, 'a replaced report hides projections under the previous report');
+select is_empty($$select * from public.read_gate1_researcher_transcripts('90600000-0000-4000-8000-000000000001')$$,
+    'the grouped projection observes report replacement');
+reset role;
+update internal.gate1_redaction_policies set qualification_digest = repeat('b', 64) where policy_digest = repeat('a', 64);
 update internal.gate1_redaction_policies set revoked_at = now() where policy_digest = repeat('a', 64);
 set local role authenticated;
 select is((select count(*) from research.transcripts), 0::bigint, 'revoked policy immediately hides its projection');

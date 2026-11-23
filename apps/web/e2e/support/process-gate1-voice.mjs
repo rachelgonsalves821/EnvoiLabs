@@ -22,6 +22,7 @@ for (const answerId of audioIds) {
     answerId,
     createTranscriber: () => new FakeTranscriber(transcripts),
     policyDigest: "a".repeat(64),
+    qualificationDigest: "b".repeat(64),
     redact: async (input) => input === syntheticTranscript ? "Synthetic speaker at [EMAIL]" : null,
   });
   const claim = ports.claim;
