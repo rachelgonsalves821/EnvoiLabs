@@ -37,3 +37,35 @@ class PersonSlotTests(unittest.TestCase):
 
     def test_product_and_order_labels_do_not_count_as_person_slots(self):
         self.assertEqual(slot_hits("the receipt uses discount code blue sky", "blue"), [])
+
+    def test_sentence_case_preserves_signing_and_record_boundaries(self):
+        for text, private in (
+            ("I signed the forms under Merin Fielding Before they checked the receipt.", "Merin Fielding"),
+            ("The roster lists Dariel Birch Lane And I received the reminder.", "Dariel Birch Lane"),
+            ("I go by Corin Dove And I wanted the early pickup.", "Corin Dove"),
+            ("People call me Eril Daily Before they check the roster.", "Eril Daily"),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(slot_hits(text), [name(text, private)])
+
+    def test_cased_introduction_still_needs_corroboration(self):
+        text = "I’m berin rémy By The Way."
+        person = name(text, "berin rémy")
+        self.assertEqual(slot_hits(text), [])
+        self.assertEqual(slot_hits(text, "berin"), [person])
+        self.assertEqual(slot_hits(text, detections=[name(text, "berin")]), [person])
+        self.assertEqual(slot_hits("I'm Berin Rémy."), [])
+
+    def test_capitalized_ordinary_speech_and_roles_are_preserved(self):
+        for text in (
+            "I'm A Floor Supervisor By The Way.",
+            "I'm Floor Supervisor By The Way.",
+            "I'm Very Disappointed By The Way.",
+            "I'm Somewhat Disappointed By The Way.",
+            "The receipt uses Discount Code Silver Morning.",
+            "They call me Pretty Often.",
+            "I go by Bus Most Days.",
+            "I go by word of mouth.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(slot_hits(text), [])
