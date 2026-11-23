@@ -43,6 +43,8 @@ The corroborated mailbox comparison tests fragmented host names and damaged addr
 
 The corroborated phone comparison handles misheard digits, repeated groups and a single damaged fragment inside a bounded contact value. It requires a direct phone role or a handoff with call wording or a nearby detected mailbox. Explicit local numbers can be shorter. Order codes and stock references alone are outside this comparison.
 
+The personal-record comparison tests bounded badge, check-in and recipient fields. Generic receipt fields also need an existing contextual person detection contained in the value. This extra pass blocks explicit public, vendor and product labels and preserves the preceding phone baseline.
+
 `spoken_pipeline.py` owns the source spans for every comparison. The scorer uses a fixed-width mask for those spans. The private synthetic entry point renders the latest development spans as `[redacted]` and rejects invalid offsets or casing transformations that change source length.
 
 The evaluator and private synthetic renderer can use the same `LocalDetectors` from `local_detectors.py` and `LocalCasingModel` from `asr_casing.py`. The model directory must contain exactly the five pinned contextual files. The loader checks every digest before inference. The evaluator records model hashes, policy source hashes and installed package versions.
