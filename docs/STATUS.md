@@ -762,3 +762,15 @@ Needs from others. Hosted speech and scheduling credentials are tracked in [issu
 Contract or schema changes. The worker completion call accepts an optional qualification digest. Existing callers can still complete private processing.
 
 Risks. Earlier job-backed projections without a recorded report digest stay hidden. The preview has no existing published projections or approved report.
+
+### 2026-11-23 — Gate 1 hosted scheduler and speech verification
+
+Done. The hosted expiry and private answer schedules both completed. The scheduled worker processed three synthetic typed answers privately and transcribed a separate pinned speech fixture with OpenAI `gpt-transcribe`. Both expected fixture terms were present, latency was 611 ms and estimated cost was 300 micros. The voice result stayed private. The separate [live speech smoke](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136) passed all six synthetic recordings, including Chromium audio.
+
+Next. Score the frozen independent redaction policy and rehearse publication only after qualification.
+
+Needs from others. None for the running qualification test.
+
+Contract or schema changes. None.
+
+Risks. A successful private worker run provides no evidence of researcher publication.
