@@ -630,3 +630,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. None.
 
 Risks. Inputs beyond the model limits stay private. The live worker remains disconnected and independent qualification is pending.
+
+### 2026-11-23 — Gate 1 long-answer redaction
+
+Done. The local candidate handles an over-limit answer as overlapping sections and validates each source span before projecting it back. The caller receives a result only after every section succeeds. All 72 focused tests passed, including an identity crossing a split and errors late in a long answer. [Replay instructions](../packages/ai/evals/redaction/contextual/spoken_v3/README.md)
+
+Next. Measure independently annotated long answers alongside short recognition output before approving the private publication policy.
+
+Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) for hosted prerequisites.
+
+Contract or schema changes. None.
+
+Risks. The long-answer path has synthetic evidence. Researcher publication remains gated.

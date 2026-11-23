@@ -12,7 +12,7 @@ from evaluate import PACKAGES, coverage, version
 from evaluate_v2 import digest, sources
 import benchmark
 from local_detectors import LocalDetectors, MODEL_FILES as CONTEXT_MODEL_FILES
-from spoken_pipeline import span_variants
+from spoken_pipeline import CANDIDATE, redaction_spans, span_variants
 
 _KNOWN_CORPORA = {
     "2057f7214368b047d9bb27b87b91cfd41e634182ab3f1feb3135f4d838d6ce85",
@@ -37,7 +37,10 @@ def main():
     args.add_argument("cases", type=Path)
     args.add_argument("output", type=Path)
     args.add_argument("--casing-model", type=Path, help="Run the pinned offline casing experiment on recognized text.")
+    args.add_argument("--candidate-only", action="store_true", help="Score the full-answer candidate, including section retries.")
     opts = args.parse_args()
+    if opts.candidate_only and opts.casing_model is None:
+        args.error("--candidate-only requires --casing-model")
     corpus_sha = digest(opts.cases)
     if corpus_sha not in _KNOWN_CORPORA:
         raise ValueError("Expected the already evaluated, known synthetic corpus")
@@ -48,7 +51,7 @@ def main():
         "identity_boundaries.py", "local_detectors.py",
         "person_slot_recovery.py",
         "phone_slot_recovery.py",
-        "product_context.py", "public_website_context.py", "spoken_contacts_recover.py", "spoken_pipeline.py",
+        "product_context.py", "public_website_context.py", "redaction_input.py", "spoken_contacts_recover.py", "spoken_pipeline.py",
     )] + [Path(benchmark.__file__)]
     candidate_hashes = {rule.name: digest(rule) for rule in candidates}
     rows = json.loads(opts.cases.read_text(encoding="utf-8-sig"))["cases"]
@@ -61,7 +64,12 @@ def main():
     results = {}
     for row in rows:
         text = row["text"]
-        for name, spans in span_variants(text, detectors.deterministic, detectors.contextual, restore, timings=timings):
+        if opts.candidate_only:
+            spans = redaction_spans(text, detectors.deterministic, detectors.contextual, restore)
+            variants = ((CANDIDATE, spans),)
+        else:
+            variants = span_variants(text, detectors.deterministic, detectors.contextual, restore, timings=timings)
+        for name, spans in variants:
             if name not in results:
                 results[name] = report_template()
             coverage(row, mask(text, spans), results[name])
@@ -83,9 +91,10 @@ def main():
         "inference_versions": {name: version(name) for name in (*PACKAGES, "tokenizers", "numpy")},
         "employer_slots_source_sha256": candidate_hashes["employer_slot_recovery.py"],
         "website_context_source_sha256": candidate_hashes["public_website_context.py"],
-        "additional_pass_p95_ms": p95(timings["contacts"]),
         "corpus_sha256": corpus_sha, "v2_sources": frozen_sources, "results": results,
     }
+    if timings["contacts"]:
+        report["additional_pass_p95_ms"] = p95(timings["contacts"])
     if casing:
         report["casing_model"] = {
             "revision": MODEL_REVISION, "asset_sha256": MODEL_FILES,
@@ -93,8 +102,9 @@ def main():
             "boundaries_source_sha256": candidate_hashes["identity_boundaries.py"],
             "person_slots_source_sha256": candidate_hashes["person_slot_recovery.py"],
             "phone_slots_source_sha256": candidate_hashes["phone_slot_recovery.py"],
-            "p95_ms": p95(timings["casing"]),
         }
+        if timings["casing"]:
+            report["casing_model"]["p95_ms"] = p95(timings["casing"])
     with opts.output.open("x", encoding="utf8") as stream:
         stream.write(json.dumps(report, indent=2) + "\n")
 

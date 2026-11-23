@@ -4,6 +4,7 @@ from hashlib import file_digest
 import json
 import re
 
+from redaction_input import RedactionInputTooLong
 from speech_context import Restored
 
 
@@ -71,7 +72,9 @@ class LocalCasingModel:
         if text != text.lower():
             raise ValueError("The casing evaluation expects lowercase recognized speech")
         encoded = self._tokenizer.encode(text)
-        if not 0 < len(encoded.ids) <= 512 or not any(encoded.special_tokens_mask):
+        if len(encoded.ids) > 512:
+            raise RedactionInputTooLong("Casing input exceeds the model limit")
+        if not encoded.ids or not any(encoded.special_tokens_mask):
             raise ValueError("Unexpected casing input shape")
         arrays = {
             "input_ids": encoded.ids, "attention_mask": encoded.attention_mask, "token_type_ids": encoded.type_ids,

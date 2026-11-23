@@ -3,6 +3,7 @@
 from hashlib import file_digest
 
 from candidate import Hit
+from redaction_input import RedactionInputTooLong
 
 
 MODEL_FILES = {
@@ -26,7 +27,9 @@ def _verify_model(directory):
 def _require_full_model_input(model, text, labels):
     processor = model.data_processor
     words = [token for token, _, _ in processor.words_splitter(text)]
-    if not words or len(words) > model.config.max_len:
+    if len(words) > model.config.max_len:
+        raise RedactionInputTooLong("Context input exceeds the model word limit")
+    if not words:
         raise ValueError("Context recognizer cannot process the full input")
     prompted, prompt_lengths = processor.prepare_inputs([words], labels)
     tokenizer = processor.transformer_tokenizer
@@ -34,7 +37,9 @@ def _require_full_model_input(model, text, labels):
     max_tokens = min(tokenizer.model_max_length, model.config.encoder_config.max_position_embeddings)
     source_words = {index for index in encoded.word_ids(0) if index is not None and index >= prompt_lengths[0]}
     expected_words = set(range(prompt_lengths[0], prompt_lengths[0] + len(words)))
-    if len(encoded.input_ids[0]) > max_tokens or source_words != expected_words:
+    if len(encoded.input_ids[0]) > max_tokens:
+        raise RedactionInputTooLong("Context input exceeds the model subword limit")
+    if source_words != expected_words:
         raise ValueError("Context recognizer cannot process the full input")
 
 

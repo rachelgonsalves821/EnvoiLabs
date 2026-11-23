@@ -3,7 +3,7 @@
 from time import perf_counter
 
 from address_slot_recovery import recover_address_slots
-from candidate import candidate_hits
+from candidate import Hit, candidate_hits
 from confirmed_names import confirmed_name_slots
 from email_slot_recovery import recover_email_slots
 from employer_slot_recovery import employer_slots
@@ -12,6 +12,7 @@ from person_slot_recovery import detect_person_slots
 from phone_slot_recovery import recover_number_slots
 from product_context import is_explicit_commercial_reference, is_product_title
 from public_website_context import preserving_public_ref, public_website_ranges
+from redaction_input import RedactionInputTooLong, answer_windows
 from speech_context import explicit_identities, restore_for_model
 from spoken_contact import spoken_contact_hits
 from spoken_contacts_recover import recovered_contacts
@@ -108,9 +109,7 @@ def span_variants(text, deterministic, predict, restore=None, *, timings=None):
 def render_redacted(text, spans):
     """Replace the union of the same scored spans with readable placeholders."""
     parts, end = [], 0
-    ordered = sorted((hit.start, hit.end) for hit in spans)
-    if any(not 0 <= start < stop <= len(text) for start, stop in ordered):
-        raise ValueError("Recognizer returned an invalid source span")
+    ordered = sorted((hit.start, hit.end) for hit in _validated_spans(text, spans))
     for start, stop in ordered:
         if end == 0 or start > end:
             parts.extend((text[end:start], "[redacted]"))
@@ -119,11 +118,39 @@ def render_redacted(text, spans):
     return "".join(parts)
 
 
-def redact(text, deterministic, predict, restore):
-    """Render the unqualified candidate for private synthetic verification."""
-    if restore is None:
-        raise ValueError("The candidate requires the configured casing model")
+def _validated_spans(text, spans):
+    result = tuple(spans)
+    if any(not 0 <= hit.start < hit.end <= len(text) for hit in result):
+        raise ValueError("Recognizer returned an invalid source span")
+    return result
+
+
+def _candidate_spans(text, deterministic, predict, restore):
     for policy, spans in span_variants(text, deterministic, predict, restore):
         if policy == CANDIDATE:
-            return render_redacted(text, spans)
+            return _validated_spans(text, spans)
     raise RuntimeError("The configured candidate was absent from the pipeline")
+
+
+def redaction_spans(text, deterministic, predict, restore):
+    """Return source spans only after all required model calls succeed."""
+    if restore is None:
+        raise ValueError("The candidate requires the configured casing model")
+    try:
+        return _candidate_spans(text, deterministic, predict, restore)
+    except RedactionInputTooLong:
+        windows = tuple(answer_windows(text))
+        if len(windows) < 2:
+            raise
+
+    spans = []
+    for start, end in windows:
+        section = text[start:end]
+        for hit in _candidate_spans(section, deterministic, predict, restore):
+            spans.append(Hit(hit.label, start + hit.start, start + hit.end))
+    return tuple(spans)
+
+
+def redact(text, deterministic, predict, restore):
+    """Render the unqualified candidate for private synthetic verification."""
+    return render_redacted(text, redaction_spans(text, deterministic, predict, restore))

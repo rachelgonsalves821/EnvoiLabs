@@ -41,7 +41,9 @@ The address comparison follows bounded private location and delivery cues. It te
 
 `spoken_pipeline.py` owns the source spans for every comparison. The scorer uses a fixed-width mask for those spans. The private synthetic entry point renders the latest development spans as `[redacted]` and rejects invalid offsets or casing transformations that change source length.
 
-The evaluator and private synthetic renderer can use the same `LocalDetectors` from `local_detectors.py` and `LocalCasingModel` from `asr_casing.py`. The model directory must contain exactly the five pinned contextual files. The loader checks every digest before inference. It rejects input if the contextual or casing models cannot read all of it. The evaluator records model hashes, policy source hashes and installed package versions. The live worker still needs a qualified policy, controlled long-answer handling and a verified private deployment before publication.
+The evaluator and private synthetic renderer can use the same `LocalDetectors` from `local_detectors.py` and `LocalCasingModel` from `asr_casing.py`. The model directory must contain exactly the five pinned contextual files. The loader checks every digest before inference. The evaluator records model hashes, policy source hashes and installed package versions.
+
+The `redaction_spans` entry point retries an input that exceeds a model length limit as overlapping sections of 128 words with 64 words of overlap. It validates each section's spans before projecting them back to the full text. The renderer runs only after every section succeeds. An invalid result or a section beyond the model's limits withholds the full answer. Pass `--candidate-only` with `--casing-model` to score this exact entry point. The live worker still needs a qualified policy and a verified private deployment before publication.
 
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
