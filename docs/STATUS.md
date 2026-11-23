@@ -726,3 +726,15 @@ Needs from others. See [issue #4](https://github.com/rachelgonsalves821/EnvoiLab
 Contract or schema changes. The qualification report records its canonical policy digest. No database change.
 
 Risks. No independent policy is active. The hosted job has no redactor configuration.
+
+### 2026-11-23 — Gate 1 grouped transcript contract
+
+Done. Defined a versioned researcher response for redacted answers grouped by a study-local respondent number. The only profile field is a nullable student flag. The existing flat transcript schema remains supported.
+
+Next. Add the consent-scoped database projection and update the researcher panel and acceptance test.
+
+Needs from others. Platform and Researcher use the new response for the grouped viewer. The existing flat endpoint keeps its response shape for current callers.
+
+Contract or schema changes. Added `ResearcherTranscriptListV2Schema`.
+
+Risks. The contract does not grant profile or transcript access. The database projection still needs to be wired and tested before enabling the grouped view.

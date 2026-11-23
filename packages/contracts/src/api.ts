@@ -152,9 +152,21 @@ export const StudyTrackingResponseSchema = withExample(z.strictObject({
   projectedFinish: timestamp.nullable(),
 }), { ...exampleStudy, state: "fielding", invited: 3, accepted: 2, completed: 1, removed: 0, projectedFinish: null });
 
+const researcherTranscript = z.strictObject({ id, redactedText: z.string() });
+const exampleTranscript = { id: exampleId, redactedText: "I ordered lunch." };
+
 export const ResearcherTranscriptListSchema = withExample(z.strictObject({
-  ...studyId, transcripts: z.array(z.strictObject({ id, redactedText: z.string() })),
-}), { ...exampleStudy, transcripts: [{ id: exampleId, redactedText: "I ordered lunch." }] });
+  ...studyId, transcripts: z.array(researcherTranscript),
+}), { ...exampleStudy, transcripts: [exampleTranscript] });
+
+export const ResearcherTranscriptListV2Schema = withExample(z.strictObject({
+  ...studyId,
+  respondents: z.array(z.strictObject({
+    number: positive,
+    student: z.boolean().nullable(),
+    transcripts: z.array(researcherTranscript).min(1),
+  })),
+}), { ...exampleStudy, respondents: [{ number: 1, student: true, transcripts: [exampleTranscript] }] });
 
 export type RespondentEmailStartRequest = z.infer<typeof RespondentEmailStartRequestSchema>;
 export type ResearcherMagicLinkRequest = z.infer<typeof ResearcherMagicLinkRequestSchema>;
@@ -186,3 +198,4 @@ export type StudyMutationResponse = z.infer<typeof StudyMutationResponseSchema>;
 export type StudyTrackingRequest = z.infer<typeof StudyTrackingRequestSchema>;
 export type StudyTrackingResponse = z.infer<typeof StudyTrackingResponseSchema>;
 export type ResearcherTranscriptList = z.infer<typeof ResearcherTranscriptListSchema>;
+export type ResearcherTranscriptListV2 = z.infer<typeof ResearcherTranscriptListV2Schema>;
