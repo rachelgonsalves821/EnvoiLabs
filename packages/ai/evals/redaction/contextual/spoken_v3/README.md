@@ -51,6 +51,20 @@ The evaluator and private synthetic renderer can use the same `LocalDetectors` f
 
 The `redaction_spans` entry point retries an input that exceeds a model length limit as overlapping sections of 128 words with 64 words of overlap. It validates each section's spans before projecting them back to the full text. The renderer runs only after every section succeeds. An invalid result or a section beyond the model's limits withholds the full answer. Pass `--candidate-only` with `--casing-model` to score this exact entry point. The live worker still needs a qualified policy and a verified private deployment before publication.
 
+### Independent qualification
+
+Set `PYTHONHASHSEED=0` and run `python -B qualify.py describe-policy` on the pinned evaluator machine before opening any independent fixture. Save that JSON under `policy` in a manifest. An independent corpus custodian supplies the SHA-256 digests of the paired authored and recognized fixtures under `corpora.authored` and `corpora.recognized`. Record `provenance.independent` and the recognition identifiers in `provenance.asr.provider` and `provenance.asr.model`. Review the completed manifest with the custodian and commit its SHA-256 to `approved-qualification-manifests.json` before the scoring operator accesses either fixture. Use `independent: false` for development replays.
+
+Each file has a `cases` array with shared unique `id` values. A case includes `text`, `sensitive` spans with `entity`, `start`, and `end`, and protected `evidence` spans. Ranges are zero-based Unicode character offsets with exclusive ends. Recognition annotations must account for every authored sensitive span. Record genuinely absent spans as entity labels in `omitted_entities` so missing speech is visible separately from detection recall. Include clean controls, annotated evidence and representative long cases for assessment.
+
+```sh
+python -B qualify.py run --manifest qualification.json --manifest-sha256 "$FROZEN_MANIFEST_SHA256" \
+  --authored reference.json --recognized observed.json --context-model "$ENVOI_GLINER_MODEL" \
+  --casing-model "$ENVOI_CASING_MODEL" --output qualification-report.json
+```
+
+The output contains aggregate counts, withheld answers, ASR omissions and timings. It reports recall on visible spans and coverage against the paired authored spans, so omitted material cannot inflate the qualification score. A `qualified_recall` result requires an approved independent manifest, paired coverage meeting the PRD floors, full address coverage, clean and evidence controls, and zero failed answers. Exit `1` means the report is complete and recall did not qualify. Exit `2` means policy or input verification failed. Review evidence alterations and deployment separately before authorizing any publication. [PRD](../../../../../../docs/PRD.md)
+
 ```sh
 python -B compare_contact_recovery.py "$ENVOI_SPOKEN_KNOWN/asr-cases.json" \
   contact-recovery-casing.json --casing-model "$ENVOI_CASING_MODEL"
