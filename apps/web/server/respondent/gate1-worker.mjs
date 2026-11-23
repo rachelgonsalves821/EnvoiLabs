@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { createGroqTranscriber, createOpenAITranscriber, runGate1AnswerJob, withTranscriptionFallback } from "@envoi-labs/ai";
+import { createLocalGate1Redactor } from "./gate1-local-redactor.mjs";
 
 const audioBucket = "gate1-interview-audio";
 const uuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
@@ -89,7 +90,7 @@ function configuredTranscriber(env, durationMs) {
   return openai && groq ? withTranscriptionFallback(openai, groq) : openai ?? groq;
 }
 
-export async function runConfiguredGate1AnswerJob(env, answerId = null) {
+export async function runConfiguredGate1AnswerJob(env, answerId = null, redactor = null) {
   if (answerId !== null && !uuid.test(answerId)) throw new Error("Supply a valid Gate 1 answer ID.");
   const url = new URL(env.SUPABASE_URL);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
@@ -99,7 +100,7 @@ export async function runConfiguredGate1AnswerJob(env, answerId = null) {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
   return runGate1AnswerJob(createGate1DatabasePorts(client, {
-    answerId, createTranscriber: (durationMs) => configuredTranscriber(env, durationMs),
+    ...redactor, answerId, createTranscriber: (durationMs) => configuredTranscriber(env, durationMs),
   }));
 }
 
@@ -107,7 +108,19 @@ async function main(args, env) {
   const next = args.length === 1 && args[0] === "--next";
   const selected = args.length === 2 && args[0] === "--answer" && uuid.test(args[1]);
   if (!next && !selected) throw new Error("Use --next or supply one Gate 1 answer ID using --answer.");
-  const status = await runConfiguredGate1AnswerJob(env, next ? null : args[1]);
+  const redactor = env.ENVOI_GATE1_REDACTION_EXECUTABLE ? createLocalGate1Redactor({
+    executable: env.ENVOI_GATE1_REDACTION_EXECUTABLE,
+    script: env.ENVOI_GATE1_REDACTION_SCRIPT,
+    manifest: env.ENVOI_GATE1_REDACTION_MANIFEST,
+    manifestSha256: env.ENVOI_GATE1_REDACTION_MANIFEST_SHA256,
+    report: env.ENVOI_GATE1_REDACTION_REPORT,
+    reportSha256: env.ENVOI_GATE1_REDACTION_REPORT_SHA256,
+    policyDigest: env.ENVOI_GATE1_REDACTION_POLICY_DIGEST,
+    contextModel: env.ENVOI_GATE1_REDACTION_CONTEXT_MODEL,
+    casingModel: env.ENVOI_GATE1_REDACTION_CASING_MODEL,
+    pythonPath: env.ENVOI_GATE1_REDACTION_PYTHONPATH,
+  }) : null;
+  const status = await runConfiguredGate1AnswerJob(env, next ? null : args[1], redactor);
   console.log(JSON.stringify({ status }));
 }
 

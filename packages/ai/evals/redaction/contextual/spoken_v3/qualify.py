@@ -35,13 +35,17 @@ _SOURCES = (
         "address_slot_recovery", "asr_casing", "compare_contact_recovery", "confirmed_names",
         "email_slot_recovery", "employer_slot_recovery", "identity_boundaries", "local_detectors",
         "person_slot_recovery", "phone_slot_recovery", "product_context", "public_website_context",
-        "qualify", "redaction_input", "spoken_contacts_recover", "spoken_pipeline",
+        "qualify", "redaction_input", "serve_gate1", "spoken_contacts_recover", "spoken_pipeline",
     )),
 )
 
 
 def digest(data):
     return sha256(data).hexdigest()
+
+
+def policy_digest(policy):
+    return digest(json.dumps(policy, separators=(",", ":"), sort_keys=True).encode("utf8"))
 
 
 def policy_snapshot():
@@ -211,6 +215,7 @@ def main():
         if policy_snapshot() != policy or _APPROVALS.read_bytes() != approvals:
             raise ValueError("Policy changed during qualification")
         result["manifest_sha256"] = args.manifest_sha256
+        result["policy_digest"] = policy_digest(policy)
         result["approval_record_sha256"] = digest(approvals)
         with args.output.open("x", encoding="utf-8") as stream:
             stream.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
