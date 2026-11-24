@@ -35,7 +35,7 @@ export interface ProbeDecisionPort {
     readonly turnId: string; readonly transcriptRevision: string;
     readonly decision: ProbeDecision;
   }): Promise<{ status: "committed"; value: CommittedProbe } |
-    { status: "stale" | "unavailable" }>;
+    { status: "conflict" | "stale" | "unavailable" }>;
   /** Compare and set before storing shown_at for this exact persisted probe. */
   markShown(input: { readonly sessionId: string; readonly turnId: string;
     readonly probeId: string; readonly browserRenderedAtMs: number }): Promise<"recorded" | "stale" | "unavailable">;
@@ -64,6 +64,14 @@ function validCommitted(value: CommittedProbe, sessionId: string, turnId: string
     && !!value.questionId && !!value.answerId && !!value.transcriptRevision
     && value.decision.turnId === turnId
     && (value.decision.action === "probe" ? !!value.probeId : value.probeId === null);
+}
+
+function sameCommittedTurn(ready: ReadyProbeTurn, value: CommittedProbe): boolean {
+  return value.sessionId === ready.turn.sessionId
+    && value.questionId === ready.turn.questionId
+    && value.answerId === ready.turn.answerId
+    && value.turnId === ready.turn.turnId
+    && value.transcriptRevision === ready.transcriptRevision;
 }
 
 /** Runs one authorized, revision-bound decision; no generated text is shown before commit. */
@@ -104,19 +112,22 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
     if (!current || !sameReady(ready, current)) {
       const committed = await port.readCommitted(sessionId, turnId);
       return committed && validCommitted(committed, sessionId, turnId)
+        && sameCommittedTurn(ready, committed)
         ? { status: "committed", value: committed } : { status: "stale" };
     }
     const result = await port.commitDecision({ sessionId, questionId: ready.turn.questionId,
       answerId: ready.turn.answerId, turnId, transcriptRevision: ready.transcriptRevision, decision });
-    if (result.status !== "committed") return result;
+    if (result.status !== "committed") {
+      if (result.status === "stale") return { status: "stale" };
+      const winner = await port.readCommitted(sessionId, turnId);
+      if (winner && validCommitted(winner, sessionId, turnId))
+        return sameCommittedTurn(ready, winner)
+          ? { status: "committed", value: winner } : { status: "stale" };
+      return { status: "unavailable" };
+    }
     const saved = result.value;
     if (!validCommitted(saved, sessionId, turnId)
-      || saved.questionId !== ready.turn.questionId
-      || saved.answerId !== ready.turn.answerId || saved.turnId !== turnId
-      || saved.transcriptRevision !== ready.transcriptRevision
-      || JSON.stringify(saved.decision) !== JSON.stringify(decision)
-      || (decision.action === "probe" && !saved.probeId)
-      || (decision.action === "next" && saved.probeId !== null)) return { status: "unavailable" };
+      || !sameCommittedTurn(ready, saved)) return { status: "stale" };
     return { status: "committed", value: saved };
   } catch {
     return { status: "unavailable" };

@@ -139,4 +139,38 @@ describe("probe decision and render ports", () => {
     expect(result).toEqual({ status: "committed", value: prior });
     expect(port.commitDecision).not.toHaveBeenCalled();
   });
+
+  it("accepts a different first-writer decision returned by the commit port", async () => {
+    const { port } = setup();
+    const winner = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
+      turnId: "turn-1", transcriptRevision: "source-1", probeId: null,
+      decision: { action: "next" as const, turnId: "turn-1", outcome: "no_probe" as const } };
+    port.commitDecision = vi.fn(async () => ({ status: "committed" as const, value: winner }));
+    expect(await runProbeDecision(port, provider(async () => response({ action: "probe",
+      text: "Our losing proposal?" })), "session-1", "turn-1", 500, () => 300))
+      .toEqual({ status: "committed", value: winner });
+  });
+
+  it("reads a conflict winner only for the same still-current answer and revision", async () => {
+    const { port, setCommitted } = setup();
+    port.commitDecision = vi.fn(async () => ({ status: "conflict" as const }));
+    const winner = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
+      turnId: "turn-1", transcriptRevision: "source-1", probeId: "probe-winner",
+      decision: { action: "probe" as const, turnId: "turn-1", text: "What changed?",
+        uploadConfirmedAtMs: 50 } };
+    const model = provider(async () => {
+      setCommitted(winner);
+      return response({ action: "probe", text: "Different proposed probe?" });
+    });
+    expect(await runProbeDecision(port, model, "session-1", "turn-1", 500, () => 300))
+      .toEqual({ status: "committed", value: winner });
+    setCommitted(null);
+    const revised = { ...winner, transcriptRevision: "source-2" };
+    const staleModel = provider(async () => {
+      setCommitted(revised);
+      return response({ action: "probe", text: "Still current?" });
+    });
+    expect(await runProbeDecision(port, staleModel, "session-1", "turn-1", 500, () => 300))
+      .toEqual({ status: "stale" });
+  });
 });
