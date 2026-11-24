@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import { PaymentV2Schema, QuoteV2Schema, ScreeningDecisionV1Schema,
+import { PaymentV2Schema, QuoteV2Schema, QuoteV3Schema, ScreeningDecisionV1Schema,
   ScreeningInterpretationV1Schema, ScreeningRuleV1Schema } from "../src/index.js";
 
 function example(schema: z.ZodType) {
@@ -10,6 +10,20 @@ function example(schema: z.ZodType) {
 }
 
 describe("Gate 2 additive contracts", () => {
+  it("keeps old quotes readable but requires ten respondents and $1 reward in V3", () => {
+    const oldQuote = QuoteV2Schema.parse(example(QuoteV2Schema));
+    const marketplace = QuoteV3Schema.parse(example(QuoteV3Schema));
+    expect(QuoteV3Schema.safeParse(oldQuote).success).toBe(false);
+    expect(QuoteV3Schema.safeParse(marketplace).success).toBe(true);
+    expect(QuoteV3Schema.safeParse({ ...marketplace,
+      incentiveCentsPerComplete: 400 }).success).toBe(false);
+    expect(QuoteV3Schema.safeParse({ ...marketplace, lineItems: [{
+      ...marketplace.lineItems[0], unitPriceCents: 100,
+      amountCents: 5000 }], totalCents: 5000 }).success).toBe(false);
+    expect(QuoteV3Schema.safeParse({ ...marketplace, lineItems: [{
+      ...marketplace.lineItems[0], respondentCount: 9,
+      amountCents: 9000 }], totalCents: 9000 }).success).toBe(false);
+  });
   it.each([QuoteV2Schema, PaymentV2Schema, ScreeningRuleV1Schema,
     ScreeningInterpretationV1Schema, ScreeningDecisionV1Schema])("round trips its example", (schema) => {
     const value = example(schema);
