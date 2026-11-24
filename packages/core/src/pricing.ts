@@ -9,6 +9,7 @@ export interface StudyPrice {
   pricingConfigVersion: number;
   totalCents: number;
   incentiveCentsPerComplete: number;
+  /** Revenue less planned respondent incentives only; not realized margin. */
   expectedMarginCents: number;
   lineItems: readonly [{
     label: "Core questions";
