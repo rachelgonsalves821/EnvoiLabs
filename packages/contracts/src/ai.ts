@@ -85,6 +85,57 @@ export const ThemeSetSchema = withExample(z.strictObject({
   hypotheses: [{ hypothesis: "Fees matter more for small orders.", result: "supported" }],
   followUpBrief: exampleBrief });
 
+const hypothesisFields = {
+  hypothesis: nonBlank,
+  result: z.enum(["supported", "weakened", "untested"]),
+};
+const themeV2Fields = {
+  claim: nonBlank,
+  count: z.int().positive(),
+  total: z.int().positive(),
+  confidence: z.enum(["high", "medium", "low"]),
+};
+const validThemeCount = ({ count: themeCount, total }: { count: number; total: number }) =>
+  themeCount <= total;
+const exampleVerifiedQuote = { studyId: exampleId, transcriptId: exampleId,
+  sourceVersion: exampleId, startChar: 0, endChar: 7, exactText: "ordered", confidence: 0.9 };
+const exampleCandidateQuote = { ...exampleVerifiedQuote, rationale: "Describes a past order." };
+
+export const AnalystThemeV2Schema = withExample(z.strictObject({
+  ...themeV2Fields,
+  supportingQuotes: z.array(EvidenceQuoteCandidateV2Schema).min(1).max(10),
+  contradictingQuotes: z.array(EvidenceQuoteCandidateV2Schema),
+}).refine(validThemeCount, { path: ["count"], message: "The theme count cannot exceed the total." }),
+{ ...exampleTheme, supportingQuotes: [exampleCandidateQuote], contradictingQuotes: [] });
+
+// Private model output: the follow-up brief and quote rationale need review.
+export const AnalystThemeSetV2Schema = withExample(z.strictObject({
+  executiveAnswer: nonBlank,
+  themes: z.array(AnalystThemeV2Schema),
+  hypotheses: z.array(z.strictObject(hypothesisFields)),
+  followUpBrief: BriefSchema,
+}), { executiveAnswer: "Test a lower fee.", themes: [{ ...exampleTheme,
+  supportingQuotes: [exampleCandidateQuote], contradictingQuotes: [] }],
+  hypotheses: [{ hypothesis: "Fees matter more for small orders.", result: "supported" as const }],
+  followUpBrief: exampleBrief });
+
+export const PublishedThemeV2Schema = withExample(z.strictObject({
+  ...themeV2Fields,
+  supportingQuotes: z.array(VerifiedEvidenceQuoteV2Schema).min(1).max(10),
+  contradictingQuotes: z.array(VerifiedEvidenceQuoteV2Schema),
+}).refine(validThemeCount, { path: ["count"], message: "The theme count cannot exceed the total." }),
+{ ...exampleTheme, supportingQuotes: [exampleVerifiedQuote], contradictingQuotes: [] });
+
+// The trusted qualified publisher must check every free-text field and quote
+// before constructing this public shape. Parsing alone cannot publish it.
+export const PublishedThemeSetV2Schema = withExample(z.strictObject({
+  executiveAnswer: nonBlank,
+  themes: z.array(PublishedThemeV2Schema),
+  hypotheses: z.array(z.strictObject(hypothesisFields)),
+}), { executiveAnswer: "Test a lower fee.", themes: [{ ...exampleTheme,
+  supportingQuotes: [exampleVerifiedQuote], contradictingQuotes: [] }],
+  hypotheses: [{ hypothesis: "Fees matter more for small orders.", result: "supported" as const }] });
+
 export type ScopingTurn = z.infer<typeof ScopingTurnSchema>;
 export type ProbeDecision = z.infer<typeof ProbeDecisionSchema>;
 export type QualitySignals = z.infer<typeof QualitySignalsSchema>;
@@ -93,3 +144,7 @@ export type EvidenceQuoteCandidateV2 = z.infer<typeof EvidenceQuoteCandidateV2Sc
 export type VerifiedEvidenceQuoteV2 = z.infer<typeof VerifiedEvidenceQuoteV2Schema>;
 export type Theme = z.infer<typeof ThemeSchema>;
 export type ThemeSet = z.infer<typeof ThemeSetSchema>;
+export type AnalystThemeV2 = z.infer<typeof AnalystThemeV2Schema>;
+export type AnalystThemeSetV2 = z.infer<typeof AnalystThemeSetV2Schema>;
+export type PublishedThemeV2 = z.infer<typeof PublishedThemeV2Schema>;
+export type PublishedThemeSetV2 = z.infer<typeof PublishedThemeSetV2Schema>;
