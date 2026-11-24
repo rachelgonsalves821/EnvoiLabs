@@ -2,7 +2,7 @@
 
 import re
 
-from candidate import Hit
+from candidate import Hit, _STREET
 from spoken_contact import _CARDINAL, _STREET_SUFFIXES, _address_end, _digit, _number_end, tokenize
 
 
@@ -86,6 +86,23 @@ _WRITTEN_UNIT = re.compile(
     r"(?:[0-9]{1,4}[a-z]?(?!\.[0-9])(?=$|[ \t\r\n,.;:!?])|[a-z](?=$|[\r\n,.;:!?]))",
     re.I | re.ASCII,
 )
+_HYPHENATED_HOUSE_NUMBER = re.compile(
+    r"(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)-(?:one|two|three|four|five|six|seven|eight|nine)",
+    re.I,
+)
+_SHAPED_UNIT = re.compile(
+    r"(?P<street_period>\.)?,?[ \t]+(?:(?:front|rear|side|upper|lower) (?:apartment|apt\.?|flat|suite|unit)|"
+    r"(?:apartment|apt\.?|flat|suite|unit) (?:number|no\.?))[ \t]+"
+    r"[0-9]{1,4}[a-z]?(?!\.[0-9])(?=$|[ \t\r\n,.;:!?])",
+    re.I | re.ASCII,
+)
+_SHAPED_STREET_TYPES = _STREET_SUFFIXES - {"way", "place", "pl", "trail", "trl", "loop", "highway", "hwy", "row"}
+_STREET_PUBLIC_CONTEXT = re.compile(
+    r"\b(?:public|advertised|directory|landmark|library|museum|store|shop|vendor|route|mile marker|exhibit|"
+    r"passed|(?:walked|drove|rode) (?:past|along)|purchased|bought|sold|quote|price|total|item|model)\b",
+    re.I,
+)
+_SHAPED_BOUNDARY = re.compile(r"\b(?:just (?:before|after)|even though)\b", re.I)
 
 
 def _house_number_end(tokens, start):
@@ -157,6 +174,45 @@ def _qualified_unit_end(text, start, stop):
     end = unit.end() + value[last - 1].end
     access = _UNIT_ACCESS.match(text, end, stop)
     return access.end() if access else end
+
+
+def _strong_street_shapes(text, tokens, offsets):
+    for match in _STREET.finditer(text):
+        number = match["number"]
+        hyphenated = _HYPHENATED_HOUSE_NUMBER.fullmatch(number)
+        if not (hyphenated or re.fullmatch(r"[0-9]{1,6}", number)):
+            continue
+        start = match.start()
+        index = offsets.get(start)
+        if index is None or tokens[index].end != match.end("number"):
+            continue
+        before = re.split(r"[.!?;\r\n]", text[max(0, start - 72):start])[-1]
+        if _STREET_PUBLIC_CONTEXT.search(before):
+            continue
+        # Reuse the same street parser and source tokens as the private cue paths.
+        first = index + 1
+        street_end = _street_end(tokens, first, len(tokens), private=False)
+        if not 2 <= street_end - first - 1 <= 4:
+            continue
+        street_type = tokens[street_end - 1]
+        if (street_type.word not in _SHAPED_STREET_TYPES or street_type.end > match.end()
+                or not all(_STREET_WORD.fullmatch(token.word) and text[token.start].isupper()
+                           for token in tokens[first:street_end - 1])
+                or not re.fullmatch(r"[^\r\n]+", text[start:street_type.end])
+                or _PUBLIC_DELIVERY_DESTINATION.match(text, street_type.end)):
+            continue
+        unit = _SHAPED_UNIT.match(text, street_type.end)
+        if unit and (not unit.group("street_period") or street_type.word in _STREET_ABBREVIATIONS):
+            end = unit.end()
+        elif hyphenated:
+            end = _written_unit_offset(text, street_type) or tokens[_unit_end(tokens, street_end) - 1].end
+        else:
+            continue
+        following = text[end:end + 48].lstrip()
+        if not _PUBLIC_DELIVERY_DESTINATION.match(text, end) and (
+            not following or _CLAUSE_END.match(following) or _SHAPED_BOUNDARY.match(following)
+        ):
+            yield Hit("address", start, end)
 
 
 def recover_address_slots(text):
@@ -268,3 +324,4 @@ def recover_corroborated_addresses(text):
                         or _WAYPOINT.search(text, last_offset, end)):
                     continue
             yield Hit("address", tokens[start].start, written_offset or last_offset)
+    yield from _strong_street_shapes(text, tokens, offsets)

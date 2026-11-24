@@ -85,6 +85,33 @@ class AddressSlotRecoveryTests(unittest.TestCase):
                 self.assertEqual(self.recovered(text), [value])
                 self.assertEqual(self.corroborated(text), [value])
 
+    def test_uncued_complete_street_shape_recovers_spelled_number_and_conventional_units(self):
+        for text, value in (
+            ("It put eighty-one Juniper Vale Mews. The button stayed enabled.", "eighty-one Juniper Vale Mews"),
+            ("The keyboard showed 9 Crowfen Beck Ln., rear flat 4 just before the reminder.",
+             "9 Crowfen Beck Ln., rear flat 4"),
+            ("It recorded 17 White Sloe Rd. Apartment no. 5 even though the screen reset.",
+             "17 White Sloe Rd. Apartment no. 5"),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self.corroborated(text), [value])
+
+    def test_uncued_street_shapes_leave_public_or_ambiguous_evidence(self):
+        for text in (
+            "We passed eighty-one Juniper Vale Mews. The map gave clear directions.",
+            "The public library is at eighty-one Juniper Vale Mews.",
+            "I bought eighty-one Juniper Vale Mews sample cards.",
+            "The label says demo-eighty-one Juniper Vale Mews.",
+            "The field showed eighty-one new street signs.",
+            "It read 7. 2. 4. Little Larch Court and the next control worked.",
+            "The unit at 22 Foxberry Rowan Road. Unit no. 6 was the mixer I tested.",
+            "I liked 9 Crowfen Beck Ln., rear flat display panels.",
+            "The advertised shop at 17 White Sloe Rd. Apartment no. 5 was an example.",
+            "It recorded 17 White Sloe Rd. Apartment no. 5, which is the public pickup counter.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self.corroborated(text), [])
+
     def recovered(self, text):
         return [text[hit.start:hit.end] for hit in recover_address_slots(text)]
 
