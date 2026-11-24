@@ -110,11 +110,12 @@ export const AnalystThemeV2Schema = withExample(z.strictObject({
 
 // Private model output: the follow-up brief and quote rationale need review.
 export const AnalystThemeSetV2Schema = withExample(z.strictObject({
+  version: z.literal(2),
   executiveAnswer: nonBlank,
   themes: z.array(AnalystThemeV2Schema),
   hypotheses: z.array(z.strictObject(hypothesisFields)),
   followUpBrief: BriefSchema,
-}), { executiveAnswer: "Test a lower fee.", themes: [{ ...exampleTheme,
+}), { version: 2, executiveAnswer: "Test a lower fee.", themes: [{ ...exampleTheme,
   supportingQuotes: [exampleCandidateQuote], contradictingQuotes: [] }],
   hypotheses: [{ hypothesis: "Fees matter more for small orders.", result: "supported" as const }],
   followUpBrief: exampleBrief });
@@ -129,10 +130,11 @@ export const PublishedThemeV2Schema = withExample(z.strictObject({
 // The trusted qualified publisher must check every free-text field and quote
 // before constructing this public shape. Parsing alone cannot publish it.
 export const PublishedThemeSetV2Schema = withExample(z.strictObject({
+  version: z.literal(2),
   executiveAnswer: nonBlank,
   themes: z.array(PublishedThemeV2Schema),
   hypotheses: z.array(z.strictObject(hypothesisFields)),
-}), { executiveAnswer: "Test a lower fee.", themes: [{ ...exampleTheme,
+}), { version: 2, executiveAnswer: "Test a lower fee.", themes: [{ ...exampleTheme,
   supportingQuotes: [exampleVerifiedQuote], contradictingQuotes: [] }],
   hypotheses: [{ hypothesis: "Fees matter more for small orders.", result: "supported" as const }] });
 

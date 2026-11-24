@@ -26,6 +26,7 @@ describe("Gate 3 evidence contracts", () => {
     const v1 = firstExample(ThemeSetSchema);
     expect(ThemeSetSchema.safeParse(v1).success).toBe(true);
     expect(AnalystThemeSetV2Schema.safeParse(v1).success).toBe(false);
+    expect(AnalystThemeSetV2Schema.safeParse({ ...v1 as object, themes: [] }).success).toBe(false);
     expect(AnalystThemeSetV2Schema.safeParse(firstExample(AnalystThemeSetV2Schema)).success).toBe(true);
   });
 
@@ -34,7 +35,7 @@ describe("Gate 3 evidence contracts", () => {
     const verified = Object.fromEntries(Object.entries(quote).filter(([key]) => key !== "rationale"));
     const privateTheme = { claim: "A respondent used emoji.", count: 1, total: 1,
       confidence: "high" as const, supportingQuotes: [quote], contradictingQuotes: [] };
-    const published = { executiveAnswer: "An emoji appeared.", themes: [{ ...privateTheme,
+    const published = { version: 2, executiveAnswer: "An emoji appeared.", themes: [{ ...privateTheme,
       supportingQuotes: [verified] }],
     hypotheses: [{ hypothesis: "Emoji matter.", result: "untested" as const }] };
     expect(AnalystThemeSetV2Schema.safeParse({ ...published, themes: [privateTheme],
