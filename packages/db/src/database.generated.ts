@@ -441,6 +441,47 @@ export type Database = {
           },
         ]
       }
+      gate2_payout_events: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          event_kind: string
+          id: string
+          payout_id: string
+          provider_event_id: string
+          provider_observed_at: string
+          provider_order_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          event_kind: string
+          id?: string
+          payout_id: string
+          provider_event_id: string
+          provider_observed_at: string
+          provider_order_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          event_kind?: string
+          id?: string
+          payout_id?: string
+          provider_event_id?: string
+          provider_observed_at?: string
+          provider_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate2_payout_events_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "payouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gate2_quote_snapshots: {
         Row: {
           brief_version: number
@@ -1658,6 +1699,16 @@ export type Database = {
           supplied_session_id: string
         }
         Returns: Json
+      }
+      reserve_gate2_session_payout: {
+        Args: {
+          annual_cap_cents: number
+          requested_amount_cents: number
+          requested_key: string
+          requested_respondent_id: string
+          requested_session_id: string
+        }
+        Returns: string
       }
       retry_gate1_answer_job: {
         Args: {
