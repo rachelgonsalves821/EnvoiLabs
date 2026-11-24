@@ -29,8 +29,10 @@ begin
             join public.organizations as org on org.id = target.organization_id
             where config.id = supplied_config_id and config.version = supplied_config_version
                 and (org.pricing_override_id = config.id
-                    or (org.pricing_override_id is null
-                        and (config.active or config.marketplace_active))))
+                    or (org.pricing_override_id is null and (config.active
+                        or (config.marketplace_active and target.target_completes >= 10
+                            and config.params_json =
+                                '{"unitPriceCents":200,"incentivePerQuestionCents":100}'::jsonb)))))
     then raise check_violation; end if;
     insert into public.gate2_quote_snapshots (study_id, brief_version, guide_digest,
         pricing_config_id, pricing_config_version, line_items_json, total_cents,

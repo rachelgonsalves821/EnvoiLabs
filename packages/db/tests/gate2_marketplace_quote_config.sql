@@ -52,6 +52,12 @@ select throws_ok($$select public.freeze_gate2_marketplace_quote(
     '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":9,"unitPriceCents":200,"amountCents":9000}]',
     9000, 500, '{"expectedCompletes":9,"hours":24}')$$,
     '23514', null, 'fewer than ten respondents cannot freeze a new marketplace quote');
+select throws_ok($$select public.freeze_gate2_quote(
+    '90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where version = 101), 101,
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":9,"unitPriceCents":200,"amountCents":9000}]',
+    9000, 500, '{"expectedCompletes":9,"hours":24}')$$,
+    '23514', null, 'legacy service RPC cannot bypass marketplace minimum');
 reset role;
 select throws_ok($$update public.pricing_configs
     set params_json = '{"unitPriceCents":300,"incentivePerQuestionCents":100}'
