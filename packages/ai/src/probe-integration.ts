@@ -158,7 +158,7 @@ export async function presentCommittedProbe(port: ProbeDecisionPort, committed: 
   if (!committed.probeId) return { outcome: "error" };
   let mounted = false;
   const outcome = await presentProbeIfCurrent(committed.decision, currentTurnId,
-    (text) => { mount(text); mounted = true; }, frame, now);
+    (text) => { mounted = true; mount(text); }, frame, now);
   if (outcome.outcome !== "rendered") {
     if (mounted) clear();
     return outcome;
