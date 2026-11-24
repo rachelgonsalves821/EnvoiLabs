@@ -41,6 +41,12 @@ describe("Stripe test-mode paid observation", () => {
       refundedCents: 200, eventId: `stripe-checkout-state:${session.id}:refunded:200` });
   });
 
+  it.each(["pending", "requires_action"])("does not count a %s refund as settled", async (status) => {
+    const { provider } = setup([session, payment, { ...refunds, data: [{ object: "refund",
+      payment_intent: payment.id, currency: "usd", amount: 200, status }] }]);
+    await expect(provider.getCheckout(session.id)).rejects.toThrow("Uncertain refund state");
+  });
+
   it("keeps unpaid or expired Sessions from launching", async () => {
     const pending = setup([{ ...session, status: "open", payment_status: "unpaid",
       payment_intent: null }]);

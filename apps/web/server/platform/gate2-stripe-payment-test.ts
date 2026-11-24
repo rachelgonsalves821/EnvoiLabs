@@ -61,7 +61,7 @@ export function createStripeTestPaymentObserver(config: {
             if (refund.object !== "refund" || refund.payment_intent !== paymentId ||
               refund.currency !== "usd" || !Number.isSafeInteger(refund.amount) ||
               (refund.amount as number) <= 0 ||
-              !["succeeded", "pending", "requires_action"].includes(String(refund.status)))
+              refund.status !== "succeeded")
               throw new Error("Uncertain refund state");
             refundedCents += refund.amount as number;
           }
