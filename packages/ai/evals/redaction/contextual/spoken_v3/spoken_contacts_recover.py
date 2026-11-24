@@ -46,6 +46,10 @@ _WEB_ACTION = {"browse", "click", "go", "look", "order", "read", "see", "shop", 
 _WORD = re.compile(r"[^\W_]+(?:[-’'][^\W_]+)*\Z")
 _DNS_SUFFIX = re.compile(r"[a-z]{2,20}\Z")
 _MAILBOX_END = re.compile(r"\s*(?:$|[,.;:!?]|(?:and|but|then|before|after) (?:i|we|they|you|it)\b)", re.I)
+_PHONE_JOIN = re.compile(
+    r"(?:[\s,;:]*(?:and|or|then|also|phone|number|is|mobile|cell|call|text|me|my|at)\b){0,5}[\s,;:]*",
+    re.I,
+)
 _NAVIGATION_PREFIX = re.compile(
     r"\b(?:browse|click|go|look|navigate|open|read|shop|view|visit) (?:to |at |on )?\s*\Z",
     re.I,
@@ -138,14 +142,19 @@ def _structured_handle_start(tokens, handle_end):
     return first if first < last else None
 
 
-def _email_runs(text, tokens):
+def _followed_by_phone(text, end, phones):
+    return any(0 <= phone.start - end <= 36 and _PHONE_JOIN.fullmatch(text[end:phone.start]) for phone in phones)
+
+
+def _email_runs(text, tokens, phones):
     for tld in range(3, len(tokens)):
         context = text[max(0, tokens[tld].start - 100):tokens[tld].end + 45]
         intent = bool(_EMAIL_INTENT.search(context))
         ending = tokens[tld].word
-        unlisted = ending not in _TLDS and bool(
-            _DNS_SUFFIX.fullmatch(ending) and _MAILBOX_END.match(text[tokens[tld].end:])
-        )
+        end = tokens[tld].end
+        unlisted = ending not in _TLDS and bool(_DNS_SUFFIX.fullmatch(ending) and (
+            _MAILBOX_END.match(text[end:]) or _followed_by_phone(text, end, phones)
+        ))
         fused = intent and ending.startswith("dot") and ending[3:] in _TLDS
         if fused:
             domain = tld - 1
@@ -177,7 +186,7 @@ def _email_runs(text, tokens):
             if first is not None:
                 start = tokens[first].start
                 if not _NAVIGATION_PREFIX.search(text[max(0, start - 40):start]):
-                    yield Hit("email", start, tokens[tld].end)
+                    yield Hit("email", start, end)
             continue
         left_limit = 12 if strict else 8
         left_first = max(0, handle_end - left_limit)
@@ -217,5 +226,6 @@ def _email_runs(text, tokens):
 
 def recovered_contacts(text):
     tokens = tokenize(text)
-    yield from _phone_runs(text, tokens)
-    yield from _email_runs(text, tokens)
+    phones = tuple(_phone_runs(text, tokens))
+    yield from phones
+    yield from _email_runs(text, tokens, phones)

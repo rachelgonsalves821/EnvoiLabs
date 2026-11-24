@@ -29,6 +29,21 @@ class SpokenContactRecoveryTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(any(hit.label == "email" for hit in recovered_contacts(text)))
 
+    def test_unlisted_mailbox_can_end_at_adjacent_phone(self):
+        email = "alder dot rill at copperworks dot solutions"
+        text = f"They transcribed {email} and +1 202-555-0146 for processing."
+        emails = [text[hit.start:hit.end] for hit in recovered_contacts(text) if hit.label == "email"]
+        self.assertEqual(emails, [email])
+
+    def test_adjacent_phone_does_not_steal_website_or_intervening_prose(self):
+        for text in (
+            "Look at alder dot rill at copperworks dot solutions and +1 202-555-0146 for processing.",
+            "They sell at copperworks dot solutions and refunded the order so I called +1 202-555-0146.",
+            "I wrote the phrase at copperworks dot rapidly erased wording before I dialed +1 202-555-0146.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(any(hit.label == "email" for hit in recovered_contacts(text)))
+
     def test_international_phone_with_spoken_country_code(self):
         number = "plus four four seven seven zero zero nine zero zero one two three"
         self.assertEqual(masked_spans(f"call me at {number} after four"), [("phone", number)])
