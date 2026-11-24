@@ -35,7 +35,6 @@ describe("paid study launch reconciliation", () => {
     { amountCents: quote.totalCents + 1 },
     { currency: "cad" },
     { id: "cs_other" },
-    { status: "refunded" as const, refundedCents: 1 },
     { status: "pending" as const },
     { eventId: "" },
   ])("blocks provider mismatch or nonpayment: %j", async (change) => {
@@ -43,6 +42,19 @@ describe("paid study launch reconciliation", () => {
     provider.getCheckout.mockResolvedValue({ ...paid, ...change });
     expect(await reconcilePaidStudyLaunch(db, provider, quote.studyId, quote.id)).toBe("blocked");
     expect(db.recordObservation).not.toHaveBeenCalled();
+    expect(db.launchPaidStudy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { status: "refunded" as const, refundedCents: 200 },
+    { status: "failed" as const, refundedCents: 0 },
+    { status: "paid" as const, refundedCents: 100 },
+  ])("records a verified refund or failure before refusing launch: %j", async (change) => {
+    const { db, provider } = setup();
+    const observed = { ...paid, ...change };
+    provider.getCheckout.mockResolvedValue(observed);
+    expect(await reconcilePaidStudyLaunch(db, provider, quote.studyId, quote.id)).toBe("blocked");
+    expect(db.recordObservation).toHaveBeenCalledWith(observed);
     expect(db.launchPaidStudy).not.toHaveBeenCalled();
   });
 

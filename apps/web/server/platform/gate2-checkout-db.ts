@@ -14,6 +14,15 @@ type PricingRow = Tables["pricing_configs"]["Row"];
 type QuoteRow = Tables["gate2_quote_snapshots"]["Row"];
 type PaymentEventRow = Tables["gate2_payment_events"]["Row"];
 
+export function mapGate2Quote(row: QuoteRow) {
+  return { id: row.id, studyId: row.study_id, briefVersion: row.brief_version,
+    guideDigest: row.guide_digest, pricingConfigId: row.pricing_config_id,
+    pricingConfigVersion: row.pricing_config_version, currency: row.currency,
+    totalCents: row.total_cents, incentiveCentsPerComplete: row.incentive_cents_per_complete,
+    lineItems: row.line_items_json, feasibility: row.feasibility_json,
+    createdAt: row.created_at, updatedAt: row.created_at };
+}
+
 function readData<T>(result: { data: T | null; error: unknown }): T | null {
   if (result.error) throw result.error;
   return result.data;
@@ -86,12 +95,7 @@ export function createGate2CheckoutDatabase(
       const row = readData(await client.from("gate2_quote_snapshots").select("*")
         .eq("study_id", studyId).eq("id", quoteId).maybeSingle()) as QuoteRow | null;
       if (!row) return null;
-      return { id: row.id, studyId: row.study_id, briefVersion: row.brief_version,
-        guideDigest: row.guide_digest, pricingConfigId: row.pricing_config_id,
-        pricingConfigVersion: row.pricing_config_version, currency: row.currency,
-        totalCents: row.total_cents, incentiveCentsPerComplete: row.incentive_cents_per_complete,
-        lineItems: row.line_items_json, feasibility: row.feasibility_json,
-        createdAt: row.created_at, updatedAt: row.created_at };
+      return mapGate2Quote(row);
     },
     async readCheckoutId(quoteId) {
       const quote = readData(await client.from("gate2_quote_snapshots").select("*")
