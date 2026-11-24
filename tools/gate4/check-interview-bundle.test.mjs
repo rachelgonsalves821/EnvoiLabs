@@ -16,7 +16,7 @@ afterEach(() => {
   }
 });
 
-function fixture(echoInEntry = false) {
+function fixture(echoInEntry = false, sharedEcho = false) {
   const next = mkdtempSync(join(tmpdir(), "envoi-gate4-"));
   temporary.push(next);
   const put = (path, body) => {
@@ -26,7 +26,11 @@ function fixture(echoInEntry = false) {
   };
   const routeDir = `server/app/${route.slice(1)}`;
   put(`${routeDir}/build-manifest.json`, JSON.stringify({ rootMainFiles: ["static/chunks/runtime.js"] }));
-  put(`${routeDir}/react-loadable-manifest.json`, JSON.stringify({ echo: { files: ["static/chunks/echo.js"] } }));
+  put(`${routeDir}/react-loadable-manifest.json`, JSON.stringify({
+    75233: { id: 75233, files: ["static/chunks/echo.js"] },
+    54321: { id: 54321, files: sharedEcho
+      ? ["static/chunks/chart.js", "static/chunks/echo.js"] : ["static/chunks/chart.js"] },
+  }));
   put(`server/app/${route.slice(1)}_client-reference-manifest.js`,
     `globalThis.__RSC_MANIFEST = globalThis.__RSC_MANIFEST || {};\n` +
     `globalThis.__RSC_MANIFEST[${JSON.stringify(route)}] = ${JSON.stringify({ entryJSFiles: {
@@ -36,8 +40,10 @@ function fixture(echoInEntry = false) {
     } })};\n`);
   put("static/chunks/runtime.js", "runtime");
   put("static/chunks/shared.js", "shared");
-  put("static/chunks/page.js", echoInEntry ? "ev-echo Preparing a follow-up Payout" : "interview");
+  put("static/chunks/page.js", 'loadableGenerated:{modules:[75233]},ssr:!1,loading:()=>({className:"ev-echo"})' +
+    (echoInEntry ? " ev-echo Preparing a follow-up Payout" : " interview"));
   put("static/chunks/echo.js", "lazy Echo implementation");
+  put("static/chunks/chart.js", "unrelated dynamic chart implementation");
   return next;
 }
 
@@ -47,9 +53,17 @@ test("includes shared route JavaScript and excludes a separate Echo chunk", () =
     "static/chunks/runtime.js", "static/chunks/shared.js", "static/chunks/page.js",
   ]);
   assert.deepEqual(result.excludedLazyEcho.map((item) => item.file), ["static/chunks/echo.js"]);
+  assert.deepEqual(result.otherDynamic.map((item) => item.file), ["static/chunks/chart.js"]);
+  assert.equal(result.echoModuleId, "75233");
+  assert.equal(result.observedGzipBytes,
+    [...result.initial, ...result.otherDynamic].reduce((sum, item) => sum + item.gzipBytes, 0));
   assert.equal(result.echoImplementationInInitial, false);
 });
 
 test("detects a lazy wrapper whose Echo implementation is still in entry JavaScript", () => {
   assert.equal(inspectBundle(fixture(true)).echoImplementationInInitial, true);
+});
+
+test("does not exclude a chunk shared with another dynamic module", () => {
+  assert.throws(() => inspectBundle(fixture(false, true)), /separate lazy Echo chunk/);
 });

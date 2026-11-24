@@ -27,6 +27,18 @@ function size(next, file) {
   return { file, rawBytes: bytes.length, gzipBytes: gzipSync(bytes).length };
 }
 
+function echoModuleId(next, initialPaths) {
+  const ids = new Set();
+  for (const file of initialPaths) {
+    const body = readFileSync(resolve(next, file), "utf8");
+    for (const match of body.matchAll(/loadableGenerated:\{modules:\[(\d+)\]\}[\s\S]{0,400}?className:"ev-echo"/g)) {
+      ids.add(match[1]);
+    }
+  }
+  if (ids.size !== 1) throw new Error("Could not uniquely identify the Echo dynamic module in interview entry JavaScript.");
+  return [...ids][0];
+}
+
 export function inspectBundle(next) {
   const routeManifest = json(resolve(next, routeRoot, "build-manifest.json"));
   const references = clientReferences(resolve(next, `server/app/${route.slice(1)}_client-reference-manifest.js`));
@@ -41,23 +53,34 @@ export function inspectBundle(next) {
     ...(routeManifest.rootMainFiles ?? []),
     ...routeEntries.flatMap(([, files]) => files),
   ])];
-  const echoPaths = [...new Set(Object.values(loadable).flatMap((item) => item.files ?? []))];
-  if (initialPaths.length === 0 || echoPaths.length === 0 || echoPaths.some((file) => initialPaths.includes(file))) {
+  const echoId = echoModuleId(next, initialPaths);
+  const echoEntry = loadable[echoId];
+  if (!echoEntry || String(echoEntry.id) !== echoId) {
+    throw new Error("Echo dynamic module is absent from the route loadable manifest.");
+  }
+  const echoPaths = [...new Set(echoEntry.files ?? [])];
+  const otherDynamicPaths = [...new Set(Object.entries(loadable)
+    .filter(([key]) => key !== echoId).flatMap(([, item]) => item.files ?? []))]
+    .filter((file) => !initialPaths.includes(file));
+  const exclusiveEchoPaths = echoPaths.filter((file) => !otherDynamicPaths.includes(file));
+  if (initialPaths.length === 0 || exclusiveEchoPaths.length === 0 || echoPaths.some((file) => initialPaths.includes(file))) {
     throw new Error("A separate lazy Echo chunk was not found outside the initial interview JavaScript.");
   }
   const initial = initialPaths.map((file) => size(next, file));
-  const echo = echoPaths.map((file) => size(next, file));
-  const observedGzipBytes = initial.reduce((sum, file) => sum + file.gzipBytes, 0);
+  const echo = exclusiveEchoPaths.map((file) => size(next, file));
+  const otherDynamic = otherDynamicPaths.map((file) => size(next, file));
+  const observedGzipBytes = [...initial, ...otherDynamic].reduce((sum, file) => sum + file.gzipBytes, 0);
   // Next can put a tiny async wrapper around an Echo implementation already present in an entry chunk.
   const echoImplementationInInitial = initialPaths.some((file) => {
     const body = readFileSync(resolve(next, file), "utf8");
     return body.includes("Preparing a follow-up") && body.includes("ev-echo") && body.includes("Payout");
   });
   return {
-    route, budgetGzipBytes: 200_000, observedGzipBytes, withinBuildBudget: observedGzipBytes < 200_000,
+    route, echoModuleId: echoId, budgetGzipBytes: 200_000, observedGzipBytes,
+    withinBuildBudget: observedGzipBytes < 200_000,
     echoImplementationInInitial,
-    initial, excludedLazyEcho: echo,
-    note: "Build-artifact estimate. Echo code detection uses current state labels; verify requested JS, lazy timing, and LCP in a mobile browser before acceptance.",
+    initial, otherDynamic, excludedLazyEcho: echo,
+    note: "Build-artifact estimate includes other dynamic chunks conservatively. Echo code detection uses current state labels; verify browser-requested JS, lazy timing, and LCP before acceptance.",
   };
 }
 
