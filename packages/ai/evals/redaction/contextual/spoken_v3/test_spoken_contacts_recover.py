@@ -8,6 +8,26 @@ def masked_spans(text):
 
 
 class SpokenContactRecoveryTests(unittest.TestCase):
+    def test_complete_split_spoken_domain_with_structured_handle(self):
+        for phrase in (
+            "quartz dot cedar at copper leaf dot solutions",
+            "lake.field at valley ridge dot technology",
+            "fir underscore alder at orchard river dot net",
+        ):
+            with self.subTest(phrase=phrase):
+                text = f"The recorded entry was {phrase}. The return policy was useful."
+                emails = [text[hit.start:hit.end] for hit in recovered_contacts(text) if hit.label == "email"]
+                self.assertIn(phrase, emails)
+
+    def test_split_domain_does_not_substitute_for_email_shape(self):
+        for text in (
+            "I looked at Valley Ridge dot technology. Their checkout is useful.",
+            "Look at pine dot guide at Copper Leaf dot solutions. That one is public.",
+            "We buy from Cedar at the market dot net help desk.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(any(hit.label == "email" for hit in recovered_contacts(text)))
+
     def test_spelled_at_and_handle_separator_accept_unlisted_dns_suffix(self):
         for phrase in (
             "alder dot delta at copperworks dot technology",

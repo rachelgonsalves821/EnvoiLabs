@@ -45,6 +45,7 @@ _HANDLE_START_BLOCK = {
 _WEB_ACTION = {"browse", "click", "go", "look", "order", "read", "see", "shop", "view", "visit"}
 _WORD = re.compile(r"[^\W_]+(?:[-’'][^\W_]+)*\Z")
 _DNS_SUFFIX = re.compile(r"[a-z]{2,20}\Z")
+_DOMAIN_WORD = re.compile(r"[a-z](?:[a-z0-9-]*[a-z0-9])?\Z")
 _MAILBOX_END = re.compile(r"\s*(?:$|[,.;:!?]|(?:and|but|then|before|after) (?:i|we|they|you|it)\b)", re.I)
 _PHONE_JOIN = re.compile(
     r"(?:[\s,;:]*(?:and|or|then|also|phone|number|is|mobile|cell|call|text|me|my|at)\b){0,5}[\s,;:]*",
@@ -146,15 +147,29 @@ def _followed_by_phone(text, end, phones):
     return any(0 <= phone.start - end <= 36 and _PHONE_JOIN.fullmatch(text[end:phone.start]) for phone in phones)
 
 
+def _split_host_handle_start(text, tokens, last_host):
+    marker = last_host - 2
+    if marker < 1 or tokens[marker].word != "at":
+        return None
+    left, right = tokens[last_host - 1:last_host + 1]
+    if not text[left.end:right.start].isspace() or any(
+        not _DOMAIN_WORD.fullmatch(atom.word) or atom.word in _HANDLE_START_BLOCK or atom.word in _WEB_ACTION
+        for atom in (left, right)
+    ):
+        return None
+    return _structured_handle_start(tokens, marker)
+
+
 def _email_runs(text, tokens, phones):
     for tld in range(3, len(tokens)):
         context = text[max(0, tokens[tld].start - 100):tokens[tld].end + 45]
         intent = bool(_EMAIL_INTENT.search(context))
         ending = tokens[tld].word
         end = tokens[tld].end
-        unlisted = ending not in _TLDS and bool(_DNS_SUFFIX.fullmatch(ending) and (
+        bounded_end = bool(_DNS_SUFFIX.fullmatch(ending) and (
             _MAILBOX_END.match(text[end:]) or _followed_by_phone(text, end, phones)
         ))
+        unlisted = ending not in _TLDS and bounded_end
         fused = intent and ending.startswith("dot") and ending[3:] in _TLDS
         if fused:
             domain = tld - 1
@@ -171,6 +186,13 @@ def _email_runs(text, tokens, phones):
             domain -= 2
         if not _WORD.fullmatch(tokens[domain].word):
             continue
+        if not fused and bounded_end and sep in _DOMAIN_BREAK:
+            first = _split_host_handle_start(text, tokens, domain)
+            if first is not None:
+                start = tokens[first].start
+                if not _NAVIGATION_PREFIX.search(text[max(0, start - 40):start]):
+                    yield Hit("email", start, end)
+                continue
         at = domain - 1
         strict = tokens[at].word in {"at", "@"} or tokens[at].word == "sign" and tokens[at - 1].word == "at"
         fuzzy = tokens[at].word in _WEAK_AT
