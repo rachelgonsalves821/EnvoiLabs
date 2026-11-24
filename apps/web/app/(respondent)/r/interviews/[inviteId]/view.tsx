@@ -1,7 +1,7 @@
 "use client";
 
 import { SessionResponseSchema, SubmitSessionResponseSchema, type SessionResponse } from "@envoi-labs/contracts";
-import { Button, Card, EarningsChip, ProgressTrack } from "@envoi-labs/ui";
+import { Button, Card, EarningsChip, ProgressTrack } from "@envoi-labs/ui/primitives";
 import { useEffect, useRef, useState } from "react";
 import { interviewRequest } from "../../interview-request";
 import { formatReward } from "../../reward";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@envoi-labs/ui";
+import { Button } from "@envoi-labs/ui/primitives";
 import { useState } from "react";
 import { TextAnswer } from "./text-answer";
 import { VoiceAnswer } from "./voice-answer";
