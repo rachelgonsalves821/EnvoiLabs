@@ -3,12 +3,15 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./qualified-report": "./src/qualified-report.ts",
     "./study-draft": "./src/study-draft.ts",
     "./study-draft-criteria": "./src/study-draft-criteria.ts",
     "./study-tracking": "./src/study-tracking.ts"
   },
   "scripts": {
-    "lint": "cd ../.. && eslint --no-error-on-unmatched-pattern packages/services"
+    "lint": "cd ../.. && eslint --no-error-on-unmatched-pattern packages/services",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run"
   },
   "dependencies": { "@envoi-labs/contracts": "workspace:*" }
 }
