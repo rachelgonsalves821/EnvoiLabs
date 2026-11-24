@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(12);
+select plan(13);
 
 select ok(not has_table_privilege('authenticated', 'pii.gate3_evidence_proposals', 'SELECT')
     and not has_table_privilege('authenticated', 'pii.gate3_evidence_decisions', 'SELECT'),
@@ -11,6 +11,10 @@ select ok(not has_table_privilege('service_role', 'pii.gate3_evidence_proposals'
     'service role cannot rewrite audit history');
 
 set local role service_role;
+select ok(not has_table_privilege('service_role', 'pii.gate3_evidence_proposals', 'INSERT')
+    and not has_table_privilege('service_role', 'pii.gate3_evidence_decisions', 'INSERT'),
+    'service must publish decisions through the reviewed transaction');
+reset role;
 insert into pii.gate3_evidence_proposals (id, study_id, candidate_json,
     model_name, model_version, prompt_version, private_rationale)
 values ('a9800000-0000-4000-8000-000000000001',
