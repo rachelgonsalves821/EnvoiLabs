@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { summarizeProbeOutcomes } from "../src/probe-metrics.js";
+import { summarizeProbeAttemptLog, summarizeProbeOutcomes } from "../src/probe-metrics.js";
 
 it("reports rendered p95 and separate no-probe, error and timeout rates", () => {
   const result = summarizeProbeOutcomes([
@@ -14,4 +14,33 @@ it("reports rendered p95 and separate no-probe, error and timeout rates", () => 
   expect(summarizeProbeOutcomes([{ outcome: "no_probe" }]).renderedP95Ms).toBeNull();
   expect(() => summarizeProbeOutcomes([{ outcome: "rendered", uploadConfirmedAtMs: 3, renderedAtMs: 2 }]))
     .toThrow("Invalid probe timestamps");
+});
+
+it("summarizes unique fictional turns by device without claiming a physical timing pass", () => {
+  const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const records = [
+    { turnId: id(1), device: "ios-safari" as const, evidence: "fixture" as const,
+      result: { outcome: "rendered" as const, uploadConfirmedAtMs: 100,
+        renderedAtMs: 5200 } },
+    { turnId: id(2), device: "android-chrome" as const, evidence: "fixture" as const,
+      result: { outcome: "timeout" as const } },
+    { turnId: id(3), device: "android-chrome" as const, evidence: "fixture" as const,
+      result: { outcome: "no_probe" as const } },
+  ];
+  expect(summarizeProbeAttemptLog(records)).toMatchObject({ evidence: "fixture",
+    bothDeviceLabelsPresent: true,
+    overall: { total: 3, rendered: 1, renderedP95Ms: 5100, noProbe: 1, timeouts: 1 },
+    iosSafari: { total: 1, rendered: 1, renderedP95Ms: 5100 },
+    androidChrome: { total: 2, rendered: 0, renderedP95Ms: null },
+  });
+  expect(summarizeProbeAttemptLog([])).toMatchObject({ evidence: "none",
+    bothDeviceLabelsPresent: false, overall: { total: 0, renderedP95Ms: null } });
+  expect(() => summarizeProbeAttemptLog([...records, records[0]!]))
+    .toThrow("Invalid or duplicate probe attempt");
+  expect(() => summarizeProbeAttemptLog([...records, { ...records[0]!,
+    turnId: id(4), evidence: "physical-device" as const }]))
+    .toThrow("Mixed fixture and physical-device evidence");
+  expect(() => summarizeProbeAttemptLog([{ ...records[0]!,
+    result: { outcome: "rendered" as const, uploadConfirmedAtMs: 100,
+      renderedAtMs: Number.NaN } }])).toThrow("Invalid or duplicate probe attempt");
 });
