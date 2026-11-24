@@ -79,6 +79,17 @@ set local request.jwt.claims = '{"sub":"a9700000-0000-4000-8000-000000000009","r
 select is((select count(*) from research.reports), 0::bigint, 'other tenant sees no report');
 reset role;
 
+insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
+values (repeat('c', 64), repeat('b', 64));
+update public.reports set qualified_policy_digest = repeat('c', 64)
+where id = 'a9700000-0000-4000-8000-000000000006';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports), 0::bigint, 'report receipt must match each cited source');
+reset role;
+update public.reports set qualified_policy_digest = repeat('a', 64)
+where id = 'a9700000-0000-4000-8000-000000000006';
+
 update public.evidence_quotes set text = 'not the source'
 where id = 'a9700000-0000-4000-8000-000000000008';
 set local role authenticated;

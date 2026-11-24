@@ -65,8 +65,12 @@ language sql stable security definer set search_path = pg_catalog as $$
                     and internal.gate3_quote_current(quote.id))
             and not exists (select 1 from public.findings as finding
                 left join public.evidence_quotes as quote on quote.finding_id = finding.id
+                left join public.transcripts as source on source.id = quote.transcript_id
+                left join internal.gate1_answer_jobs as job on job.answer_id = source.answer_id
                 where finding.report_id = report.id and (finding.qualified_claim is null
-                    or quote.id is null or not internal.gate3_quote_current(quote.id)))
+                    or quote.id is null or not internal.gate3_quote_current(quote.id)
+                    or job.publication_policy_digest is distinct from report.qualified_policy_digest
+                    or job.publication_qualification_digest is distinct from report.qualified_qualification_digest))
     );
 $$;
 revoke all on function internal.gate3_policy_qualified(text, text),
