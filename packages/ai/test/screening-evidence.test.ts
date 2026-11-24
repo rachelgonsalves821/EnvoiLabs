@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { LLMProvider, LLMResponse } from "../src/index.js";
 import { evidenceSupports, type ScreeningEvidenceInput } from "../src/screening-evidence.js";
 
@@ -22,13 +22,27 @@ const provider = (output: unknown): LLMProvider => ({
       latencyMs: 0, costMicros: 0 };
   },
 });
+const authorizedEvidenceSupports = (model: LLMProvider, candidate: ScreeningEvidenceInput) =>
+  evidenceSupports(model, candidate, { authorize: async () => true });
 
 describe("screening evidence boundary", () => {
+  it("denies model dispatch without current screening authorization", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
+      model: "fictional", inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
+    expect(await evidenceSupports({ generate }, candidate)).toBe(false);
+    expect(await evidenceSupports({ generate }, candidate,
+      { authorize: async () => false })).toBe(false);
+    expect(await evidenceSupports({ generate }, candidate,
+      { authorize: async () => { throw new Error("consent read failed"); } })).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("accepts explicit supported and contradicted respondent evidence", async () => {
     const yes = "I worked as a hospital nurse this year.";
     const no = "I have never worked as a hospital nurse.";
-    expect(await evidenceSupports(provider(judgment("supported", yes)), input(yes, "supported"))).toBe(true);
-    expect(await evidenceSupports(provider(judgment("contradicted", no)), input(no, "contradicted"))).toBe(true);
+    expect(await authorizedEvidenceSupports(provider(judgment("supported", yes)), input(yes, "supported"))).toBe(true);
+    expect(await authorizedEvidenceSupports(provider(judgment("contradicted", no)), input(no, "contradicted"))).toBe(true);
   });
 
   it("fails closed for ambiguous, negated, third-party, and wrong-timeframe claims", async () => {
@@ -39,7 +53,7 @@ describe("screening evidence boundary", () => {
       ["I did not work as a hospital nurse this year.", "ambiguous", {}],
     ] as const;
     for (const [answer, relation, flags] of cases) {
-      expect(await evidenceSupports(provider(judgment(relation, answer, flags)), input(answer, "supported"))).toBe(false);
+      expect(await authorizedEvidenceSupports(provider(judgment(relation, answer, flags)), input(answer, "supported"))).toBe(false);
     }
   });
 
@@ -47,18 +61,18 @@ describe("screening evidence boundary", () => {
     const answer = "🩺 I was a nurse five years ago, but not this year.";
     const excerpt = "I was a nurse five years ago";
     const proposed = input(answer, "supported", excerpt);
-    expect(await evidenceSupports(provider(judgment("ambiguous", excerpt)), proposed)).toBe(false);
-    expect(await evidenceSupports(provider(judgment("supported", "nurse five years ago")), proposed)).toBe(false);
-    expect(await evidenceSupports(provider(judgment("supported", excerpt)),
+    expect(await authorizedEvidenceSupports(provider(judgment("ambiguous", excerpt)), proposed)).toBe(false);
+    expect(await authorizedEvidenceSupports(provider(judgment("supported", "nurse five years ago")), proposed)).toBe(false);
+    expect(await authorizedEvidenceSupports(provider(judgment("supported", excerpt)),
       { ...proposed, span: { startChar: 0, endChar: 999 } })).toBe(false);
   });
 
   it("treats judge failure or unapproved criterion as review", async () => {
     const answer = "I worked as a hospital nurse this year.";
-    expect(await evidenceSupports(provider({ relation: "supported" }), input(answer, "supported"))).toBe(false);
-    expect(await evidenceSupports({ generate: async () => { throw new Error("timeout"); } },
+    expect(await authorizedEvidenceSupports(provider({ relation: "supported" }), input(answer, "supported"))).toBe(false);
+    expect(await authorizedEvidenceSupports({ generate: async () => { throw new Error("timeout"); } },
       input(answer, "supported"))).toBe(false);
-    expect(await evidenceSupports(provider(judgment("supported", answer)),
+    expect(await authorizedEvidenceSupports(provider(judgment("supported", answer)),
       { ...input(answer, "supported"), criterionText: "" })).toBe(false);
   });
 });
@@ -76,7 +90,7 @@ const heldOutExclusions = [
 it("held-out exclusion-error replay rejects all ambiguous or invalid support proposals", async () => {
   let falseExclusions = 0;
   for (const fixture of heldOutExclusions) {
-    const decision = await evidenceSupports(provider(judgment(fixture.relation, fixture.answer, {
+    const decision = await authorizedEvidenceSupports(provider(judgment(fixture.relation, fixture.answer, {
       respondentOwnExperience: fixture.own,
       criterionAndTimeframeMatch: "time" in fixture ? fixture.time : true,
     })), input(fixture.answer, "supported"));

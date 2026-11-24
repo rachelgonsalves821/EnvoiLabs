@@ -10,6 +10,11 @@ export interface ScreeningEvidenceInput {
   readonly span: { readonly startChar: number; readonly endChar: number };
 }
 
+/** Platform must check current purpose-specific consent and source authority. */
+export interface ScreeningModelUsePort {
+  authorize(input: ScreeningEvidenceInput): Promise<boolean>;
+}
+
 interface Judgment {
   readonly relation: "supported" | "contradicted" | "ambiguous";
   readonly evidenceText: string;
@@ -34,7 +39,8 @@ function isJudgment(value: unknown): value is Judgment {
 }
 
 /** Advisory Agent 3 port: false forces Platform's review/clarification path. */
-export async function evidenceSupports(provider: LLMProvider, input: ScreeningEvidenceInput): Promise<boolean> {
+export async function evidenceSupports(provider: LLMProvider, input: ScreeningEvidenceInput,
+  modelUse?: ScreeningModelUsePort): Promise<boolean> {
   const { criterionText, question, answerText, result, span } = input;
   if (!criterionText?.trim() || !question?.trim() || !answerText?.trim()
     || (result !== "supported" && result !== "contradicted")
@@ -45,6 +51,7 @@ export async function evidenceSupports(provider: LLMProvider, input: ScreeningEv
   const excerpt = chars.slice(span.startChar, span.endChar).join("");
   if (!excerpt.trim()) return false;
   try {
+    if (!modelUse || !await modelUse.authorize(input)) return false;
     const { output } = await provider.generate({
       purpose: "screening-evidence",
       promptVersion: "1",
