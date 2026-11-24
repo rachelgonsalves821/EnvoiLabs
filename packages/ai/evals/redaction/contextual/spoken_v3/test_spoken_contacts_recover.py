@@ -64,6 +64,33 @@ class SpokenContactRecoveryTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(any(hit.label == "email" for hit in recovered_contacts(text)))
 
+    def test_dictated_address_ends_before_a_bounded_contact_purpose(self):
+        examples = (
+            ("fern dot ledger at lantern dot solutions", "for the reply."),
+            ("yarrow.archive at pebble.technology", "for the order confirmation email."),
+            ("ember underscore draft at willow ridge dot services", "for the survey reply before noon."),
+            ("willow dot form at atlas dot solutions", "for the confirmation"),
+        )
+        for email, following in examples:
+            with self.subTest(email=email):
+                text = f"The filter was useful. {email} {following}"
+                self.assertEqual(masked_spans(text), [("email", email)])
+
+    def test_contact_purpose_preserves_public_navigation_and_unrelated_phrases(self):
+        texts = (
+            "Look at fern dot ledger at lantern dot solutions for the reply.",
+            "We visited fern dot ledger at lantern dot solutions for the confirmation.",
+            "The public website is fern dot ledger at lantern dot solutions for the reply.",
+            "The official catalog shows fern dot ledger at lantern dot solutions for the confirmation.",
+            "I picked fern dot ledger at lantern dot solutions for the pickup receipt.",
+            "Fern at lantern dot solutions for the reply.",
+            "Fern dot ledger at lantern dot solutions for the reply rate comparison.",
+            "Fern dot ledger at lantern dot before for the confirmation.",
+        )
+        for text in texts:
+            with self.subTest(text=text):
+                self.assertEqual(masked_spans(text), [])
+
     def test_international_phone_with_spoken_country_code(self):
         number = "plus four four seven seven zero zero nine zero zero one two three"
         self.assertEqual(masked_spans(f"call me at {number} after four"), [("phone", number)])
