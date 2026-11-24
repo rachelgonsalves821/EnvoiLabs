@@ -7,8 +7,12 @@ type PreviewEnvironment = Record<string, string | undefined>;
 export function previewTrustedSource(headers: Headers, env: PreviewEnvironment): string | null {
   if (env.VERCEL !== "1" || env.VERCEL_ENV !== "preview") return null;
   const value = headers.get("x-vercel-forwarded-for");
-  if (!value || value.includes(",") || value.includes("%") || !isIP(value)) return null;
-  return value;
+  if (!value || value.includes(",") || value.includes("%")) return null;
+  const family = isIP(value);
+  if (family === 4) return value;
+  if (family !== 6) return null;
+  // Canonicalize equivalent IPv6 spellings before deriving a quota key.
+  return new URL(`http://[${value}]/`).hostname.slice(1, -1);
 }
 
 const policyVariables = {

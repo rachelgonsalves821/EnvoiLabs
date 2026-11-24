@@ -18,6 +18,8 @@ describe("Gate 4 preview ingress and configuration", () => {
       .toBe("203.0.113.7");
     expect(previewTrustedSource(new Headers({ "x-vercel-forwarded-for": "2001:db8::7" }), preview))
       .toBe("2001:db8::7");
+    expect(previewTrustedSource(new Headers({ "x-vercel-forwarded-for":
+      "2001:0DB8:0000:0000:0000:0000:0000:0007" }), preview)).toBe("2001:db8::7");
     expect(previewTrustedSource(new Headers({ "x-vercel-forwarded-for": "203.0.113.7" }),
       { VERCEL: "1", VERCEL_ENV: "production" })).toBeNull();
   });
