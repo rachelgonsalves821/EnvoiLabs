@@ -1601,6 +1601,10 @@ export type Database = {
         Args: { supplied_answer_id?: string }
         Returns: Json
       }
+      claim_gate2_checkout_intent: {
+        Args: { supplied_quote_id: string; supplied_study_id: string }
+        Returns: Json
+      }
       commit_gate2_screening_decision: {
         Args: {
           requested_action: string

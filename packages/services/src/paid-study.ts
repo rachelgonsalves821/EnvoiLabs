@@ -1,6 +1,6 @@
 import { QuoteV2Schema, type QuoteV2 } from "@envoi-labs/contracts";
 
-type CheckoutObservation = {
+export type CheckoutObservation = {
   id: string;
   eventId: string;
   studyId: string;
@@ -13,7 +13,7 @@ type CheckoutObservation = {
   observedAt: string;
 };
 
-type PaidStudyDatabase = {
+export type PaidStudyDatabase = {
   readQuote(studyId: string, quoteId: string): Promise<unknown>;
   readCheckoutId(quoteId: string): Promise<string | null>;
   recordObservation(observation: CheckoutObservation): Promise<void>;
@@ -22,17 +22,18 @@ type PaidStudyDatabase = {
   launchPaidStudy(studyId: string, quoteId: string, providerEventId: string): Promise<boolean>;
 };
 
-type CheckoutProvider = { getCheckout(checkoutId: string): Promise<CheckoutObservation> };
+export type PaidCheckoutProvider = { getCheckout(checkoutId: string): Promise<CheckoutObservation> };
 
-const matchesQuote = (quote: QuoteV2, checkout: CheckoutObservation, checkoutId: string) =>
+const matchesQuoteIdentity = (quote: QuoteV2, checkout: CheckoutObservation, checkoutId: string) =>
   checkout.id === checkoutId && checkout.studyId === quote.studyId &&
   checkout.quoteId === quote.id && checkout.pricingConfigVersion === quote.pricingConfigVersion &&
   checkout.amountCents === quote.totalCents && checkout.currency === quote.currency &&
-  checkout.status === "paid" && checkout.refundedCents === 0 &&
+  Number.isSafeInteger(checkout.refundedCents) && checkout.refundedCents >= 0 &&
+  checkout.refundedCents <= quote.totalCents &&
   checkout.eventId.trim() !== "" && Number.isFinite(Date.parse(checkout.observedAt));
 
 export async function reconcilePaidStudyLaunch(
-  db: PaidStudyDatabase, provider: CheckoutProvider, studyId: string, quoteId: string,
+  db: PaidStudyDatabase, provider: PaidCheckoutProvider, studyId: string, quoteId: string,
 ): Promise<"launched" | "blocked" | "unavailable"> {
   let rawQuote: unknown;
   let checkoutId: string | null;
@@ -54,10 +55,13 @@ export async function reconcilePaidStudyLaunch(
   } catch {
     return "unavailable";
   }
-  if (!matchesQuote(quote.data, checkout, checkoutId)) return "blocked";
+  if (!matchesQuoteIdentity(quote.data, checkout, checkoutId) ||
+    (checkout.status === "refunded" && checkout.refundedCents === 0)) return "blocked";
+  if (checkout.status === "pending") return "blocked";
 
   try {
     await db.recordObservation(checkout);
+    if (checkout.status !== "paid" || checkout.refundedCents !== 0) return "blocked";
     return await db.launchPaidStudy(studyId, quoteId, checkout.eventId) ? "launched" : "blocked";
   } catch {
     return "unavailable";
