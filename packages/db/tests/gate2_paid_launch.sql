@@ -1,7 +1,16 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(14);
+select plan(19);
+
+select is((select tgfoid from pg_trigger where tgname = 'lock_gate2_guide_study'
+    and tgrelid = 'public.guide_questions'::regclass),
+    (select tgfoid from pg_trigger where tgname = 'lock_gate2_brief_study'
+    and tgrelid = 'public.brief_versions'::regclass),
+    'guide and brief writes use the same study lock trigger');
+select ok(pg_get_functiondef('internal.lock_gate2_study_content()'::regprocedure)
+    like '%from public.studies where id = target_id for update%',
+    'content edits acquire the study row lock before mutation');
 
 update public.studies set state = 'awaiting_payment'
 where id = '90600000-0000-4000-8000-000000000001';
@@ -19,6 +28,24 @@ select 'a9900000-0000-4000-8000-000000000001',
     public.gate2_guide_digest('90600000-0000-4000-8000-000000000001'), id, version,
     '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":1,"unitPriceCents":100,"amountCents":500}]',
     500, 200, '{"expectedCompletes":1,"hours":24}' from public.pricing_configs where active;
+select ok(not has_table_privilege('service_role', 'public.gate2_quote_snapshots', 'INSERT'),
+    'service must freeze through the canonical guide digest function');
+set local role service_role;
+select is(public.freeze_gate2_quote('90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where active),
+    (select version from public.pricing_configs where active),
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":1,"unitPriceCents":100,"amountCents":500}]',
+    500, 200, '{"expectedCompletes":1,"hours":24}'),
+    'a9900000-0000-4000-8000-000000000001'::uuid,
+    'same frozen quote request returns the immutable quote ID');
+select throws_ok($$select public.freeze_gate2_quote(
+    '90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where active),
+    (select version from public.pricing_configs where active),
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":1,"unitPriceCents":100,"amountCents":500}]',
+    600, 200, '{"expectedCompletes":1,"hours":24}')$$,
+    '23505', null, 'quote replay cannot change the frozen price');
+reset role;
 insert into public.gate2_payment_events (quote_id, study_id, provider_checkout_id,
     provider_event_id, event_kind, amount_cents, currency, provider_observed_at)
 values ('a9900000-0000-4000-8000-000000000001',
