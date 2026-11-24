@@ -44,6 +44,12 @@ _HANDLE_START_BLOCK = {
 }
 _WEB_ACTION = {"browse", "click", "go", "look", "order", "read", "see", "shop", "view", "visit"}
 _WORD = re.compile(r"[^\W_]+(?:[-’'][^\W_]+)*\Z")
+_DNS_SUFFIX = re.compile(r"[a-z]{2,20}\Z")
+_MAILBOX_END = re.compile(r"\s*(?:$|[,.;:!?]|(?:and|but|then|before|after) (?:i|we|they|you|it)\b)", re.I)
+_NAVIGATION_PREFIX = re.compile(
+    r"\b(?:browse|click|go|look|navigate|open|read|shop|view|visit) (?:to |at |on )?\s*\Z",
+    re.I,
+)
 
 
 def _digit(word):
@@ -118,15 +124,33 @@ def _phone_runs(text, tokens):
         cursor = stop
 
 
+def _structured_handle_start(tokens, handle_end):
+    """Read adjacent written or spoken local-part separators without taking preceding prose."""
+    last = handle_end - 1
+    if not _WORD.fullmatch(tokens[last].word) or tokens[last].word in _WEB_ACTION:
+        return None
+    first = last
+    while first >= 2 and last - first < 6 and tokens[first - 1].word in _HANDLE_BREAK:
+        atom = tokens[first - 2].word
+        if not _WORD.fullmatch(atom) or atom in _HANDLE_START_BLOCK or atom in _WEB_ACTION:
+            break
+        first -= 2
+    return first if first < last else None
+
+
 def _email_runs(text, tokens):
     for tld in range(3, len(tokens)):
         context = text[max(0, tokens[tld].start - 100):tokens[tld].end + 45]
         intent = bool(_EMAIL_INTENT.search(context))
         ending = tokens[tld].word
-        if ending.removeprefix("dot") in _TLDS and ending.startswith("dot") and intent:
+        unlisted = ending not in _TLDS and bool(
+            _DNS_SUFFIX.fullmatch(ending) and _MAILBOX_END.match(text[tokens[tld].end:])
+        )
+        fused = intent and ending.startswith("dot") and ending[3:] in _TLDS
+        if fused:
             domain = tld - 1
         else:
-            if ending not in _TLDS:
+            if ending not in _TLDS and not unlisted:
                 continue
             sep = tokens[tld - 1].word
             if sep not in _DOMAIN_BREAK and (not intent or sep not in _WEAK_MAIL_BREAK):
@@ -147,6 +171,13 @@ def _email_runs(text, tokens):
         if strict and tokens[at].word == "sign":
             handle_end -= 1
         if handle_end < 1:
+            continue
+        if unlisted and not fused:
+            first = _structured_handle_start(tokens, handle_end) if strict and sep in _DOMAIN_BREAK else None
+            if first is not None:
+                start = tokens[first].start
+                if not _NAVIGATION_PREFIX.search(text[max(0, start - 40):start]):
+                    yield Hit("email", start, tokens[tld].end)
             continue
         left_limit = 12 if strict else 8
         left_first = max(0, handle_end - left_limit)
