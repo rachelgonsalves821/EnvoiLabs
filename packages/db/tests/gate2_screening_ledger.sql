@@ -5,17 +5,19 @@ select plan(10);
 
 insert into public.criteria (id, study_id, kind, attribute_key, operator, value_json, text)
 values ('99610000-0000-4000-8000-000000000001',
-    '90600000-0000-4000-8000-000000000001', 'must', 'late_order', 'eq', 'true', 'Ordered late');
+    '90600000-0000-4000-8000-000000000001', 'must', 'late_order', 'eq', 'true',
+    'Ordered late in the last 30 days');
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 values ('99610000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001',
     '90500000-0000-4000-8000-000000000001', 'screening', 200, now() + interval '1 day');
 insert into public.gate2_screening_rules (id, study_id, criterion_id, version,
-    criterion_kind, question, approved_by, approved_at)
+    criterion_kind, criterion_text, timeframe_text, question, approved_by, approved_at)
 values ('99610000-0000-4000-8000-000000000003',
     '90600000-0000-4000-8000-000000000001',
     '99610000-0000-4000-8000-000000000001', 1, 'must',
-    'Did you order late?', '90400000-0000-4000-8000-000000000001', now());
+    'Ordered late in the last 30 days', 'last 30 days', 'Did you order late?',
+    '90400000-0000-4000-8000-000000000001', now());
 insert into pii.gate2_screener_answers (id, invite_id, study_id, rule_id,
     rule_version, kind, answer_text, idempotency_key)
 values ('99610000-0000-4000-8000-000000000004',
