@@ -51,3 +51,15 @@ test("accepts an ingress rejection of the comma-list request", async () => {
   } });
   assert.deepEqual(result.list, { rejected: true });
 });
+
+test("sends the optional protection bypass on every request without changing spoof assertions", async () => {
+  const seen = [];
+  const bypass = "synthetic-protected-preview-bypass";
+  await checkPreviewIngress({ url, token, protectionBypass: bypass, fetcher: fetcher([
+    { sourceUsable: true, sourceEqualsSpoof: false },
+    { sourceUsable: true, sourceEqualsSpoof: false },
+    { sourceUsable: true, sourceEqualsSpoof: false },
+  ], seen) });
+  assert.deepEqual(seen.map((request) => request.headers["x-vercel-protection-bypass"]),
+    [bypass, bypass, bypass]);
+});

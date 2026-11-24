@@ -19,10 +19,11 @@ function previewUrl(value) {
   return url;
 }
 
-async function observe(fetcher, url, token, headers = {}, allowIngressReject = false) {
+async function observe(fetcher, url, token, bypass, headers = {}, allowIngressReject = false) {
   const response = await fetcher(url, {
     method: "GET", cache: "no-store", redirect: "error",
-    headers: { Authorization: `Bearer ${token}`, ...headers },
+    headers: { Authorization: `Bearer ${token}`,
+      ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}), ...headers },
   });
   if (allowIngressReject && [400, 403, 431].includes(response.status)) return { rejected: true };
   assert.equal(response.status, 200, "Preview observer was unavailable.");
@@ -34,13 +35,17 @@ async function observe(fetcher, url, token, headers = {}, allowIngressReject = f
   return result;
 }
 
-export async function checkPreviewIngress({ url, token, fetcher = fetch }) {
+export async function checkPreviewIngress({ url, token, protectionBypass, fetcher = fetch }) {
   const target = previewUrl(url);
   assert.ok(typeof token === "string" && Buffer.byteLength(token) >= 32,
     "A disposable preview observer token is required.");
-  const baseline = await observe(fetcher, target, token);
-  const spoof = await observe(fetcher, target, token, spoofHeaders);
-  const list = await observe(fetcher, target, token,
+  if (protectionBypass !== undefined) {
+    assert.ok(typeof protectionBypass === "string" && protectionBypass.length > 0,
+      "A nonempty preview protection bypass value is required.");
+  }
+  const baseline = await observe(fetcher, target, token, protectionBypass);
+  const spoof = await observe(fetcher, target, token, protectionBypass, spoofHeaders);
+  const list = await observe(fetcher, target, token, protectionBypass,
     { ...spoofHeaders, "x-vercel-forwarded-for": "192.0.2.71, 203.0.113.73" }, true);
   assert.equal(baseline.sourceUsable, true, "Baseline source was unavailable.");
   assert.equal(spoof.sourceUsable, true, "Spoof request had no usable platform source.");
@@ -55,7 +60,8 @@ export async function checkPreviewIngress({ url, token, fetcher = fetch }) {
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   try {
     await checkPreviewIngress({ url: process.env.GATE4_OBSERVER_URL,
-      token: process.env.GATE4_OBSERVER_TOKEN });
+      token: process.env.GATE4_OBSERVER_TOKEN,
+      protectionBypass: process.env.GATE4_PROTECTION_BYPASS });
     process.stdout.write("Hosted preview ingress spoof check passed.\n");
   } catch (error) {
     // Do not print exception details: fetch errors can include URLs or headers.
