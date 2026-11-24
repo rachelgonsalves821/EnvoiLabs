@@ -10,7 +10,7 @@ const config = { id: quote.pricingConfigId, version: quote.pricingConfigVersion,
 const checkout = { id: "cs_test_1", studyId: quote.studyId, quoteId: quote.id,
   pricingConfigVersion: quote.pricingConfigVersion, amountCents: quote.totalCents,
   currency: "usd" as const, status: "open" as const,
-  url: "https://checkout.stripe.test/cs_test_1" };
+  url: "https://checkout.stripe.com/c/pay/cs_test_1" };
 
 function setup() {
   const db = {
@@ -65,6 +65,8 @@ describe("synthetic quote to checkout", () => {
     provider.get.mockResolvedValue({ ...checkout, amountCents: 400 });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
     provider.get.mockResolvedValue({ ...checkout, status: "expired" });
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
+    provider.get.mockResolvedValue({ ...checkout, url: "https://checkout.stripe.com.evil.test/cs_test_1" });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
   });
 

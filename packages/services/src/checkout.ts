@@ -48,12 +48,20 @@ type CheckoutProvider = {
   get(checkoutId: string): Promise<CheckoutSession>;
 };
 
+const approvedCheckoutUrl = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.origin === "https://checkout.stripe.com" &&
+      parsed.username === "" && parsed.password === "";
+  } catch { return false; }
+};
+
 const matchesQuote = (session: CheckoutSession, quote: QuoteV2) =>
   session.studyId === quote.studyId && session.quoteId === quote.id &&
   session.pricingConfigVersion === quote.pricingConfigVersion &&
   session.amountCents === quote.totalCents && session.currency === quote.currency &&
   session.status === "open" &&
-  session.id.trim() !== "" && session.url.trim() !== "";
+  session.id.trim() !== "" && approvedCheckoutUrl(session.url);
 
 export async function prepareStudyCheckout(
   db: CheckoutDatabase, provider: CheckoutProvider, studyId: string,
