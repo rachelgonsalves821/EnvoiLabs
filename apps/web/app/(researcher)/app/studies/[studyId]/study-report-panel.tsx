@@ -67,6 +67,7 @@ export function StudyReportPanel({ controller, save = saveJson }: {
       {state.kind === "ready" && (
         <>
           <p className={styles.reportAnnouncement} role="status">Current report ready.</p>
+          <p>Directional qualitative</p>
           <p className={styles.reportAnswer}>{state.report.summary.executiveAnswer}</p>
           <div className={styles.reportThemes}>
             {state.report.summary.themes.map((theme, index) => (
