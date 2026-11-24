@@ -1,6 +1,10 @@
+import { createHash } from "node:crypto";
+
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const nonblank = (value) => typeof value === "string" && value.trim().length > 0;
 const actions = new Set(["probe", "next", "error", "timeout"]);
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const digest = /^[0-9a-f]{64}$/i;
 
 function indexed(rows, kind) {
   if (!Array.isArray(rows) || rows.length !== 60) throw new Error(`${kind}: exactly 60 rows required`);
@@ -14,10 +18,18 @@ function indexed(rows, kind) {
 }
 
 /** Scores held-out responses without reading provider inputs or raw answers into the report. */
-export function scoreProbeHeldout(inputs, outputs, judgments) {
+export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   const inputById = indexed(inputs, "inputs");
   const outputById = indexed(outputs, "outputs");
   const judgmentById = indexed(judgments, "judgments");
+  if (!Array.isArray(answerReceipts)) throw new Error("Answer receipts required");
+  const receiptById = new Map();
+  for (const receipt of answerReceipts) {
+    if (!isObject(receipt) || !nonblank(receipt.id) || !nonblank(receipt.caseId)
+      || !uuid.test(receipt.sourceVersion) || !digest.test(receipt.answerDigest)
+      || receiptById.has(receipt.id)) throw new Error("Invalid answer receipt");
+    receiptById.set(receipt.id, receipt);
+  }
   let probes = 0; let acceptable = 0; let offTopicAnswers = 0;
   let noProbes = 0; let errors = 0; let timeouts = 0;
   const followUpAnswerIds = new Set();
@@ -28,14 +40,15 @@ export function scoreProbeHeldout(inputs, outputs, judgments) {
     if (!nonblank(input.coreQuestion) || !nonblank(input.answer) || !nonblank(input.guideGoal)
       || !output || !judgment || !actions.has(output.action)
       || !nonblank(judgment.reviewerId) || typeof judgment.decisionAppropriate !== "boolean")
-      throw new Error(`Incomplete held-out case ${id}`);
+      throw new Error("Incomplete held-out case");
     if (output.action === "probe") {
       if (!nonblank(output.text) || !output.text.trim().endsWith("?")
         || typeof judgment.nonLeading !== "boolean" || typeof judgment.onGoal !== "boolean"
         || typeof judgment.offTopicFollowUp !== "boolean"
         || !nonblank(judgment.followUpAnswerId)
-        || followUpAnswerIds.has(judgment.followUpAnswerId))
-        throw new Error(`Incomplete probe judgment ${id}`);
+        || followUpAnswerIds.has(judgment.followUpAnswerId)
+        || receiptById.get(judgment.followUpAnswerId)?.caseId !== id)
+        throw new Error("Incomplete probe judgment");
       followUpAnswerIds.add(judgment.followUpAnswerId);
       probes++;
       if (judgment.decisionAppropriate && judgment.nonLeading && judgment.onGoal) acceptable++;
@@ -44,7 +57,7 @@ export function scoreProbeHeldout(inputs, outputs, judgments) {
       if (output.text !== undefined || judgment.nonLeading !== null
         || judgment.onGoal !== null || judgment.offTopicFollowUp !== null
         || judgment.followUpAnswerId !== null)
-        throw new Error(`Invalid no-probe judgment ${id}`);
+        throw new Error("Invalid no-probe judgment");
       if (output.action === "next") noProbes++;
       if (output.action === "error") errors++;
       if (output.action === "timeout") timeouts++;
@@ -55,6 +68,9 @@ export function scoreProbeHeldout(inputs, outputs, judgments) {
   if (outputById.size !== inputById.size || judgmentById.size !== inputById.size
     || [...outputById.keys(), ...judgmentById.keys()].some((id) => !inputById.has(id)))
     throw new Error("Held-out case IDs differ");
+  if (receiptById.size !== followUpAnswerIds.size
+    || [...receiptById.keys()].some((id) => !followUpAnswerIds.has(id)))
+    throw new Error("Unmatched answer receipts");
   const qualityRate = probes === 0 ? null : acceptable / probes;
   return { mode: "held-out-scoring", sampleSize: 60, probes, acceptable, qualityRate,
     offTopicAnswers, noProbes, errors, timeouts,
@@ -78,7 +94,7 @@ export function syntheticProbeHeldout() {
     ["How was the confirmation?", "The message was unclear.", "Confirmation clarity", "What about the message was unclear?"],
     ["How did you use the search?", "I tried a few terms.", "Search behavior", "Which search terms did you try?"],
   ];
-  const inputs = []; const outputs = []; const judgments = [];
+  const inputs = []; const outputs = []; const judgments = []; const answerReceipts = [];
   const variants = ["on a phone", "during a lunch break", "for a small order",
     "on a slow connection", "after comparing two sites"];
   for (const [seedIndex, [coreQuestion, answer, guideGoal, text]] of seeds.entries()) {
@@ -89,7 +105,10 @@ export function syntheticProbeHeldout() {
       judgments.push({ id, reviewerId: "synthetic-script", decisionAppropriate: true,
         nonLeading: true, onGoal: true, offTopicFollowUp: false,
         followUpAnswerId: `${id}-fictional-follow-up` });
+      answerReceipts.push({ id: `${id}-fictional-follow-up`, caseId: id,
+        sourceVersion: `a9700000-0000-4000-8000-${String(seedIndex * 5 + variantIndex + 1).padStart(12, "0")}`,
+        answerDigest: createHash("sha256").update(`fictional reply ${id}`).digest("hex") });
     }
   }
-  return { inputs, outputs, judgments };
+  return { inputs, outputs, judgments, answerReceipts };
 }
