@@ -18,17 +18,17 @@ export interface ReportPanelController {
   requestExport(): Promise<string | null>;
 }
 
-function saveJson(content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+function saveCsv(content: string) {
+  const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "envoi-labs-report.json";
+  anchor.download = "envoi-labs-themes-and-quotes.csv";
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** Pass a controller backed by the current qualified reader; do not mount with raw tables. */
-export function StudyReportPanel({ controller, save = saveJson }: {
+export function StudyReportPanel({ controller, save = saveCsv }: {
   controller: ReportPanelController; save?: (content: string) => void;
 }) {
   const [state, setState] = useState<State>(() => controller.getState());
@@ -91,7 +91,7 @@ export function StudyReportPanel({ controller, save = saveJson }: {
               <li key={index}>{item.hypothesis} · {item.result}</li>)}</ul>
           </>}
           <button type="button" disabled={!state.canExport} onClick={() => void download()}>
-            {state.canExport ? "Download report" : "Checking report…"}
+            {state.canExport ? "Download themes and quotes CSV" : "Checking report…"}
           </button>
         </>
       )}

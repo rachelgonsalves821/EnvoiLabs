@@ -1,5 +1,6 @@
 import { exportCurrentReport, readReportDisplay, type PublicReportSnapshot,
   type QualifiedReportReadPort } from "./report-reader.js";
+import { serializeReportCsv } from "./report-csv.js";
 
 export type ReportUiState =
   | { readonly kind: "loading" | "withheld"; readonly canExport: false }
@@ -40,7 +41,7 @@ export class ReportUiController {
     return this.state;
   }
 
-  /** Fresh read; a new unseen report version requires review before export. */
+  /** Fresh read; a new unseen report version requires review before CSV export. */
   async requestExport(): Promise<string | null> {
     if (this.state.kind !== "ready" || !this.state.canExport) return null;
     const visible = this.state.report;
@@ -54,6 +55,7 @@ export class ReportUiController {
     }
     const fresh = JSON.parse(payload) as PublicReportSnapshot;
     this.setState({ kind: "ready", report: fresh, canExport: true });
-    return fresh.reportId === visible.reportId && payload === JSON.stringify(visible) ? payload : null;
+    return fresh.reportId === visible.reportId && payload === JSON.stringify(visible)
+      ? serializeReportCsv(fresh) : null;
   }
 }

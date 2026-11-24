@@ -12,7 +12,7 @@ it("uses a fresh same-origin report request for display and export", async () =>
     json: async () => report });
   const controller = new ReportUiController(reportBrowserPort(fetcher), studyId);
   expect((await controller.refresh()).kind).toBe("ready");
-  expect(JSON.parse((await controller.requestExport())!)).toEqual(report);
+  expect(await controller.requestExport()).toContain('"report_label"');
   expect(fetcher).toHaveBeenCalledTimes(2);
   expect(fetcher).toHaveBeenCalledWith(`/api/researcher/studies/${studyId}/report`,
     expect.objectContaining({ cache: "no-store", credentials: "same-origin",
