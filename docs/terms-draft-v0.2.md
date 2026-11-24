@@ -62,13 +62,15 @@ Proposed placement is after the verified email sign-in link and before any voice
 >
 > [Separate toggle, off, proposed only] **Let an AI service read my reviewed interview text to suggest follow-up questions.** [Identify the exact provider, data sent and retention terms in approved copy.] If you do not agree, the interview uses the next planned question. This purpose is `ai_followup` and must never be inferred from recording, transcription or researcher-access consent.
 
+> [Separate toggle, off, proposed only] **Let an AI service read my screener answer to help check whether this study matches my profile.** [Disclose that the full typed or transcribed screener answer may be sent, the exact provider, data categories, purpose, human review, retention and alternative path.] This separate `screening_model` purpose needs Rachel/counsel approval. Declining it must not be treated as consent to another model purpose.
+
 > [Separate toggle, off, proposed only] **Let reviewed, redacted answers be used to test and improve future interview questions.** [Specify scope, provider, data sent and retention after approval.] This optional `question_improvement` purpose is independent of report analysis and follow-up questions.
 >
 > [Checkbox, unchecked, draft] I have read the [Respondent Privacy and Recording Notice] and [Respondent Terms]. [Counsel to approve the exact required recording release and separate optional purposes.]
 >
 > [Button] Agree and continue
 
-Proposed rows: `retention` and `researcher_access` as approved prerequisites for taking part; `recording` and `transcription_vendor` only when voice is chosen under approved copy; `voice_clip_sharing` only by separate per-study opt-in; `report_analysis` under an approved report purpose; and `ai_followup` and `question_improvement` only by their own distinct, versioned opt-ins. No purpose is inferred from another. Store the grant's actor, study scope where applicable, text version and digest, purpose, choice and timestamp; bind provider identity and exact data categories to the approved text. Recheck the current receipt before processing. The current preview screen has only four purposes and does not implement this complete flow. Live voice sharing and LLM follow-up stay disabled pending approval and enforcement tests.
+Proposed rows: `retention` and `researcher_access` as approved prerequisites for taking part; `recording` and `transcription_vendor` only when voice is chosen under approved copy; `voice_clip_sharing` only by separate per-study opt-in; `report_analysis` under an approved report purpose; and `screening_model`, `ai_followup` and `question_improvement` only by their own distinct, versioned opt-ins. No purpose is inferred from another. Store the grant's actor, study scope where applicable, text version and digest, purpose, choice and timestamp; bind provider identity and exact data categories to the approved text. Recheck the current receipt before processing. The current preview screen has only four purposes and does not implement this complete flow. Live voice sharing, screening model input and LLM follow-up stay disabled pending approval and enforcement tests.
 
 ---
 
@@ -85,7 +87,7 @@ Proposed rows: `retention` and `researcher_access` as approved prerequisites for
 
 ### 3.2 Processing purposes and choices
 
-Account operation, profile-based matching, restricted screening, quality/fraud review and payout each need exact disclosure. `recording` and `transcription_vendor` apply only to voice answers. `researcher_access` concerns qualified redacted text. `report_analysis` needs its own approved disclosure of any model or processor use for a researcher report. `voice_clip_sharing` is separate per study and stays off for the first marketplace test. **`ai_followup` is a separate, proposed, versioned opt-in for sending reviewed interview text to an approved LLM to suggest a probe. `question_improvement` is another optional, separate proposed purpose. Neither is granted by recording, transcription, report analysis or researcher-access consent. Live follow-ups remain disabled until Rachel/counsel approve the actual copy, provider and data flow and the app enforces it.** Secondary model evaluation or training is not authorized by this draft.
+Account operation, profile-based matching, restricted screening, quality/fraud review and payout each need exact disclosure. `recording` and `transcription_vendor` apply only to voice answers. `researcher_access` concerns qualified redacted text. `report_analysis` needs its own approved disclosure of any model or processor use for a researcher report. `voice_clip_sharing` is separate per study and stays off for the first marketplace test. **`screening_model` is a distinct, proposed, versioned opt-in because the validator can receive the full screener answer. `ai_followup` separately covers reviewed interview text sent to an approved LLM to suggest a probe. `question_improvement` is another optional, separate proposed purpose. None is granted by recording, transcription, report analysis, researcher access or another model purpose. Live screening model input and follow-ups remain disabled until Rachel/counsel approve exact copy, provider and data flow and the server enforces current authorization.** Secondary model evaluation or training is not authorized by this draft.
 
 ### 3.3 Voice and biometric notice [counsel and implementation hold]
 
@@ -186,7 +188,7 @@ These placements are design requirements, not claims that the current app has im
 | --- | --- | --- |
 | Discover | Links to approved terms/privacy notice | Draft only; no enrollment publication |
 | Email sign-in | 18+ attestation and link to approved Respondent Terms | Current app uses email link and age attestation; terms acceptance needs implementation review |
-| Consent before voice/profile recording | Purpose-specific approved text and unchecked choice; separate `ai_followup` opt-in | Current app saves profile before preview consent; proposed order and LLM purpose are not approved or mounted |
+| Consent before voice/profile recording | Purpose-specific approved text and unchecked choice; separate `screening_model` and `ai_followup` opt-ins | Current app saves profile before preview consent; proposed order and model purposes are not approved or mounted |
 | Matched study offer | Approved reward, privacy line and any screener amount | Open signup creates a profile; eligible profiles may later receive a matched offer. The existing internal code calls an offer an invite, but there is no selected invite-only enrollment cohort. Marketplace rules remain pending |
 | Voice sharing | Per-study separate opt-in | Off for first marketplace test; no live voice publication |
 | Receipt/Earnings | Pending per-answered-question reward and prepaid Visa status | Provider product and quality timing require verification |
@@ -210,7 +212,7 @@ These placements are design requirements, not claims that the current app has im
 | Area | Required change before live use | Review owner |
 | --- | --- | --- |
 | Auth/profile | Keep email-link signup and 18+ proof; audit legacy phone fields. If voice profile input is enabled, present approved recording consent before mic access | Gate 1, Platform, counsel |
-| Consent | Version `recording`, `transcription_vendor`, `retention`, `researcher_access`, `report_analysis`, per-study `voice_clip_sharing`, and distinct `ai_followup` and optional `question_improvement` copy. Bind each grant to its text digest, provider/data disclosure and scope. Deny live LLM probes until approved text and enforcement tests exist | Rachel/counsel, Gate 1, Gate 2, Gate 3 |
+| Consent | Version `recording`, `transcription_vendor`, `retention`, `researcher_access`, `report_analysis`, per-study `voice_clip_sharing`, and distinct `screening_model`, `ai_followup` and optional `question_improvement` copy. Bind each grant to its text digest, provider/data disclosure and scope. Platform must provide a current server-side, study/answer/provider-specific authorization to Gate 3's screening validator before a model call; fail closed if missing, revoked, stale or denied. Deny live screening model input and LLM probes until approved text and enforcement tests exist | Rachel/counsel, Gate 1, Gate 2, Gate 3 |
 | Pricing | Select immutable marketplace config at $2 charge/$1 reward, reject fewer than 10, retain historical quote versions | Gate 2 |
 | Refund | Finalize a qualifying-complete snapshot at the approved close event; refund only missing slots at the frozen per-slot price, transactionally and idempotently | Rachel/counsel, Gate 2 |
 | Respondent payout | Reward approved answered core questions separately from refunds; verify prepaid Visa catalog, recipient routing, fee disclosure and provider statuses in sandbox | Gate 2, Gate 4 |
@@ -221,7 +223,7 @@ These placements are design requirements, not claims that the current app has im
 
 - Rachel and counsel: legal entity, jurisdiction, dispute terms, voice and biometric classification, signed release, data-purpose copy, retention by data class, withdrawal/export effect, tax and incentive eligibility. The v0.1 BIPA, arbitration, tax-cap and fixed-retention assertions remain unverified.
 - Rachel: qualifying-complete definition, partial-session reward rules, close/cutoff time, refund initiation, referral verification/reversal, points or other bonuses and prepaid Visa experience.
-- Platform and Gate 1: actual consent order, independent `ai_followup` receipt, legacy phone-field audit, voice/transcript deletion, restricted redacted report/export, current-source check and provider configuration. Live LLM follow-up remains disabled.
+- Platform and Gate 1: actual consent order, independent `screening_model` and `ai_followup` receipts, legacy phone-field audit, voice/transcript deletion, restricted redacted report/export, current-source check and provider configuration. Gate 2 must supply Gate 3's validator a current, scoped server authorization decision before any screener-answer model call. Live screening model input and LLM follow-up remain disabled.
 - Gate 2: authenticated quote/checkout, frozen quote and refund ledger, payout provider product and recipient fee verification, five-unique-profile referral accounting and synthetic retry tests. No charge, payout, recruitment or publication is authorized by this draft.
 
 ---
