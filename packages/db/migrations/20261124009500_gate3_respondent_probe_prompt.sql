@@ -50,9 +50,7 @@ begin
             where raw.transcript_id = source.id and raw.raw_text = supplied_text)
         then raise unique_violation; end if;
     else
-        select count(*) into rank_number from public.probes as counted
-        where counted.answer_id = turn.answer_id
-            and (counted.decided_at, counted.id) <= (probe.decided_at, probe.id);
+        rank_number := internal.gate3_probe_chain_count(turn.answer_id);
         insert into public.answers (id, session_id, study_id, guide_question_id,
             probe_id, kind, sequence)
         values (supplied_answer_id, interview.id, interview.study_id,
