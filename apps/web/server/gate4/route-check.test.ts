@@ -29,7 +29,7 @@ describe("Gate 4 route seam", () => {
       "email-start", "person@example.test")).toEqual({ kind: "unavailable" });
     expect(await createGate4RouteCheck(store, { ...env, GATE4_RATE_LIMIT_HMAC_KEY: "" })(source,
       "email-start", "person@example.test")).toEqual({ kind: "unavailable" });
-    expect(await createGate4RouteCheck(undefined, env)(source,
+    expect(await createGate4RouteCheck(undefined, env, () => null)(source,
       "email-start", "person@example.test")).toEqual({ kind: "unavailable" });
     expect(store.consume).not.toHaveBeenCalled();
   });
@@ -48,5 +48,18 @@ describe("Gate 4 route seam", () => {
     expect(store.consume).toHaveBeenCalledTimes(2);
     expect(store.consume.mock.calls[0]?.[0]?.map((rule: { surface: string }) => rule.surface))
       .toEqual(["email-start", "email-start"]);
+  });
+
+  it("resolves a service-backed store only after valid preview config and source", async () => {
+    const store = { consume: vi.fn(async () => ({ allowed: true as const })) };
+    const resolveStore = vi.fn(() => store);
+    const check = createGate4RouteCheck(undefined, env, resolveStore);
+    expect(await check(request({ "x-forwarded-for": "203.0.113.7" }),
+      "email-start", "person@example.test")).toEqual({ kind: "unavailable" });
+    expect(resolveStore).not.toHaveBeenCalled();
+    expect(await check(request({ "x-vercel-forwarded-for": "203.0.113.7" }),
+      "email-start", "person@example.test")).toEqual({ kind: "allow" });
+    expect(resolveStore).toHaveBeenCalledOnce();
+    expect(store.consume).toHaveBeenCalledOnce();
   });
 });
