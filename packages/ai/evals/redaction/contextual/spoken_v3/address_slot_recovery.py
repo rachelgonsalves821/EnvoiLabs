@@ -103,6 +103,22 @@ _STREET_PUBLIC_CONTEXT = re.compile(
     re.I,
 )
 _SHAPED_BOUNDARY = re.compile(r"\b(?:just (?:before|after)|even though)\b", re.I)
+_PRIVATE_POSTAL_ROLE = re.compile(
+    r"\b(?:my|our) (?:(?:home|mailing|shipping|billing|street|residential|delivery) )?address"
+    r"[ \t]+(?:is|was)[ \t]*[:,]?[ \t]+", re.I,
+)
+_LOCALITY_WORD = r"[^\W\d_]+(?:[-’'][^\W\d_]+)*"
+_POSTAL_ADDRESS = re.compile(
+    rf"(?P<street>[^,\r\n]{{4,64}}),[ \t]+{_LOCALITY_WORD}(?:[ \t]+{_LOCALITY_WORD}){{0,3}}"
+    r"(?:,[ \t]+|[ \t]+)(?P<region>[a-z]{2})[ \t]+"
+    r"(?P<postal>[0-9]{5}(?:-[0-9]{4})?|[abceghj-nprstvxy][0-9][abceghj-nprstv-z][ \t]?[0-9][abceghj-nprstv-z][0-9])"
+    r"(?![\w-])", re.I,
+)
+_US_POSTAL_REGIONS = set(
+    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY "
+    "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split()
+)
+_CA_POSTAL_REGIONS = set("AB BC MB NB NL NS NT NU ON PE QC SK YT".split())
 
 
 def _house_number_end(tokens, start):
@@ -215,6 +231,48 @@ def _strong_street_shapes(text, tokens, offsets):
             yield Hit("address", start, end)
 
 
+def _is_street_record(text):
+    if _NON_ADDRESS.search(text) or _WAYPOINT.search(text):
+        return False
+    tokens = tokenize(text)
+    if not tokens or tokens[0].start:
+        return False
+    first, reliable = _house_number_end(tokens, 0)
+    if _HYPHENATED_HOUSE_NUMBER.fullmatch(tokens[0].word):
+        first, reliable = 1, 1
+    if not 1 <= first <= 5 or not reliable:
+        return False
+    if tokens[-1].word == ".":
+        tokens = tokens[:-1]
+        if len(tokens) <= first or tokens[-1].word not in _STREET_ABBREVIATIONS:
+            return False
+    street = tokens[first:]
+    has_suffix = bool(street and street[-1].word in _STREET_SUFFIXES)
+    name = street[:-1] if has_suffix else street
+    return (
+        (1 if has_suffix else 2) <= len(name) <= 4 and all(_STREET_WORD.fullmatch(part.word) for part in name)
+        and all(text[left.end:right.start].isspace() for left, right in zip(tokens, tokens[1:]))
+    )
+
+
+def _private_postal_addresses(text):
+    """Extend a personal address only when a structured locality and postal tail corroborate it."""
+    for role in _PRIVATE_POSTAL_ROLE.finditer(text):
+        record = _POSTAL_ADDRESS.match(text, role.end())
+        if not record:
+            continue
+        postal, region = record["postal"], record["region"].upper()
+        regions = _US_POSTAL_REGIONS if postal[0].isdigit() else _CA_POSTAL_REGIONS
+        if region not in regions or not _is_street_record(record["street"]):
+            continue
+        end = record.end()
+        following = text[end:].lstrip()
+        if not _PUBLIC_DELIVERY_DESTINATION.match(text, end) and (
+            not following or _CLAUSE_END.match(following)
+        ):
+            yield Hit("address", record.start(), end)
+
+
 def recover_address_slots(text):
     tokens = tokenize(text)
     offsets = {token.start: index for index, token in enumerate(tokens)}
@@ -325,3 +383,4 @@ def recover_corroborated_addresses(text):
                     continue
             yield Hit("address", tokens[start].start, written_offset or last_offset)
     yield from _strong_street_shapes(text, tokens, offsets)
+    yield from _private_postal_addresses(text)
