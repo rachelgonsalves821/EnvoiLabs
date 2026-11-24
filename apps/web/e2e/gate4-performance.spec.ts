@@ -8,11 +8,21 @@ test.skip(process.env.ENVOI_TEST_LOCAL_SUPABASE !== "1", "Requires a disposable 
 test.skip(({ browserName }) => browserName !== "chromium", "Chromium performance baseline.");
 
 test("Gate 4 synthetic interview JS and LCP baseline", async ({ browser, baseURL }) => {
-  test.setTimeout(240_000);
+  const runsPerMode = Number(process.env.ENVOI_PERF_RUNS ?? "3");
+  if (!Number.isSafeInteger(runsPerMode) || runsPerMode < 1 || runsPerMode > 50) {
+    throw new Error("ENVOI_PERF_RUNS must be an integer from 1 to 50.");
+  }
+  const cpuProfiled = process.env.ENVOI_PERF_CPU_PROFILE === "1";
+  const traceCaptured = process.env.ENVOI_PERF_TRACE !== "0";
+  test.setTimeout(Math.max(240_000, runsPerMode * 2 * 60_000));
   const origin = loopbackOrigin(baseURL);
   const echoChunk = process.env.ENVOI_ECHO_CHUNK;
   const output = process.env.ENVOI_PERF_OUTPUT;
-  if (!echoChunk?.startsWith("static/chunks/") || !output) throw new Error("Configure local performance output and Echo chunk.");
+  const revision = process.env.ENVOI_PERF_REVISION;
+  const buildId = process.env.ENVOI_PERF_BUILD_ID;
+  if (!echoChunk?.startsWith("static/chunks/") || !output || !/^[a-f\d]{40}$/i.test(revision ?? "") || !buildId) {
+    throw new Error("Configure output, Echo chunk, full revision, and production build ID.");
+  }
   const service = localService();
   const email = `gate4-perf-${randomUUID()}@example.test`;
   const setup = await browser.newContext({ ...devices["Pixel 7"], baseURL: origin });
@@ -78,11 +88,11 @@ test("Gate 4 synthetic interview JS and LCP baseline", async ({ browser, baseURL
       const consent = await service.from("consents").insert({ respondent_id: respondent.data.id,
         study_id: null, purpose: "recording", granted: mode === "voice", text_version: "gate1-preview-v1" });
       if (consent.error) throw new Error("Synthetic voice/typed consent fixture failed.");
-      for (let index = 1; index <= 3; index++) {
+      for (let index = 1; index <= runsPerMode; index++) {
         const context = await browser.newContext({ ...devices["Pixel 7"], baseURL: origin });
         try {
           await context.addCookies(cookies);
-          await context.tracing.start({ screenshots: true, snapshots: true });
+          if (traceCaptured) await context.tracing.start({ screenshots: true, snapshots: true });
           const measured = await context.newPage();
           const responseHeaders = new Map<string, { contentEncoding: string | null; contentLength: string | null }>();
           measured.on("response", (response) => {
@@ -108,9 +118,11 @@ test("Gate 4 synthetic interview JS and LCP baseline", async ({ browser, baseURL
           await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 150,
             downloadThroughput: 1_600_000 / 8, uploadThroughput: 750_000 / 8 });
           await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
-          await cdp.send("Profiler.enable");
-          await cdp.send("Profiler.setSamplingInterval", { interval: 1000 });
-          await cdp.send("Profiler.start");
+          if (cpuProfiled) {
+            await cdp.send("Profiler.enable");
+            await cdp.send("Profiler.setSamplingInterval", { interval: 1000 });
+            await cdp.send("Profiler.start");
+          }
           await measured.goto(`/r/interviews/${invite.data.id}`, { waitUntil: "networkidle" });
           await expect(measured.getByRole("heading", { name: "Synthetic performance question 1" })).toBeVisible();
           if (mode === "typed") await expect(measured.getByRole("textbox", { name: /answer/i })).toBeVisible();
@@ -128,20 +140,23 @@ test("Gate 4 synthetic interview JS and LCP baseline", async ({ browser, baseURL
                   transferBytes: entry.transferSize, startMs: entry.startTime })),
             };
           });
-          const { profile } = await cdp.send("Profiler.stop");
-          writeFileSync(resolve(output, `cpu-${process.env.ENVOI_PERF_ORDER ?? "voice-first"}-${mode}-${index}.json`), JSON.stringify(profile));
-          const nodes = new Map(profile.nodes.map((node) => [node.id, node.callFrame]));
-          const cpu = new Map<string, number>();
-          for (let sampleIndex = 0; sampleIndex < (profile.samples?.length ?? 0); sampleIndex++) {
-            const nodeId = profile.samples?.[sampleIndex];
-            if (nodeId === undefined) continue;
-            const frame = nodes.get(nodeId);
-            if (!frame) continue;
-            const key = `${frame.functionName || "(anonymous)"} ${frame.url || ""}`.trim();
-            cpu.set(key, (cpu.get(key) ?? 0) + (profile.timeDeltas?.[sampleIndex] ?? 0));
+          let topCpu: { frame: string; sampledMs: number }[] = [];
+          if (cpuProfiled) {
+            const { profile } = await cdp.send("Profiler.stop");
+            writeFileSync(resolve(output, `cpu-${process.env.ENVOI_PERF_ORDER ?? "voice-first"}-${mode}-${index}.json`), JSON.stringify(profile));
+            const nodes = new Map(profile.nodes.map((node) => [node.id, node.callFrame]));
+            const cpu = new Map<string, number>();
+            for (let sampleIndex = 0; sampleIndex < (profile.samples?.length ?? 0); sampleIndex++) {
+              const nodeId = profile.samples?.[sampleIndex];
+              if (nodeId === undefined) continue;
+              const frame = nodes.get(nodeId);
+              if (!frame) continue;
+              const key = `${frame.functionName || "(anonymous)"} ${frame.url || ""}`.trim();
+              cpu.set(key, (cpu.get(key) ?? 0) + (profile.timeDeltas?.[sampleIndex] ?? 0));
+            }
+            topCpu = [...cpu].sort((a, b) => b[1] - a[1]).slice(0, 10)
+              .map(([frame, micros]) => ({ frame, sampledMs: Math.round(micros / 1000) }));
           }
-          const topCpu = [...cpu].sort((a, b) => b[1] - a[1]).slice(0, 10)
-            .map(([frame, micros]) => ({ frame, sampledMs: Math.round(micros / 1000) }));
           const unique = new Map(sample.js.map((entry) => [entry.path, entry]));
           const js = [...unique.values()].map((entry) => ({ ...entry, ...responseHeaders.get(entry.path) }));
           const echo = js.find((entry) => entry.path.endsWith(echoChunk));
@@ -153,18 +168,22 @@ test("Gate 4 synthetic interview JS and LCP baseline", async ({ browser, baseURL
             longTasks: preLcpTasks, topCpu,
             jsCount: js.length, jsEncodedBodyBytes: js.reduce((sum, entry) => sum + entry.encodedBodyBytes, 0),
             echoRequested: Boolean(echo), echoEncodedBodyBytes: echo?.encodedBodyBytes ?? null, js });
-          await context.tracing.stop({ path: resolve(output, `trace-${process.env.ENVOI_PERF_ORDER ?? "voice-first"}-${mode}-${index}.zip`) });
+          if (traceCaptured) {
+            await context.tracing.stop({ path: resolve(output, `trace-${process.env.ENVOI_PERF_ORDER ?? "voice-first"}-${mode}-${index}.zip`) });
+          }
         } finally {
           await context.close();
         }
       }
     }
-    const report = { source: "Production build from the pinned Gate 2 Echo split revision in an isolated Gate 4 archive",
-      revision: process.env.ENVOI_PERF_REVISION ?? null, browserVersion: browser.version(),
+    const report = { source: "Production interview build with a disposable local respondent and invite",
+      revision, buildId,
+      finalWebglEcho: process.env.ENVOI_PERF_FINAL_WEBGL === "1",
+      browserVersion: browser.version(), cpuProfiled, traceCaptured, runsPerMode, echoChunk,
       order: process.env.ENVOI_PERF_ORDER ?? "voice-first",
       profile: "Playwright Pixel 7 viewport, Chromium, 4x CPU slowdown, 150 ms latency, 1.6 Mbps down, 0.75 Mbps up",
       url: `/r/interviews/${invite.data.id}`, runs: samples };
-    writeFileSync(resolve(output, `metrics-cpu-${report.order}.json`), JSON.stringify(report, null, 2));
+    writeFileSync(resolve(output, `metrics-${cpuProfiled ? "cpu-" : ""}${report.order}.json`), JSON.stringify(report, null, 2));
     expect(samples.every((sample) => sample.lcpMs !== null && sample.jsCount > 0)).toBe(true);
   } finally {
     await setup.close();

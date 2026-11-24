@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { emailCallbackCredential, normalizeEmail } from "./email-link";
 import { failure, input, reply } from "./http";
 import { appOrigin, privateHeaders, requestSession, trustedClient } from "./supabase";
+import { gate4RouteCheck, type Gate4RouteCheck } from "../gate4/route-check";
+import { rateLimitRejection } from "../gate4/rate-limit-http";
 
 const callbackPath = "/api/respondent/auth/callback";
 const ageProofCookie = "envoi-respondent-age";
@@ -26,7 +28,7 @@ function cookieOptions(origin: string) {
   };
 }
 
-export async function respondentStart(request: NextRequest) {
+export async function respondentStart(request: NextRequest, check: Gate4RouteCheck = gate4RouteCheck) {
   const parsed = await input(request);
   if (parsed.error !== undefined) return failure(parsed.error);
   const email = normalizeEmail(parsed.body.email);
@@ -36,6 +38,8 @@ export async function respondentStart(request: NextRequest) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const session = requestSession(request, { keepPendingVerifier: true });
   if (!origin || !key || !session.client) return failure(503);
+  const rejection = rateLimitRejection(await check(request, "email-start", email));
+  if (rejection) return rejection;
   const { error } = await session.client.auth.signInWithOtp({
     email,
     options: { shouldCreateUser: true, emailRedirectTo: origin + callbackPath },

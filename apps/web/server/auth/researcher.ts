@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { emailCallbackCredential, normalizeEmail } from "./email-link";
 import { failure, input, providerFailure, reply } from "./http";
 import { appOrigin, privateHeaders, requestSession, trustedClient } from "./supabase";
+import { gate4RouteCheck, type Gate4RouteCheck } from "../gate4/route-check";
+import { rateLimitRejection } from "../gate4/rate-limit-http";
 
 const codePattern = /^\d{6}$/;
 const uuidPattern = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i;
@@ -15,7 +17,7 @@ async function researcherMembership(userId: string): Promise<"member" | "absent"
   return typeof data?.id === "string" ? "member" : "absent";
 }
 
-export async function researcherStart(request: NextRequest) {
+export async function researcherStart(request: NextRequest, check: Gate4RouteCheck = gate4RouteCheck) {
   const parsed = await input(request);
   if (parsed.error !== undefined) return failure(parsed.error);
   const email = normalizeEmail(parsed.body.email);
@@ -25,6 +27,8 @@ export async function researcherStart(request: NextRequest) {
   const session = requestSession(request, { keepPendingVerifier: true });
   const { client } = session;
   if (!origin || !client || !trustedClient()) return failure(503);
+  const rejection = rateLimitRejection(await check(request, "email-start", email));
+  if (rejection) return rejection;
   const { error } = await client.auth.signInWithOtp({
     email,
     options: { shouldCreateUser: false, emailRedirectTo: `${origin}/api/researcher/auth/callback` },
