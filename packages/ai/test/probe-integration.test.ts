@@ -135,6 +135,21 @@ describe("probe decision and render ports", () => {
     expect(retract).toHaveBeenCalledTimes(1);
   });
 
+  it("retracts text when the active turn changes after mount but before paint", async () => {
+    const { port } = setup();
+    const saved = await runProbeDecision(port, provider(async () => response({ action: "probe",
+      text: "What changed?" })), "session-1", "turn-1", 500, () => 300);
+    if (saved.status !== "committed") return;
+    let activeTurn = "turn-1";
+    const mount = vi.fn(() => { activeTurn = "turn-2"; });
+    const retract = vi.fn();
+    expect(await presentCommittedProbe(port, saved.value, () => activeTurn, mount,
+      (callback) => callback(), () => 500, retract)).toEqual({ outcome: "superseded" });
+    expect(mount).toHaveBeenCalledTimes(1);
+    expect(retract).toHaveBeenCalledTimes(1);
+    expect(port.markShown).not.toHaveBeenCalled();
+  });
+
   it("replays a current committed decision without another model call", async () => {
     const { port, setCurrent } = setup();
     const first = await runProbeDecision(port, provider(async () => response({ action: "probe",

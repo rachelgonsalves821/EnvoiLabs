@@ -156,8 +156,13 @@ export async function presentCommittedProbe(port: ProbeDecisionPort, committed: 
   const clear = () => { try { retract(); } catch { /* Keep the failed render unmeasured. */ } };
   if (committed.decision.action === "next") return { outcome: committed.decision.outcome };
   if (!committed.probeId) return { outcome: "error" };
-  const outcome = await presentProbeIfCurrent(committed.decision, currentTurnId, mount, frame, now);
-  if (outcome.outcome !== "rendered") return outcome;
+  let mounted = false;
+  const outcome = await presentProbeIfCurrent(committed.decision, currentTurnId,
+    (text) => { mount(text); mounted = true; }, frame, now);
+  if (outcome.outcome !== "rendered") {
+    if (mounted) clear();
+    return outcome;
+  }
   try {
     const stored = await port.markShown({ sessionId: committed.sessionId, turnId: committed.turnId,
       probeId: committed.probeId, browserRenderedAtMs: outcome.renderedAtMs });
