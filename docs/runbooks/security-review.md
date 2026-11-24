@@ -15,6 +15,8 @@ Reviewed 2026-11-23 on `codex/gate-4-parallel` against the [OWASP Top 10:2025](h
 | A09 Security Logging and Alerting Failures | Current workers mask private database/provider errors from scheduler logs. | R-PLAT-12 observability is not complete. Verify structured safe logs, alerting, incident routing, and access to job dashboards. |
 | A10 Mishandling of Exceptional Conditions | Answer processing retries provider failure and keeps redaction failures private. | Complete IT-4.2 on integrated LLM, transcription, and payout paths; rehearse runbooks and confirm no raw response leaks in failure logs. |
 
+The [Gate 2/3 draft-interface review and chaos fixture handoff](integration-chaos-fixtures.md) identifies synthetic provider, publication, and no-probe failures to run after their adapters land. It is a source review only; no integrated fault path passed here.
+
 ## Rate-limit path inventory and acceptance cases
 
 The route file is a thin handler; the service path named here is where a limit must run before the expensive or externally visible action. No application limiter was found in these paths on this revision. Supabase returning 429 is a secondary provider guard, not proof that the application controls request volume.
