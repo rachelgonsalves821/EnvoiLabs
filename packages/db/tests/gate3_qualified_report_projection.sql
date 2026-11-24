@@ -104,6 +104,26 @@ select is((select count(*) from research.reports), 0::bigint, 'revoked qualifica
 reset role;
 update internal.gate1_redaction_policies set revoked_at = null where policy_digest = repeat('a', 64);
 
+insert into public.consents (respondent_id, purpose, granted, text_version, created_at)
+values ('90500000-0000-4000-8000-000000000001', 'researcher_access', false,
+    'withdrawn', now() + interval '1 second');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports), 0::bigint, 'withdrawal hides report');
+select is((select count(*) from research.evidence_quotes), 0::bigint, 'withdrawal hides evidence');
+reset role;
+insert into public.consents (respondent_id, purpose, granted, text_version, created_at)
+values ('90500000-0000-4000-8000-000000000001', 'researcher_access', true,
+    'regranted', now() + interval '2 seconds');
+update public.respondents set status = 'deleted'
+where id = '90500000-0000-4000-8000-000000000001';
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint, 'respondent deletion hides report');
+select is((select count(*) from research.evidence_quotes), 0::bigint, 'respondent deletion hides evidence');
+reset role;
+update public.respondents set status = 'active'
+where id = '90500000-0000-4000-8000-000000000001';
+
 create temp table previous_source_version as
 select redacted_source_version as version from public.transcripts
 where id = 'a9700000-0000-4000-8000-000000000005';
@@ -122,6 +142,16 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
 select is((select count(*) from research.reports), 0::bigint,
     'old quote source version cannot cross an identical-text republication');
+reset role;
+update public.transcripts set redacted_source_version = (select version from previous_source_version)
+where id = 'a9700000-0000-4000-8000-000000000005';
+select isnt((select redacted_source_version from public.transcripts
+    where id = 'a9700000-0000-4000-8000-000000000005'),
+    (select version from previous_source_version),
+    'direct write cannot restore a prior source UUID');
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint,
+    'attempted UUID replay cannot reactivate the old quote');
 reset role;
 
 update public.transcripts set redacted_text = 'A 😀 ordered rice.'
