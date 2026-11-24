@@ -5,6 +5,8 @@ type Reservation = {
   recipientId: string;
   productId: string;
   amountCents: number;
+  state: "pending" | "ordered" | "delivered" | "failed";
+  providerOrderId: string | null;
 };
 type ProviderOrder = {
   id: string;
@@ -42,23 +44,31 @@ export async function issueReservedPayout(
       reserved.amountCents <= 0 || !reserved.id || !reserved.recipientId || !reserved.productId) {
     return "blocked";
   }
+  if (reserved.state === "delivered" || reserved.state === "failed") return reserved.state;
   const key = `gate2-payout:${reserved.id}`;
-  try {
-    await provider.createOrder({ recipientId: reserved.recipientId,
-      productId: reserved.productId, amountCents: reserved.amountCents, idempotencyKey: key });
-  } catch {
-    // A timed-out request can still have created an order. The stable key lets
-    // us ask the provider before considering any new attempt.
-  }
-
   let observed: ProviderOrder | null;
   try {
     observed = await provider.getOrderByKey(key);
   } catch {
     return "unavailable";
   }
+  if (!observed) {
+    if (reserved.state !== "pending" || reserved.providerOrderId) return "unavailable";
+    try {
+      await provider.createOrder({ recipientId: reserved.recipientId,
+        productId: reserved.productId, amountCents: reserved.amountCents, idempotencyKey: key });
+    } catch {
+      // The provider may have created the order before this request timed out.
+    }
+    try {
+      observed = await provider.getOrderByKey(key);
+    } catch {
+      return "unavailable";
+    }
+  }
   if (!observed) return "unavailable";
   if (!observed.id || !observed.eventId ||
+      (reserved.providerOrderId !== null && reserved.providerOrderId !== observed.id) ||
       observed.recipientId !== reserved.recipientId ||
       observed.productId !== reserved.productId ||
       observed.amountCents !== reserved.amountCents ||
