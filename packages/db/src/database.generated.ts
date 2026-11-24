@@ -1376,6 +1376,10 @@ export type Database = {
         }
         Returns: Json
       }
+      consume_gate4_rate_limit: {
+        Args: { requested_rules: Json }
+        Returns: Json
+      }
       create_gate1_study: {
         Args: {
           draft: Json
