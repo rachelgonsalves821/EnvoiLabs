@@ -97,12 +97,12 @@ Counsel must supply the applicable release, collection purpose, processor disclo
 
 | Data | Approved period and trigger | Implementation evidence needed |
 | --- | --- | --- |
-| Raw voice and private transcript | [Counsel/Rachel to approve] | Storage, queue, backup and worker deletion tests |
+| Raw voice, abandoned uploads and private transcript | [Counsel/Rachel to approve] | Storage, interview-expiry, orphan-object, queue, backup and worker deletion tests. Gate 4 observed an uploaded object remaining after interview expiry; Gate 1 owns the lifecycle fix |
 | Redacted transcript, report and export | [Counsel/Rachel to approve] | Current consent/source checks and deletion regression |
 | Account/profile and legacy phone fields | [Counsel/Rachel to approve] | Actual collection, access and deletion audit |
 | Payout, referral, consent and tax records | [Counsel/Rachel to approve] | Provider, ledger and legal retention review |
 
-The 60-day, 24-month, 7-year and other periods in v0.1 are proposals only. The right to delete and any records retained by law need counsel-approved language matched to tested behavior.
+The 60-day, 24-month, 7-year and other periods in v0.1 are proposals only. An expired interview currently cannot be assumed to remove an abandoned audio upload. The right to delete and any records retained by law need counsel-approved language matched to tested behavior, including a proven orphan-object cleanup path.
 
 ### 3.5 Providers and data transfers [configuration hold]
 
@@ -217,7 +217,7 @@ These placements are design requirements, not claims that the current app has im
 | Refund | Finalize a qualifying-complete snapshot at the approved close event; refund only missing slots at the frozen per-slot price, transactionally and idempotently | Rachel/counsel, Gate 2 |
 | Respondent payout | Reward approved answered core questions separately from refunds; verify prepaid Visa catalog, recipient routing, fee disclosure and provider statuses in sandbox | Gate 2, Gate 4 |
 | Referral | Count five distinct verified referred profiles, reject duplicate/self-referrals, and reserve one $5 threshold award | Gate 2, Gate 4 |
-| Voice, retention and providers | Verify actual voice, redaction, deletion, signed access, processor contracts, data-use settings, tax and fee statements; publish no period or legal claim until approved | Gate 1, Gate 3, Gate 4, counsel |
+| Voice, retention and providers | Verify actual voice, redaction, expiry/orphan-audio cleanup, deletion, signed access, processor contracts, data-use settings, tax and fee statements; publish no period or legal claim until approved. Gate 1 owns the storage lifecycle fix; Platform will coordinate shared schema support if required | Gate 1, Gate 3, Gate 4, counsel |
 | First study | Use open self-service profiles and matching after the above gates; no hand-recruited or selected invite cohort | Rachel, coordinator |
 ## 9. Approval and implementation holds
 
