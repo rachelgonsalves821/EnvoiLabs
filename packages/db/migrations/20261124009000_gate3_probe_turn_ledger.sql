@@ -90,6 +90,40 @@ $$;
 revoke all on function internal.gate3_probe_revision(uuid)
     from public, anon, authenticated, service_role;
 
+create function internal.gate3_probe_root_answer(supplied_answer_id uuid)
+returns uuid language sql stable security definer set search_path = '' as $$
+    with recursive ancestry as (
+        select answer.id, answer.probe_id, 0 as depth
+        from public.answers as answer where answer.id = supplied_answer_id
+        union all
+        select parent.id, parent.probe_id, child.depth + 1
+        from ancestry as child
+        join public.probes as link on link.id = child.probe_id
+        join public.answers as parent on parent.id = link.answer_id
+        where child.depth < 8
+    )
+    select id from ancestry where probe_id is null order by depth desc limit 1;
+$$;
+revoke all on function internal.gate3_probe_root_answer(uuid)
+    from public, anon, authenticated, service_role;
+
+create function internal.gate3_probe_chain_count(supplied_answer_id uuid)
+returns bigint language sql stable security definer set search_path = '' as $$
+    with recursive chain as (
+        select root.id, 0 as depth from public.answers as root
+        where root.id = internal.gate3_probe_root_answer(supplied_answer_id)
+        union all
+        select reply.id, chain.depth + 1 from chain
+        join public.probes as probe on probe.answer_id = chain.id
+        join public.answers as reply on reply.probe_id = probe.id
+        where chain.depth < 8
+    )
+    select count(*) from public.probes as probe
+    where probe.answer_id in (select id from chain);
+$$;
+revoke all on function internal.gate3_probe_chain_count(uuid)
+    from public, anon, authenticated, service_role;
+
 create function internal.gate3_probe_current_for_answer(
     supplied_answer_id uuid, supplied_auth_user_id uuid
 ) returns boolean language sql volatile security definer set search_path = '' as $$
@@ -102,11 +136,13 @@ create function internal.gate3_probe_current_for_answer(
         where answer.id = supplied_answer_id and respondent.auth_user_id = supplied_auth_user_id
             and respondent.status = 'active' and offer.state = 'accepted'
             and offer.expires_at > clock_timestamp() and study.state = 'fielding'
-            and interview.state = 'in_progress' and answer.probe_id is null
-            and question.study_id = interview.study_id and question.position between 1 and 4
+            and interview.state = 'in_progress'
+            and (answer.probe_id is null or exists (
+                select 1 from public.probes as parent
+                where parent.id = answer.probe_id and parent.shown_at is not null))
+            and question.study_id = interview.study_id and question.position > 0
             and question.max_probes > 0
-            and (select count(*) from public.probes as prior
-                where prior.answer_id = answer.id) < question.max_probes
+            and internal.gate3_probe_chain_count(answer.id) < question.max_probes
             and internal.gate1_consent(respondent.id, interview.study_id, 'retention')
             and internal.gate1_consent(respondent.id, interview.study_id, 'researcher_access')
             and internal.gate1_consent(respondent.id, interview.study_id, 'ai_followup')
@@ -133,9 +169,12 @@ create function internal.gate3_probe_current(
         where turn.id = supplied_turn_id and respondent.auth_user_id = supplied_auth_user_id
             and respondent.status = 'active' and offer.state = 'accepted'
             and offer.expires_at > clock_timestamp() and study.state = 'fielding'
-            and interview.state = 'in_progress' and answer.probe_id is null
+            and interview.state = 'in_progress'
+            and (answer.probe_id is null or exists (
+                select 1 from public.probes as parent
+                where parent.id = answer.probe_id and parent.shown_at is not null))
             and answer.session_id = interview.id and answer.guide_question_id = question.id
-            and question.study_id = interview.study_id and question.position between 1 and 4
+            and question.study_id = interview.study_id and question.position > 0
             and turn.transcript_revision = internal.gate3_probe_revision(answer.id)
             and internal.gate1_consent(respondent.id, interview.study_id, 'retention')
             and internal.gate1_consent(respondent.id, interview.study_id, 'researcher_access')
@@ -210,8 +249,7 @@ create function public.read_gate3_ready_probe_turn(
         'sessionId', turn.session_id, 'questionId', turn.guide_question_id,
         'answerId', turn.answer_id, 'turnId', turn.id,
         'transcriptRevision', turn.transcript_revision,
-        'probesUsed', (select count(*) from public.probes as probe
-            where probe.answer_id = turn.answer_id),
+        'probesUsed', internal.gate3_probe_chain_count(turn.answer_id),
         'maxProbes', question.max_probes,
         'decisionDeadlineAtMs', extract(epoch from turn.decision_deadline_at) * 1000,
         'serverUploadConfirmedAtMs', extract(epoch from turn.server_upload_confirmed_at) * 1000,
@@ -287,7 +325,7 @@ begin
             or nullif(btrim(supplied_decision ->> 'text'), '') is null
             or char_length(supplied_decision ->> 'text') > 240
             or right(supplied_decision ->> 'text', 1) <> '?'
-            or (select count(*) from public.probes where answer_id = turn.answer_id)
+            or internal.gate3_probe_chain_count(turn.answer_id)
                 >= (select max_probes from public.guide_questions
                     where id = turn.guide_question_id)
             or (select count(*) from jsonb_object_keys(supplied_decision)) <> 4

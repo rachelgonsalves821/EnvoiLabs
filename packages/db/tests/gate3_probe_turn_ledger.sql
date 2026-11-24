@@ -155,6 +155,71 @@ reset role;
 select ok((select shown_at is not null and browser_rendered_ms = 1200
     from internal.gate3_probe_turns where id = (select turn_id from probe_ids)),
     'server shown timestamp and browser monotonic metric stay separate');
+update public.transcripts set redacted_text = 'The short route saved time.'
+where answer_id = 'a9700000-0000-4000-8000-000000000006';
+update internal.gate1_answer_jobs set source_hash = decode(repeat('e', 64), 'hex'),
+    completed_at = clock_timestamp(), result_status = 'published',
+    publication_policy_digest = repeat('a', 64),
+    publication_qualification_digest = repeat('b', 64)
+where answer_id = 'a9700000-0000-4000-8000-000000000006';
+create temporary table second_probe_turn (turn_id uuid not null);
+grant select, insert on second_probe_turn to service_role;
+set local role service_role;
+insert into second_probe_turn values (public.begin_gate3_probe_turn(
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001', 1400));
+select ok((select turn_id is not null from second_probe_turn),
+    'qualified first probe answer can begin the second turn');
+select is((select public.read_gate3_ready_probe_turn(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    '90300000-0000-4000-8000-000000000001') ->> 'probesUsed'
+    from second_probe_turn), '1', 'second turn counts the first probe');
+select is((select public.commit_gate3_probe_decision(
+    'a9700000-0000-4000-8000-000000000003',
+    'a9700000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006', turn_id,
+    '90300000-0000-4000-8000-000000000001',
+    public.read_gate3_ready_probe_turn(
+        'a9700000-0000-4000-8000-000000000003', turn_id,
+        '90300000-0000-4000-8000-000000000001') ->> 'transcriptRevision',
+    jsonb_build_object('action', 'probe', 'turnId', turn_id,
+        'uploadConfirmedAtMs', 1400, 'text', 'What else made the route useful?'))
+    ->> 'status' from second_probe_turn), 'committed',
+    'second probe commits under the same guide cap');
+select is((select public.read_gate3_respondent_probe(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001') ->> 'text'),
+    'What else made the route useful?', 'second probe is the current respondent prompt');
+select is((select public.mark_gate3_probe_shown(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    (public.read_gate3_respondent_probe(
+        'a9700000-0000-4000-8000-000000000003',
+        '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
+    '90300000-0000-4000-8000-000000000001', 1500)
+    from second_probe_turn), 'recorded', 'second probe has its own shown receipt');
+select is((select public.record_gate3_probe_text_answer(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    (public.read_gate3_respondent_probe(
+        'a9700000-0000-4000-8000-000000000003',
+        '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
+    'a9700000-0000-4000-8000-000000000007',
+    '90300000-0000-4000-8000-000000000001', 'It also cost less.')
+    -> 'answer' ->> 'sequence' from second_probe_turn), '1012',
+    'second probe reply has a distinct sequence');
+reset role;
+update public.transcripts set redacted_text = 'It also cost less.'
+where answer_id = 'a9700000-0000-4000-8000-000000000007';
+update internal.gate1_answer_jobs set source_hash = decode(repeat('f', 64), 'hex'),
+    completed_at = clock_timestamp(), result_status = 'published',
+    publication_policy_digest = repeat('a', 64),
+    publication_qualification_digest = repeat('b', 64)
+where answer_id = 'a9700000-0000-4000-8000-000000000007';
+set local role service_role;
+select is(public.begin_gate3_probe_turn(
+    'a9700000-0000-4000-8000-000000000007',
+    '90300000-0000-4000-8000-000000000001', 1600), null::uuid,
+    'a third probe is denied by the full guide-question chain cap');
+reset role;
 select throws_ok($$update internal.gate3_probe_turns
     set transcript_revision = repeat('f', 64)$$,
     '23514', 'probe turn is immutable',
