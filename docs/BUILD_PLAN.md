@@ -34,7 +34,7 @@ Rule of ownership. Each directory has exactly one owning agent (section 3). You 
 | Storage | Supabase Storage, private buckets, signed URLs | Audio files |
 | Auth | Supabase Auth. A one-time email link opens the persistent respondent account. Researchers use an email link plus TOTP MFA. | Match the callback to the account type. |
 | Payments | Stripe Checkout and webhooks | Researcher payment |
-| Payouts | Tremendous API (sandbox first) | Gift cards, W-9 and 1099 handling |
+| Payouts | Prepaid Visa through a sandbox-verified provider adapter | Verify catalog, fees, recipient routing and tax handling before live use |
 | LLM | Anthropic Claude via `packages/ai` provider interface | Structured outputs, tool use |
 | Transcription | OpenAI primary and Groq Whisper fallback behind an interface | Pin and verify supported models for the deployment before enabling live calls |
 | Redaction | Deterministic analyzer plus approved contextual pass | See section 11 for Presidio evaluation and private hosting |
@@ -134,7 +134,7 @@ The [PRD user journeys](PRD.md#6-user-journeys) describe the two paths in full. 
 | --- | --- | --- |
 | 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [email signup and sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation and respondent account provisioning. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
 | 1 · Seeded study preview | [Respondent Home](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) opens eligible invites and in-progress studies after sign-in. [Profile and privacy choices](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/onboarding) precede the interview, which supports recording, typing, retry, resume and submission. | [Researcher workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) opens the four-question study form after email and MFA. Launch a test study to reach live tracking and the redacted transcript panel. |
-| 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt, and Earnings with gift card brand selection, payout status and history. | Scoping chat beside the live brief, review of screening criteria and guide, quote, checkout, and live tracking. |
+| 2 · First real study | Open self-service profile and matching, confirming screener, interview follow-ups, receipt, and Earnings with prepaid Visa payout status and history. | Scoping chat beside the live brief, review of screening criteria and guide, $2-per-question quote, checkout, and live tracking. |
 | 3 · Pilot | Liveness, full Echo states, privacy and withdrawal controls. | Report and findings, verified quotes, hypothesis evidence and next-study proposal. |
 | 4 · Launch | Accessible and resilient interview on mobile. | Export and launch hardening. |
 
@@ -187,27 +187,40 @@ Debt review. Every `Fake` used in the Gate 1 flow is listed in `DEBT.md` with th
 
 ### Gate 2. Money loop and scoping (end of week 5)
 
+**2026-11-24 owner direction and implementation impact.** Open self-service signup/profile feeds eligibility and matching; there is no selected invite cohort or hand recruitment for the first real study. The table records the next required changes; draft PRs remain synthetic preparation until the revised economics and lifecycle pass together.
+
+| Area | Required Gate 2 behavior | Existing preparation and gap |
+| --- | --- | --- |
+| Quote and checkout | Freeze 200 cents per core question per respondent, minimum 10 respondents, config version, scope and per-slot price. Probes/screeners are unbilled. | Existing versioned quote/test-mode checkout work assumes the old active config and must be migrated and retested before a new paid quote. Do not rewrite a paid quote. |
+| Marketplace and feasibility | Accept self-service profiles, match eligible active respondents with caps/cooldowns, and estimate fill only from measurable active supply and historic rates. | Seeded invite selection is a fixture, not real open-marketplace feasibility. No promise of fill time without a defensible sample. |
+| Respondent reward and payout | Reserve 100 cents for each answered core question under approved quality policy; prepaid Visa is the v1 product. Keep payout ledger separate from researcher charges/refunds. | Existing payout reservation/idempotency is a base; provider catalog, recipient routing, partial-answer eligibility and sandbox order need revision and evidence. |
+| Unfilled refund | At the fill cutoff, refund each uncompleted respondent slot using the frozen quote's per-slot charge. One missing slot in a 12-slot quote refunds one slot, once. | Existing refund observations cover provider state, but not a completed-slot accounting/refund command. Add immutable count snapshot, idempotency and reconciliation. |
+| Referral | Vest $5 once when five distinct referred friends have verified profiles. | Referral source fields alone are insufficient. Add unique attribution, verified-profile event, fraud exclusions and an idempotent bonus ledger. |
+
+The owner still needs to define the fill cutoff, disputed or later-completed slot handling, verified-profile fraud review, partial-answer quality eligibility and prepaid Visa provider details. Keep live enrollment and money actions closed while these are unresolved. The missing voice consent/data handling document also keeps live voice and LLM follow-up dispatch disabled.
+
 Exit criteria
 - [ ] Scoping chat produces a complete brief through the real LLM with structured `BriefPatch` outputs, and the researcher approves the screening criteria and guide.
 - [ ] A preliminary match can complete an LLM-assisted confirming screener (R-RESP-05, PRD 8.5). Respondents see the question, progress and a clear result. Platform applies documented qualification rules after Agent 3 validates the model output and evidence. Consent-gated voice answers use the Gate 1 speech-to-text path.
-- [ ] Quote computed by `packages/core` pricing with stored config version, and feasibility from matching
-- [ ] Stripe Checkout in test mode, webhook launches the study, refund path for cancelled studies
+- [ ] Quote computed by `packages/core` pricing at the active versioned $2 unit price, at least 10 respondents, and feasibility from actual active marketplace matching data; never promise a fill time without evidence
+- [ ] Stripe Checkout in test mode, webhook launches the study, and an idempotent pro-rata refund path for uncompleted respondent slots using the original frozen quote price per slot. A 12-slot study with 11 completes refunds one slot.
 - [ ] Web push invites and halfway and 2-hours-left nudges
 - [ ] Quality hold job approves or removes sessions using the v1 quality score, and removed sessions trigger replacement invites
-- [ ] Tremendous sandbox gift card payout after approval, idempotent, with annual cap enforced. Respondent Earnings shows gift card brand choice after the first approved interview, their own payout status and gift card history.
+- [ ] Sandbox prepaid Visa payout after approval, idempotent, with annual cap enforced. Verify the provider's exact Visa product, recipient delivery, fees and status mapping. Respondent Earnings shows their own payout status and history.
 - [ ] Points ledger, milestone bonuses and receipt UI
-- [ ] **First real study** run on a dedicated, access-controlled preview with hand-recruited respondents (at least 10 completes) and Rachel as researcher. Complete the pre-study checklist below before enrollment.
+- [ ] **First real study** uses open self-service respondent signup/profile and approved marketplace matching, with at least 10 target respondents and Rachel as researcher. No hand-picked cohort or recruiting contact is part of this plan. Complete the pre-study checklist below before live enrollment.
 
 Integration tests required
-- `IT-2.1` Playwright `gate2-money.spec.ts`, scoping (LLM in fixture-replay mode) to quote to Stripe test checkout to launch to 3 completes to approval to Tremendous sandbox order. Verify gift card selection, status and history in the respondent account
+- `IT-2.1` Playwright `gate2-money.spec.ts`, open signup/profile to eligible matching and scoping (LLM in fixture-replay mode) to a 10-respondent-minimum quote to Stripe test checkout to launch to synthetic completes, approval and sandbox prepaid Visa order. Verify payout status and history in the respondent account
 - `IT-2.2` webhook idempotency, replay every Stripe and Tremendous webhook 3 times, assert one effect
-- `IT-2.3` pricing tests, price equals core questions × respondents × unit price in integer cents, probes and screeners never billed, 5 questions × 1 respondent = 500 cents, config version stored on every quote
+- `IT-2.3` pricing tests, price equals core questions × respondents × 200 cents in integer cents, probes and screeners never billed, 5 questions × 10 respondents = 10000 cents, fewer than 10 rejected, config version stored on every quote
 - `IT-2.4` quality removal triggers replacement invite, and target completes still reached
 - `IT-2.5` payout cap, a respondent at $1,990 YTD cannot receive a $20 payout and is flagged
 - `IT-2.6` push delivery contract, the nudge job enqueues correct payloads at the right times (injectable clock)
-- `IT-2.7` complete the screening sheet through eligibility and invite state. Cover typed and transcribed answers, supported and contradicted evidence, ambiguity, invalid and timed-out responses, consent, repeated delivery, and an existing participation cap.
+- `IT-2.7` complete the screening sheet through eligibility and invite state for an open self-service profile. Cover typed and transcribed answers, supported and contradicted evidence, ambiguity, invalid and timed-out responses, consent, repeated delivery, and an existing participation cap. Add five distinct verified referred profiles, self-referral/duplicate rejection and exact-replay tests before the $5 bonus can vest.
+- `IT-2.8` freeze a 12-respondent quote and complete 11 synthetic slots; reconcile exactly one refund at the original per-slot price under repeated webhook/job delivery. A changed active price version must not alter the refund. Keep the 11 respondents' per-answered-question reward reservations independent of the researcher refund. Reject a second refund for the same missing slot.
 
-**Pre-study checklist.** Platform records the approved cohort and recruiting channel, consent text version and allowed processing, provider data handling and preview isolation. Apply PRD Q-04 through Q-06 to the proposed cohort and processing. Resolve applicable open decisions with Rachel before enrollment. Use synthetic participants while those decisions are pending. Verify Auth email delivery with a dedicated sender to a controlled external test inbox before recruiting. Exercise consent enforcement, withdrawal and deletion through storage, queues and derived data, and verify that researcher endpoints and exports only publish redacted artifacts. Keep raw voice sharing off for this first study. Exercise recording and retry on physical iOS Safari and Android Chrome, verify speech-to-text and the probe display, and verify the screener clarification and timeout paths on approved test inputs before inviting participants. Agree on participant compensation and applicable refund terms with Rachel before any real monetary commitment. Record the actual compensation path separately from sandbox evidence.
+**Pre-study checklist.** Platform records the approved open-marketplace eligibility and matching policy, verified-profile referral event, consent text version and allowed processing, provider data handling and preview isolation. Apply PRD Q-04 through Q-06, Q-08, Q-10 and Q-11 before live enrollment. Use synthetic participants while those details are pending. Verify Auth email delivery with a dedicated sender to a controlled external test inbox before opening signup to real respondents. Exercise consent enforcement, withdrawal and deletion through storage, queues and derived data, and verify that researcher endpoints and exports only publish redacted artifacts. Keep raw voice sharing off for this first study. Exercise recording and retry on physical iOS Safari and Android Chrome, verify speech-to-text and the probe display, and verify the screener clarification and timeout paths on approved test inputs before participants enter a paid study. Confirm the $1-per-answered-core-question payout, pro-rata frozen-quote refund and prepaid Visa provider fees before any real monetary commitment. Record actual results separately from sandbox evidence.
 
 Debt review plus a **contract freeze check**. List every breaking contract change since Gate 0 and confirm old versions are removed or dated.
 
@@ -293,7 +306,7 @@ Risks: <anything that might slip a gate>
 | 1 | Repo, CI, Supabase, schema v1, RLS, contracts v1, fakes, seed, lint rules | `packages/ui` tokens and base components, respondent shell, email signup and sign-in | `packages/ai` interfaces and fakes, prompt file structure, eval harness, researcher shell |
 | 2 | State machines, matching, invites, session APIs, audit log | Profile, consent, invite card, interview screen with recording | Minimal study form, guide editor, transcription pipeline |
 | 3 | Gate 1 integration suite, expiry job | Upload and resume, receipt stub | Redaction v1, tracking page |
-| 4 | Pricing, Stripe, quality v1, payout sandbox, screening rules | Confirming screener, push subscription and nudges, gift card choice | Scoping, screening interpretation and evals, live brief, quote and checkout |
+| 4 | Revised pricing, Stripe, quality v1, prepaid Visa sandbox, screening and referral rules | Confirming screener, push subscription, nudges and prepaid Visa status | Scoping, screening interpretation and evals, live brief, quote and checkout |
 | 5 | Gate 2 suite, points ledger, replacement invites, pre-study privacy and compensation checks | Points and receipt, probe display, physical-device checks | Interviewer probe agent v1, first real study support |
 | 6 | Fraud controls, liveness check, retention job, admin console | Full Echo (WebGL states), probe display, privacy controls | Analyst agent, report UI, evidence verification |
 | 7 | Gate 3 suite, load test, pilot ops | Accessibility pass, pilot fixes | Evals to threshold, next-study proposal, pilot fixes |
