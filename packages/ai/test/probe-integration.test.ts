@@ -173,4 +173,17 @@ describe("probe decision and render ports", () => {
     expect(await runProbeDecision(port, staleModel, "session-1", "turn-1", 500, () => 300))
       .toEqual({ status: "stale" });
   });
+
+  it("withholds a malformed persisted conflict winner", async () => {
+    const { port, setCommitted } = setup();
+    port.commitDecision = vi.fn(async () => ({ status: "conflict" as const }));
+    const result = await runProbeDecision(port, provider(async () => {
+      setCommitted({ sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
+        turnId: "turn-1", transcriptRevision: "source-1", probeId: "probe-1",
+        decision: { action: "probe", turnId: "turn-1", text: "not a question",
+          uploadConfirmedAtMs: 50 } });
+      return response({ action: "probe", text: "What happened?" });
+    }), "session-1", "turn-1", 500, () => 300);
+    expect(result).toEqual({ status: "unavailable" });
+  });
 });

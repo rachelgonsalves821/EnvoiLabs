@@ -63,7 +63,13 @@ function validCommitted(value: CommittedProbe, sessionId: string, turnId: string
   return value.sessionId === sessionId && value.turnId === turnId
     && !!value.questionId && !!value.answerId && !!value.transcriptRevision
     && value.decision.turnId === turnId
-    && (value.decision.action === "probe" ? !!value.probeId : value.probeId === null);
+    && (value.decision.action === "probe"
+      ? !!value.probeId && typeof value.decision.text === "string"
+        && !!value.decision.text.trim() && value.decision.text.length <= 240
+        && value.decision.text.endsWith("?")
+        && Number.isFinite(value.decision.uploadConfirmedAtMs)
+      : value.decision.action === "next" && value.probeId === null
+        && ["no_probe", "error", "timeout", "superseded"].includes(value.decision.outcome));
 }
 
 function sameCommittedTurn(ready: ReadyProbeTurn, value: CommittedProbe): boolean {
