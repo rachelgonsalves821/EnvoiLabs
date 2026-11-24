@@ -808,3 +808,15 @@ Needs from others. None for the current redaction work.
 Contract or schema changes. None. The manifest registers test inputs. Publication still requires a passing report and a matching active database policy.
 
 Risks. The current candidate leaves portions of private information visible in synthetic inputs. Researcher transcript publication remains disabled.
+
+### 2026-11-23 — Gate 1 spoken contact and address development
+
+Done. Improved dictated email parsing for mixed spoken and written separators, explicit email labels and an adjacent validated phone number. Added bounded street and unit recognition. On a development replay of the completed second benchmark, the email count improved from 58 to 93 of 125 and the recognized address count improved from 42 to 43 of 58. The replay still altered 17 of 60 clean answers and 30 of 258 evidence spans. All 133 spoken-redaction unit tests passed against the combined changes. [Contact fixes](https://github.com/rachelgonsalves821/EnvoiLabs/pull/116)
+
+Next. Improve recall and evidence preservation on development data, then evaluate a new frozen candidate on a separate independent benchmark.
+
+Needs from others. None for the current development checks.
+
+Contract or schema changes. None.
+
+Risks. The development scores fall below the PRD recall floors. Researcher transcript publication remains disabled.
