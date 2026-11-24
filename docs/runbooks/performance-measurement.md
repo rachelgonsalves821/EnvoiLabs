@@ -37,7 +37,7 @@ This three-sample local baseline does not meet the 20-navigation acceptance prot
 
 ## CPU and typed-only comparison on the same pinned build
 
-On the same build and disposable local stack, the test captured Chromium sampling profiles and browser long tasks while alternating the interview's real consent-controlled voice and typed-only paths. It ran three navigations per mode in voice-first order and three more per mode in typed-first order. Each navigation used a fresh browser context and the same Pixel 7/4× CPU/150 ms/1.6 Mbps profile. The profiler itself adds overhead, so these LCP values are a separate diagnostic series from the three-run baseline above.
+On the same build and disposable local stack, the test captured Chromium sampling profiles and browser long tasks for the interview's real consent-controlled voice and typed-only paths. It ran three navigations per mode in voice-first order and three more per mode in typed-first order. Each navigation used a fresh browser context and the same Pixel 7/4× CPU/150 ms/1.6 Mbps profile. The profiler itself adds overhead, so these LCP values are a separate diagnostic series from the three-run baseline above.
 
 | Order | Voice LCP (ms) | Typed-only LCP (ms) | Voice/typed median (ms) |
 | --- | --- | --- | --- |
