@@ -7,6 +7,40 @@ class AddressSlotRecoveryTests(unittest.TestCase):
     def corroborated(self, text):
         return [text[hit.start:hit.end] for hit in recover_corroborated_addresses(text)]
 
+    def test_explicit_personal_postal_address_retains_the_complete_source_span(self):
+        cases = (
+            ("My mailing address is", "twenty-one Fern Hollow, Bellhaven, NY 10018", ". The basket updated."),
+            ("Our shipping address is", "one two four Copper Field Rd., New Bracken, OR 97303",
+             ". The page snapped back."),
+            ("My home address was", "thirty-two Willow Span Ave., North Alder, ME 04103-1024",
+             ". Support called later."),
+            ("My billing address is", "one hundred six Cedar Ledge, Silver Glen, ON K2K 3A6",
+             ". The quote came in quickly."),
+            ("my street address is", "three seven ash ridge, maple hollow, bc v5k 1a1",
+             " before I moved."),
+        )
+        for cue, address, following in cases:
+            with self.subTest(cue=cue):
+                text = f"🧾 The order was delayed. {cue} {address}{following}"
+                self.assertIn(address, self.corroborated(text))
+
+    def test_postal_tail_preserves_public_and_unrelated_fields(self):
+        value = "twenty-one Fern Hollow, Bellhaven, NY 10018"
+        cases = (
+            ("The advertised store is", value, ". The entrance was clearly marked."),
+            ("Use the public location", value, " for pickup."),
+            ("My order arrived at", value, "."),
+            ("My mailing address is", "twenty-one Fern Hollow, Bellhaven, XX 10018", "."),
+            ("My mailing address is", "twenty-one Fern Hollow, Bellhaven, NY 100182", "."),
+            ("My home address is", value, ", which is the public pickup counter."),
+            ("My mailing address is", value, " orders appeared in the catalog."),
+            ("My mailing address is", "twenty-one minutes, next stop, NY 10018", "."),
+            ("My shipping address is", "twenty-one Fern Hollow, Bellhaven, NY", "."),
+        )
+        for cue, address, following in cases:
+            with self.subTest(address=address, cue=cue):
+                self.assertNotIn(address, self.corroborated(f"{cue} {address}{following}"))
+
     def test_residence_and_appointment_recover_collapsed_street_suffix(self):
         self.assertEqual(self.corroborated("i stayed at to seven silver grove terrorists before i moved"),
                          ["to seven silver grove terrorists"])

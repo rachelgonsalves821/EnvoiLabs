@@ -51,6 +51,25 @@ _PUBLIC_ORGANIZATION = re.compile(
 )
 _ORGANIZATION_LABELS = {"organization", "organization educational"}
 _LEGAL_ORGANIZATION = re.compile(r"\b(?:co|corp|inc|llc|llp|ltd|limited|incorporated)\.?\s*$", re.I)
+_RECEIPT_SELLER = re.compile(
+    r"\b(?:the )?(?:(?:checkout|order|purchase|sales) )?receipt (?:lists|names|shows)[ \t]+"
+    r"(?P<seller>[^,!?;:\r\n]{5,75}?)[ \t]+as (?:the|a) (?:seller|merchant|vendor)\b"
+    r"(?=[ \t]*(?:[.!?]|$))",
+    re.I,
+)
+_SELLER_COMPANY = re.compile(
+    r"(?:[^\W\d_]+(?:['’\-][^\W\d_]+)*[ \t]+){2,6}"
+    r"(?:llc|llp|plc|ltd\.?|limited|corp\.?|corporation|inc\.?|incorporated)",
+    re.I,
+)
+_RECEIPT_PRIVATE_RELATION = re.compile(
+    r"\b(?:(?:i|we)(?:[ \t]+[\w'-]+){0,3}[ \t]+work(?:ed|ing)? "
+    r"(?:here|there|for (?:them|that (?:company|business|vendor|seller)))|"
+    r"(?:i (?:am|was)|we (?:are|were)|i[’']m|we[’']re) (?:paid by|employed (?:by|here|there))|"
+    r"where (?:i|we) work|(?:on (?:their|the) payroll)|"
+    r"(?:my|our) (?:employer|workplace|payroll|paycheck|paycheque|payslip|(?:own )?(?:company|business)))\b",
+    re.I,
+)
 _SCHOOL_IDIOM = re.compile(r"(?:the )?school of thought\Z", re.I)
 _MENU_ITEM = re.compile(
     r"\b(?:menu label (?:was|is)|app called it)\s+[“'\"]*"
@@ -115,6 +134,21 @@ def public_organization_ranges(text):
             continue
         if _LEGAL_ORGANIZATION.search(match[match.lastgroup]):
             yield match.span(match.lastgroup)
+    for match in _RECEIPT_SELLER.finditer(text):
+        seller = match["seller"]
+        if not _SELLER_COMPANY.fullmatch(seller):
+            continue
+        prefix = text[max(0, match.start() - 90):match.start()]
+        before = _CLAUSE_BOUNDARY.split(prefix)[-1]
+        after = text[match.end():match.end() + 90]
+        if any(_RECEIPT_PRIVATE_RELATION.search(fragment) for fragment in (prefix, seller, after)):
+            continue
+        if not any(
+            pattern.search(fragment)
+            for pattern in (_PRIVATE_ROLE, _PRIVATE_ASSERTION)
+            for fragment in (before, seller)
+        ):
+            yield match.span("seller")
 
 
 def is_public_organization_reference(hit, ranges, private_hits):

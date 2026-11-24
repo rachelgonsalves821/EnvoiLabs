@@ -1,7 +1,11 @@
 import unittest
 
 from candidate import Hit
-from product_context import is_explicit_commercial_reference, is_product_title
+from product_context import (
+    is_explicit_commercial_reference, is_product_title, is_public_organization_reference, public_organization_ranges,
+)
+from speech_context import Restored
+from spoken_pipeline import redact
 
 
 class ProductContextTests(unittest.TestCase):
@@ -62,3 +66,52 @@ class ProductContextTests(unittest.TestCase):
         commercial = self.detection(text, "violet mint")
         private = self.detection(text, "violet", "person")
         self.assertFalse(is_explicit_commercial_reference(text, commercial, (private,)))
+
+    def test_receipt_merchant_range_preserves_exact_source_organization_only(self):
+        value = "Laurène Vale Equipment Ltd."
+        text = f"🧾 The checkout receipt names {value} as the vendor. The quantity was clear."
+        ranges = tuple(public_organization_ranges(text))
+        seller = self.detection(text, value, "ORGANIZATION")
+        self.assertEqual(ranges, ((seller.start, seller.end),))
+        self.assertTrue(is_public_organization_reference(seller, ranges, ()))
+        self.assertTrue(is_public_organization_reference(self.detection(text, "Vale Equipment", "organization"),
+                                                         ranges, ()))
+        for label in ("person", "name", "employer", "phone number", "address"):
+            with self.subTest(label=label):
+                self.assertFalse(is_public_organization_reference(self.detection(text, value, label), ranges, ()))
+        self.assertFalse(is_public_organization_reference(self.detection(text, value + " as the vendor"), ranges, ()))
+        self.assertFalse(is_public_organization_reference(seller, ranges, (self.detection(text, "Laurène", "person"),)))
+
+    def test_similar_receipt_fields_do_not_override_private_roles(self):
+        for text in (
+            "The receipt names my employer Dovewake Lantern Works Inc. as the merchant.",
+            "The receipt lists Cinder Brae Supply LLC as the seller and I work there.",
+            "I work there and the receipt lists Cinder Brae Supply LLC as the seller.",
+            "The receipt lists Cinder Brae Supply LLC as the seller, the company where I work.",
+            "The receipt lists Cinder Brae Supply LLC as the seller. I work there.",
+            "The receipt lists Cinder Brae Supply LLC as the seller. I usually work there.",
+            "The receipt lists Cinder Brae Supply LLC as the seller. I’m employed there.",
+            "I often worked there. The receipt lists Cinder Brae Supply LLC as the seller.",
+            "The receipt lists Cinder Brae Supply LLC as the seller. The print was clear. I work for that company.",
+            "The receipt lists Cinder Brae Supply LLC as the seller. That's my company.",
+            "The receipt lists Cinder Brae Supply LLC as the seller. I'm on their payroll.",
+            "The receipt shows Cinder Brae Supply LLC as the vendor representative.",
+            "The receipt shows Cinder Brae Supply LLC as the vendor contact.",
+            "The receipt names Cinder Brae Supply LLC as the seller address.",
+            "The receipt lists Berit Lorne as the seller.",
+            "The receipt lists 18 Brindle Quay Street as the vendor.",
+            "The receipt lists 212-555-0149 as the merchant.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(tuple(public_organization_ranges(text)), ())
+
+    def test_receipt_seller_preservation_flows_through_both_recognizers(self):
+        company = "Cinder Brae Supply LLC"
+        text = f"The order receipt names {company} as the seller. My legal name is Berit Lorne."
+        deterministic = lambda source: (self.detection(source, company, "ORGANIZATION"),)
+        contextual = lambda source, _: (self.detection(source, "cinder brae" if source.islower() else "Cinder Brae"),)
+        restore = lambda source: Restored(source, tuple(range(len(source))))
+        self.assertEqual(
+            redact(text, deterministic, contextual, restore),
+            f"The order receipt names {company} as the seller. My legal name is [redacted].",
+        )
