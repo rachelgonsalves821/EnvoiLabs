@@ -53,11 +53,12 @@ export function createGate2PaidStudyDatabase(client: SupabaseClient<Database>): 
       if (error.code !== "23505") throw error;
       const prior = readData(await client.from("gate2_payment_events").select("*")
         .eq("provider_event_id", observation.eventId).maybeSingle()) as PaymentEventRow | null;
+      // A fresh provider fetch can observe the same state later. Keep the first
+      // observation time while requiring every immutable identity/value to match.
       if (!prior || prior.quote_id !== event.quote_id || prior.study_id !== event.study_id ||
         prior.provider_checkout_id !== event.provider_checkout_id ||
         prior.event_kind !== event.event_kind || prior.amount_cents !== event.amount_cents ||
-        prior.currency !== event.currency ||
-        Date.parse(prior.provider_observed_at) !== Date.parse(event.provider_observed_at)) {
+        prior.currency !== event.currency) {
         throw error;
       }
     },

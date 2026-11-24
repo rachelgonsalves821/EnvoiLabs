@@ -22,7 +22,7 @@ export type PaidStudyDatabase = {
   launchPaidStudy(studyId: string, quoteId: string, providerEventId: string): Promise<boolean>;
 };
 
-type CheckoutProvider = { getCheckout(checkoutId: string): Promise<CheckoutObservation> };
+export type PaidCheckoutProvider = { getCheckout(checkoutId: string): Promise<CheckoutObservation> };
 
 const matchesQuoteIdentity = (quote: QuoteV2, checkout: CheckoutObservation, checkoutId: string) =>
   checkout.id === checkoutId && checkout.studyId === quote.studyId &&
@@ -33,7 +33,7 @@ const matchesQuoteIdentity = (quote: QuoteV2, checkout: CheckoutObservation, che
   checkout.eventId.trim() !== "" && Number.isFinite(Date.parse(checkout.observedAt));
 
 export async function reconcilePaidStudyLaunch(
-  db: PaidStudyDatabase, provider: CheckoutProvider, studyId: string, quoteId: string,
+  db: PaidStudyDatabase, provider: PaidCheckoutProvider, studyId: string, quoteId: string,
 ): Promise<"launched" | "blocked" | "unavailable"> {
   let rawQuote: unknown;
   let checkoutId: string | null;
