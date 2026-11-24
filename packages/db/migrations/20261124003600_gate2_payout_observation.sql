@@ -42,7 +42,11 @@ begin
         tremendous_order_id = requested_order_id, updated_at = clock_timestamp()
     where id = target.id;
     if requested_kind = 'delivered' then
-        update public.respondents set ytd_payout_cents = ytd_payout_cents + target.amount_cents
+        update public.respondents set
+            ytd_payout_cents = case when ytd_payout_year =
+                extract(year from now() at time zone 'UTC')::integer
+                then ytd_payout_cents + target.amount_cents else target.amount_cents end,
+            ytd_payout_year = extract(year from now() at time zone 'UTC')::integer
         where id = respondent;
     end if;
     return true;

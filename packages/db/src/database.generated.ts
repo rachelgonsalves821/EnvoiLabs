@@ -1380,6 +1380,7 @@ export type Database = {
           updated_at: string
           whatsapp_waitlist_at: string | null
           ytd_payout_cents: number
+          ytd_payout_year: number
         }
         Insert: {
           age_attested_at: string
@@ -1392,6 +1393,7 @@ export type Database = {
           updated_at?: string
           whatsapp_waitlist_at?: string | null
           ytd_payout_cents?: number
+          ytd_payout_year?: number
         }
         Update: {
           age_attested_at?: string
@@ -1404,6 +1406,7 @@ export type Database = {
           updated_at?: string
           whatsapp_waitlist_at?: string | null
           ytd_payout_cents?: number
+          ytd_payout_year?: number
         }
         Relationships: []
       }

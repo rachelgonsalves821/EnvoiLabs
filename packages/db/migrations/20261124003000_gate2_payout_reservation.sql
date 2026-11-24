@@ -1,5 +1,9 @@
 -- One respondent lock serializes all session payout reservations, including
 -- different sessions and duplicate requests. Provider delivery is separate.
+alter table public.respondents add column ytd_payout_year integer not null
+    default extract(year from now() at time zone 'UTC')::integer
+    check (ytd_payout_year between 2000 and 9999);
+
 create table public.gate2_payout_events (
     id uuid primary key default gen_random_uuid(),
     payout_id uuid not null references public.payouts (id),
@@ -26,7 +30,7 @@ declare
     approved_reward integer;
     delivered_cents bigint;
     outstanding_cents bigint;
-    year_start timestamptz;
+    current_year integer;
     reserved_id uuid;
 begin
     if requested_amount_cents is null or requested_amount_cents <= 0
@@ -54,14 +58,17 @@ begin
         and offer.respondent_id = requested_respondent_id;
     if approved_reward is distinct from requested_amount_cents then raise check_violation; end if;
 
-    year_start := make_timestamptz(extract(year from now() at time zone 'UTC')::integer,
-        1, 1, 0, 0, 0, 'UTC');
-    select coalesce(sum(amount_cents) filter (where state = 'delivered'), 0),
+    current_year := extract(year from now() at time zone 'UTC')::integer;
+    -- An older pending order can still deliver this year. Reserve capacity for
+    -- every outstanding order, regardless of when it was created.
+    select coalesce(sum(amount_cents) filter (where state = 'delivered'
+        and created_at >= make_timestamptz(current_year, 1, 1, 0, 0, 0, 'UTC')
+        and created_at < make_timestamptz(current_year + 1, 1, 1, 0, 0, 0, 'UTC')), 0),
         coalesce(sum(amount_cents) filter (where state in ('pending', 'ordered')), 0)
         into delivered_cents, outstanding_cents
-    from public.payouts where respondent_id = requested_respondent_id
-        and created_at >= year_start and created_at < year_start + interval '1 year';
-    if greatest(delivered_cents, (select ytd_payout_cents from public.respondents
+    from public.payouts where respondent_id = requested_respondent_id;
+    if greatest(delivered_cents, (select case when ytd_payout_year = current_year
+        then ytd_payout_cents else 0 end from public.respondents
         where id = requested_respondent_id)) + outstanding_cents + requested_amount_cents >= annual_cap_cents
     then raise check_violation; end if;
 

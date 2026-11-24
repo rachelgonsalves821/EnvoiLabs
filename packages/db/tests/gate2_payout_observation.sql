@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(11);
+select plan(12);
 
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 values ('a9a00000-0000-4000-8000-000000000001',
@@ -20,6 +20,11 @@ insert into reserved select public.reserve_gate2_session_payout(
     '90500000-0000-4000-8000-000000000001', 500, 200000,
     'payout:a9a00000-0000-4000-8000-000000000002');
 select ok((select id from reserved) is not null, 'approved session is reserved first');
+reset role;
+update public.respondents set ytd_payout_cents = 199000,
+    ytd_payout_year = extract(year from now() at time zone 'UTC')::integer - 1
+where id = '90500000-0000-4000-8000-000000000001';
+set local role service_role;
 select ok(public.record_gate2_payout_observation((select id from reserved),
     'evt_ordered', 'gift_fixture', 'ordered', 500, '2026-11-23T20:00:00Z'),
     'provider order observation advances reservation');
@@ -45,7 +50,11 @@ select is((select state from public.payouts where id = (select id from reserved)
 reset role;
 select is((select ytd_payout_cents from public.respondents
     where id = '90500000-0000-4000-8000-000000000001'),
-    500, 'delivery increments respondent annual cap once');
+    500, 'new-year delivery resets prior-year total and increments once');
+select is((select ytd_payout_year from public.respondents
+    where id = '90500000-0000-4000-8000-000000000001'),
+    extract(year from now() at time zone 'UTC')::integer,
+    'delivery records the current UTC cap year');
 set local role authenticated;
 select ok(not has_function_privilege('authenticated',
     'public.record_gate2_payout_observation(uuid,text,text,text,integer,timestamptz)', 'EXECUTE'),

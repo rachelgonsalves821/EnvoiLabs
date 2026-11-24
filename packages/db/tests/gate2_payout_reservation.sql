@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(9);
+select plan(12);
 
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 values
@@ -48,6 +48,35 @@ select throws_ok($$select public.reserve_gate2_session_payout(
     '90500000-0000-4000-8000-000000000002', 2000, 200000,
     'payout:99620000-0000-4000-8000-000000000004')$$,
     '23514', null, '$1,990 YTD cannot reserve another $20');
+reset role;
+update public.respondents set ytd_payout_year =
+    extract(year from now() at time zone 'UTC')::integer - 1
+where id = '90500000-0000-4000-8000-000000000002';
+insert into public.payouts (id, bonus_ref, respondent_id, amount_cents, idempotency_key, created_at)
+values ('99620000-0000-4000-8000-000000000005',
+    '99620000-0000-4000-8000-000000000005',
+    '90500000-0000-4000-8000-000000000002', 198000,
+    'old-year-pending-fixture', now() - interval '1 year');
+set local role service_role;
+select throws_ok($$select public.reserve_gate2_session_payout(
+    '99620000-0000-4000-8000-000000000004',
+    '90500000-0000-4000-8000-000000000002', 2000, 200000,
+    'payout:99620000-0000-4000-8000-000000000004')$$,
+    '23514', null, 'old-year pending order still reserves new-year capacity');
+reset role;
+delete from public.payouts where id = '99620000-0000-4000-8000-000000000005';
+set local role service_role;
+select ok(public.reserve_gate2_session_payout(
+    '99620000-0000-4000-8000-000000000004',
+    '90500000-0000-4000-8000-000000000002', 2000, 200000,
+    'payout:99620000-0000-4000-8000-000000000004') is not null,
+    'prior-year delivered total does not block a new-year reward');
+reset role;
+select is((select ytd_payout_year from public.respondents
+    where id = '90500000-0000-4000-8000-000000000002'),
+    extract(year from now() at time zone 'UTC')::integer - 1,
+    'reservation does not rewrite delivered-year accounting');
+set local role service_role;
 select throws_ok($$select public.reserve_gate2_session_payout(
     '99620000-0000-4000-8000-000000000003',
     '90500000-0000-4000-8000-000000000001', 501, 200000,
