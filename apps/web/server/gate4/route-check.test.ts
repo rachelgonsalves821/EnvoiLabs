@@ -35,8 +35,10 @@ describe("Gate 4 route seam", () => {
   });
 
   it("uses the injected atomic store for both approved surfaces", async () => {
-    const store = { consume: vi.fn(async (_rules: readonly [RateLimitRule, RateLimitRule]) =>
-      ({ allowed: false as const, retryAfterSeconds: 15 })) };
+    const store = { consume: vi.fn(async (rules: readonly [RateLimitRule, RateLimitRule]) => {
+      expect(rules).toHaveLength(2);
+      return { allowed: false as const, retryAfterSeconds: 15 };
+    }) };
     const check = createGate4RouteCheck(store, env);
     const source = request({ "x-vercel-forwarded-for": "203.0.113.7" });
     expect(await check(source, "email-start", "person@example.test"))
