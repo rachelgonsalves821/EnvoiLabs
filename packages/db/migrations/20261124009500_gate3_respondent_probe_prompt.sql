@@ -12,7 +12,7 @@ create function public.read_gate3_respondent_probe(
         and internal.gate3_probe_current(turn.id, supplied_auth_user_id)
         and not exists (select 1 from public.answers as answer
             where answer.probe_id = probe.id)
-    order by turn.created_at desc limit 1;
+    order by probe.decided_at desc, probe.id desc limit 1;
 $$;
 revoke all on function public.read_gate3_respondent_probe(uuid, uuid)
     from public, anon, authenticated, service_role;
