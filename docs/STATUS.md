@@ -857,13 +857,25 @@ Contract or schema changes. None. The next qualification must use the updated wo
 
 Risks. Researcher transcript publication remains disabled pending a passing independent result and the hosted rehearsal.
 
+### 2026-11-24 Gate 1 concurrent browser requests
+
+Done. The production-build Chromium test sent concurrent duplicate requests for study launch, invite acceptance and the second voice answer confirmation. Both calls returned the same successful response for each action. The database recorded one launch transition, one invite acceptance, one interview and exactly four distinct answers. After a fresh email sign-in the respondent resumed at question three, submitted, and entered quality hold. The researcher saw four redacted test transcripts only after the disposable fixture worker processed them. [IT-1.1, IT-1.3 and IT-1.5](../apps/web/e2e/gate1-slice.spec.ts)
+
+Next. Repeat the qualified publication journey on the dedicated hosted preview once the redactor passes independently.
+
+Needs from others. None for this browser check.
+
+Contract or schema changes. None.
+
+Risks. This trace uses a fixture redactor. The live publication check still requires the independently qualified policy.
+
 ### 2026-11-24 Gate 1 abandoned upload cleanup
 
 Done. Draft PR #148 adds an opt-in cleanup step after interview expiry. The application handler and proposed service-only query removed a synthetic abandoned upload through disposable Storage. A valid confirmation that stayed open past expiry and an unexpired upload remained available. Cleanup removed a late upload on the next sweep, and a repeat found zero objects. Workspace typecheck, lint and 83 web tests passed. [Cleanup draft](https://github.com/rachelgonsalves821/EnvoiLabs/pull/148)
 
 Next. Integrate the shared migration and database types with Platform, then repeat the lifecycle tests on the integrated revision. [Gate 1 evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7141104642)
 
-Needs from others. The Platform migration owner has the tested query and generated signature for integration. No action is needed from the project owner.
+Needs from others. The Platform migration owner has the tested query and generated signature for integration.
 
 Contract or schema changes. Proposed service-only `list_gate1_expired_audio` RPC. The app uses an explicit cleanup flag scoped to local development and Vercel Preview.
 

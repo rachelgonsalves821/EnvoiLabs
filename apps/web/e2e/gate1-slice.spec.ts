@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
-import { devices, expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type APIResponse, type Page } from "@playwright/test";
 import { deliveredEmail, localService, loopbackOrigin, totp, useDefaultTemplate } from "./support/disposable-auth";
 import { installSyntheticMicrophone, submitSyntheticRecording } from "./respondent/voice-fixture";
 
@@ -12,10 +12,32 @@ const questions = [
   "What did you look for in the menu?",
   "How did you decide which option to pick?",
   "What would you change about that order?",
-];
+] as const;
 const title = "Food ordering app decisions";
 const sensitiveFixture = "Synthetic speaker at private@example.test";
 const redactedFixture = "Synthetic speaker at [EMAIL]";
+
+async function raceDuplicatePost<T>(page: Page, path: string, action: () => Promise<T>): Promise<T> {
+  let duplicate: APIResponse | undefined;
+  await page.route(`**${path}`, async (route) => {
+    const [response, replay] = await Promise.all([route.fetch(), route.fetch()]);
+    duplicate = replay;
+    await route.fulfill({ response });
+  }, { times: 1 });
+  const [response, output] = await Promise.all([
+    page.waitForResponse((reply) => reply.request().method() === "POST" && new URL(reply.url()).pathname === path),
+    action(),
+  ]);
+  if (!duplicate) throw new Error(`The duplicate ${path} request was not sent.`);
+  try {
+    expect(response.status()).toBe(200);
+    expect(duplicate.status()).toBe(200);
+    expect(await duplicate.json()).toEqual(await response.json());
+  } finally {
+    await duplicate.dispose();
+  }
+  return output;
+}
 
 async function requestRespondentEmail(page: Page, email: string) {
   await page.goto("/r/signup");
@@ -48,7 +70,8 @@ async function createStudy(page: Page, email: string, origin: string) {
   }
   await page.getByRole("button", { name: "Create draft" }).click();
   await expect(page.getByRole("heading", { name: "Study draft created" })).toBeVisible();
-  await page.getByRole("button", { name: "Launch test study" }).click();
+  await raceDuplicatePost(page, "/api/researcher/studies/launch", () =>
+    page.getByRole("button", { name: "Launch test study" }).click());
   await expect(page.getByRole("heading", { name: "Study launched" })).toBeVisible();
   await page.getByRole("link", { name: "View tracking" }).click();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
@@ -61,7 +84,7 @@ test.describe("Gate 1 seeded study", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Uses Chromium MediaRecorder with synthetic input.");
   test.use({ actionTimeout: 12_000, navigationTimeout: 15_000 });
 
-  test("IT-1.1 matches a signed-in respondent, resumes four private recordings and shows redacted research", async ({
+  test("IT-1.1, IT-1.3 and IT-1.5 match and resume four private recordings through concurrent retries", async ({
     browser, page: researcher, baseURL,
   }) => {
     test.setTimeout(180_000);
@@ -139,6 +162,10 @@ test.describe("Gate 1 seeded study", () => {
       const selected = await db.from("invites").select("id,respondent_id,state").eq("study_id", studyId).single();
       if (selected.error || !selected.data) throw new Error("Matching did not produce exactly one invite.");
       expect(selected.data).toMatchObject({ respondent_id: respondentId, state: "invited" });
+      const launchAudit = await db.from("audit_log").select("id", { count: "exact", head: true })
+        .eq("entity", "study").eq("entity_id", studyId).eq("to_state", "fielding");
+      expect(launchAudit.error).toBeNull();
+      expect(launchAudit.count).toBe(1);
       const inviteId = selected.data.id;
       const someoneElse = await db.auth.admin.createUser({ email: `slice-other-${randomUUID()}@example.test`, email_confirm: true });
       if (someoneElse.error || !someoneElse.data.user) throw new Error("The second synthetic respondent is missing.");
@@ -155,13 +182,18 @@ test.describe("Gate 1 seeded study", () => {
       await expect(respondent.getByText("$1.60")).toBeVisible();
       await expect(respondent.getByText("$9.99")).toHaveCount(0);
       await expect(respondent.getByText("Other account’s study invitation")).toHaveCount(0);
-      await respondent.getByRole("button", { name: "Start answering" }).click();
+      await raceDuplicatePost(respondent, "/api/respondent/invites/accept", () =>
+        respondent.getByRole("button", { name: "Start answering" }).click());
       await expect(respondent).toHaveURL(origin + "/r/interviews/" + inviteId);
-      const answers = [];
-      for (const question of questions.slice(0, 2)) {
-        await expect(respondent.getByRole("heading", { name: question })).toBeVisible();
-        answers.push(await submitSyntheticRecording(respondent));
-      }
+      const acceptanceAudit = await db.from("audit_log").select("id", { count: "exact", head: true })
+        .eq("entity", "invite").eq("entity_id", inviteId).eq("to_state", "accepted");
+      expect(acceptanceAudit.error).toBeNull();
+      expect(acceptanceAudit.count).toBe(1);
+      await expect(respondent.getByRole("heading", { name: questions[0] })).toBeVisible();
+      const answers = [await submitSyntheticRecording(respondent)];
+      await expect(respondent.getByRole("heading", { name: questions[1] })).toBeVisible();
+      answers.push(await raceDuplicatePost(respondent, "/api/respondent/answers/record", () =>
+        submitSyntheticRecording(respondent)));
       await respondent.getByRole("link", { name: "Back to your studies" }).click();
       const resumePath = await respondent.getByRole("link", { name: "Continue interview" }).getAttribute("href");
       if (!resumePath?.startsWith("/r/s/")) throw new Error("The in-progress interview has no signed resume link.");
@@ -190,6 +222,9 @@ test.describe("Gate 1 seeded study", () => {
       expect(session.data).toEqual({ id: answers[0]?.sessionId, state: "quality_hold" });
       expect(new Set(answers.map(({ sessionId }) => sessionId)).size).toBe(1);
       expect(new Set(answers.map(({ guideQuestionId }) => guideQuestionId)).size).toBe(4);
+      const persisted = await db.from("answers").select("id").eq("session_id", session.data?.id);
+      expect(persisted.error).toBeNull();
+      expect(persisted.data?.map(({ id }) => id).sort()).toEqual(answers.map(({ id }) => id).sort());
       await returning.goto(origin + "/r/interviews/" + otherInvite.data.id);
       await expect(returning.getByRole("main").getByRole("alert")).toHaveText("This interview isn’t available anymore.");
 
