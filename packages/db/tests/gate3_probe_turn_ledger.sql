@@ -253,6 +253,26 @@ select is(public.begin_gate3_probe_turn(
     '90300000-0000-4000-8000-000000000001', 1600), null::uuid,
     'a third probe is denied by the full guide-question chain cap');
 reset role;
+insert into public.guide_questions (id, study_id, position, text, max_probes)
+values ('a9700000-0000-4000-8000-000000000008',
+    '90600000-0000-4000-8000-000000000001', 2, 'What came next?', 0);
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence)
+values ('a9700000-0000-4000-8000-000000000009',
+    'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000008', 'text', 2);
+set local role service_role;
+select is((select public.read_gate3_committed_probe(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    '90300000-0000-4000-8000-000000000001')
+    from second_probe_turn), null::jsonb,
+    'a later core answer invalidates a second probe despite its high sequence');
+select is(public.read_gate3_respondent_probe(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), null::jsonb,
+    'later core answer hides an unanswered probe on reload');
+reset role;
 select throws_ok($$update internal.gate3_probe_turns
     set transcript_revision = repeat('f', 64)$$,
     '23514', 'probe turn is immutable',

@@ -46,15 +46,23 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     const probe = state.session.currentProbe;
     const sessionId = state.session.sessionId;
     let active = true;
+    let paintedFrame = 0;
     const frame = requestAnimationFrame(() => {
-      void interviewRequest("/api/respondent/probes/shown", {
-        sessionId, turnId: probe.turnId, probeId: probe.probeId,
-        browserRenderedAtMs: performance.now(),
-      }).then((result) => {
-        if (active && result.status !== 200) retry();
+      paintedFrame = requestAnimationFrame(() => {
+        if (!active) return;
+        void interviewRequest("/api/respondent/probes/shown", {
+          sessionId, turnId: probe.turnId, probeId: probe.probeId,
+          browserRenderedAtMs: performance.now(),
+        }).then((result) => {
+          if (active && result.status !== 200) retry();
+        });
       });
     });
-    return () => { active = false; cancelAnimationFrame(frame); };
+    return () => {
+      active = false;
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(paintedFrame);
+    };
   }, [state]);
 
   function retry() {
