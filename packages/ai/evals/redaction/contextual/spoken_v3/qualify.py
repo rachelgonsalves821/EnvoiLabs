@@ -122,6 +122,10 @@ def check_pairs(authored, recognized):
             raise ValueError("ASR annotations must account for every authored sensitive span")
 
 
+def paired_recall_met(fully_masked, planted, omitted, minimum):
+    return 100 * fully_masked >= minimum * (planted + omitted)
+
+
 def score(rows, detect):
     result = report_template()
     withheld, evidence_withheld, samples = 0, 0, []
@@ -152,7 +156,7 @@ def score(rows, detect):
         counts = result["entities"].get(entity)
         checks[entity] = bool(counts and 100 * counts["fully_masked"] >= minimum * counts["planted"])
         paired_coverage[entity] = bool(counts and
-            100 * counts["fully_masked"] >= minimum * (counts["planted"] + omissions[entity]))
+            paired_recall_met(counts["fully_masked"], counts["planted"], omissions[entity], minimum))
     for counts in result["entities"].values():
         counts["unmasked"] = counts["planted"] - counts["fully_masked"] - counts["partially_masked"]
     return {

@@ -844,3 +844,15 @@ Needs from others. None for the current development checks.
 Contract or schema changes. None.
 
 Risks. The replay falls below the paired recall floors. Researcher transcript publication remains disabled.
+
+### 2026-11-24 Gate 1 qualification report validation
+
+Done. The private worker verifies the authored and speech totals against the existing recall floors before loading a model or reading answer text. It rejects missing controls, withheld answers and mismatched paired totals even when the pass flag is set. All 148 spoken-redaction tests passed, including a synthetic contradictory report that stopped before model loading or private input.
+
+Next. Freeze the improved redaction candidate with the updated validation code, run independent qualification, then verify hosted researcher publication.
+
+Needs from others. None for redaction development and testing.
+
+Contract or schema changes. None. The next qualification must use the updated worker source fingerprint.
+
+Risks. Researcher transcript publication remains disabled pending a passing independent result and the hosted rehearsal.

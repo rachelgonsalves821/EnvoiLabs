@@ -8,8 +8,11 @@ import sys
 _HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(path) for path in (_HERE.parent / "spoken_v2", _HERE.parent, _HERE.parent.parent)]
 
-from qualify import _APPROVALS, policy_digest, policy_snapshot, verified_json, verify_independence
+from qualify import (
+    _APPROVALS, LANES, TARGETS, paired_recall_met, policy_digest, policy_snapshot, verified_json, verify_independence,
+)
 from asr_casing import LocalCasingModel
+from evaluate import ENTITY_CLASSES
 from local_detectors import LocalDetectors
 from spoken_pipeline import redact
 
@@ -18,12 +21,60 @@ REQUEST_LIMIT = 256 * 1024
 RESULT_LIMIT = 512 * 1024
 
 
+def passing_lane_totals(lane, allow_omissions):
+    if not isinstance(lane, dict) or lane.get("recall_passed") is not True:
+        return None
+    for field in ("cases", "clean_transcripts", "evidence_spans"):
+        count = lane.get(field)
+        if type(count) is not int or count <= 0:
+            return None
+    for field, upper in (("clean_transcripts", lane["cases"] - 1), ("withheld_answers", 0),
+                         ("withheld_evidence_spans", 0), ("clean_transcripts_altered", lane["clean_transcripts"]),
+                         ("evidence_spans_altered", lane["evidence_spans"])):
+        count = lane.get(field)
+        if type(count) is not int or not 0 <= count <= upper:
+            return None
+    entities, omissions = lane.get("entities"), lane.get("asr_omitted_entities")
+    if (not isinstance(entities, dict) or not isinstance(omissions, dict) or (omissions and not allow_omissions)
+            or not TARGETS.keys() <= entities.keys() or (entities.keys() | omissions.keys()) - ENTITY_CLASSES):
+        return None
+    totals = {}
+    for entity in entities.keys() | omissions.keys():
+        counts = entities.get(entity, {"planted": 0, "fully_masked": 0, "partially_masked": 0, "unmasked": 0})
+        if not isinstance(counts, dict):
+            return None
+        full, partial, unmasked, planted = (counts.get(field) for field in (
+            "fully_masked", "partially_masked", "unmasked", "planted",
+        ))
+        omitted = omissions.get(entity, 0)
+        if (any(type(count) is not int or count < 0 for count in (full, partial, unmasked, planted, omitted))
+                or full + partial + unmasked != planted):
+            return None
+        if entity in TARGETS and (planted == 0 or not paired_recall_met(full, planted, omitted, TARGETS[entity])):
+            return None
+        totals[entity] = planted + omitted
+    return totals
+
+
+def passing_report_summary(report):
+    results = report.get("results")
+    if (report.get("controls_present") is not True or report.get("thresholds_percent") != TARGETS
+            or not isinstance(results, dict) or set(results) != set(LANES)):
+        return False
+    authored, recognized = (results[lane] for lane in LANES)
+    authored_totals = passing_lane_totals(authored, False)
+    recognized_totals = passing_lane_totals(recognized, True)
+    return bool(authored_totals and authored_totals == recognized_totals and authored["cases"] == recognized["cases"]
+                and authored["clean_transcripts"] == recognized["clean_transcripts"])
+
+
 def verify_release(manifest, report, manifest_sha, policy, approvals):
     if manifest["policy"] != policy or not verify_independence(manifest["provenance"], manifest_sha, approvals):
         raise ValueError("Redactor policy is unapproved or changed")
     version = policy_digest(policy)
-    if (report["qualified_recall"] is not True or report["independent"] is not True
-            or report["manifest_sha256"] != manifest_sha or report["policy_digest"] != version):
+    if (report.get("qualified_recall") is not True or report.get("independent") is not True
+            or report.get("manifest_sha256") != manifest_sha or report.get("policy_digest") != version
+            or report.get("candidate") != policy["candidate"] or not passing_report_summary(report)):
         raise ValueError("Redactor has no matching qualification")
     return version
 
