@@ -1693,6 +1693,7 @@ export type Database = {
         Args: {
           supplied_claims: Json
           supplied_policy: string
+          supplied_positions: Json
           supplied_qualification: string
           supplied_quotes: Json
           supplied_report_id: string
@@ -1718,6 +1719,10 @@ export type Database = {
           student: boolean
         }[]
       }
+      read_gate3_qualified_report: {
+        Args: { supplied_report_id: string; supplied_study_id: string }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -1727,6 +1732,22 @@ export type Database = {
           supplied_text: string
         }
         Returns: Json
+      }
+      record_gate3_withheld_proposal: {
+        Args: {
+          supplied_actor: string
+          supplied_candidate: Json
+          supplied_causation_id: string
+          supplied_model_name: string
+          supplied_model_version: string
+          supplied_prompt_version: string
+          supplied_proposal_id: string
+          supplied_rationale: string
+          supplied_reason: string
+          supplied_report_id: string
+          supplied_study_id: string
+        }
+        Returns: boolean
       }
       requeue_gate1_answer_job: {
         Args: { supplied_answer_id: string }

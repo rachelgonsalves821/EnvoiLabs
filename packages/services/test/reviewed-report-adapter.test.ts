@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PublishedThemeSetV2Schema } from "@envoi-labs/contracts";
-import { publishReviewedReport, type ReviewedEvidenceDecision } from "../src/reviewed-report-adapter.js";
+import { loadQualifiedReport, publishReviewedReport, recordWithheldProposal,
+  type ReviewedEvidenceDecision } from "../src/reviewed-report-adapter.js";
 
 const content = PublishedThemeSetV2Schema.parse({ version: 2,
   executiveAnswer: "One soup order", hypotheses: [], themes: [{
@@ -35,6 +36,7 @@ describe("reviewed report database adapter", () => {
     expect(db.rpc).toHaveBeenCalledWith("publish_gate3_reviewed_report", expect.objectContaining({
       supplied_claims: { "finding-id": "One diner ordered soup" },
       supplied_quotes: { "1": [quote] }, supplied_reviews: reviews,
+      supplied_positions: { "finding-id": 1 },
     }));
   });
 
@@ -47,5 +49,29 @@ describe("reviewed report database adapter", () => {
     db.rpc.mockResolvedValue({ data: null, error: new Error("transaction failed") });
     await expect(publishReviewedReport(db, "report-id", content, ["finding-id"], policy, reviews))
       .rejects.toThrow("transaction failed");
+  });
+
+  it("records a withheld proposal without creating a public report", async () => {
+    const db = { rpc: vi.fn().mockResolvedValue({ data: true, error: null }) };
+    const withheld = { studyId: quote.studyId, reportId: null, proposalId: reviews[0]!.proposalId,
+      candidate: reviews[0]!.candidate, modelName: "synthetic", modelVersion: "v1",
+      promptVersion: "p1", privateRationale: "private", actorId: "reviewer",
+      causationId: reviews[0]!.causationId, reason: "source withdrawn" };
+    expect(await recordWithheldProposal(db, withheld)).toBe(true);
+    expect(db.rpc).toHaveBeenCalledWith("record_gate3_withheld_proposal",
+      expect.objectContaining({ supplied_report_id: null, supplied_reason: "source withdrawn" }));
+  });
+
+  it("reads the current scoped projection for each report/export request", async () => {
+    const reportId = "a9700000-0000-4000-8000-000000000006";
+    const payload = { report: { id: reportId, studyId: quote.studyId, summary: content },
+      findings: [] };
+    const db = { rpc: vi.fn().mockResolvedValueOnce({ data: payload, error: null })
+      .mockResolvedValueOnce({ data: null, error: null }) };
+    expect(await loadQualifiedReport(db, quote.studyId, reportId)).toEqual(payload);
+    expect(await loadQualifiedReport(db, quote.studyId, reportId)).toBeNull();
+    expect(db.rpc).toHaveBeenCalledTimes(2);
+    expect(db.rpc).toHaveBeenCalledWith("read_gate3_qualified_report", {
+      supplied_study_id: quote.studyId, supplied_report_id: reportId });
   });
 });

@@ -94,15 +94,25 @@ select is(public.publish_gate3_reviewed_report(
     '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     '{"1":[]}', repeat('a', 64), repeat('b', 64),
-    (select payload from expected_reviews)), false,
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'missing cited quote cannot be published');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":2}'), false,
+    'caller cannot substitute a finding position');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select jsonb_set(payload, '{1}', (payload -> '1') || (payload -> '1'))
         from expected_report_quotes), repeat('a', 64), repeat('b', 64),
-    (select payload from expected_reviews)), false,
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'extra cited quote cannot be published');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
@@ -111,7 +121,8 @@ select is(public.publish_gate3_reviewed_report(
     (select jsonb_set(payload, '{1,0,studyId}',
         '"00000000-0000-4000-8000-000000000001"'::jsonb) from expected_report_quotes),
     repeat('a', 64), repeat('b', 64),
-    (select payload from expected_reviews)), false,
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'quote from a different study cannot be published');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
@@ -119,21 +130,25 @@ select ok(public.publish_gate3_reviewed_report(
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes),
     repeat('a', 64), repeat('b', 64),
-    (select payload from expected_reviews)),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'),
     'trusted publisher binds exact qualified output and private decision');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
-    (select payload from expected_reviews)), 'exact publication retry returns prior result');
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'),
+    'exact publication retry returns prior result');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
     (select jsonb_set(payload, '{0,actorId}', '"different-reviewer"'::jsonb)
-        from expected_reviews)), false,
+        from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'changed actor cannot replay an approved publication');
 select throws_ok($$select public.publish_gate3_qualified_report(
     'a9700000-0000-4000-8000-000000000006', '{}'::jsonb, '{}'::jsonb,
@@ -152,6 +167,10 @@ set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","r
 select is((select count(*) from research.reports), 1::bigint, 'qualified report is visible to MFA tenant researcher');
 select is((select claim from research.findings), 'One respondent ordered soup', 'only qualified claim is projected');
 select is((select text from research.evidence_quotes), 'ordered soup', 'exact Unicode codepoint span is projected');
+select ok(public.read_gate3_qualified_report(
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006') is not null,
+    'qualified reader returns current report to MFA tenant');
 reset role;
 update public.findings set count = 0
 where id = 'a9700000-0000-4000-8000-000000000007';
@@ -242,21 +261,43 @@ select is(public.publish_gate3_reviewed_report(
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
     (select jsonb_set(payload, '{0,approvedQuote}', 'null'::jsonb)
-        from edited_reviews)), false,
+        from edited_reviews),
+    '{"a9700000-0000-4000-8000-000000000031":1}'), false,
     'publication refuses an edit with no approved quote');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000030',
+    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
+    '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
+    (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select jsonb_set(payload, '{0,editedClaim}', '"Different claim"'::jsonb)
+        from edited_reviews),
+    '{"a9700000-0000-4000-8000-000000000031":1}'), false,
+    'edited claim must equal qualified published claim');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000030',
+    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
+    '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
+    (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select jsonb_set(payload, '{0,editedQuoteText}', '"Different quote"'::jsonb)
+        from edited_reviews),
+    '{"a9700000-0000-4000-8000-000000000031":1}'), false,
+    'edited quote must equal approved published quote');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
     '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
-    (select payload from edited_reviews)),
+    (select payload from edited_reviews),
+    '{"a9700000-0000-4000-8000-000000000031":1}'),
     'edit and drop decisions commit with the reviewed report');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
     '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
-    (select payload from edited_reviews)), 'edit/drop retry returns prior decisions');
+    (select payload from edited_reviews),
+    '{"a9700000-0000-4000-8000-000000000031":1}'),
+    'edit/drop retry returns prior decisions');
 reset role;
 select is((select count(*) from pii.gate3_evidence_decisions
     where proposal_id in ('a9700000-0000-4000-8000-000000000033',
@@ -265,11 +306,45 @@ select is((select count(*) from pii.gate3_evidence_decisions
 select is((select count(*) from pii.gate3_report_publications where report_id =
     'a9700000-0000-4000-8000-000000000030'), 1::bigint,
     'one publication receipt survives edit/drop retry');
+set local role service_role;
+select ok(public.record_gate3_withheld_proposal(
+    '90600000-0000-4000-8000-000000000001', null,
+    'a9700000-0000-4000-8000-000000000040',
+    '{"exactText":"Private rejected candidate"}', 'synthetic-model', 'fixture-v2',
+    'fixture-prompt-v2', 'Source did not support claim', 'synthetic-reviewer',
+    'a9700000-0000-4000-8000-000000000041', 'Evidence withheld'),
+    'rejected proposal gets private drop record without publication');
+select ok(public.record_gate3_withheld_proposal(
+    '90600000-0000-4000-8000-000000000001', null,
+    'a9700000-0000-4000-8000-000000000040',
+    '{"exactText":"Private rejected candidate"}', 'synthetic-model', 'fixture-v2',
+    'fixture-prompt-v2', 'Source did not support claim', 'synthetic-reviewer',
+    'a9700000-0000-4000-8000-000000000041', 'Evidence withheld'),
+    'exact withheld-proposal replay is idempotent');
+select is(public.record_gate3_withheld_proposal(
+    '90600000-0000-4000-8000-000000000001', null,
+    'a9700000-0000-4000-8000-000000000040',
+    '{"exactText":"Private rejected candidate"}', 'synthetic-model', 'fixture-v2',
+    'fixture-prompt-v2', 'Source did not support claim', 'synthetic-reviewer',
+    'a9700000-0000-4000-8000-000000000041', 'Changed reason'), false,
+    'changed withheld reason cannot replay');
+reset role;
+select is((select count(*) from pii.gate3_evidence_decisions where proposal_id =
+    'a9700000-0000-4000-8000-000000000040'), 1::bigint,
+    'withheld proposal has one append-only decision');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
 select is((select count(*) from research.reports), 0::bigint, 'pre-MFA researcher sees no report');
+select is(public.read_gate3_qualified_report(
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006'), null::jsonb,
+    'reader refuses pre-MFA access');
 set local request.jwt.claims = '{"sub":"a9700000-0000-4000-8000-000000000009","role":"authenticated","aal":"aal2"}';
 select is((select count(*) from research.reports), 0::bigint, 'other tenant sees no report');
+select is(public.read_gate3_qualified_report(
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006'), null::jsonb,
+    'reader refuses other-tenant access');
 reset role;
 
 insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
@@ -308,6 +383,10 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
 select is((select count(*) from research.reports), 0::bigint, 'withdrawal hides report');
 select is((select count(*) from research.evidence_quotes), 0::bigint, 'withdrawal hides evidence');
+select is(public.read_gate3_qualified_report(
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006'), null::jsonb,
+    'reader rechecks withdrawal');
 reset role;
 insert into public.consents (respondent_id, purpose, granted, text_version, created_at)
 values ('90500000-0000-4000-8000-000000000001', 'researcher_access', true,
@@ -317,6 +396,10 @@ where id = '90500000-0000-4000-8000-000000000001';
 set local role authenticated;
 select is((select count(*) from research.reports), 0::bigint, 'respondent deletion hides report');
 select is((select count(*) from research.evidence_quotes), 0::bigint, 'respondent deletion hides evidence');
+select is(public.read_gate3_qualified_report(
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006'), null::jsonb,
+    'reader rechecks respondent deletion');
 reset role;
 update public.respondents set status = 'active'
 where id = '90500000-0000-4000-8000-000000000001';

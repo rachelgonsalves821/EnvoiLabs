@@ -23,7 +23,7 @@ revoke all on function internal.gate3_reviewed_quotes_match(jsonb, jsonb)
 create function public.publish_gate3_reviewed_report(
     supplied_report_id uuid, supplied_summary jsonb, supplied_claims jsonb,
     supplied_quotes jsonb, supplied_policy text, supplied_qualification text,
-    supplied_reviews jsonb
+    supplied_reviews jsonb, supplied_positions jsonb
 ) returns boolean language plpgsql security definer set search_path = '' as $$
 declare
     target public.reports%rowtype;
@@ -37,12 +37,20 @@ declare
     action_text text;
     approved jsonb;
     position_text text;
+    finding_uuid uuid;
 begin
     select * into target from public.reports where id = supplied_report_id for update;
     if not found or jsonb_typeof(supplied_reviews) <> 'array'
         or jsonb_array_length(supplied_reviews) = 0
         or not internal.gate3_report_quotes_match(supplied_report_id, supplied_quotes)
         or not internal.gate3_reviewed_quotes_match(supplied_quotes, supplied_reviews)
+        or jsonb_typeof(supplied_positions) <> 'object'
+        or (select count(*) from public.findings where report_id = target.id) <>
+            (select count(*) from jsonb_object_keys(supplied_positions))
+        or exists (select 1 from public.findings as finding
+            where finding.report_id = target.id and (
+                finding.study_id is distinct from target.study_id
+                or supplied_positions ->> finding.id::text is distinct from finding.position::text))
     then return false; end if;
     select count(*) into review_count from jsonb_array_elements(supplied_reviews);
     select count(distinct review ->> 'proposalId') into expected_count
@@ -65,15 +73,21 @@ begin
         action_text := item ->> 'action';
         position_text := item ->> 'findingPosition';
         approved := item -> 'approvedQuote';
+        select id into finding_uuid from public.findings
+            where report_id = target.id and position = position_text::integer;
         if not (supplied_quotes ? position_text)
-            or not exists (select 1 from public.findings
-                where report_id = target.id and position = position_text::integer)
+            or finding_uuid is null
             or (action_text = 'drop' and approved <> 'null'::jsonb)
             or (action_text in ('accept', 'edit') and jsonb_typeof(approved) <> 'object')
             or (action_text = 'edit' and nullif(btrim(coalesce(item ->> 'editedClaim',
                 item ->> 'editedQuoteText', '')), '') is null)
             or (action_text <> 'edit' and (item ->> 'editedClaim' is not null
                 or item ->> 'editedQuoteText' is not null))
+            or (action_text = 'edit' and item ->> 'editedClaim' is not null
+                and item ->> 'editedClaim' is distinct from
+                    supplied_claims ->> finding_uuid::text)
+            or (action_text = 'edit' and item ->> 'editedQuoteText' is not null
+                and item ->> 'editedQuoteText' is distinct from approved ->> 'exactText')
         then return false; end if;
         if action_text = 'accept' and approved is distinct from jsonb_build_object(
             'studyId', item #>> '{candidate,studyId}',
@@ -142,10 +156,101 @@ begin
 end;
 $$;
 revoke all on function public.publish_gate3_reviewed_report(
-    uuid, jsonb, jsonb, jsonb, text, text, jsonb)
+    uuid, jsonb, jsonb, jsonb, text, text, jsonb, jsonb)
     from public, anon, authenticated, service_role;
 grant execute on function public.publish_gate3_reviewed_report(
-    uuid, jsonb, jsonb, jsonb, text, text, jsonb) to service_role;
+    uuid, jsonb, jsonb, jsonb, text, text, jsonb, jsonb) to service_role;
 revoke execute on function public.publish_gate3_qualified_report(
     uuid, jsonb, jsonb, jsonb, text, text) from service_role;
 revoke insert on pii.gate3_evidence_proposals, pii.gate3_evidence_decisions from service_role;
+
+-- A withheld proposal must still leave private evidence even when there is no
+-- qualified public report to publish. Exact causation replay is a no-op.
+create function public.record_gate3_withheld_proposal(
+    supplied_study_id uuid, supplied_report_id uuid, supplied_proposal_id uuid,
+    supplied_candidate jsonb, supplied_model_name text, supplied_model_version text,
+    supplied_prompt_version text, supplied_rationale text, supplied_actor text,
+    supplied_causation_id uuid, supplied_reason text
+) returns boolean language plpgsql security definer set search_path = '' as $$
+declare
+    prior_proposal pii.gate3_evidence_proposals%rowtype;
+    prior_decision pii.gate3_evidence_decisions%rowtype;
+begin
+    if not exists (select 1 from public.studies where id = supplied_study_id)
+        or (supplied_report_id is not null and not exists (
+            select 1 from public.reports where id = supplied_report_id
+                and study_id = supplied_study_id))
+        or supplied_proposal_id is null or supplied_causation_id is null
+        or jsonb_typeof(supplied_candidate) <> 'object'
+        or nullif(btrim(supplied_model_name), '') is null
+        or nullif(btrim(supplied_model_version), '') is null
+        or nullif(btrim(supplied_prompt_version), '') is null
+        or nullif(btrim(supplied_rationale), '') is null
+        or nullif(btrim(supplied_actor), '') is null
+        or nullif(btrim(supplied_reason), '') is null
+    then return false; end if;
+    insert into pii.gate3_evidence_proposals
+        (id, study_id, report_id, candidate_json, model_name, model_version,
+            prompt_version, private_rationale)
+    values (supplied_proposal_id, supplied_study_id, supplied_report_id,
+        supplied_candidate, supplied_model_name, supplied_model_version,
+        supplied_prompt_version, supplied_rationale)
+    on conflict (id) do nothing;
+    select * into prior_proposal from pii.gate3_evidence_proposals
+        where id = supplied_proposal_id;
+    if prior_proposal.study_id is distinct from supplied_study_id
+        or prior_proposal.report_id is distinct from supplied_report_id
+        or prior_proposal.candidate_json is distinct from supplied_candidate
+        or prior_proposal.model_name is distinct from supplied_model_name
+        or prior_proposal.model_version is distinct from supplied_model_version
+        or prior_proposal.prompt_version is distinct from supplied_prompt_version
+        or prior_proposal.private_rationale is distinct from supplied_rationale
+        or exists (select 1 from pii.gate3_evidence_decisions
+            where proposal_id = supplied_proposal_id and causation_id <> supplied_causation_id)
+    then return false; end if;
+    insert into pii.gate3_evidence_decisions
+        (proposal_id, action, actor_id, causation_id, private_note)
+    values (supplied_proposal_id, 'drop', supplied_actor, supplied_causation_id, supplied_reason)
+    on conflict (proposal_id, causation_id) do nothing;
+    select * into prior_decision from pii.gate3_evidence_decisions
+        where proposal_id = supplied_proposal_id and causation_id = supplied_causation_id;
+    return prior_decision.action = 'drop'
+        and prior_decision.actor_id = supplied_actor
+        and prior_decision.private_note = supplied_reason;
+end;
+$$;
+revoke all on function public.record_gate3_withheld_proposal(
+    uuid, uuid, uuid, jsonb, text, text, text, text, text, uuid, text)
+    from public, anon, authenticated, service_role;
+grant execute on function public.record_gate3_withheld_proposal(
+    uuid, uuid, uuid, jsonb, text, text, text, text, text, uuid, text) to service_role;
+
+-- Every report and export read re-enters the current RLS projection in one
+-- statement snapshot; callers cannot reuse an earlier authorized payload.
+create function public.read_gate3_qualified_report(
+    supplied_study_id uuid, supplied_report_id uuid
+) returns jsonb language sql stable security invoker set search_path = '' as $$
+    select jsonb_build_object(
+        'report', jsonb_build_object('id', report.id, 'studyId', report.study_id,
+            'version', report.version, 'state', report.state,
+            'summary', report.summary_json),
+        'findings', coalesce((select jsonb_agg(jsonb_build_object(
+            'id', finding.id, 'position', finding.position,
+            'claim', finding.claim, 'count', finding.count,
+            'total', finding.total, 'confidence', finding.confidence,
+            'quotes', coalesce((select jsonb_agg(jsonb_build_object(
+                'id', quote.id, 'transcriptId', quote.transcript_id,
+                'sourceVersion', quote.source_version,
+                'startChar', quote.start_char, 'endChar', quote.end_char,
+                'exactText', quote.text) order by quote.id)
+                from research.evidence_quotes as quote
+                where quote.finding_id = finding.id), '[]'::jsonb))
+            order by finding.position)
+            from research.findings as finding where finding.report_id = report.id), '[]'::jsonb))
+    from research.reports as report
+    where report.id = supplied_report_id and report.study_id = supplied_study_id
+        and internal.gate3_report_current(report.id);
+$$;
+revoke all on function public.read_gate3_qualified_report(uuid, uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function public.read_gate3_qualified_report(uuid, uuid) to authenticated;
