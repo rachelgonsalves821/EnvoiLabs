@@ -154,8 +154,11 @@ create function internal.gate3_probe_current_for_answer(
                 internal.gate1_consent(respondent.id, interview.study_id, 'recording')
                 and internal.gate1_consent(respondent.id, interview.study_id, 'transcription_vendor')))
             and not exists (select 1 from public.answers as later
+                join public.guide_questions as later_question
+                    on later_question.id = later.guide_question_id
                 where later.session_id = interview.id and later.probe_id is null
-                    and later.sequence > answer.sequence));
+                    and later_question.study_id = interview.study_id
+                    and later_question.position > question.position));
 $$;
 revoke all on function internal.gate3_probe_current_for_answer(uuid, uuid)
     from public, anon, authenticated, service_role;
@@ -189,8 +192,11 @@ create function internal.gate3_probe_current(
                 internal.gate1_consent(respondent.id, interview.study_id, 'recording')
                 and internal.gate1_consent(respondent.id, interview.study_id, 'transcription_vendor')))
             and not exists (select 1 from public.answers as later
+                join public.guide_questions as later_question
+                    on later_question.id = later.guide_question_id
                 where later.session_id = interview.id and later.probe_id is null
-                    and later.sequence > answer.sequence));
+                    and later_question.study_id = interview.study_id
+                    and later_question.position > question.position));
 $$;
 revoke all on function internal.gate3_probe_current(uuid, uuid)
     from public, anon, authenticated, service_role;

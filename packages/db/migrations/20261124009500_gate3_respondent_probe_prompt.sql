@@ -8,7 +8,8 @@ create function public.read_gate3_respondent_probe(
     join public.probes as probe on probe.id = turn.probe_id
     where turn.session_id = supplied_session_id
         and turn.decision_json ->> 'action' = 'probe'
-        and turn.decision_deadline_at > clock_timestamp()
+        and (turn.decision_deadline_at > clock_timestamp()
+            or turn.shown_at is not null)
         and internal.gate3_probe_current(turn.id, supplied_auth_user_id)
         and not exists (select 1 from public.answers as answer
             where answer.probe_id = probe.id)
