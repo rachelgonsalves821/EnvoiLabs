@@ -1683,6 +1683,7 @@ export type Database = {
           supplied_claims: Json
           supplied_policy: string
           supplied_qualification: string
+          supplied_quotes: Json
           supplied_report_id: string
           supplied_summary: Json
         }

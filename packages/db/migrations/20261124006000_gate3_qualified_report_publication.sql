@@ -16,10 +16,24 @@ create trigger immutable_gate3_publication before update or delete on pii.gate3_
 
 create function internal.gate3_report_content_digest(target uuid) returns text
 language sql stable security definer set search_path = pg_catalog as $$
-    select encode(sha256(convert_to(report.qualified_summary_json::text || E'\n' ||
-        coalesce((select string_agg(finding.id::text || ':' || finding.qualified_claim,
-            E'\n' order by finding.id) from public.findings as finding
-            where finding.report_id = report.id), ''), 'UTF8')), 'hex')
+    select encode(sha256(convert_to(jsonb_build_object(
+        'report', jsonb_build_array(report.id, report.study_id, report.version,
+            report.state, report.created_at, report.updated_at,
+            report.qualified_summary_json),
+        'findings', coalesce((select jsonb_agg(jsonb_build_array(
+            finding.id, finding.study_id, finding.report_id, finding.position,
+            finding.qualified_claim, finding.count, finding.total, finding.confidence
+        ) order by finding.id) from public.findings as finding
+            where finding.report_id = report.id), '[]'::jsonb),
+        'quotes', coalesce((select jsonb_agg(jsonb_build_array(
+            quote.id, quote.study_id, quote.finding_id, quote.transcript_id,
+            quote.start_char, quote.end_char, quote.source_version,
+            quote.text, source.answer_id, source.redacted_text, source.created_at
+        ) order by quote.id) from public.evidence_quotes as quote
+            join public.findings as finding on finding.id = quote.finding_id
+            join public.transcripts as source on source.id = quote.transcript_id
+            where finding.report_id = report.id), '[]'::jsonb)
+    )::text, 'UTF8')), 'hex')
     from public.reports as report where report.id = target;
 $$;
 revoke all on function internal.gate3_report_content_digest(uuid)
@@ -54,8 +68,60 @@ $$;
 revoke all on function internal.gate3_source_current_for_publication(uuid, text, text)
     from public, anon, authenticated, service_role;
 
+-- Child writes take the same report lock as publication. A publication can
+-- therefore validate and hash one stable set of findings and quotes.
+create function internal.lock_gate3_report_child() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare target uuid;
+begin
+    if tg_table_name = 'findings' then
+        if tg_op = 'UPDATE' and new.report_id is distinct from old.report_id then
+            raise exception 'finding report cannot change';
+        end if;
+        target := case when tg_op = 'DELETE' then old.report_id else new.report_id end;
+    else
+        if tg_op = 'UPDATE' and new.finding_id is distinct from old.finding_id then
+            raise exception 'quote finding cannot change';
+        end if;
+        select report_id into target from public.findings
+        where id = case when tg_op = 'DELETE' then old.finding_id else new.finding_id end;
+    end if;
+    perform 1 from public.reports where id = target for update;
+    if not found then raise exception 'report missing for child write'; end if;
+    return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+create trigger lock_gate3_finding_report before insert or update or delete on public.findings
+    for each row execute function internal.lock_gate3_report_child();
+create trigger lock_gate3_quote_report before insert or update or delete on public.evidence_quotes
+    for each row execute function internal.lock_gate3_report_child();
+
+create function internal.gate3_report_quotes_match(target uuid, supplied jsonb)
+returns boolean language sql stable security definer set search_path = pg_catalog as $$
+    select jsonb_typeof(supplied) = 'object'
+        and (select count(*) from jsonb_object_keys(supplied)) =
+            (select count(*) from public.findings where report_id = target)
+        and not exists (select 1 from public.findings as finding
+            where finding.report_id = target and (
+                jsonb_typeof(supplied -> finding.position::text) is distinct from 'array'
+                or coalesce((select jsonb_agg(item order by item::text) from (
+                    select jsonb_build_object('studyId', quote.study_id,
+                        'transcriptId', quote.transcript_id,
+                        'sourceVersion', quote.source_version,
+                        'startChar', quote.start_char, 'endChar', quote.end_char,
+                        'exactText', quote.text) as item
+                    from public.evidence_quotes as quote where quote.finding_id = finding.id
+                ) as stored), '[]'::jsonb)
+                is distinct from coalesce((select jsonb_agg(item order by item::text)
+                    from jsonb_array_elements(supplied -> finding.position::text) as item), '[]'::jsonb)
+            ));
+$$;
+revoke all on function internal.gate3_report_quotes_match(uuid, jsonb)
+    from public, anon, authenticated, service_role;
+
 create function public.publish_gate3_qualified_report(
     supplied_report_id uuid, supplied_summary jsonb, supplied_claims jsonb,
+    supplied_quotes jsonb,
     supplied_policy text, supplied_qualification text
 ) returns boolean language plpgsql security definer set search_path = '' as $$
 declare
@@ -66,6 +132,7 @@ begin
     if not found or target.state <> 'ready'
         or jsonb_typeof(supplied_summary) <> 'object'
         or jsonb_typeof(supplied_claims) <> 'object'
+        or not internal.gate3_report_quotes_match(supplied_report_id, supplied_quotes)
         or not internal.gate3_policy_qualified(supplied_policy, supplied_qualification)
         or exists (select 1 from pii.gate3_report_publications where report_id = supplied_report_id)
     then return false; end if;
@@ -102,9 +169,9 @@ begin
     return true;
 end;
 $$;
-revoke all on function public.publish_gate3_qualified_report(uuid, jsonb, jsonb, text, text)
+revoke all on function public.publish_gate3_qualified_report(uuid, jsonb, jsonb, jsonb, text, text)
     from public, anon, authenticated, service_role;
-grant execute on function public.publish_gate3_qualified_report(uuid, jsonb, jsonb, text, text)
+grant execute on function public.publish_gate3_qualified_report(uuid, jsonb, jsonb, jsonb, text, text)
     to service_role;
 
 -- The service can create private model rows, but cannot write the public

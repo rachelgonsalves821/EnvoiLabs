@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AnalystThemeSetV2Schema } from "@envoi-labs/contracts";
-import { publishQualifiedThemeSet } from "../src/qualified-report.js";
+import { publicationQuoteMap, publishQualifiedThemeSet } from "../src/qualified-report.js";
 
 const analyst = AnalystThemeSetV2Schema.parse(
   (AnalystThemeSetV2Schema.meta()?.examples as unknown[])[0]);
@@ -33,7 +33,8 @@ describe("qualified report publication boundary", () => {
       expect(exposed).not.toContain(secret);
     }
     expect(ports.qualifyText).toHaveBeenCalledTimes(3);
-    expect(ports.publish).toHaveBeenCalledWith("report_1", publicReport, policy);
+    expect(ports.publish).toHaveBeenCalledWith("report_1", publicReport,
+      publicationQuoteMap(publicReport!), policy);
   });
 
   it("fails closed when the qualified policy or any text qualification is unavailable", async () => {

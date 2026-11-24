@@ -63,6 +63,13 @@ select is((select count(*) from research.evidence_quotes), 0::bigint, 'quote can
 select throws_ok($$select claim from public.findings$$, '42501', null, 'raw model claim cannot be read');
 reset role;
 
+create temp table expected_report_quotes as
+select jsonb_build_object('1', jsonb_build_array(jsonb_build_object(
+    'studyId', study_id, 'transcriptId', transcript_id,
+    'sourceVersion', source_version, 'startChar', start_char,
+    'endChar', end_char, 'exactText', text))) as payload
+from public.evidence_quotes where id = 'a9700000-0000-4000-8000-000000000008';
+grant select on expected_report_quotes to service_role;
 set local role service_role;
 select throws_ok($$update public.reports set qualified_summary_json = '{"raw":"Ada Example"}'
     where id = 'a9700000-0000-4000-8000-000000000006'$$,
@@ -70,10 +77,32 @@ select throws_ok($$update public.reports set qualified_summary_json = '{"raw":"A
 select throws_ok($$update public.findings set qualified_claim = 'Ada Example'
     where id = 'a9700000-0000-4000-8000-000000000007'$$,
     '42501', null, 'service cannot directly write a qualified claim');
+select is(public.publish_gate3_qualified_report(
+    'a9700000-0000-4000-8000-000000000006',
+    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    '{"1":[]}', repeat('a', 64), repeat('b', 64)), false,
+    'missing cited quote cannot be published');
+select is(public.publish_gate3_qualified_report(
+    'a9700000-0000-4000-8000-000000000006',
+    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select jsonb_set(payload, '{1}', (payload -> '1') || (payload -> '1'))
+        from expected_report_quotes), repeat('a', 64), repeat('b', 64)), false,
+    'extra cited quote cannot be published');
+select is(public.publish_gate3_qualified_report(
+    'a9700000-0000-4000-8000-000000000006',
+    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select jsonb_set(payload, '{1,0,studyId}',
+        '"00000000-0000-4000-8000-000000000001"'::jsonb) from expected_report_quotes),
+    repeat('a', 64), repeat('b', 64)), false,
+    'quote from a different study cannot be published');
 select ok(public.publish_gate3_qualified_report(
     'a9700000-0000-4000-8000-000000000006',
     '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes),
     repeat('a', 64), repeat('b', 64)), 'trusted publisher binds exact qualified output');
 reset role;
 set local role authenticated;
@@ -81,6 +110,39 @@ set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","r
 select is((select count(*) from research.reports), 1::bigint, 'qualified report is visible to MFA tenant researcher');
 select is((select claim from research.findings), 'One respondent ordered soup', 'only qualified claim is projected');
 select is((select text from research.evidence_quotes), 'ordered soup', 'exact Unicode codepoint span is projected');
+reset role;
+update public.findings set count = 0
+where id = 'a9700000-0000-4000-8000-000000000007';
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint,
+    'changed finding count invalidates the whole report receipt');
+reset role;
+update public.findings set count = 1
+where id = 'a9700000-0000-4000-8000-000000000007';
+update public.findings set confidence = 'low'
+where id = 'a9700000-0000-4000-8000-000000000007';
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint,
+    'changed confidence invalidates the whole report receipt');
+reset role;
+update public.findings set confidence = 'high'
+where id = 'a9700000-0000-4000-8000-000000000007';
+insert into public.evidence_quotes
+    (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
+select 'a9700000-0000-4000-8000-000000000011',
+    'a9700000-0000-4000-8000-000000000007', id, study_id,
+    4, 16, 'ordered soup', redacted_source_version
+from public.transcripts where id = 'a9700000-0000-4000-8000-000000000005';
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint,
+    'added valid quote invalidates the whole report receipt');
+select is((select count(*) from research.evidence_quotes), 0::bigint,
+    'added quote cannot appear while its report receipt is stale');
+reset role;
+delete from public.evidence_quotes where id = 'a9700000-0000-4000-8000-000000000011';
+set local role authenticated;
+select is((select count(*) from research.reports), 1::bigint,
+    'restoring exact published rows restores receipt visibility');
 reset role;
 update public.reports set qualified_summary_json = '{"raw":"Ada Example"}'
 where id = 'a9700000-0000-4000-8000-000000000006';

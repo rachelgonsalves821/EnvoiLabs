@@ -4,12 +4,26 @@ import { AnalystThemeSetV2Schema, PublishedThemeSetV2Schema,
 
 type Policy = { policyDigest: string; qualificationDigest: string };
 type QualifiedText = Policy & { text: string };
+type PublishedQuote = PublishedThemeSetV2["themes"][number]["supportingQuotes"][number];
+type QuoteIdentity = Pick<PublishedQuote, "studyId" | "transcriptId" | "sourceVersion" |
+  "startChar" | "endChar" | "exactText">;
+export type PublicationQuoteMap = Record<string, QuoteIdentity[]>;
+
+export function publicationQuoteMap(content: PublishedThemeSetV2): PublicationQuoteMap {
+  return Object.fromEntries(content.themes.map((theme, index) => [String(index + 1),
+    [...theme.supportingQuotes, ...theme.contradictingQuotes].map((quote) => ({
+      studyId: quote.studyId, transcriptId: quote.transcriptId,
+      sourceVersion: quote.sourceVersion, startChar: quote.startChar,
+      endChar: quote.endChar, exactText: quote.exactText,
+    }))]));
+}
 type Publisher = {
   activePolicy(): Promise<Policy | null>;
   qualifyText(text: string, policy: Policy): Promise<QualifiedText | null>;
   verifyQuote(quote: EvidenceQuoteCandidateV2, policy: Policy): Promise<unknown>;
   // Persist in one transaction through the restricted qualified publication RPC.
-  publish(reportId: string, content: PublishedThemeSetV2, policy: Policy): Promise<boolean>;
+  publish(reportId: string, content: PublishedThemeSetV2,
+    quoteMap: PublicationQuoteMap, policy: Policy): Promise<boolean>;
 };
 
 export async function publishQualifiedThemeSet(
@@ -62,6 +76,7 @@ export async function publishQualifiedThemeSet(
   }
   const content = PublishedThemeSetV2Schema.safeParse({ version: 2,
     executiveAnswer, hypotheses, themes });
-  if (!content.success || !(await ports.publish(reportId, content.data, policy))) return null;
+  if (!content.success || !(await ports.publish(reportId, content.data,
+    publicationQuoteMap(content.data), policy))) return null;
   return content.data;
 }
