@@ -868,3 +868,15 @@ Needs from others. None for this browser check.
 Contract or schema changes. None.
 
 Risks. This trace uses a fixture redactor. The live publication check still requires the independently qualified policy.
+
+### 2026-11-24 Gate 1 protected preview sync
+
+Done. Vercel marked preview commit `b5af43a42c1d106afcc9cb04724486d8a74ab790` ready. It has the same source tree as main `e99559689c373d81b21a729b99c97ca790f0a7cc`. On both preview addresses, unauthenticated requests to respondent signup, researcher sign-in and the job endpoint redirected to Vercel sign-in. [Deployment receipt](https://vercel.com/rachelgonsalves821s-projects/envoilabs/EwMUgNpDXuEbFNhsbYEiduJ9xCLA) · [Gate 1 evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7141104642)
+
+Next. Qualify redaction independently and rehearse researcher publication on the protected preview.
+
+Needs from others. None for this preview check.
+
+Contract or schema changes. None.
+
+Risks. The deployment and protection checks cover the new build. Researcher transcript publication still needs a qualified redactor and a signed-in rehearsal.
