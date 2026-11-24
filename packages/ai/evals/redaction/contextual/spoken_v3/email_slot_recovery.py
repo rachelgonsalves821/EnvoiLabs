@@ -54,6 +54,11 @@ _PRIVATE_LABEL = re.compile(
     r"(?:e-?mail(?: address)?|inbox|mailbox) (?:is|was|as)\s+|(?:write|email) me (?:to|at)\s+|"
     r"(?:for e-?mail (?:use|try)|(?:the )?written reply (?:goes to|use))\s+)"
 )
+_SPLIT_ADDRESS_ROLE = re.compile(
+    r"\b(?:e-?mail address (?:(?:i|we|you) (?:gave|provided|verified|confirmed) )?(?:is|was)|"
+    r"(?:write|e-?mail) me (?:to|at)|for e-?mail (?:use|try)|(?:reply|respond) by e-?mail (?:to|at))"
+    r"\s*(?::\s*|\s+)"
+)
 _CONFIRMED_AT = _STRONG_AT | {"ad", "add", "an", "and", "et", "said", "set", "at's"}
 _AT_PAIRS = {("as", "an"), ("at", "sign")}
 _CONFIRMED_DOT = _DOMAIN_BREAK | _DISTORTED_DOT | {"dott", "drug"}
@@ -61,6 +66,7 @@ _HOST_WORD = re.compile(r"[^\W\d_]{2,}(?:-[^\W\d_]{2,})*\Z")
 _PRIVATE_SUFFIXES = _TLDS | {"example"}
 _FUSED_AT = re.compile(r"[^\W\d_]{2,}at[^\W\d_]{3,}\Z")
 _DISCOURSE_WORDS = _BLOCK | {"and", "but", "because", "if", "i", "we", "they", "while"}
+_SPLIT_PROSE = _DISCOURSE_WORDS | _WEB_ACTION | {"available", "closed", "down", "empty", "full", "open"}
 
 
 def _domain_continues(tokens, stop):
@@ -226,10 +232,24 @@ def _labeled_address_shape(tokens, first, separator):
     return False
 
 
+def _split_host_address(text, words):
+    if len(words) not in (5, 6):
+        return False
+    handle, marker, host = words[:2], words[2:-2], words[-2:]
+    return (
+        tuple(token.word for token in marker) in {("at",), ("at", "sign")}
+        and _spelled_handle(handle)
+        and all(token.word not in _SPLIT_PROSE for token in (*handle, *host))
+        and all(_HOST_WORD.fullmatch(token.word) for token in host)
+        and all(text[left.end:right.start].isspace() for left, right in zip(words, words[1:]))
+    )
+
+
 def _recover_labeled_spelling(lower, tokens, offsets):
     """Read a mailbox after a direct label, including fused or missing spoken separators."""
-    starts = sorted({label.end() for pattern in (_PRIVATE_LABEL, _ADDRESS_LABEL) for label in pattern.finditer(lower)})
-    for start in starts:
+    starts = {label.end() for pattern in (_PRIVATE_LABEL, _ADDRESS_LABEL) for label in pattern.finditer(lower)}
+    split_starts = {label.end() for label in _SPLIT_ADDRESS_ROLE.finditer(lower)}
+    for start in sorted(starts | split_starts):
         first = offsets.get(start)
         if first is None:
             continue
@@ -237,7 +257,12 @@ def _recover_labeled_spelling(lower, tokens, offsets):
             if tokens[separator].word not in _DOMAIN_BREAK:
                 continue
             stop = _domain_suffix(lower, tokens, separator, suffixes=_PRIVATE_SUFFIXES, inferred_limit=63)
-            if stop is None or not _labeled_address_shape(tokens, first, separator):
+            if stop is None:
+                continue
+            if not (
+                start in starts and _labeled_address_shape(tokens, first, separator)
+                or start in split_starts and _split_host_address(lower, tokens[first:separator])
+            ):
                 continue
             end = tokens[stop - 1].end
             if not _public_mail_reference(lower[start:end], lower[end:]):

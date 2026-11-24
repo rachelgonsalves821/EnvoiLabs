@@ -75,6 +75,32 @@ class LabeledSpellingTests(unittest.TestCase):
         return {text[hit.start:hit.end] for detector in (recover_email_slots, recover_corroborated_mailboxes)
                 for hit in detector(text)}
 
+    def test_explicit_address_role_can_identify_two_space_split_words_on_each_side(self):
+        examples = (
+            ("My email address is", "fern folio at small grove dot solutions", ". The app showed checkout."),
+            ("Email me at", "sage depot at granite coast dot technology", " for the confirmation."),
+            ("The email address I verified is", "alder archive at meadow bridge dot services", ". The tab stayed open."),
+            ("Reply by email to", "birch notes at sign elm hill dot systems", " for the survey reply."),
+        )
+        for cue, address, following in examples:
+            with self.subTest(cue=cue):
+                self.assertEqual(self.recovered(f"{cue} {address}{following}"), {address})
+
+    def test_space_split_handle_needs_an_explicit_address_role_and_clear_boundary(self):
+        texts = (
+            "Fern folio at small grove dot solutions for the reply.",
+            "View fern folio at small grove dot solutions for the reply.",
+            "The official catalog lists fern folio at small grove dot solutions.",
+            "My inbox is full today at small grove dot solutions, which shows the backlog.",
+            "My email address is for urgent orders at small grove dot solutions.",
+            "Email me at fern folio at public site dot solutions.",
+            "Email me at fern folio at small grove dot solutions show only the new pricing",
+            "Email me at fern folio at small grove dot solutions as the public site.",
+        )
+        for text in texts:
+            with self.subTest(text=text):
+                self.assertEqual(self.recovered(text), set())
+
     def test_private_address_spelling_keeps_the_complete_source_span(self):
         addresses = (
             "maple dot folio at relay dot example",
