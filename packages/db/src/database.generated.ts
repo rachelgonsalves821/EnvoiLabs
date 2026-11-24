@@ -302,6 +302,7 @@ export type Database = {
           end_char: number
           finding_id: string
           id: string
+          source_version: string | null
           start_char: number
           study_id: string
           text: string
@@ -313,6 +314,7 @@ export type Database = {
           end_char: number
           finding_id: string
           id?: string
+          source_version?: string | null
           start_char: number
           study_id: string
           text: string
@@ -324,6 +326,7 @@ export type Database = {
           end_char?: number
           finding_id?: string
           id?: string
+          source_version?: string | null
           start_char?: number
           study_id?: string
           text?: string
@@ -355,6 +358,7 @@ export type Database = {
           created_at: string
           id: string
           position: number
+          qualified_claim: string | null
           report_id: string
           study_id: string
           total: number
@@ -367,6 +371,7 @@ export type Database = {
           created_at?: string
           id?: string
           position: number
+          qualified_claim?: string | null
           report_id: string
           study_id: string
           total: number
@@ -379,6 +384,7 @@ export type Database = {
           created_at?: string
           id?: string
           position?: number
+          qualified_claim?: string | null
           report_id?: string
           study_id?: string
           total?: number
@@ -1293,6 +1299,9 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          qualified_policy_digest: string | null
+          qualified_qualification_digest: string | null
+          qualified_summary_json: Json | null
           state: string
           study_id: string
           summary_json: Json
@@ -1302,6 +1311,9 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          qualified_policy_digest?: string | null
+          qualified_qualification_digest?: string | null
+          qualified_summary_json?: Json | null
           state: string
           study_id: string
           summary_json: Json
@@ -1311,6 +1323,9 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          qualified_policy_digest?: string | null
+          qualified_qualification_digest?: string | null
+          qualified_summary_json?: Json | null
           state?: string
           study_id?: string
           summary_json?: Json
@@ -1545,6 +1560,7 @@ export type Database = {
           latency_ms: number
           model: string
           provider: string
+          redacted_source_version: string
           redacted_text: string | null
           study_id: string
           updated_at: string
@@ -1557,6 +1573,7 @@ export type Database = {
           latency_ms: number
           model: string
           provider: string
+          redacted_source_version?: string
           redacted_text?: string | null
           study_id: string
           updated_at?: string
@@ -1569,6 +1586,7 @@ export type Database = {
           latency_ms?: number
           model?: string
           provider?: string
+          redacted_source_version?: string
           redacted_text?: string | null
           study_id?: string
           updated_at?: string
