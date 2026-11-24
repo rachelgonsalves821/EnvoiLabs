@@ -32,31 +32,37 @@ export function StudyReportPanel({ controller, save = saveJson }: {
   controller: ReportPanelController; save?: (content: string) => void;
 }) {
   const [state, setState] = useState<State>(() => controller.getState());
-  const [exportError, setExportError] = useState(false);
+  const [exportNotice, setExportNotice] = useState(false);
   const headingId = useId();
 
   useEffect(() => {
     const unsubscribe = controller.subscribe(setState);
     void controller.refresh();
-    const refresh = () => { if (!document.hidden) void controller.refresh(); };
+    const refresh = () => { if (!document.hidden) { setExportNotice(false); void controller.refresh(); } };
     document.addEventListener("visibilitychange", refresh);
     return () => { unsubscribe(); document.removeEventListener("visibilitychange", refresh); };
   }, [controller]);
 
   async function download() {
-    setExportError(false);
+    setExportNotice(false);
     const payload = await controller.requestExport();
-    if (!payload) { setExportError(true); return; }
+    if (!payload) {
+      // The withheld state already explains a revoked report. A newer ready
+      // version needs review before its first download.
+      if (controller.getState().kind === "ready") setExportNotice(true);
+      return;
+    }
     save(payload);
   }
 
   return (
-    <section className={`${styles.panel} ${styles.report}`} aria-labelledby={headingId}>
+    <section className={`${styles.panel} ${styles.report}`} aria-labelledby={headingId}
+      aria-busy={state.kind === "loading"}>
       <h2 id={headingId}>Research report</h2>
       {state.kind === "loading" && <p role="status">Checking the current report…</p>}
       {state.kind === "withheld" && (
         <><p role="status">The report is currently unavailable.</p>
-          <button type="button" onClick={() => void controller.refresh()}>Check again</button></>
+          <button type="button" onClick={() => { setExportNotice(false); void controller.refresh(); }}>Check again</button></>
       )}
       {state.kind === "ready" && (
         <>
@@ -87,7 +93,8 @@ export function StudyReportPanel({ controller, save = saveJson }: {
           </button>
         </>
       )}
-      {exportError && <p role="status">The report changed. Review the current version before downloading.</p>}
+      {exportNotice && state.kind === "ready" &&
+        <p role="status">The report changed. Review the current version before downloading.</p>}
     </section>
   );
 }
