@@ -26,6 +26,9 @@ export function decideScreening(input: ScreeningInput): ScreeningDecision {
     throw new Error("Screening rule version must be a positive safe integer.");
   }
   const { interpretation, answerText } = input;
+  if (input.criterionKind !== "must" && input.criterionKind !== "nice" && input.criterionKind !== "exclude") {
+    return { action: "review", ruleVersion: input.ruleVersion, confirmedFact: null };
+  }
   if (!input.hasParticipationCapacity) return { action: "review", ruleVersion: input.ruleVersion, confirmedFact: null };
   if (input.timedOut || !interpretation || !answerText.trim()) {
     return { action: "clarify", ruleVersion: input.ruleVersion, confirmedFact: null };

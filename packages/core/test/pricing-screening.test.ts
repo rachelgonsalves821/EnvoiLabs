@@ -57,5 +57,6 @@ describe("screening rule", () => {
 
   it("keeps participation caps authoritative", () => {
     expect(decideScreening({ ...base, hasParticipationCapacity: false }).action).toBe("review");
+    expect(decideScreening({ ...base, criterionKind: "unknown" as "must" }).action).toBe("review");
   });
 });
