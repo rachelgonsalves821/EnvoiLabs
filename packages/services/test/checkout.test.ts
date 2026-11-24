@@ -22,7 +22,7 @@ function setup() {
     recordCheckoutCreated: vi.fn().mockResolvedValue(undefined),
   };
   const provider = {
-    findByKey: vi.fn().mockResolvedValue(null),
+    findByKey: vi.fn().mockResolvedValue({ status: "absent" }),
     create: vi.fn().mockResolvedValue(checkout),
     get: vi.fn().mockResolvedValue(checkout),
   };
@@ -49,7 +49,7 @@ describe("synthetic quote to checkout", () => {
     const { db, provider } = setup();
     provider.create.mockRejectedValueOnce(new Error("provider response lost"));
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
-    provider.findByKey.mockResolvedValueOnce(checkout);
+    provider.findByKey.mockResolvedValueOnce({ status: "found", checkout });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toMatchObject({ status: "ready" });
     expect(provider.create).toHaveBeenCalledTimes(1);
     expect(db.recordCheckoutCreated).toHaveBeenCalledTimes(1);
@@ -80,5 +80,13 @@ describe("synthetic quote to checkout", () => {
     provider.findByKey.mockRejectedValue(new Error("lookup unavailable"));
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
     expect(provider.create).not.toHaveBeenCalled();
+  });
+
+  it("never creates after an incomplete provider reconciliation", async () => {
+    const { db, provider } = setup();
+    provider.findByKey.mockResolvedValue({ status: "uncertain" });
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
+    expect(provider.create).not.toHaveBeenCalled();
+    expect(db.recordCheckoutCreated).not.toHaveBeenCalled();
   });
 });

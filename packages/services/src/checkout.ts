@@ -38,7 +38,12 @@ export type CheckoutDatabase = {
   recordCheckoutCreated(session: CheckoutSession, eventId: string, observedAt: string): Promise<void>;
 };
 type CheckoutProvider = {
-  findByKey(key: string): Promise<CheckoutSession | null>;
+  // "absent" must mean an authoritative lookup covered the full provider
+  // history for this key. An incomplete scan or expired idempotency window is
+  // "uncertain" and cannot permit another create.
+  findByKey(key: string): Promise<
+    { status: "found"; checkout: CheckoutSession } |
+    { status: "absent" } | { status: "uncertain" }>;
   create(key: string, quote: QuoteV2): Promise<CheckoutSession>;
   get(checkoutId: string): Promise<CheckoutSession>;
 };
@@ -79,8 +84,14 @@ export async function prepareStudyCheckout(
     const existingId = await db.readCheckoutId(quote.id);
     // A failed lookup never permits a fresh create; an uncertain prior create
     // must first be reconciled through this stable provider key.
-    let checkout = existingId ? await provider.get(existingId) : await provider.findByKey(key);
-    if (!checkout) checkout = await provider.create(key, quote);
+    let checkout: CheckoutSession;
+    if (existingId) {
+      checkout = await provider.get(existingId);
+    } else {
+      const lookup = await provider.findByKey(key);
+      if (lookup.status === "uncertain") return { status: "unavailable" };
+      checkout = lookup.status === "found" ? lookup.checkout : await provider.create(key, quote);
+    }
     if (!matchesQuote(checkout, quote) || (existingId && checkout.id !== existingId)) {
       return { status: "blocked" };
     }
