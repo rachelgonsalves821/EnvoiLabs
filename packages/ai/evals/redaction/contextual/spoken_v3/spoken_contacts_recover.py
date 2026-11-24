@@ -47,6 +47,11 @@ _WORD = re.compile(r"[^\W_]+(?:[-’'][^\W_]+)*\Z")
 _DNS_SUFFIX = re.compile(r"[a-z]{2,20}\Z")
 _DOMAIN_WORD = re.compile(r"[a-z](?:[a-z0-9-]*[a-z0-9])?\Z")
 _MAILBOX_END = re.compile(r"\s*(?:$|[,.;:!?]|(?:and|but|then|before|after) (?:i|we|they|you|it)\b)", re.I)
+_MAILBOX_PURPOSE = re.compile(
+    r"\s+for (?:the|my|our|your) (?:(?:booking|delivery|order|survey|written) )?(?:reply|confirmation)"
+    r"(?=\s*(?:$|[,.;:!?])|\s+(?:after|and|before|but|email|then)\b)", re.I,
+)
+_PURPOSE_PROSE = _HANDLE_START_BLOCK | {"after", "before", "but", "while"}
 _PHONE_JOIN = re.compile(
     r"(?:[\s,;:]*(?:and|or|then|also|phone|number|is|mobile|cell|call|text|me|my|at)\b){0,5}[\s,;:]*",
     re.I,
@@ -54,6 +59,12 @@ _PHONE_JOIN = re.compile(
 _NAVIGATION_PREFIX = re.compile(
     r"\b(?:browse|click|go|look|navigate|open|read|shop|view|visit) (?:to |at |on )?\s*\Z",
     re.I,
+)
+_PUBLIC_MAILBOX_PREFIX = re.compile(
+    r"\b(?:(?:(?:public|official|vendor|store|support) )?(?:web ?site|page|url|catalog|public link)"
+    r"(?:\s+(?:at|is|was|says|shows?|reads|uses|lists?))?|"
+    r"(?:looked|shopped) at|(?:went|navigated) to|(?:browsed|clicked|opened|visited)(?: on)?)"
+    r"[\s,:]*\Z", re.I,
 )
 
 
@@ -129,13 +140,16 @@ def _phone_runs(text, tokens):
         cursor = stop
 
 
-def _structured_handle_start(tokens, handle_end):
+def _structured_handle_start(tokens, handle_end, *, sentence_bound=False):
     """Read adjacent written or spoken local-part separators without taking preceding prose."""
     last = handle_end - 1
     if not _WORD.fullmatch(tokens[last].word) or tokens[last].word in _WEB_ACTION:
         return None
     first = last
     while first >= 2 and last - first < 6 and tokens[first - 1].word in _HANDLE_BREAK:
+        separator = tokens[first - 1]
+        if sentence_bound and separator.word == "." and separator.end != tokens[first].start:
+            break
         atom = tokens[first - 2].word
         if not _WORD.fullmatch(atom) or atom in _HANDLE_START_BLOCK or atom in _WEB_ACTION:
             break
@@ -147,7 +161,7 @@ def _followed_by_phone(text, end, phones):
     return any(0 <= phone.start - end <= 36 and _PHONE_JOIN.fullmatch(text[end:phone.start]) for phone in phones)
 
 
-def _split_host_handle_start(text, tokens, last_host):
+def _split_host_handle_start(text, tokens, last_host, *, sentence_bound=False):
     marker = last_host - 2
     if marker < 1 or tokens[marker].word != "at":
         return None
@@ -157,7 +171,13 @@ def _split_host_handle_start(text, tokens, last_host):
         for atom in (left, right)
     ):
         return None
-    return _structured_handle_start(tokens, marker)
+    return _structured_handle_start(tokens, marker, sentence_bound=sentence_bound)
+
+
+def _public_mailbox_context(text, start, purpose_end):
+    return _NAVIGATION_PREFIX.search(text[max(0, start - 40):start]) or (
+        purpose_end and _PUBLIC_MAILBOX_PREFIX.search(text[max(0, start - 64):start])
+    )
 
 
 def _email_runs(text, tokens, phones):
@@ -166,8 +186,9 @@ def _email_runs(text, tokens, phones):
         intent = bool(_EMAIL_INTENT.search(context))
         ending = tokens[tld].word
         end = tokens[tld].end
+        purpose_end = ending not in _PURPOSE_PROSE and bool(_MAILBOX_PURPOSE.match(text, end))
         bounded_end = bool(_DNS_SUFFIX.fullmatch(ending) and (
-            _MAILBOX_END.match(text[end:]) or _followed_by_phone(text, end, phones)
+            _MAILBOX_END.match(text[end:]) or purpose_end or _followed_by_phone(text, end, phones)
         ))
         unlisted = ending not in _TLDS and bounded_end
         fused = intent and ending.startswith("dot") and ending[3:] in _TLDS
@@ -187,10 +208,10 @@ def _email_runs(text, tokens, phones):
         if not _WORD.fullmatch(tokens[domain].word):
             continue
         if not fused and bounded_end and sep in _DOMAIN_BREAK:
-            first = _split_host_handle_start(text, tokens, domain)
+            first = _split_host_handle_start(text, tokens, domain, sentence_bound=purpose_end)
             if first is not None:
                 start = tokens[first].start
-                if not _NAVIGATION_PREFIX.search(text[max(0, start - 40):start]):
+                if not _public_mailbox_context(text, start, purpose_end):
                     yield Hit("email", start, end)
                 continue
         at = domain - 1
@@ -204,10 +225,11 @@ def _email_runs(text, tokens, phones):
         if handle_end < 1:
             continue
         if unlisted and not fused:
-            first = _structured_handle_start(tokens, handle_end) if strict and sep in _DOMAIN_BREAK else None
+            first = (_structured_handle_start(tokens, handle_end, sentence_bound=purpose_end)
+                     if strict and sep in _DOMAIN_BREAK else None)
             if first is not None:
                 start = tokens[first].start
-                if not _NAVIGATION_PREFIX.search(text[max(0, start - 40):start]):
+                if not _public_mailbox_context(text, start, purpose_end):
                     yield Hit("email", start, end)
             continue
         left_limit = 12 if strict else 8
