@@ -1635,6 +1635,23 @@ export type Database = {
         Args: { supplied_cutoff: string }
         Returns: Json
       }
+      freeze_gate2_quote: {
+        Args: {
+          supplied_brief_version: number
+          supplied_config_id: string
+          supplied_config_version: number
+          supplied_feasibility: Json
+          supplied_incentive_cents: number
+          supplied_line_items: Json
+          supplied_study_id: string
+          supplied_total_cents: number
+        }
+        Returns: string
+      }
+      gate2_guide_digest: {
+        Args: { supplied_study_id: string }
+        Returns: string
+      }
       get_gate1_study_tracking: {
         Args: { supplied_study_id: string }
         Returns: Json
@@ -1646,6 +1663,14 @@ export type Database = {
           supplied_study_id: string
         }
         Returns: Json
+      }
+      launch_gate2_paid_study: {
+        Args: {
+          supplied_provider_event_id: string
+          supplied_quote_id: string
+          supplied_study_id: string
+        }
+        Returns: boolean
       }
       list_gate1_home_invites: { Args: never; Returns: Json }
       provision_email_respondent: {
