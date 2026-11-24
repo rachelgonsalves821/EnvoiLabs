@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { QuoteV2Schema } from "@envoi-labs/contracts";
-import { reconcilePaidStudyLaunch } from "../src/paid-study.js";
+import { QuoteV2Schema, QuoteV4Schema } from "@envoi-labs/contracts";
+import { reconcileCheckoutObservation, reconcilePaidStudyLaunch } from "../src/paid-study.js";
 
 const quote = QuoteV2Schema.parse((QuoteV2Schema.meta()?.examples as unknown[])[0]);
+const currentQuote = QuoteV4Schema.parse((QuoteV4Schema.meta()?.examples as unknown[])[0]);
 const paid = { id: "cs_test_1", eventId: "evt_paid_1", studyId: quote.studyId,
   quoteId: quote.id, pricingConfigVersion: quote.pricingConfigVersion,
   amountCents: quote.totalCents, currency: quote.currency, status: "paid" as const,
@@ -20,6 +21,36 @@ function setup() {
 }
 
 describe("paid study launch reconciliation", () => {
+  it("records a current V4 payment observation without launching or treating a redirect as proof", async () => {
+    const { db, provider } = setup();
+    db.readQuote.mockResolvedValue(currentQuote);
+    provider.getCheckout.mockResolvedValue({ ...paid,
+      pricingConfigVersion: currentQuote.pricingConfigVersion,
+      amountCents: currentQuote.totalCents });
+    expect(await reconcileCheckoutObservation(db, provider,
+      currentQuote.studyId, currentQuote.id)).toBe("paid");
+    expect(db.recordObservation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      quoteId: currentQuote.id, amountCents: currentQuote.totalCents }));
+    expect(db.launchPaidStudy).not.toHaveBeenCalled();
+    provider.getCheckout.mockResolvedValue({ ...paid,
+      pricingConfigVersion: currentQuote.pricingConfigVersion,
+      amountCents: currentQuote.totalCents, status: "pending" });
+    expect(await reconcileCheckoutObservation(db, provider,
+      currentQuote.studyId, currentQuote.id)).toBe("pending");
+    expect(db.recordObservation).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps historical paid quote reconciliation but rejects old marketplace shapes for launch", async () => {
+    const { db, provider } = setup();
+    const oldMarketplace = { ...quote, pricingConfigVersion: 101 };
+    db.readQuote.mockResolvedValue(oldMarketplace);
+    provider.getCheckout.mockResolvedValue({ ...paid, pricingConfigVersion: 101 });
+    expect(await reconcileCheckoutObservation(db, provider,
+      quote.studyId, quote.id)).toBe("paid");
+    expect(await reconcilePaidStudyLaunch(db, provider,
+      quote.studyId, quote.id)).toBe("blocked");
+    expect(db.launchPaidStudy).not.toHaveBeenCalled();
+  });
   it("fetches provider state and binds it to the frozen quote before launch", async () => {
     const { db, provider } = setup();
     expect(await reconcilePaidStudyLaunch(db, provider, quote.studyId, quote.id)).toBe("launched");
