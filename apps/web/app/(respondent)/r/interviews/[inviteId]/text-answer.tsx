@@ -1,7 +1,7 @@
 "use client";
 
 import { RecordAnswerResponseSchema } from "@envoi-labs/contracts";
-import { Button } from "@envoi-labs/ui";
+import { Button } from "@envoi-labs/ui/primitives";
 import { useRef, useState, type SubmitEvent } from "react";
 import { interviewRequest } from "../../interview-request";
 import { interviewCopy as copy } from "./copy";

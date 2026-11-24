@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@envoi-labs/ui";
+import { Button } from "@envoi-labs/ui/primitives";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { interviewCopy as copy } from "./copy";

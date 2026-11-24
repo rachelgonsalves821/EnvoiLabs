@@ -4,6 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./primitives": "./src/primitives.tsx",
+    "./echo": "./src/echo.tsx",
     "./styles.css": "./src/styles.css"
   },
   "scripts": {
