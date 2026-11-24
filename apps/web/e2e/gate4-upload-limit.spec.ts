@@ -93,7 +93,7 @@ test("two local web processes share authenticated audio reservation quota", asyn
     if (org.error || !org.data) throw new Error("Synthetic organization missing.");
     const study = await service.from("studies").insert({ organization_id: org.data.id,
       title: "Gate 4 synthetic audio interview", state: "fielding", target_completes: 1,
-      length_minutes: 8 }).select("id").single();
+      length_minutes: 8, labels: ["gate1_food"] }).select("id").single();
     if (study.error || !study.data) throw new Error("Synthetic study missing.");
     const guide = await service.from("guide_questions").insert([1, 2, 3, 4].map((position) => ({
       study_id: study.data.id, position, text: `Synthetic audio question ${position}`,
@@ -152,6 +152,12 @@ test("two local web processes share authenticated audio reservation quota", asyn
     const signedUrl = new URL(firstUpload.uploadUrl);
     expect(signedUrl.origin).toBe(provider);
     expect(signedUrl.pathname).toContain(`/${session.data.id}/${firstUpload.audioObjectId}`);
+    const token = signedUrl.searchParams.get("token");
+    expect(token?.split(".")).toHaveLength(3);
+    const claims: { exp?: number } = JSON.parse(Buffer.from(token!.split(".")[1]!, "base64url").toString("utf8"));
+    const remainingSeconds = claims.exp! - Math.floor(Date.now() / 1000);
+    expect(remainingSeconds).toBeGreaterThan(7000);
+    expect(remainingSeconds).toBeLessThanOrEqual(7200);
     const validAudio = Buffer.alloc(payload.bytes);
     Buffer.from([0x1a, 0x45, 0xdf, 0xa3]).copy(validAudio);
     const changedPath = new URL(signedUrl);
@@ -172,5 +178,21 @@ test("two local web processes share authenticated audio reservation quota", asyn
       data: validAudio, headers: { "Content-Type": payload.mime },
     });
     expect(correct.ok()).toBe(true);
+    const replay = await context.request.put(signedUrl.href, {
+      data: validAudio, headers: { "Content-Type": payload.mime },
+    });
+    expect(replay.ok()).toBe(false);
+    const stored = async () => service.storage.from("gate1-interview-audio").list(session.data.id);
+    const beforeExpiry = await stored();
+    expect(beforeExpiry.error).toBeNull();
+    expect(beforeExpiry.data?.some(({ name }) => name === firstUpload.audioObjectId)).toBe(true);
+    const expiry = await service.rpc("expire_gate1_interviews", {
+      supplied_cutoff: new Date(Date.now() + 2 * 3_600_000).toISOString(),
+    });
+    expect(expiry.error).toBeNull();
+    expect(expiry.data?.abandonedSessions).toBe(1);
+    const afterExpiry = await stored();
+    expect(afterExpiry.error).toBeNull();
+    expect(afterExpiry.data?.some(({ name }) => name === firstUpload.audioObjectId)).toBe(true);
   } finally { await context.close(); }
 });

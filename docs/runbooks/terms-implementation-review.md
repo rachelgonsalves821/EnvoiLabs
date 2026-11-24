@@ -15,6 +15,6 @@ Rachel's November 24 `envoi-terms-draft-v0.1.md` is a draft for counsel review, 
 
 - Race the fifth profile verification against a duplicate event, account withdrawal and two award workers. A self, circular or duplicate identity must not advance the eligible count; one logical $5 award must result at most once.
 - Race a late complete against the study's refund cutoff. Test 12 purchased / 11 complete and zero/all complete at the frozen $2-per-core-question price. The reward liability is $1 per answered core question under Rachel's decision; no replay may duplicate a refund, reward or provider order.
-- Retain the existing two-process upload quota and signed-transfer boundary fixture. Add signed-token lifetime/reuse, orphan cleanup and request-bandwidth evidence before any public clip or deletion promise.
+- Retain the two-process upload quota and signed-transfer fixture. A follow-up local test found a roughly two-hour encoded upload-token lifetime, rejected overwrite on token replay with `upsert:false`, and an unconfirmed object still stored after the current expiry RPC abandoned its interview under a synthetic future cutoff. The expiry job is not object cleanup; add bounded orphan purge, retention receipts and hosted bandwidth evidence before any public clip or deletion promise.
 
 BIPA, tax, arbitration, DPA, zero-retention and prepaid-card fee statements are outside this implementation verification and remain for counsel/provider review. This review does not authorize live AI, enrollment, payment, payout or production configuration.
