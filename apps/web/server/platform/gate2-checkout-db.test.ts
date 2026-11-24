@@ -8,7 +8,7 @@ const quoteId = "a9900000-0000-4000-8000-000000000001";
 const organizationId = "90100000-0000-4000-8000-000000000001";
 const researcher = { id: "90400000-0000-4000-8000-000000000001", organizationId,
   authUserId: "90200000-0000-4000-8000-000000000001" };
-const feasibility = { studyId, eligibleProfileCount: 1,
+const feasibility = { studyId, eligibleProfileCount: 12,
   history: { offered: 1, accepted: 1, completed: 1 },
   projectedCompletes: null, fillHours: null,
   basis: "insufficient_history" as const, asOf: "2026-11-24T20:00:00.000Z" };

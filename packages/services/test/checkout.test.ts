@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { QuoteV3Schema, QuoteV4Schema } from "@envoi-labs/contracts";
 import { prepareStudyCheckout } from "../src/checkout.js";
 
-const quote = QuoteV4Schema.parse((QuoteV4Schema.meta()?.examples as unknown[])[0]);
+const quote = QuoteV4Schema.parse({
+  ...((QuoteV4Schema.meta()?.examples as unknown[])[0] as Record<string, unknown>),
+  feasibility: { ...(((QuoteV4Schema.meta()?.examples as unknown[])[0] as {
+    feasibility: Record<string, unknown> }).feasibility), eligibleProfileCount: 12 },
+});
 const scope = { studyId: quote.studyId, briefVersion: quote.briefVersion,
   coreQuestionCount: 5, targetRespondents: 10, feasibility: quote.feasibility };
 const config = { id: quote.pricingConfigId, version: quote.pricingConfigVersion,
@@ -93,6 +97,19 @@ describe("synthetic quote to checkout", () => {
     db.readQuote.mockResolvedValueOnce(QuoteV3Schema.parse(
       (QuoteV3Schema.meta()?.examples as unknown[])[0]));
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
+    expect(provider.create).not.toHaveBeenCalled();
+  });
+
+  it("does not ask for test checkout when eligible or projected completes cannot fill the slots", async () => {
+    const { db, provider } = setup();
+    db.readApprovedScope.mockResolvedValueOnce({ ...scope, feasibility: {
+      ...scope.feasibility, eligibleProfileCount: 9 } });
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
+    db.readApprovedScope.mockResolvedValueOnce({ ...scope, feasibility: {
+      ...scope.feasibility, history: { offered: 30, accepted: 20, completed: 10 },
+      projectedCompletes: 4, basis: "observed_rates" } });
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
+    expect(db.freezeQuote).not.toHaveBeenCalled();
     expect(provider.create).not.toHaveBeenCalled();
   });
 

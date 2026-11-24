@@ -69,7 +69,10 @@ export async function prepareStudyCheckout(
     const config = await db.readSelectedPricing(studyId);
     if (!scope || !config || scope.studyId !== studyId) return { status: "blocked" };
     const evidence = MarketplaceFeasibilitySchema.safeParse(scope.feasibility);
-    if (!evidence.success || evidence.data.studyId !== studyId) return { status: "blocked" };
+    if (!evidence.success || evidence.data.studyId !== studyId ||
+      evidence.data.eligibleProfileCount < scope.targetRespondents ||
+      (evidence.data.projectedCompletes !== null &&
+        evidence.data.projectedCompletes < scope.targetRespondents)) return { status: "blocked" };
     const price = priceMarketplaceStudy({ coreQuestionCount: scope.coreQuestionCount,
       respondentCount: scope.targetRespondents, unitPriceCents: config.unitPriceCents,
       rewardPerQuestionCents: config.incentivePerQuestionCents });
