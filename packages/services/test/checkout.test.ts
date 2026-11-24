@@ -18,11 +18,10 @@ function setup() {
     readSelectedPricing: vi.fn().mockResolvedValue(config),
     freezeQuote: vi.fn().mockResolvedValue(quote.id),
     readQuote: vi.fn().mockResolvedValue(quote),
-    readCheckoutId: vi.fn().mockResolvedValue(null),
+    claimCheckoutIntent: vi.fn().mockResolvedValue({ status: "create", key: `gate2-checkout:${quote.id}` }),
     recordCheckoutCreated: vi.fn().mockResolvedValue(undefined),
   };
   const provider = {
-    findByKey: vi.fn().mockResolvedValue({ status: "absent" }),
     create: vi.fn().mockResolvedValue(checkout),
     get: vi.fn().mockResolvedValue(checkout),
   };
@@ -39,27 +38,28 @@ describe("synthetic quote to checkout", () => {
       pricingConfigVersion: config.version, feasibility: quote.feasibility,
       totalCents: 500, incentiveCentsPerComplete: 200,
       lineItems: quote.lineItems });
-    expect(provider.findByKey).toHaveBeenCalledWith(`gate2-checkout:${quote.id}`);
+    expect(db.claimCheckoutIntent).toHaveBeenCalledWith(quote.studyId, quote.id);
+    expect(provider.create).toHaveBeenCalledWith(`gate2-checkout:${quote.id}`, quote);
     expect(provider.create).toHaveBeenCalledTimes(1);
     expect(db.recordCheckoutCreated).toHaveBeenCalledWith(checkout,
       `checkout-created:${checkout.id}`, expect.any(String));
   });
 
-  it("finds an uncertain prior create by stable provider key on retry", async () => {
+  it("keeps an uncertain prior create unavailable until the durable lease grants a same-key retry", async () => {
     const { db, provider } = setup();
     provider.create.mockRejectedValueOnce(new Error("provider response lost"));
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
-    provider.findByKey.mockResolvedValueOnce({ status: "found", checkout });
+    db.claimCheckoutIntent.mockResolvedValueOnce({ status: "unavailable" });
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toMatchObject({ status: "ready" });
-    expect(provider.create).toHaveBeenCalledTimes(1);
+    expect(provider.create).toHaveBeenCalledTimes(2);
     expect(db.recordCheckoutCreated).toHaveBeenCalledTimes(1);
   });
 
   it("uses a recorded checkout without creating another and blocks provider mismatch", async () => {
     const { db, provider } = setup();
-    db.readCheckoutId.mockResolvedValue(checkout.id);
+    db.claimCheckoutIntent.mockResolvedValue({ status: "known", checkoutId: checkout.id });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toMatchObject({ status: "ready" });
-    expect(provider.findByKey).not.toHaveBeenCalled();
     expect(provider.create).not.toHaveBeenCalled();
     expect(db.recordCheckoutCreated).not.toHaveBeenCalled();
     provider.get.mockResolvedValue({ ...checkout, amountCents: 400 });
@@ -70,7 +70,7 @@ describe("synthetic quote to checkout", () => {
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
   });
 
-  it("fails closed on stale scope, changed quote economics or provider lookup outage", async () => {
+  it("fails closed on stale scope, changed quote economics or intent outage", async () => {
     const { db, provider } = setup();
     db.readApprovedScope.mockResolvedValue({ ...scope, briefVersion: 2 });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
@@ -79,14 +79,14 @@ describe("synthetic quote to checkout", () => {
     db.readQuote.mockResolvedValue({ ...quote, totalCents: 400 });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
     db.readQuote.mockResolvedValue(quote);
-    provider.findByKey.mockRejectedValue(new Error("lookup unavailable"));
+    db.claimCheckoutIntent.mockRejectedValue(new Error("intent unavailable"));
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
     expect(provider.create).not.toHaveBeenCalled();
   });
 
-  it("never creates after an incomplete provider reconciliation", async () => {
+  it("never creates after a late or exhausted intent", async () => {
     const { db, provider } = setup();
-    provider.findByKey.mockResolvedValue({ status: "uncertain" });
+    db.claimCheckoutIntent.mockResolvedValue({ status: "unavailable" });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
     expect(provider.create).not.toHaveBeenCalled();
     expect(db.recordCheckoutCreated).not.toHaveBeenCalled();

@@ -51,7 +51,10 @@ function fixture({ otherOrganization = false, existingCheckout = false } = {}) {
     };
     return query;
   });
-  const rpc = vi.fn().mockResolvedValue({ data: quoteId, error: null });
+  const rpc = vi.fn(async (name: string) => ({ data: name === "freeze_gate2_quote"
+    ? quoteId : existingCheckout
+      ? { status: "known", checkoutId: session.id }
+      : { status: "create", key: `gate2-checkout:${quoteId}` }, error: null }));
   const client = { from, rpc } as unknown as SupabaseClient<Database>;
   const estimate = vi.fn().mockResolvedValue({ expectedCompletes: 1, hours: 24 });
   return { db: createGate2CheckoutDatabase(client, researcher, estimate), from, rpc, rows, estimate };
@@ -80,7 +83,7 @@ describe("Gate 2 checkout database scope", () => {
     const { db, rpc, rows } = fixture({ otherOrganization: true });
     expect(await db.readApprovedScope(studyId)).toBeNull();
     expect(await db.readSelectedPricing(studyId)).toBeNull();
-    expect(await db.readCheckoutId(quoteId)).toBeNull();
+    expect(await db.claimCheckoutIntent(studyId, quoteId)).toEqual({ status: "blocked" });
     await expect(db.recordCheckoutCreated(session, `checkout-created:${session.id}`,
       "2026-11-23T20:00:00Z")).rejects.toThrow("scope");
     expect(rpc).not.toHaveBeenCalled();
@@ -89,7 +92,7 @@ describe("Gate 2 checkout database scope", () => {
 
   it("accepts an exact checkout replay and refuses a conflicting identity", async () => {
     const { db } = fixture({ existingCheckout: true });
-    expect(await db.readCheckoutId(quoteId)).toBe(session.id);
+    expect(await db.claimCheckoutIntent(studyId, quoteId)).toEqual({ status: "known", checkoutId: session.id });
     await expect(db.recordCheckoutCreated(session, `checkout-created:${session.id}`,
       "2026-11-23T20:00:00Z")).resolves.toBeUndefined();
     await expect(db.recordCheckoutCreated({ ...session, id: "cs_other" }, "checkout-created:cs_other",

@@ -97,14 +97,21 @@ export function createGate2CheckoutDatabase(
       if (!row) return null;
       return mapGate2Quote(row);
     },
-    async readCheckoutId(quoteId) {
-      const quote = readData(await client.from("gate2_quote_snapshots").select("*")
-        .eq("id", quoteId).maybeSingle()) as QuoteRow | null;
-      if (!quote || !await allowedStudy(quote.study_id)) return null;
-      const row = readData(await client.from("gate2_payment_events")
-        .select("*").eq("quote_id", quoteId)
-        .eq("event_kind", "checkout_created").maybeSingle()) as PaymentEventRow | null;
-      return row?.provider_checkout_id ?? null;
+    async claimCheckoutIntent(studyId, quoteId) {
+      if (!await allowedStudy(studyId)) return { status: "blocked" };
+      const result = readData(await client.rpc("claim_gate2_checkout_intent", {
+        supplied_study_id: studyId, supplied_quote_id: quoteId,
+      }));
+      if (!result || typeof result !== "object" || Array.isArray(result))
+        return { status: "unavailable" };
+      const value = result as Record<string, unknown>;
+      if (value.status === "create" && value.key === `gate2-checkout:${quoteId}`)
+        return { status: "create", key: value.key };
+      if (value.status === "known" && typeof value.checkoutId === "string" &&
+        value.checkoutId.startsWith("cs_test_"))
+        return { status: "known", checkoutId: value.checkoutId };
+      if (value.status === "blocked") return { status: "blocked" };
+      return { status: "unavailable" };
     },
     async recordCheckoutCreated(session: CheckoutSession, eventId, observedAt) {
       const quote = readData(await client.from("gate2_quote_snapshots").select("*")

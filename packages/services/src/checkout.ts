@@ -34,16 +34,12 @@ export type CheckoutDatabase = {
     feasibility: CheckoutScope["feasibility"];
   }): Promise<string>;
   readQuote(studyId: string, quoteId: string): Promise<unknown>;
-  readCheckoutId(quoteId: string): Promise<string | null>;
+  claimCheckoutIntent(studyId: string, quoteId: string): Promise<
+    { status: "create"; key: string } | { status: "known"; checkoutId: string } |
+    { status: "blocked" } | { status: "unavailable" }>;
   recordCheckoutCreated(session: CheckoutSession, eventId: string, observedAt: string): Promise<void>;
 };
-type CheckoutProvider = {
-  // "absent" must mean an authoritative lookup covered the full provider
-  // history for this key. An incomplete scan or expired idempotency window is
-  // "uncertain" and cannot permit another create.
-  findByKey(key: string): Promise<
-    { status: "found"; checkout: CheckoutSession } |
-    { status: "absent" } | { status: "uncertain" }>;
+export type CheckoutProvider = {
   create(key: string, quote: QuoteV2): Promise<CheckoutSession>;
   get(checkoutId: string): Promise<CheckoutSession>;
 };
@@ -88,22 +84,17 @@ export async function prepareStudyCheckout(
       return { status: "blocked" };
     }
     const quote = parsed.data;
-    const key = `gate2-checkout:${quote.id}`;
-    const existingId = await db.readCheckoutId(quote.id);
-    // A failed lookup never permits a fresh create; an uncertain prior create
-    // must first be reconciled through this stable provider key.
+    const intent = await db.claimCheckoutIntent(studyId, quote.id);
+    if (intent.status === "blocked") return { status: "blocked" };
+    if (intent.status === "unavailable") return { status: "unavailable" };
     let checkout: CheckoutSession;
-    if (existingId) {
-      checkout = await provider.get(existingId);
-    } else {
-      const lookup = await provider.findByKey(key);
-      if (lookup.status === "uncertain") return { status: "unavailable" };
-      checkout = lookup.status === "found" ? lookup.checkout : await provider.create(key, quote);
-    }
-    if (!matchesQuote(checkout, quote) || (existingId && checkout.id !== existingId)) {
+    if (intent.status === "known") checkout = await provider.get(intent.checkoutId);
+    else checkout = await provider.create(intent.key, quote);
+    if (!matchesQuote(checkout, quote) ||
+      (intent.status === "known" && checkout.id !== intent.checkoutId)) {
       return { status: "blocked" };
     }
-    if (!existingId) await db.recordCheckoutCreated(checkout,
+    if (intent.status === "create") await db.recordCheckoutCreated(checkout,
       `checkout-created:${checkout.id}`, new Date().toISOString());
     return { status: "ready", quote, checkout };
   } catch (error) {
