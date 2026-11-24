@@ -51,10 +51,12 @@ export const PaymentV2Schema = withExample(z.strictObject({
 
 export const ScreeningRuleV1Schema = withExample(z.strictObject({
   id, studyId: id, criterionId: id, version: positive,
-  criterionKind: z.enum(["must", "nice", "exclude"]), question: text,
+  criterionKind: z.enum(["must", "nice", "exclude"]),
+  criterionText: text, timeframeText: text, question: text,
   approvedAt: timestamp,
 }), { id: exampleId, studyId: exampleId, criterionId: exampleId, version: 1,
-  criterionKind: "must", question: "Did you order food after 10pm in the last 30 days?",
+  criterionKind: "must", criterionText: "Ordered food after 10pm in the last 30 days",
+  timeframeText: "last 30 days", question: "Did you order food after 10pm in the last 30 days?",
   approvedAt: exampleDate });
 
 /** Model evidence stays private; the Platform rule determines qualification. */

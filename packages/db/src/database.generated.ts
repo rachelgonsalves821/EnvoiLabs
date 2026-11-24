@@ -595,9 +595,11 @@ export type Database = {
           created_at: string
           criterion_id: string
           criterion_kind: string
+          criterion_text: string
           id: string
           question: string
           study_id: string
+          timeframe_text: string
           version: number
         }
         Insert: {
@@ -606,9 +608,11 @@ export type Database = {
           created_at?: string
           criterion_id: string
           criterion_kind: string
+          criterion_text: string
           id?: string
           question: string
           study_id: string
+          timeframe_text: string
           version: number
         }
         Update: {
@@ -617,9 +621,11 @@ export type Database = {
           created_at?: string
           criterion_id?: string
           criterion_kind?: string
+          criterion_text?: string
           id?: string
           question?: string
           study_id?: string
+          timeframe_text?: string
           version?: number
         }
         Relationships: [
@@ -1595,6 +1601,19 @@ export type Database = {
         Args: { supplied_answer_id?: string }
         Returns: Json
       }
+      commit_gate2_screening_decision: {
+        Args: {
+          requested_action: string
+          requested_answer_id: string
+          requested_confirmed: boolean
+          requested_end: number
+          requested_interpretation: string
+          requested_rule_id: string
+          requested_start: number
+          requested_version: number
+        }
+        Returns: Json
+      }
       complete_gate1_answer_job: {
         Args: {
           supplied_answer_id: string
@@ -1657,6 +1676,18 @@ export type Database = {
       }
       get_gate1_study_tracking: {
         Args: { supplied_study_id: string }
+        Returns: Json
+      }
+      get_gate2_screening_decision: {
+        Args: { requested_answer_id: string }
+        Returns: Json
+      }
+      get_gate2_screening_rule: {
+        Args: {
+          requested_rule_id: string
+          requested_study_id: string
+          requested_version: number
+        }
         Returns: Json
       }
       launch_gate1_study: {
@@ -1761,6 +1792,20 @@ export type Database = {
       save_gate1_profile: { Args: { attributes: Json }; Returns: boolean }
       start_gate1_session: {
         Args: { supplied_invite_id: string }
+        Returns: Json
+      }
+      store_gate2_screening_answer: {
+        Args: {
+          requested_consent_version: string
+          requested_invite_id: string
+          requested_key: string
+          requested_kind: string
+          requested_respondent_id: string
+          requested_rule_id: string
+          requested_study_id: string
+          requested_text: string
+          requested_version: number
+        }
         Returns: Json
       }
       submit_gate1_session: {
