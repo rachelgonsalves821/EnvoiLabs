@@ -14,7 +14,8 @@ alter table public.findings add column qualified_claim text
 create function internal.rotate_redacted_source_version() returns trigger
 language plpgsql set search_path = '' as $$
 begin
-    if new.redacted_text is distinct from old.redacted_text then
+    if new.redacted_text is distinct from old.redacted_text
+        or new.redacted_source_version is distinct from old.redacted_source_version then
         new.redacted_source_version := gen_random_uuid();
     end if;
     return new;
