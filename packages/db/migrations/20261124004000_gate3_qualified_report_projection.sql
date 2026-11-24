@@ -16,8 +16,6 @@ language plpgsql set search_path = '' as $$
 begin
     if new.redacted_text is distinct from old.redacted_text then
         new.redacted_source_version := gen_random_uuid();
-    elsif new.redacted_source_version is distinct from old.redacted_source_version then
-        raise check_violation;
     end if;
     return new;
 end;
@@ -25,6 +23,30 @@ $$;
 revoke all on function internal.rotate_redacted_source_version() from public, anon, authenticated, service_role;
 create trigger rotate_redacted_source_version before update on public.transcripts
     for each row execute function internal.rotate_redacted_source_version();
+
+-- Gate 1 writes the redacted text and its qualification receipt in separate
+-- updates. The receipt transition is a new publication even for identical text.
+create function internal.rotate_redacted_source_on_publication() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+    if new.result_status = 'published' and new.publication_policy_digest is not null
+        and new.publication_qualification_digest is not null
+        and (old.result_status is distinct from new.result_status
+            or old.publication_policy_digest is distinct from new.publication_policy_digest
+            or old.publication_qualification_digest is distinct from new.publication_qualification_digest
+            or old.completed_at is distinct from new.completed_at)
+    then
+        update public.transcripts set redacted_source_version = gen_random_uuid()
+        where answer_id = new.answer_id;
+    end if;
+    return null;
+end;
+$$;
+revoke all on function internal.rotate_redacted_source_on_publication()
+    from public, anon, authenticated, service_role;
+create trigger rotate_redacted_source_on_publication
+    after update on internal.gate1_answer_jobs for each row
+    execute function internal.rotate_redacted_source_on_publication();
 
 create function internal.gate3_policy_qualified(policy text, receipt text) returns boolean
 language sql stable security definer set search_path = pg_catalog as $$
