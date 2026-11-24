@@ -11,7 +11,7 @@ const ready: ReadyProbeTurn = {
     turnId: "turn-1", probesUsed: 0, maxProbes: 2, decisionDeadlineAtMs: 1000 },
   transcriptRevision: "source-1", serverUploadConfirmedAtMs: 100,
   browserUploadConfirmedAtMs: 50, transcriptReadyAtMs: 200,
-  request: { purpose: "probe", promptVersion: "v1", system: "fictional",
+  request: { purpose: "ai_followup", promptVersion: "v1", system: "fictional",
     messages: [{ role: "user", content: "Fictional answer" }] },
 };
 
@@ -32,6 +32,16 @@ function setup() {
 }
 
 describe("probe decision and render ports", () => {
+  it("does not call the provider for a request without the follow-up purpose", async () => {
+    const { port, setCurrent } = setup();
+    setCurrent({ ...ready, request: { ...ready.request, purpose: "probe" } });
+    const generate = vi.fn(async () => response({ action: "probe", text: "What happened?" }));
+    expect(await runProbeDecision(port, provider(generate), "session-1", "turn-1", 500,
+      () => 300)).toEqual({ status: "unavailable" });
+    expect(generate).not.toHaveBeenCalled();
+    expect(port.commitDecision).not.toHaveBeenCalled();
+  });
+
   it("commits a revision-bound probe before mounting and records its browser paint", async () => {
     const { port } = setup();
     const chosen = await runProbeDecision(port, provider(async () => response({ action: "probe",

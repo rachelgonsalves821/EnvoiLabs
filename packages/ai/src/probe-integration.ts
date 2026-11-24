@@ -93,6 +93,10 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
       || !Number.isFinite(ready.browserUploadConfirmedAtMs)
       || !Number.isFinite(ready.transcriptReadyAtMs)
       || ready.transcriptReadyAtMs < ready.serverUploadConfirmedAtMs) return { status: "stale" };
+    // The Platform read must separately prove the current purpose-specific
+    // consent grant. Do not dispatch a mislabeled model request even in tests.
+    if (ready.request.purpose !== "ai_followup" || !ready.request.promptVersion.trim())
+      return { status: "unavailable" };
     let state = beginProbeTurn(ready.turn, ready.serverUploadConfirmedAtMs);
     if (state.phase === "awaiting_upload") state = advanceProbeState(state,
       { type: "upload_confirmed", turnId, atMs: ready.serverUploadConfirmedAtMs });
