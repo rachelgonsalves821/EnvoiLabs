@@ -1,0 +1,110 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions, research;
+select no_plan();
+
+update public.studies set state = 'fielding'
+where id = '90600000-0000-4000-8000-000000000001';
+insert into public.guide_questions (id, study_id, position, text)
+values ('a9700000-0000-4000-8000-000000000001', '90600000-0000-4000-8000-000000000001', 99, 'Synthetic question');
+insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
+values ('a9700000-0000-4000-8000-000000000002', '90600000-0000-4000-8000-000000000001',
+    '90500000-0000-4000-8000-000000000001', 'accepted', 160, now() + interval '1 day');
+insert into public.sessions (id, invite_id, study_id, state)
+values ('a9700000-0000-4000-8000-000000000003', 'a9700000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001', 'in_progress');
+insert into public.answers (id, session_id, study_id, guide_question_id, kind, sequence)
+values ('a9700000-0000-4000-8000-000000000004', 'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001', 'a9700000-0000-4000-8000-000000000001', 'text', 1);
+insert into public.transcripts (id, answer_id, study_id, provider, model, latency_ms, cost_micros)
+values ('a9700000-0000-4000-8000-000000000005', 'a9700000-0000-4000-8000-000000000004',
+    '90600000-0000-4000-8000-000000000001', 'typed', 'none', 0, 0);
+insert into pii.transcript_raw (transcript_id, raw_text)
+values ('a9700000-0000-4000-8000-000000000005', 'Synthetic private source');
+insert into internal.gate1_answer_jobs (answer_id) values ('a9700000-0000-4000-8000-000000000004');
+insert into public.consents (respondent_id, purpose, granted, text_version)
+select '90500000-0000-4000-8000-000000000001', purpose, true, 'fixture-v1'
+from unnest(array['retention','researcher_access']) as purpose;
+insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
+values (repeat('a', 64), repeat('b', 64));
+insert into auth.users (id) values ('a9700000-0000-4000-8000-000000000009');
+insert into public.organizations (id, name)
+values ('a9700000-0000-4000-8000-000000000010', 'Other synthetic tenant');
+insert into public.researchers (auth_user_id, organization_id, terms_version, terms_accepted_at)
+values ('a9700000-0000-4000-8000-000000000009', 'a9700000-0000-4000-8000-000000000010',
+    'fixture-v1', now());
+
+create temp table claimed (payload jsonb);
+grant select, insert on claimed to service_role;
+set local role service_role;
+insert into claimed select public.claim_gate1_answer_job('a9700000-0000-4000-8000-000000000004');
+select is(public.complete_gate1_answer_job(
+    'a9700000-0000-4000-8000-000000000004', (select (payload ->> 'leaseId')::uuid from claimed),
+    supplied_redacted_text => 'A 😀 ordered soup.', supplied_redaction_passed => true,
+    supplied_policy_digest => repeat('a', 64), supplied_qualification_digest => repeat('b', 64)
+) ->> 'status', 'published', 'qualified synthetic source publishes');
+reset role;
+
+insert into public.reports (id, study_id, version, state, summary_json)
+values ('a9700000-0000-4000-8000-000000000006', '90600000-0000-4000-8000-000000000001',
+    1, 'ready', '{"raw":"private model summary"}');
+insert into public.findings (id, report_id, study_id, position, claim, count, total, confidence)
+values ('a9700000-0000-4000-8000-000000000007', 'a9700000-0000-4000-8000-000000000006',
+    '90600000-0000-4000-8000-000000000001', 1, 'Private model claim', 1, 1, 'high');
+insert into public.evidence_quotes (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
+select 'a9700000-0000-4000-8000-000000000008', 'a9700000-0000-4000-8000-000000000007', id,
+    study_id, 4, 16, 'ordered soup', redacted_source_version
+from public.transcripts where id = 'a9700000-0000-4000-8000-000000000005';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports), 0::bigint, 'legacy report has no public projection');
+select is((select count(*) from research.evidence_quotes), 0::bigint, 'quote cannot bypass unqualified report');
+select throws_ok($$select claim from public.findings$$, '42501', null, 'raw model claim cannot be read');
+reset role;
+
+update public.reports set qualified_summary_json = '{"summary":"One soup order"}',
+    qualified_policy_digest = repeat('a', 64), qualified_qualification_digest = repeat('b', 64)
+where id = 'a9700000-0000-4000-8000-000000000006';
+update public.findings set qualified_claim = 'One respondent ordered soup'
+where id = 'a9700000-0000-4000-8000-000000000007';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports), 1::bigint, 'qualified report is visible to MFA tenant researcher');
+select is((select claim from research.findings), 'One respondent ordered soup', 'only qualified claim is projected');
+select is((select text from research.evidence_quotes), 'ordered soup', 'exact Unicode codepoint span is projected');
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
+select is((select count(*) from research.reports), 0::bigint, 'pre-MFA researcher sees no report');
+set local request.jwt.claims = '{"sub":"a9700000-0000-4000-8000-000000000009","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports), 0::bigint, 'other tenant sees no report');
+reset role;
+
+update public.evidence_quotes set text = 'not the source'
+where id = 'a9700000-0000-4000-8000-000000000008';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports), 0::bigint, 'mismatched quote text hides report');
+reset role;
+update public.evidence_quotes set text = 'ordered soup'
+where id = 'a9700000-0000-4000-8000-000000000008';
+update internal.gate1_redaction_policies set revoked_at = now() where policy_digest = repeat('a', 64);
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint, 'revoked qualification hides report');
+reset role;
+update internal.gate1_redaction_policies set revoked_at = null where policy_digest = repeat('a', 64);
+
+update public.transcripts set redacted_text = 'A 😀 ordered rice.'
+where id = 'a9700000-0000-4000-8000-000000000005';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports), 0::bigint, 'source revision immediately hides report');
+reset role;
+
+update public.transcripts set redacted_text = 'A 😀 ordered soup.'
+where id = 'a9700000-0000-4000-8000-000000000005';
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint, 'restored text cannot replay an old source version');
+reset role;
+
+select * from finish();
+rollback;
