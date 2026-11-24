@@ -40,7 +40,8 @@ from (values
     ('public.pricing_configs'), ('public.push_subscriptions'), ('public.quality_scores'),
     ('public.removals'), ('public.gate2_payment_events'), ('public.gate2_payout_events'),
     ('public.gate2_screening_rules'), ('public.gate2_screening_events'),
-    ('pii.gate2_screener_answers')
+    ('pii.gate2_screener_answers'), ('pii.gate3_evidence_proposals'),
+    ('pii.gate3_evidence_decisions')
 ) as service_only(relation);
 grant select on access_matrix to authenticated, anon;
 
