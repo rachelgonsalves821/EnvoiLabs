@@ -7,6 +7,7 @@ const self = fileURLToPath(import.meta.url);
 export function localRpcUrl(base) {
   const url = new URL(base);
   if (url.protocol !== "http:" || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
+      url.username || url.password || url.search || url.hash ||
       (url.pathname !== "/" && url.pathname !== "")) {
     throw new Error("Gate 4 RPC harness requires a local disposable Supabase API origin.");
   }
@@ -14,10 +15,10 @@ export function localRpcUrl(base) {
   return url.toString();
 }
 
-function positiveInteger(value, name) {
+function positiveInteger(value, name, maximum = 1000) {
   const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 1000) {
-    throw new Error(`${name} must be a positive integer no greater than 1000.`);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) {
+    throw new Error(`${name} must be a positive integer no greater than ${maximum}.`);
   }
   return parsed;
 }
@@ -33,10 +34,10 @@ export function rulesForRun({ surface, identity, source, secret, windowSeconds, 
   return [
     { surface, key_kind: identityKind, key_digest: digest(secret, identityKind, identity),
       max_attempts: positiveInteger(identityMax, "identityMax"),
-      window_seconds: positiveInteger(windowSeconds, "windowSeconds") },
+      window_seconds: positiveInteger(windowSeconds, "windowSeconds", 86_400) },
     { surface, key_kind: "source", key_digest: digest(secret, `${surface}:source`, source),
       max_attempts: positiveInteger(sourceMax, "sourceMax"),
-      window_seconds: positiveInteger(windowSeconds, "windowSeconds") },
+      window_seconds: positiveInteger(windowSeconds, "windowSeconds", 86_400) },
   ];
 }
 

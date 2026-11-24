@@ -14,7 +14,8 @@ test("local-only guard rejects a remote or HTTPS endpoint", () => {
   assert.equal(localRpcUrl("http://127.0.0.1:54321"),
     "http://127.0.0.1:54321/rest/v1/rpc/consume_gate4_rate_limit");
   for (const value of ["https://127.0.0.1:54321", "http://example.test:54321",
-    "http://127.0.0.1:54321/custom", "http://192.168.1.1:54321"]) {
+    "http://127.0.0.1:54321/custom", "http://192.168.1.1:54321",
+    "http://user@127.0.0.1:54321", "http://127.0.0.1:54321/?unused=1"]) {
     assert.throws(() => localRpcUrl(value), /local disposable/);
   }
 });
