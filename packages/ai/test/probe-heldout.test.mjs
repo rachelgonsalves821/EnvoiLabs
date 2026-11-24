@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { scoreProbeHeldout, syntheticProbeHeldout } from "../evals/probe-heldout.mjs";
 
 it("scores all 60 fictional cases without echoing answer text into the report", () => {
@@ -12,8 +13,8 @@ it("scores all 60 fictional cases without echoing answer text into the report", 
 
 it("labels the CLI fixture replay without a pilot rubric pass", () => {
   const run = spawnSync(process.execPath,
-    ["packages/ai/evals/run-probe-heldout.mjs", "--synthetic"],
-    { cwd: process.cwd(), encoding: "utf8" });
+    [fileURLToPath(new URL("../evals/run-probe-heldout.mjs", import.meta.url)), "--synthetic"],
+    { encoding: "utf8" });
   expect(run.status).toBe(0);
   const output = JSON.parse(run.stdout);
   expect(output).toMatchObject({ evidence: "synthetic-pipeline-smoke-only",
