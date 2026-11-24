@@ -9,6 +9,7 @@ export type ProbeDecision =
 export interface CommittedProbe {
   readonly sessionId: string; readonly questionId: string; readonly answerId: string;
   readonly turnId: string; readonly transcriptRevision: string;
+  readonly sourceVersion: string;
   readonly decision: ProbeDecision; readonly probeId: string | null;
 }
 
@@ -17,6 +18,7 @@ export interface ReadyProbeTurn {
     readonly answerId: string; readonly turnId: string; readonly probesUsed: number;
     readonly maxProbes: number; readonly decisionDeadlineAtMs: number };
   readonly transcriptRevision: string;
+  readonly sourceVersion: string;
   readonly serverUploadConfirmedAtMs: number;
   readonly browserUploadConfirmedAtMs: number;
   readonly transcriptReadyAtMs: number;
@@ -37,6 +39,9 @@ function record(value: unknown): Record<string, unknown> | null {
 function string(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
+function uuid(value: unknown): value is string {
+  return string(value) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -54,13 +59,14 @@ function committed(value: unknown): CommittedProbe | null {
   const item = record(value);
   if (!item || !string(item.sessionId) || !string(item.questionId)
     || !string(item.answerId) || !string(item.turnId)
-    || !string(item.transcriptRevision)) return null;
+    || !string(item.transcriptRevision) || !uuid(item.sourceVersion)) return null;
   const saved = decision(item.decision);
   if (!saved || saved.turnId !== item.turnId
     || (saved.action === "probe" ? !string(item.probeId) : item.probeId !== null)) return null;
   return { sessionId: item.sessionId, questionId: item.questionId,
     answerId: item.answerId, turnId: item.turnId,
-    transcriptRevision: item.transcriptRevision, decision: saved,
+    transcriptRevision: item.transcriptRevision, sourceVersion: item.sourceVersion,
+    decision: saved,
     probeId: item.probeId as string | null };
 }
 
@@ -85,7 +91,8 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
       const item = record(data);
       if (!item || item.sessionId !== sessionId || item.turnId !== turnId
         || !string(item.questionId) || !string(item.answerId)
-        || !string(item.transcriptRevision) || !string(item.sourceText)
+        || !string(item.transcriptRevision) || !uuid(item.sourceVersion)
+        || !string(item.sourceText)
         || !string(item.questionText) || !finite(item.probesUsed)
         || !finite(item.maxProbes) || !finite(item.decisionDeadlineAtMs)
         || !finite(item.serverUploadConfirmedAtMs)
@@ -95,6 +102,7 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
         answerId: item.answerId, turnId, probesUsed: item.probesUsed,
         maxProbes: item.maxProbes, decisionDeadlineAtMs: item.decisionDeadlineAtMs },
         transcriptRevision: item.transcriptRevision,
+        sourceVersion: item.sourceVersion,
         serverUploadConfirmedAtMs: item.serverUploadConfirmedAtMs,
         browserUploadConfirmedAtMs: item.browserUploadConfirmedAtMs,
         transcriptReadyAtMs: item.transcriptReadyAtMs,
@@ -102,13 +110,15 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
     },
     async commitDecision(input: { readonly sessionId: string; readonly questionId: string;
       readonly answerId: string; readonly turnId: string;
-      readonly transcriptRevision: string; readonly decision: ProbeDecision }): Promise<
+      readonly transcriptRevision: string; readonly sourceVersion: string;
+      readonly decision: ProbeDecision }): Promise<
       { status: "committed"; value: CommittedProbe } |
       { status: "stale" | "unavailable" }> {
       const { data, error } = await call("commit_gate3_probe_decision", {
         supplied_session_id: input.sessionId, supplied_question_id: input.questionId,
         supplied_answer_id: input.answerId, supplied_turn_id: input.turnId,
         supplied_auth_user_id: authUserId,
+        supplied_source_version: input.sourceVersion,
         supplied_transcript_revision: input.transcriptRevision,
         supplied_decision: input.decision });
       if (error) return { status: "unavailable" };
@@ -119,6 +129,7 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
         && saved.sessionId === input.sessionId && saved.questionId === input.questionId
         && saved.answerId === input.answerId && saved.turnId === input.turnId
         && saved.transcriptRevision === input.transcriptRevision
+        && saved.sourceVersion === input.sourceVersion
         ? { status: "committed", value: saved } : { status: "unavailable" };
     },
     async markShown(input: { readonly sessionId: string; readonly turnId: string;

@@ -3,6 +3,11 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
+-- The qualified-source PR supplies this column in the integration stack.
+-- This fixture adds it only when the probe draft is tested in isolation.
+alter table public.transcripts add column if not exists redacted_source_version
+    uuid not null default gen_random_uuid();
+
 update public.studies set state = 'fielding'
 where id = '90600000-0000-4000-8000-000000000001';
 insert into public.guide_questions (id, study_id, position, text, max_probes)
@@ -44,7 +49,7 @@ from unnest(array['retention', 'researcher_access']) as consent(purpose);
 select ok(not has_function_privilege('authenticated',
     'public.read_gate3_ready_probe_turn(uuid,uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('authenticated',
-    'public.commit_gate3_probe_decision(uuid,uuid,uuid,uuid,uuid,text,jsonb)', 'EXECUTE')
+    'public.commit_gate3_probe_decision(uuid,uuid,uuid,uuid,uuid,uuid,text,jsonb)', 'EXECUTE')
     and not has_table_privilege('service_role', 'internal.gate3_probe_turns', 'SELECT'),
     'private ledger and source read are restricted to service RPCs');
 set local role service_role;
@@ -81,6 +86,17 @@ select is((select public.read_gate3_committed_probe(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     '90300000-0000-4000-8000-000000000001') from probe_ids), null::jsonb,
     'no decision before commit');
+select is((select public.commit_gate3_probe_decision(
+    'a9700000-0000-4000-8000-000000000003',
+    'a9700000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000004', turn_id,
+    '90300000-0000-4000-8000-000000000001', gen_random_uuid(),
+    public.read_gate3_ready_probe_turn(
+        'a9700000-0000-4000-8000-000000000003', turn_id,
+        '90300000-0000-4000-8000-000000000001') ->> 'transcriptRevision',
+    jsonb_build_object('action', 'next', 'turnId', turn_id,
+        'outcome', 'no_probe')) ->> 'status' from probe_ids), 'stale',
+    'a different source-version UUID cannot commit the same turn');
 create temporary table probe_actions (result jsonb not null);
 grant select, insert on probe_actions to service_role;
 insert into probe_actions
@@ -89,6 +105,9 @@ select public.commit_gate3_probe_decision(
     'a9700000-0000-4000-8000-000000000001',
     'a9700000-0000-4000-8000-000000000004', turn_id,
     '90300000-0000-4000-8000-000000000001',
+    (public.read_gate3_ready_probe_turn(
+        'a9700000-0000-4000-8000-000000000003', turn_id,
+        '90300000-0000-4000-8000-000000000001') ->> 'sourceVersion')::uuid,
     public.read_gate3_ready_probe_turn(
         'a9700000-0000-4000-8000-000000000003', turn_id,
         '90300000-0000-4000-8000-000000000001') ->> 'transcriptRevision',
@@ -104,6 +123,7 @@ select is((select public.commit_gate3_probe_decision(
     'a9700000-0000-4000-8000-000000000001',
     'a9700000-0000-4000-8000-000000000004', turn_id,
     '90300000-0000-4000-8000-000000000001',
+    (select (result -> 'value' ->> 'sourceVersion')::uuid from probe_actions),
     (select result -> 'value' ->> 'transcriptRevision' from probe_actions),
     jsonb_build_object('action', 'next', 'turnId', turn_id,
         'outcome', 'no_probe')) -> 'value' -> 'decision' ->> 'text'
@@ -155,6 +175,16 @@ reset role;
 select ok((select shown_at is not null and browser_rendered_ms = 1200
     from internal.gate3_probe_turns where id = (select turn_id from probe_ids)),
     'server shown timestamp and browser monotonic metric stay separate');
+savepoint same_text_source_rotation;
+update public.transcripts set redacted_source_version = gen_random_uuid()
+where answer_id = 'a9700000-0000-4000-8000-000000000004';
+set local role service_role;
+select is((select public.read_gate3_committed_probe(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    '90300000-0000-4000-8000-000000000001') from probe_ids), null::jsonb,
+    'same text under a new source UUID invalidates the committed turn');
+reset role;
+rollback to savepoint same_text_source_rotation;
 update public.transcripts set redacted_text = 'The short route saved time.'
 where answer_id = 'a9700000-0000-4000-8000-000000000006';
 update internal.gate1_answer_jobs set source_hash = decode(repeat('e', 64), 'hex'),
@@ -179,6 +209,9 @@ select is((select public.commit_gate3_probe_decision(
     'a9700000-0000-4000-8000-000000000001',
     'a9700000-0000-4000-8000-000000000006', turn_id,
     '90300000-0000-4000-8000-000000000001',
+    (public.read_gate3_ready_probe_turn(
+        'a9700000-0000-4000-8000-000000000003', turn_id,
+        '90300000-0000-4000-8000-000000000001') ->> 'sourceVersion')::uuid,
     public.read_gate3_ready_probe_turn(
         'a9700000-0000-4000-8000-000000000003', turn_id,
         '90300000-0000-4000-8000-000000000001') ->> 'transcriptRevision',

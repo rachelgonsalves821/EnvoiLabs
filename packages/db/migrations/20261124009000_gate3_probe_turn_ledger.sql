@@ -12,6 +12,7 @@ create table internal.gate3_probe_turns (
     session_id uuid not null,
     guide_question_id uuid not null,
     transcript_id uuid not null references public.transcripts (id) on delete cascade,
+    source_version uuid not null,
     transcript_revision text not null check (transcript_revision ~ '^[0-9a-f]{64}$'),
     server_upload_confirmed_at timestamptz not null,
     transcript_ready_at timestamptz not null,
@@ -36,11 +37,11 @@ create function internal.gate3_keep_probe_turn_identity()
 returns trigger language plpgsql set search_path = '' as $$
 begin
     if (new.id, new.answer_id, new.session_id, new.guide_question_id,
-        new.transcript_id, new.transcript_revision, new.server_upload_confirmed_at,
+        new.transcript_id, new.source_version, new.transcript_revision, new.server_upload_confirmed_at,
         new.transcript_ready_at, new.decision_deadline_at,
         new.browser_upload_confirmed_ms) is distinct from
        (old.id, old.answer_id, old.session_id, old.guide_question_id,
-        old.transcript_id, old.transcript_revision, old.server_upload_confirmed_at,
+        old.transcript_id, old.source_version, old.transcript_revision, old.server_upload_confirmed_at,
         old.transcript_ready_at, old.decision_deadline_at,
         old.browser_upload_confirmed_ms)
         or (old.decision_json is not null and (new.decision_json, new.probe_id,
@@ -63,7 +64,9 @@ create function internal.gate3_probe_revision(supplied_answer_id uuid)
 returns text language sql stable security definer set search_path = '' as $$
     select encode(sha256(convert_to(jsonb_build_array(
         answer.id, answer.updated_at, transcript.id, transcript.updated_at,
-        transcript.redacted_text, encode(job.source_hash, 'hex'),
+        transcript.redacted_text,
+        to_jsonb(transcript) ->> 'redacted_source_version',
+        encode(job.source_hash, 'hex'),
         job.completed_at, job.publication_policy_digest,
         job.publication_qualification_digest,
         coalesce((select jsonb_agg(jsonb_build_array(consent.purpose,
@@ -85,6 +88,7 @@ returns text language sql stable security definer set search_path = '' as $$
         and policy.qualification_digest = job.publication_qualification_digest
     where answer.id = supplied_answer_id and job.result_status = 'published'
         and job.completed_at is not null and policy.revoked_at is null
+        and (to_jsonb(transcript) ->> 'redacted_source_version') is not null
         and nullif(btrim(transcript.redacted_text), '') is not null;
 $$;
 revoke all on function internal.gate3_probe_revision(uuid)
@@ -161,6 +165,7 @@ create function internal.gate3_probe_current(
 ) returns boolean language sql volatile security definer set search_path = '' as $$
     select exists (select 1 from internal.gate3_probe_turns as turn
         join public.answers as answer on answer.id = turn.answer_id
+        join public.transcripts as source on source.id = turn.transcript_id
         join public.sessions as interview on interview.id = turn.session_id
         join public.invites as offer on offer.id = interview.invite_id
         join public.respondents as respondent on respondent.id = offer.respondent_id
@@ -176,6 +181,7 @@ create function internal.gate3_probe_current(
             and answer.session_id = interview.id and answer.guide_question_id = question.id
             and question.study_id = interview.study_id and question.position > 0
             and turn.transcript_revision = internal.gate3_probe_revision(answer.id)
+            and turn.source_version::text = (to_jsonb(source) ->> 'redacted_source_version')
             and internal.gate1_consent(respondent.id, interview.study_id, 'retention')
             and internal.gate1_consent(respondent.id, interview.study_id, 'researcher_access')
             and internal.gate1_consent(respondent.id, interview.study_id, 'ai_followup')
@@ -201,6 +207,7 @@ declare
     job internal.gate1_answer_jobs%rowtype;
     prior internal.gate3_probe_turns%rowtype;
     revision text;
+    version_id uuid;
     created_id uuid;
 begin
     if supplied_browser_upload_ms is null or supplied_browser_upload_ms < 0
@@ -216,21 +223,23 @@ begin
     select * into source from public.transcripts where answer_id = answer.id;
     select * into job from internal.gate1_answer_jobs where answer_id = answer.id;
     revision := internal.gate3_probe_revision(answer.id);
+    version_id := (to_jsonb(source) ->> 'redacted_source_version')::uuid;
     if interview.id is null or source.id is null or job.completed_at is null
-        or revision is null or question.max_probes = 0
+        or revision is null or version_id is null or question.max_probes = 0
         or job.completed_at >= answer.created_at + interval '6 seconds'
         or not internal.gate3_probe_current_for_answer(
             answer.id, supplied_auth_user_id)
     then return null; end if;
     select * into prior from internal.gate3_probe_turns where answer_id = answer.id;
     if found then return case when prior.transcript_revision = revision
+        and prior.source_version = version_id
         and prior.browser_upload_confirmed_ms = supplied_browser_upload_ms
         then prior.id else null end; end if;
     insert into internal.gate3_probe_turns
-        (answer_id, session_id, guide_question_id, transcript_id,
+        (answer_id, session_id, guide_question_id, transcript_id, source_version,
             transcript_revision, server_upload_confirmed_at, transcript_ready_at,
             decision_deadline_at, browser_upload_confirmed_ms)
-    values (answer.id, answer.session_id, answer.guide_question_id, source.id,
+    values (answer.id, answer.session_id, answer.guide_question_id, source.id, version_id,
         revision, answer.created_at, job.completed_at,
         answer.created_at + interval '6 seconds', supplied_browser_upload_ms)
     returning id into created_id;
@@ -248,6 +257,7 @@ create function public.read_gate3_ready_probe_turn(
     select jsonb_build_object(
         'sessionId', turn.session_id, 'questionId', turn.guide_question_id,
         'answerId', turn.answer_id, 'turnId', turn.id,
+        'sourceVersion', turn.source_version,
         'transcriptRevision', turn.transcript_revision,
         'probesUsed', internal.gate3_probe_chain_count(turn.answer_id),
         'maxProbes', question.max_probes,
@@ -275,6 +285,7 @@ create function public.read_gate3_committed_probe(
     select jsonb_build_object('sessionId', turn.session_id,
         'questionId', turn.guide_question_id, 'answerId', turn.answer_id,
         'turnId', turn.id, 'transcriptRevision', turn.transcript_revision,
+        'sourceVersion', turn.source_version,
         'decision', turn.decision_json, 'probeId', turn.probe_id)
     from internal.gate3_probe_turns as turn
     where turn.id = supplied_turn_id and turn.session_id = supplied_session_id
@@ -289,7 +300,8 @@ grant execute on function public.read_gate3_committed_probe(uuid, uuid, uuid)
 create function public.commit_gate3_probe_decision(
     supplied_session_id uuid, supplied_question_id uuid, supplied_answer_id uuid,
     supplied_turn_id uuid, supplied_auth_user_id uuid,
-    supplied_transcript_revision text, supplied_decision jsonb
+    supplied_source_version uuid, supplied_transcript_revision text,
+    supplied_decision jsonb
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
     turn internal.gate3_probe_turns%rowtype;
@@ -303,6 +315,7 @@ begin
     where id = supplied_turn_id and session_id = supplied_session_id for update;
     if not found or turn.answer_id is distinct from supplied_answer_id
         or turn.guide_question_id is distinct from supplied_question_id
+        or turn.source_version is distinct from supplied_source_version
         or turn.transcript_revision is distinct from supplied_transcript_revision
         or not internal.gate3_probe_current(turn.id, supplied_auth_user_id)
     then return jsonb_build_object('status', 'stale'); end if;
@@ -311,6 +324,7 @@ begin
             jsonb_build_object('sessionId', turn.session_id,
                 'questionId', turn.guide_question_id, 'answerId', turn.answer_id,
                 'turnId', turn.id, 'transcriptRevision', turn.transcript_revision,
+                'sourceVersion', turn.source_version,
                 'decision', turn.decision_json, 'probeId', turn.probe_id));
     end if;
     if turn.decision_deadline_at <= clock_timestamp()
@@ -346,15 +360,16 @@ begin
     result_json := jsonb_build_object('sessionId', turn.session_id,
         'questionId', turn.guide_question_id, 'answerId', turn.answer_id,
         'turnId', turn.id, 'transcriptRevision', turn.transcript_revision,
+        'sourceVersion', turn.source_version,
         'decision', supplied_decision, 'probeId', probe_uuid);
     return jsonb_build_object('status', 'committed', 'value', result_json);
 end;
 $$;
 revoke all on function public.commit_gate3_probe_decision(
-    uuid, uuid, uuid, uuid, uuid, text, jsonb)
+    uuid, uuid, uuid, uuid, uuid, uuid, text, jsonb)
     from public, anon, authenticated, service_role;
 grant execute on function public.commit_gate3_probe_decision(
-    uuid, uuid, uuid, uuid, uuid, text, jsonb) to service_role;
+    uuid, uuid, uuid, uuid, uuid, uuid, text, jsonb) to service_role;
 
 create function public.mark_gate3_probe_shown(
     supplied_session_id uuid, supplied_turn_id uuid, supplied_probe_id uuid,

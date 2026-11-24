@@ -1799,6 +1799,7 @@ export type Database = {
           supplied_decision: Json
           supplied_question_id: string
           supplied_session_id: string
+          supplied_source_version: string
           supplied_transcript_revision: string
           supplied_turn_id: string
         }
