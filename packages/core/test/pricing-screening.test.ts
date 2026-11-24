@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideScreening, priceStudy } from "../src/index.js";
+import { decideScreening, priceStudy, transitionScreenedInvite } from "../src/index.js";
 
 const config = { version: 7, params: { unitPriceCents: 100, incentivePerQuestionCents: 40 } };
 const coreQuestions = ["One?", "Two?", "Three?", "Four?", "Five?"];
@@ -58,5 +58,18 @@ describe("screening rule", () => {
   it("keeps participation caps authoritative", () => {
     expect(decideScreening({ ...base, hasParticipationCapacity: false }).action).toBe("review");
     expect(decideScreening({ ...base, criterionKind: "unknown" as "must" }).action).toBe("review");
+  });
+
+  it("sends only qualified invites and leaves uncertain or capped invites in screening", () => {
+    const context = { entityId: "invite-1", actor: "platform", now: new Date("2026-11-23T12:00:00Z"),
+      expiresAt: new Date("2026-11-24T12:00:00Z") };
+    const qualified = decideScreening(base);
+    expect(transitionScreenedInvite("screening", qualified, true, context)?.state).toBe("invited");
+    expect(transitionScreenedInvite("screening", qualified, false, context)).toBeNull();
+    expect(transitionScreenedInvite("screening", { action: "clarify", ruleVersion: 3, confirmedFact: null }, true, context)).toBeNull();
+    expect(transitionScreenedInvite("screening", { action: "review", ruleVersion: 3, confirmedFact: null }, true, context)).toBeNull();
+    const excluded = decideScreening({ ...base, interpretation: { ...evidence, result: "contradicted" } });
+    expect(transitionScreenedInvite("screening", excluded, true, context)?.state).toBe("screened_out");
+    expect(() => transitionScreenedInvite("invited", qualified, true, context)).toThrow(/screening invite/);
   });
 });

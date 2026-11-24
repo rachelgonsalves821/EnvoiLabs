@@ -1,3 +1,7 @@
+import type { InviteState } from "@envoi-labs/contracts";
+import { transitionInvite } from "./state/invite.js";
+import type { TransitionContext } from "./state/transition.js";
+
 export type ScreeningEvidence = "supported" | "contradicted" | "unclear";
 export type ScreeningCriterionKind = "must" | "nice" | "exclude";
 
@@ -46,4 +50,15 @@ export function decideScreening(input: ScreeningInput): ScreeningDecision {
   const excluded = input.criterionKind === "must" ? !confirmedFact :
     input.criterionKind === "exclude" && confirmedFact;
   return { action: excluded ? "screen_out" : "qualify", ruleVersion: input.ruleVersion, confirmedFact };
+}
+/** Does not change an invite for clarification or review. Recheck caps at delivery. */
+export function transitionScreenedInvite(
+  state: InviteState,
+  decision: ScreeningDecision,
+  hasParticipationCapacity: boolean,
+  context: TransitionContext & { expiresAt: Date },
+) {
+  if (state !== "screening") throw new Error("A screening decision requires a screening invite.");
+  if (!hasParticipationCapacity || decision.action === "clarify" || decision.action === "review") return null;
+  return transitionInvite(state, decision.action === "qualify" ? "send" : "screen_out", context);
 }
