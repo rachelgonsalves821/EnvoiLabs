@@ -4,7 +4,7 @@ import {
   StudyTrackingRequestSchema,
   type CreateGate1StudyRequest,
 } from "@envoi-labs/contracts";
-import { gate1CriterionChoices } from "./study-draft-criteria.js";
+import { gate1CriterionChoices } from "./study-draft-criteria";
 
 type ResearcherScope = { id: string; organizationId: string };
 type Predicate = (typeof gate1CriterionChoices)[number] & {

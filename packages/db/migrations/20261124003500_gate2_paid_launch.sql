@@ -1,5 +1,35 @@
 -- The provider observation is recorded by the trusted reconciliation service.
 -- The transition itself rechecks the immutable quote and ledger under a study lock.
+create function public.gate2_guide_digest(supplied_study_id uuid)
+returns text language sql stable security definer set search_path = pg_catalog as $$
+    select encode(sha256(convert_to(string_agg(
+        question.position::text || ':' || char_length(question.text)::text || ':' ||
+            question.text || ':' || question.max_probes::text,
+        E'\n' order by question.position), 'UTF8')), 'hex')
+    from public.guide_questions as question where question.study_id = supplied_study_id;
+$$;
+revoke all on function public.gate2_guide_digest(uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function public.gate2_guide_digest(uuid) to service_role;
+
+-- Guide edits serialize with the paid transition on the same study row.
+create function internal.lock_gate2_guide_study() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare target_id uuid;
+begin
+    if tg_op = 'UPDATE' and new.study_id is distinct from old.study_id then
+        raise check_violation;
+    end if;
+    target_id := case when tg_op = 'DELETE' then old.study_id else new.study_id end;
+    perform 1 from public.studies where id = target_id for update;
+    return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+revoke all on function internal.lock_gate2_guide_study()
+    from public, anon, authenticated, service_role;
+create trigger lock_gate2_guide_study before insert or update or delete on public.guide_questions
+    for each row execute function internal.lock_gate2_guide_study();
+
 create function public.launch_gate2_paid_study(
     supplied_study_id uuid, supplied_quote_id uuid, supplied_provider_event_id text
 ) returns boolean language plpgsql security definer set search_path = '' as $$
@@ -20,7 +50,8 @@ begin
     if target.state <> 'awaiting_payment' then return false; end if;
     select * into frozen from public.gate2_quote_snapshots
     where id = supplied_quote_id and study_id = target.id;
-    if not found or frozen.brief_version is distinct from (
+    if not found or frozen.guide_digest is distinct from public.gate2_guide_digest(target.id)
+        or frozen.brief_version is distinct from (
         select max(version) from public.brief_versions where study_id = target.id
     ) then return false; end if;
     select * into paid from public.gate2_payment_events
