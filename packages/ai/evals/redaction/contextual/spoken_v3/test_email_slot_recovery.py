@@ -68,3 +68,54 @@ class CorroboratedMailboxTests(unittest.TestCase):
         self.assertEqual(self.recovered("my inbox is open and i used the public site at market dot com"), set())
         text = "call one six zero four five five five zero one zero zero try our product label at market dot com"
         self.assertEqual(self.recovered(text), set())
+
+
+class LabeledSpellingTests(unittest.TestCase):
+    def recovered(self, text):
+        return {text[hit.start:hit.end] for detector in (recover_email_slots, recover_corroborated_mailboxes)
+                for hit in detector(text)}
+
+    def test_private_address_spelling_keeps_the_complete_source_span(self):
+        addresses = (
+            "maple dot folio at relay dot example",
+            "maple.folio at relay.example",
+            "maple.folioatrelay.example",
+            "maple dot folioatrelay dot example",
+            "maple folio at relay dot example",
+            "maple underscore folio at relay dot example",
+            "maple dot folio plus check at relay dot example",
+            "maple dot folio relay dot example",
+            "maple folio relay dot example",
+            "maple folio at sign mail dot relay dot example",
+        )
+        for address in addresses:
+            with self.subTest(address=address):
+                text = f"Earlier I compared prices. My private email address is {address} the cart estimate was forty minutes"
+                self.assertEqual(self.recovered(text), {address})
+
+    def test_spelled_address_preserves_case_and_unicode_character_offsets(self):
+        address = "Érable.FolioatRelay.example"
+        text = f"😊 Straßen are narrow. My email: {address}, then I kept the order open."
+        self.assertEqual(self.recovered(text), {address})
+
+    def test_spoken_tld_can_complete_a_valid_shorter_suffix(self):
+        address = "cedar folio at relay dot co m"
+        text = f"For email use {address} then check the product label."
+        self.assertIn(address, self.recovered(text))
+
+    def test_public_website_and_feedback_stay_untouched(self):
+        texts = (
+            "my email is about the catalog at relay dot com",
+            "my inbox is open and i used the public site at market dot com",
+            "my inbox is open and i used the public site at marketcom",
+            "my email is open while i browse maple.folioatrelay.example",
+            "the public website uses maple dot folio at relay dot example",
+            "i used maple folio at relay dot example as the public website",
+            "my email address is the public page maple.folioatrelay.example",
+            "my email: relay dot example",
+            "my email: maple.folio.relay.example",
+            "my email address is undecided but we used maple dot folio at relay dot example",
+        )
+        for text in texts:
+            with self.subTest(text=text):
+                self.assertEqual(self.recovered(text), set())
