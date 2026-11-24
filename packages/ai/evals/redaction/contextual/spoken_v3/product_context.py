@@ -63,8 +63,9 @@ _SELLER_COMPANY = re.compile(
     re.I,
 )
 _RECEIPT_PRIVATE_RELATION = re.compile(
-    r"\b(?:(?:i|we) (?:work(?:ed)? (?:here|there|for them)|"
-    r"(?:am|are|was|were) (?:paid by|employed (?:by|here|there)))|"
+    r"\b(?:(?:i|we)(?:[ \t]+[\w'-]+){0,3}[ \t]+work(?:ed|ing)? "
+    r"(?:here|there|for (?:them|that (?:company|business|vendor|seller)))|"
+    r"(?:i (?:am|was)|we (?:are|were)|i[’']m|we[’']re) (?:paid by|employed (?:by|here|there))|"
     r"where (?:i|we) work|(?:on (?:their|the) payroll)|"
     r"(?:my|our) (?:employer|workplace|payroll|paycheck|paycheque|payslip|(?:own )?(?:company|business)))\b",
     re.I,
@@ -137,12 +138,14 @@ def public_organization_ranges(text):
         seller = match["seller"]
         if not _SELLER_COMPANY.fullmatch(seller):
             continue
-        before = _CLAUSE_BOUNDARY.split(text[max(0, match.start() - 90):match.start()])[-1]
-        continuation = text[match.end():match.end() + 90].lstrip(" \t.!?")
-        after = _CLAUSE_BOUNDARY.split(continuation)[0]
-        if not _RECEIPT_PRIVATE_RELATION.search(after) and not any(
+        prefix = text[max(0, match.start() - 90):match.start()]
+        before = _CLAUSE_BOUNDARY.split(prefix)[-1]
+        after = text[match.end():match.end() + 90]
+        if any(_RECEIPT_PRIVATE_RELATION.search(fragment) for fragment in (prefix, seller, after)):
+            continue
+        if not any(
             pattern.search(fragment)
-            for pattern in (_PRIVATE_ROLE, _PRIVATE_ASSERTION, _RECEIPT_PRIVATE_RELATION)
+            for pattern in (_PRIVATE_ROLE, _PRIVATE_ASSERTION)
             for fragment in (before, seller)
         ):
             yield match.span("seller")
