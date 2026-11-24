@@ -19,7 +19,7 @@ The [Gate 2/3 draft-interface review and chaos fixture handoff](integration-chao
 
 ## Rate-limit path inventory and acceptance cases
 
-The route file is a thin handler; the service path named here is where a limit must run before the expensive or externally visible action. No application limiter was found in these paths on this revision. Supabase returning 429 is a secondary provider guard, not proof that the application controls request volume.
+The route file is a thin handler; the service path named here calls the Gate 4 decision before the expensive or externally visible action as of draft PR #113 head `7ac8cf5`. The opt-in is preview-only and no database store is connected, so no current deployment has proven application-level distributed protection. Supabase returning 429 is a secondary provider guard.
 
 | Surface | Route → current service/action | Required local acceptance cases after Gate 1 handoff |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ Also inspect `POST /api/respondent/answers/record` for typed-answer abuse and co
 
 ### Distributed-limit test handoff
 
-Gate 1 owns these exact files until its path-level release: `apps/web/app/api/respondent/auth/start/route.ts`, `apps/web/server/auth/respondent.ts`, `apps/web/app/api/researcher/auth/start/route.ts`, `apps/web/server/auth/researcher.ts`, `apps/web/app/api/respondent/answers/upload/route.ts`, and `apps/web/server/respondent/private-audio.ts`. Gate 4 requests ownership of only the rate-limit insertion and its adjacent tests after that release. The limiter's shared atomic store, key policy, threshold, and window need coordinator approval before implementation; in-memory per-instance counts cannot establish a distributed limit.
+Gate 1 released the six named auth/upload files for this rate-limit insertion on November 24, recorded in the shared `gate-1.md` handoff. Gate 4 changed only those start/upload paths and adjacent tests. The limiter's shared atomic store remains Gate 2's migration responsibility; in-memory per-instance counts cannot establish a distributed limit.
 
 Prepare a disposable integration fixture with two independent app processes pointing to one limiter store and one local Auth/storage stack. Freeze or advance the clock at the limiter boundary, and instrument OTP dispatch, `reserve_gate1_audio`, and signed URL creation. Assertions to add alongside the eventual implementation:
 
@@ -44,13 +44,21 @@ Prepare a disposable integration fixture with two independent app processes poin
 
 Run these cases against the real distributed store in local integration and preview after Gate 1 handoff. The threshold symbol `N` avoids inventing a production policy in this preparatory review.
 
-The coordinator approved the [Postgres atomic store and HMAC direction](rate-limit-proposal.md) for synthetic preparation. The exact migration and candidate thresholds have not been approved or enabled.
+The coordinator approved the [Postgres atomic store and HMAC direction](rate-limit-proposal.md) for synthetic preparation. The exact migration and candidate thresholds have not been enabled.
 
 ### Isolated limiter security checkpoint
 
 The Gate 4-owned decision module rejects missing or malformed policy, a short HMAC secret, absent/untrimmed source, invalid identity, and store failure before returning `allow`. The synthetic RPC adapter sends only hashed keys and maps null/error/malformed replies to an unavailable result. The standalone response helper uses the existing private, no-store and no-referrer headers with generic 400/429/503 bodies and a bounded `Retry-After`. Focused tests exercise these behaviors and two limiter instances sharing one atomic fixture. This is a code-path review, not proof that a real route is limited.
 
-The [exact migration and route handoff](rate-limit-integration.md) remains a security dependency. Gate 2 must demonstrate all-or-none Postgres increments, disabled-by-default policy, service-only function execution, denied direct table access, cleanup, and generated types. Gate 1/coordinator must identify a verified ingress source and dedicated secret owner. After the exact handler release, integration tests must prove no OTP, reservation, signed URL, or information leak on 429/503, plus recovery across two web processes. Direct signed-object transfer requires separate storage controls. No production limiter is enabled by this checkpoint.
+The [exact migration and route handoff](rate-limit-integration.md) remains a security dependency. Gate 2 must demonstrate all-or-none Postgres increments, disabled-by-default policy, service-only function execution, denied direct table access, cleanup, and generated types. Gate 4 owns the dedicated HMAC key interface and preview source parser; actual Vercel header ownership still needs a spoofed-client preview check. Synthetic handler tests now prove no OTP, reservation or signed URL on 429/503. Two-process tests against the real store, recovery, and direct signed-object transfer controls remain open. No production limiter is enabled by this checkpoint.
+
+## November 24 dependency and RLS follow-up
+
+On exact draft head `7ac8cf5`, a fresh `pnpm audit --prod --json` found the same 325 production dependencies and two moderate transitive advisories, with zero high or critical. Both are on the Inngest telemetry → GCP metadata → pinned gaxios → rimraf path above. The upstream advisories describe availability risks from aborted glob traversal and expensive minimatch patterns; this checkout has no evidence that user-provided interview data reaches that dependency path. This is a bounded source assessment, not a claim that the vulnerabilities are fixed. The narrow gaxios update remains pending Gate 2/3 dependency settlement, followed by a fresh audit, scheduler check, full build and CI.
+
+The current all-table RLS matrix in `packages/db/tests/workspace_access.sql` enumerates `public` and `pii` base tables; it does not enumerate the proposed private `internal.gate4_rate_windows` table or function privileges. It also requires `service_role` SELECT on listed tables, whereas this limiter table must deny direct service-role reads. Gate 2's migration must add a separate explicit check for RLS and denied direct `anon`, `authenticated`, and `service_role` access on the internal table, plus service-only EXECUTE and fixed search path for the public RPC. The existing matrix should continue to cover all public/PII tables and be rerun on the integrated revision. A passing current matrix alone cannot certify the new limiter objects.
+
+The draft PR's Vercel status is ready and its preview URL is present in the PR comment, but there is no safe request-header observer in the released paths and the limiter is disabled. Platform header documentation is not a substitute for testing whether client-supplied `x-vercel-forwarded-for` is overwritten at this actual ingress. Coordinate a temporary preview-only diagnostic or equivalent deployment log probe before enabling the feature; do not log or return raw client IPs.
 
 ## Narrow dependency proposal
 
