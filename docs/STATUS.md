@@ -820,3 +820,15 @@ Needs from others. None for the current development checks.
 Contract or schema changes. None.
 
 Risks. The development scores fall below the PRD recall floors. Researcher transcript publication remains disabled.
+
+### 2026-11-23 — Gate 1 redaction development and qualification readiness
+
+Done. Receipt seller and full postal address handling passed 144 pinned tests and the required GitHub checks. The isolated database test port fix passed its database, CI and disposable sign-in checks. On the 242-recording development replay, full masks on authored denominators were 124/124 phones, 94/125 emails, 45/61 names, 42/58 employers and 43/58 addresses. The paired floors require 123, 124, 58, 56 and 58 full masks respectively. The recognized spans leave a margin of one visible miss for phone, email, person and employer, and require every visible address span. [Receipt and postal change](https://github.com/rachelgonsalves821/EnvoiLabs/pull/135) · [Database check isolation](https://github.com/rachelgonsalves821/EnvoiLabs/pull/136)
+
+Next. Improve masking on development cases, evaluate a frozen candidate against the sealed independent benchmark, then rehearse hosted researcher publication with the matching policy and qualification report. The alternate speech model added no offset-safe redactions on primary text. A role-specific detector improved address masking on one development set and masked additional protected evidence on a separate stress set. Both remain experimental. [Development evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7120271896)
+
+Needs from others. None for the current development checks.
+
+Contract or schema changes. None.
+
+Risks. The candidate still falls below the paired recall floors. Researcher transcript publication remains disabled.
