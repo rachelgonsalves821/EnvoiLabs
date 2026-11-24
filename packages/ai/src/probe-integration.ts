@@ -7,6 +7,7 @@ import type { ProbeOutcome } from "./probe-metrics.js";
 export interface ReadyProbeTurn {
   readonly turn: ProbeTurn;
   readonly transcriptRevision: string;
+  readonly sourceVersion: string;
   /** Same server clock as decisionDeadlineAtMs and transcriptReadyAtMs. */
   readonly serverUploadConfirmedAtMs: number;
   /** Opaque value from the browser's monotonic clock, echoed only for render timing. */
@@ -21,6 +22,7 @@ export interface CommittedProbe {
   readonly answerId: string;
   readonly turnId: string;
   readonly transcriptRevision: string;
+  readonly sourceVersion: string;
   readonly decision: ProbeDecision;
   readonly probeId: string | null;
 }
@@ -33,6 +35,7 @@ export interface ProbeDecisionPort {
   commitDecision(input: {
     readonly sessionId: string; readonly questionId: string; readonly answerId: string;
     readonly turnId: string; readonly transcriptRevision: string;
+    readonly sourceVersion: string;
     readonly decision: ProbeDecision;
   }): Promise<{ status: "committed"; value: CommittedProbe } |
     { status: "conflict" | "stale" | "unavailable" }>;
@@ -44,6 +47,8 @@ export interface ProbeDecisionPort {
 export type ProbeIntegrationResult = { readonly status: "committed"; readonly value: CommittedProbe } |
   { readonly status: "stale" | "unavailable" };
 
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function sameReady(left: ReadyProbeTurn, right: ReadyProbeTurn): boolean {
   return left.turn.sessionId === right.turn.sessionId
     && left.turn.questionId === right.turn.questionId
@@ -53,6 +58,7 @@ function sameReady(left: ReadyProbeTurn, right: ReadyProbeTurn): boolean {
     && left.turn.maxProbes === right.turn.maxProbes
     && left.turn.decisionDeadlineAtMs === right.turn.decisionDeadlineAtMs
     && left.transcriptRevision === right.transcriptRevision
+    && left.sourceVersion === right.sourceVersion
     && left.serverUploadConfirmedAtMs === right.serverUploadConfirmedAtMs
     && left.browserUploadConfirmedAtMs === right.browserUploadConfirmedAtMs
     && left.transcriptReadyAtMs === right.transcriptReadyAtMs
@@ -62,6 +68,7 @@ function sameReady(left: ReadyProbeTurn, right: ReadyProbeTurn): boolean {
 function validCommitted(value: CommittedProbe, sessionId: string, turnId: string): boolean {
   return value.sessionId === sessionId && value.turnId === turnId
     && !!value.questionId && !!value.answerId && !!value.transcriptRevision
+    && uuid.test(value.sourceVersion)
     && value.decision.turnId === turnId
     && (value.decision.action === "probe"
       ? !!value.probeId && typeof value.decision.text === "string"
@@ -77,7 +84,8 @@ function sameCommittedTurn(ready: ReadyProbeTurn, value: CommittedProbe): boolea
     && value.questionId === ready.turn.questionId
     && value.answerId === ready.turn.answerId
     && value.turnId === ready.turn.turnId
-    && value.transcriptRevision === ready.transcriptRevision;
+    && value.transcriptRevision === ready.transcriptRevision
+    && value.sourceVersion === ready.sourceVersion;
 }
 
 /** Runs one authorized, revision-bound decision; no generated text is shown before commit. */
@@ -89,7 +97,8 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
       ? { status: "committed", value: previous } : { status: "unavailable" };
     const ready = await port.readReadyTurn(sessionId, turnId);
     if (!ready || ready.turn.sessionId !== sessionId || ready.turn.turnId !== turnId
-      || !ready.transcriptRevision || !Number.isFinite(ready.serverUploadConfirmedAtMs)
+      || !ready.transcriptRevision || !uuid.test(ready.sourceVersion)
+      || !Number.isFinite(ready.serverUploadConfirmedAtMs)
       || !Number.isFinite(ready.browserUploadConfirmedAtMs)
       || !Number.isFinite(ready.transcriptReadyAtMs)
       || ready.transcriptReadyAtMs < ready.serverUploadConfirmedAtMs) return { status: "stale" };
@@ -130,7 +139,8 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
         ? { status: "committed", value: committed } : { status: "stale" };
     }
     const result = await port.commitDecision({ sessionId, questionId: ready.turn.questionId,
-      answerId: ready.turn.answerId, turnId, transcriptRevision: ready.transcriptRevision, decision });
+      answerId: ready.turn.answerId, turnId, transcriptRevision: ready.transcriptRevision,
+      sourceVersion: ready.sourceVersion, decision });
     if (result.status !== "committed") {
       if (result.status === "stale") return { status: "stale" };
       const winner = await port.readCommitted(sessionId, turnId);

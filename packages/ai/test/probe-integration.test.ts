@@ -6,10 +6,11 @@ import { presentCommittedProbe, runProbeDecision, type ProbeDecisionPort,
 const response = (output: unknown): LLMResponse => ({ output, model: "fictional",
   inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 });
 const provider = (generate: LLMProvider["generate"]): LLMProvider => ({ generate });
+const sourceVersion = "019ac928-4718-7b62-b72d-8c9fb79b337c";
 const ready: ReadyProbeTurn = {
   turn: { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
     turnId: "turn-1", probesUsed: 0, maxProbes: 2, decisionDeadlineAtMs: 1000 },
-  transcriptRevision: "source-1", serverUploadConfirmedAtMs: 100,
+  transcriptRevision: "source-1", sourceVersion, serverUploadConfirmedAtMs: 100,
   browserUploadConfirmedAtMs: 50, transcriptReadyAtMs: 200,
   request: { purpose: "ai_followup", promptVersion: "v1", system: "fictional",
     messages: [{ role: "user", content: "Fictional answer" }] },
@@ -53,6 +54,16 @@ describe("probe decision and render ports", () => {
     expect(port.commitDecision).not.toHaveBeenCalled();
   });
 
+  it("withholds a ready turn without an immutable source-version UUID", async () => {
+    const { port, setCurrent } = setup();
+    setCurrent({ ...ready, sourceVersion: "not-a-uuid" });
+    const generate = vi.fn(async () => response({ action: "probe", text: "What happened?" }));
+    expect(await runProbeDecision(port, provider(generate), "session-1", "turn-1", 500,
+      () => 300)).toEqual({ status: "stale" });
+    expect(generate).not.toHaveBeenCalled();
+    expect(port.commitDecision).not.toHaveBeenCalled();
+  });
+
   it("commits a revision-bound probe before mounting and records its browser paint", async () => {
     const { port } = setup();
     const chosen = await runProbeDecision(port, provider(async () => response({ action: "probe",
@@ -60,7 +71,7 @@ describe("probe decision and render ports", () => {
     expect(chosen.status).toBe("committed");
     if (chosen.status !== "committed") return;
     expect(port.commitDecision).toHaveBeenCalledWith(expect.objectContaining({
-      answerId: "answer-1", transcriptRevision: "source-1",
+      answerId: "answer-1", transcriptRevision: "source-1", sourceVersion,
       decision: expect.objectContaining({ action: "probe" }),
     }));
     const mounted: string[] = [];
@@ -100,6 +111,13 @@ describe("probe decision and render ports", () => {
       return response({ action: "probe", text: "Late?" });
     }), "session-1", "turn-1", 500, () => 300);
     expect(result).toEqual({ status: "stale" });
+    expect(port.commitDecision).not.toHaveBeenCalled();
+    setCurrent(ready);
+    expect(await runProbeDecision(port, provider(async () => {
+      setCurrent({ ...ready, sourceVersion: "019ac928-4718-7b62-b72d-8c9fb79b337d" });
+      return response({ action: "probe", text: "Same text, new source?" });
+    }), "session-1", "turn-1", 500,
+      () => 300)).toEqual({ status: "stale" });
     expect(port.commitDecision).not.toHaveBeenCalled();
     setCurrent(null);
     expect(await runProbeDecision(port, provider(async () => response({ action: "probe",
@@ -178,7 +196,7 @@ describe("probe decision and render ports", () => {
   it("returns the first writer's decision if another worker commits during the provider call", async () => {
     const { port, setCurrent, setCommitted } = setup();
     const prior = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
-      turnId: "turn-1", transcriptRevision: "source-1", probeId: null,
+      turnId: "turn-1", transcriptRevision: "source-1", sourceVersion, probeId: null,
       decision: { action: "next" as const, turnId: "turn-1", outcome: "no_probe" as const } };
     const result = await runProbeDecision(port, provider(async () => {
       setCurrent(null);
@@ -192,7 +210,7 @@ describe("probe decision and render ports", () => {
   it("accepts a different first-writer decision returned by the commit port", async () => {
     const { port } = setup();
     const winner = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
-      turnId: "turn-1", transcriptRevision: "source-1", probeId: null,
+      turnId: "turn-1", transcriptRevision: "source-1", sourceVersion, probeId: null,
       decision: { action: "next" as const, turnId: "turn-1", outcome: "no_probe" as const } };
     port.commitDecision = vi.fn(async () => ({ status: "committed" as const, value: winner }));
     expect(await runProbeDecision(port, provider(async () => response({ action: "probe",
@@ -204,7 +222,7 @@ describe("probe decision and render ports", () => {
     const { port, setCommitted } = setup();
     port.commitDecision = vi.fn(async () => ({ status: "conflict" as const }));
     const winner = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
-      turnId: "turn-1", transcriptRevision: "source-1", probeId: "probe-winner",
+      turnId: "turn-1", transcriptRevision: "source-1", sourceVersion, probeId: "probe-winner",
       decision: { action: "probe" as const, turnId: "turn-1", text: "What changed?",
         uploadConfirmedAtMs: 50 } };
     const model = provider(async () => {
@@ -221,6 +239,12 @@ describe("probe decision and render ports", () => {
     });
     expect(await runProbeDecision(port, staleModel, "session-1", "turn-1", 500, () => 300))
       .toEqual({ status: "stale" });
+    setCommitted(null);
+    const rotated = { ...winner, sourceVersion: "019ac928-4718-7b62-b72d-8c9fb79b337d" };
+    expect(await runProbeDecision(port, provider(async () => {
+      setCommitted(rotated);
+      return response({ action: "probe", text: "Same text, new source?" });
+    }), "session-1", "turn-1", 500, () => 300)).toEqual({ status: "stale" });
   });
 
   it("withholds a malformed persisted conflict winner", async () => {
@@ -228,7 +252,7 @@ describe("probe decision and render ports", () => {
     port.commitDecision = vi.fn(async () => ({ status: "conflict" as const }));
     const result = await runProbeDecision(port, provider(async () => {
       setCommitted({ sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
-        turnId: "turn-1", transcriptRevision: "source-1", probeId: "probe-1",
+        turnId: "turn-1", transcriptRevision: "source-1", sourceVersion, probeId: "probe-1",
         decision: { action: "probe", turnId: "turn-1", text: "not a question",
           uploadConfirmedAtMs: 50 } });
       return response({ action: "probe", text: "What happened?" });
