@@ -856,3 +856,15 @@ Needs from others. None for redaction development and testing.
 Contract or schema changes. None. The next qualification must use the updated worker source fingerprint.
 
 Risks. Researcher transcript publication remains disabled pending a passing independent result and the hosted rehearsal.
+
+### 2026-11-24 Gate 1 concurrent browser requests
+
+Done. The production-build Chromium test sent concurrent duplicate requests for study launch, invite acceptance and the second voice answer confirmation. Both calls returned the same successful response for each action. The database recorded one launch transition, one invite acceptance, one interview and exactly four distinct answers. After a fresh email sign-in the respondent resumed at question three, submitted, and entered quality hold. The researcher saw four redacted test transcripts only after the disposable fixture worker processed them. [IT-1.1, IT-1.3 and IT-1.5](../apps/web/e2e/gate1-slice.spec.ts)
+
+Next. Repeat the qualified publication journey on the dedicated hosted preview once the redactor passes independently.
+
+Needs from others. None for this browser check.
+
+Contract or schema changes. None.
+
+Risks. This trace uses a fixture redactor. The live publication check still requires the independently qualified policy.
