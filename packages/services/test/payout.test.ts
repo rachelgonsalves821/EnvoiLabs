@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { issueReservedPayout } from "../src/payout.js";
+import { issueReservedPayout, PayoutReservationDenied } from "../src/payout.js";
 
 const reservation = { id: "pay_fixture_1", sessionId: "session_1", respondentId: "respondent_1",
   recipientId: "recipient_1", productId: "us-visa", amountCents: 500,
@@ -20,7 +20,8 @@ describe("payout issue and reconciliation", () => {
   it("reserves before provider call and uses the reservation as provider key", async () => {
     const { db, provider } = setup();
     expect(await issueReservedPayout(db, provider, reservation.sessionId)).toBe("ordered");
-    expect(db.reserveSessionPayout).toHaveBeenCalledWith(reservation.sessionId);
+    expect(db.reserveSessionPayout).toHaveBeenCalledWith(reservation.sessionId,
+      `payout:${reservation.sessionId}`);
     expect(provider.createOrder).toHaveBeenCalledWith({ recipientId: reservation.recipientId,
       productId: reservation.productId, amountCents: reservation.amountCents,
       idempotencyKey: `gate2-payout:${reservation.id}` });
@@ -73,11 +74,27 @@ describe("payout issue and reconciliation", () => {
     expect(db.recordOrder).not.toHaveBeenCalled();
   });
 
-  it("withholds provider call when reservation fails", async () => {
+  it("blocks a policy denial before any provider call", async () => {
     const { db, provider } = setup();
-    db.reserveSessionPayout.mockRejectedValue(new Error("cap exceeded"));
+    db.reserveSessionPayout.mockRejectedValue(new PayoutReservationDenied());
     expect(await issueReservedPayout(db, provider, reservation.sessionId)).toBe("blocked");
     expect(provider.createOrder).not.toHaveBeenCalled();
+    expect(provider.getOrderByKey).not.toHaveBeenCalled();
+  });
+
+  it("keeps the original reservation key for retry after a transient database error", async () => {
+    const { db, provider } = setup();
+    db.reserveSessionPayout.mockRejectedValueOnce(new Error("database timeout"))
+      .mockResolvedValueOnce(reservation);
+    expect(await issueReservedPayout(db, provider, reservation.sessionId)).toBe("unavailable");
+    expect(provider.createOrder).not.toHaveBeenCalled();
+    expect(provider.getOrderByKey).not.toHaveBeenCalled();
+    expect(await issueReservedPayout(db, provider, reservation.sessionId)).toBe("ordered");
+    expect(db.reserveSessionPayout).toHaveBeenNthCalledWith(1, reservation.sessionId,
+      `payout:${reservation.sessionId}`);
+    expect(db.reserveSessionPayout).toHaveBeenNthCalledWith(2, reservation.sessionId,
+      `payout:${reservation.sessionId}`);
+    expect(provider.createOrder).toHaveBeenCalledOnce();
   });
 
   it("leaves an uncertain order pending when provider state cannot be fetched", async () => {

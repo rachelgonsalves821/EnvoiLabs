@@ -20,11 +20,15 @@ type ProviderOrder = {
 type PayoutDatabase = {
   // The reservation implementation must call the respondent-locked Gate 2 RPC
   // and derive recipient, product and amount from the approved session/config.
-  reserveSessionPayout(sessionId: string): Promise<Reservation>;
+  // An exact retry must pass the same key, including after a transient error.
+  reserveSessionPayout(sessionId: string, reservationKey: string): Promise<Reservation>;
   // The writer must deduplicate providerEventId and update payout state under
   // a payout lock. A duplicate exact observation returns the prior result.
   recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
 };
+export class PayoutReservationDenied extends Error {
+  constructor() { super("Payout reservation denied"); }
+}
 type PayoutProvider = {
   createOrder(input: { recipientId: string; productId: string;
     amountCents: number; idempotencyKey: string }): Promise<void>;
@@ -35,10 +39,11 @@ export async function issueReservedPayout(
   db: PayoutDatabase, provider: PayoutProvider, sessionId: string,
 ): Promise<"ordered" | "delivered" | "failed" | "blocked" | "unavailable"> {
   let reserved: Reservation;
+  const reservationKey = `payout:${sessionId}`;
   try {
-    reserved = await db.reserveSessionPayout(sessionId);
-  } catch {
-    return "blocked";
+    reserved = await db.reserveSessionPayout(sessionId, reservationKey);
+  } catch (error) {
+    return error instanceof PayoutReservationDenied ? "blocked" : "unavailable";
   }
   if (reserved.sessionId !== sessionId || !Number.isSafeInteger(reserved.amountCents) ||
       reserved.amountCents <= 0 || !reserved.id || !reserved.recipientId || !reserved.productId) {
