@@ -67,7 +67,7 @@ export function createGate2CheckoutDatabase(
         ? await client.from("pricing_configs").select("*")
           .eq("id", organization.pricing_override_id).maybeSingle()
         : await client.from("pricing_configs").select("*")
-          .eq("active", true).maybeSingle();
+          .eq("marketplace_active", true).maybeSingle();
       const config = readData(selected) as PricingRow | null;
       if (!config || typeof config.params_json !== "object" || !config.params_json) return null;
       const params = config.params_json as Record<string, unknown>;
@@ -79,7 +79,7 @@ export function createGate2CheckoutDatabase(
     },
     async freezeQuote(input) {
       if (!await allowedStudy(input.studyId)) throw new Error("Study outside researcher organization");
-      const id = readData(await client.rpc("freeze_gate2_quote", {
+      const id = readData(await client.rpc("freeze_gate2_marketplace_quote", {
         supplied_study_id: input.studyId, supplied_brief_version: input.briefVersion,
         supplied_config_id: input.pricingConfigId,
         supplied_config_version: input.pricingConfigVersion,

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { QuoteV2Schema } from "@envoi-labs/contracts";
+import { QuoteV3Schema } from "@envoi-labs/contracts";
 import { prepareStudyCheckout } from "../src/checkout.js";
 
-const quote = QuoteV2Schema.parse((QuoteV2Schema.meta()?.examples as unknown[])[0]);
+const quote = QuoteV3Schema.parse((QuoteV3Schema.meta()?.examples as unknown[])[0]);
 const scope = { studyId: quote.studyId, briefVersion: quote.briefVersion,
-  coreQuestionCount: 5, targetRespondents: 1, feasibility: quote.feasibility };
+  coreQuestionCount: 5, targetRespondents: 10, feasibility: quote.feasibility };
 const config = { id: quote.pricingConfigId, version: quote.pricingConfigVersion,
-  unitPriceCents: 100, incentivePerQuestionCents: 40 };
+  unitPriceCents: 200, incentivePerQuestionCents: 100 };
 const checkout = { id: "cs_test_1", studyId: quote.studyId, quoteId: quote.id,
   pricingConfigVersion: quote.pricingConfigVersion, amountCents: quote.totalCents,
   currency: "usd" as const, status: "open" as const,
@@ -36,7 +36,7 @@ describe("synthetic quote to checkout", () => {
     expect(db.freezeQuote).toHaveBeenCalledWith({ studyId: quote.studyId,
       briefVersion: quote.briefVersion, pricingConfigId: config.id,
       pricingConfigVersion: config.version, feasibility: quote.feasibility,
-      totalCents: 500, incentiveCentsPerComplete: 200,
+      totalCents: 10_000, incentiveCentsPerComplete: 500,
       lineItems: quote.lineItems });
     expect(db.claimCheckoutIntent).toHaveBeenCalledWith(quote.studyId, quote.id);
     expect(provider.create).toHaveBeenCalledWith(`gate2-checkout:${quote.id}`, quote);

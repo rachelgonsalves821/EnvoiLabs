@@ -1,5 +1,5 @@
-import { QuoteV2Schema, type QuoteV2 } from "@envoi-labs/contracts";
-import { priceStudy } from "@envoi-labs/core";
+import { QuoteV3Schema, type QuoteV3 } from "@envoi-labs/contracts";
+import { priceMarketplaceStudy } from "@envoi-labs/core";
 
 export type CheckoutScope = {
   studyId: string;
@@ -29,7 +29,7 @@ export type CheckoutDatabase = {
   readSelectedPricing(studyId: string): Promise<CheckoutPricing | null>;
   freezeQuote(input: {
     studyId: string; briefVersion: number; pricingConfigId: string;
-    pricingConfigVersion: number; lineItems: ReturnType<typeof priceStudy>["lineItems"];
+    pricingConfigVersion: number; lineItems: ReturnType<typeof priceMarketplaceStudy>["lineItems"];
     totalCents: number; incentiveCentsPerComplete: number;
     feasibility: CheckoutScope["feasibility"];
   }): Promise<string>;
@@ -40,7 +40,7 @@ export type CheckoutDatabase = {
   recordCheckoutCreated(session: CheckoutSession, eventId: string, observedAt: string): Promise<void>;
 };
 export type CheckoutProvider = {
-  create(key: string, quote: QuoteV2): Promise<CheckoutSession>;
+  create(key: string, quote: QuoteV3): Promise<CheckoutSession>;
   get(checkoutId: string): Promise<CheckoutSession>;
 };
 
@@ -52,7 +52,7 @@ const approvedCheckoutUrl = (value: string) => {
   } catch { return false; }
 };
 
-const matchesQuote = (session: CheckoutSession, quote: QuoteV2) =>
+const matchesQuote = (session: CheckoutSession, quote: QuoteV3) =>
   session.studyId === quote.studyId && session.quoteId === quote.id &&
   session.pricingConfigVersion === quote.pricingConfigVersion &&
   session.amountCents === quote.totalCents && session.currency === quote.currency &&
@@ -61,19 +61,19 @@ const matchesQuote = (session: CheckoutSession, quote: QuoteV2) =>
 
 export async function prepareStudyCheckout(
   db: CheckoutDatabase, provider: CheckoutProvider, studyId: string,
-): Promise<{ status: "ready"; quote: QuoteV2; checkout: CheckoutSession } |
+): Promise<{ status: "ready"; quote: QuoteV3; checkout: CheckoutSession } |
   { status: "blocked" | "unavailable" }> {
   try {
     const scope = await db.readApprovedScope(studyId);
     const config = await db.readSelectedPricing(studyId);
     if (!scope || !config || scope.studyId !== studyId) return { status: "blocked" };
-    const price = priceStudy({ coreQuestionCount: scope.coreQuestionCount,
+    const price = priceMarketplaceStudy({ coreQuestionCount: scope.coreQuestionCount,
       respondentCount: scope.targetRespondents, unitPriceCents: config.unitPriceCents,
-      incentivePerQuestionCents: config.incentivePerQuestionCents });
+      rewardPerQuestionCents: config.incentivePerQuestionCents });
     const quoteId = await db.freezeQuote({ studyId, briefVersion: scope.briefVersion,
       pricingConfigId: config.id, pricingConfigVersion: config.version,
       ...price, feasibility: scope.feasibility });
-    const parsed = QuoteV2Schema.safeParse(await db.readQuote(studyId, quoteId));
+    const parsed = QuoteV3Schema.safeParse(await db.readQuote(studyId, quoteId));
     if (!parsed.success || parsed.data.studyId !== studyId || parsed.data.id !== quoteId ||
       parsed.data.briefVersion !== scope.briefVersion ||
       parsed.data.pricingConfigId !== config.id ||

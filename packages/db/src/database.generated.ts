@@ -957,6 +957,7 @@ export type Database = {
           active: boolean
           created_at: string
           id: string
+          marketplace_active: boolean
           params_json: Json
           updated_at: string
           version: number
@@ -965,6 +966,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          marketplace_active?: boolean
           params_json: Json
           updated_at?: string
           version: number
@@ -973,6 +975,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          marketplace_active?: boolean
           params_json?: Json
           updated_at?: string
           version?: number
@@ -1660,6 +1663,19 @@ export type Database = {
       expire_gate1_interviews: {
         Args: { supplied_cutoff: string }
         Returns: Json
+      }
+      freeze_gate2_marketplace_quote: {
+        Args: {
+          supplied_brief_version: number
+          supplied_config_id: string
+          supplied_config_version: number
+          supplied_feasibility: Json
+          supplied_incentive_cents: number
+          supplied_line_items: Json
+          supplied_study_id: string
+          supplied_total_cents: number
+        }
+        Returns: string
       }
       freeze_gate2_quote: {
         Args: {
