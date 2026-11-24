@@ -2,7 +2,7 @@
 export interface RedactedSource {
   readonly studyId: string;
   readonly transcriptId: string;
-  readonly version: string;
+  readonly sourceVersion: string;
   readonly redactedText: string;
   readonly published: boolean;
   readonly withdrawn: boolean;
@@ -15,7 +15,7 @@ export interface ProposedEvidence {
   /** Unicode character offsets, matching PostgreSQL substring positions (zero based). */
   readonly startChar: number;
   readonly endChar: number;
-  readonly quote: string;
+  readonly exactText: string;
   readonly rationale: string;
   readonly confidence: number;
 }
@@ -26,6 +26,8 @@ export type VerifiedEvidence = Omit<ProposedEvidence, "rationale">;
 export type EvidenceDecision =
   | { readonly action: "accept"; readonly evidence: VerifiedEvidence }
   | { readonly action: "drop"; readonly transcriptId: string; readonly reason: string };
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function verifyEvidence(
   studyId: string,
@@ -44,12 +46,13 @@ export function verifyEvidence(
     if (evidence.studyId !== studyId || !source || duplicates.has(evidence.transcriptId))
       reason = "study or source mismatch";
     else if (!source.published || source.withdrawn || !source.redactedText) reason = "source unavailable";
-    else if (!source.version || source.version !== evidence.sourceVersion) reason = "source version changed";
+    else if (!uuid.test(source.sourceVersion) || source.sourceVersion !== evidence.sourceVersion)
+      reason = "source version changed";
     else if (!Number.isSafeInteger(evidence.startChar) || !Number.isSafeInteger(evidence.endChar)
       || evidence.startChar < 0 || evidence.endChar <= evidence.startChar
       || evidence.endChar > Array.from(source.redactedText).length) reason = "invalid span";
-    else if (!evidence.quote.trim()
-      || Array.from(source.redactedText).slice(evidence.startChar, evidence.endChar).join("") !== evidence.quote)
+    else if (!evidence.exactText.trim()
+      || Array.from(source.redactedText).slice(evidence.startChar, evidence.endChar).join("") !== evidence.exactText)
       reason = "quote differs from redacted source";
     else if (!evidence.rationale.trim() || !Number.isFinite(evidence.confidence)
       || evidence.confidence < 0 || evidence.confidence > 1) reason = "invalid provenance";
@@ -57,7 +60,7 @@ export function verifyEvidence(
     const verified: VerifiedEvidence = {
       studyId: evidence.studyId, transcriptId: evidence.transcriptId,
       sourceVersion: evidence.sourceVersion, startChar: evidence.startChar,
-      endChar: evidence.endChar, quote: evidence.quote, confidence: evidence.confidence,
+      endChar: evidence.endChar, exactText: evidence.exactText, confidence: evidence.confidence,
     };
     return { action: "accept", evidence: verified };
   });
