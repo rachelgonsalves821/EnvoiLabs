@@ -25,6 +25,7 @@ declare
     incentive_unit_cents integer;
     expected_total bigint;
     expected_incentive bigint;
+    prior_checkout public.gate2_quote_snapshots%rowtype;
 begin
     select * into target from public.studies where id = supplied_study_id for update;
     select * into config from public.pricing_configs
@@ -50,6 +51,27 @@ begin
             'respondentCount', target.target_completes,
             'unitPriceCents', unit_cents, 'amountCents', expected_total))
     then raise check_violation; end if;
+    select quote.* into prior_checkout from public.gate2_quote_snapshots as quote
+    join public.gate2_payment_events as created on created.quote_id = quote.id
+        and created.event_kind = 'checkout_created'
+    where quote.study_id = supplied_study_id
+    order by created.created_at limit 1;
+    if found then
+        if exists (select 1 from public.gate2_payment_events as created
+            where created.study_id = supplied_study_id and created.event_kind = 'checkout_created'
+                and created.quote_id <> prior_checkout.id)
+            or prior_checkout.brief_version is distinct from supplied_brief_version
+            or prior_checkout.brief_version is distinct from (select max(version)
+                from public.brief_versions where study_id = supplied_study_id)
+            or prior_checkout.guide_digest is distinct from public.gate2_guide_digest(supplied_study_id)
+            or prior_checkout.pricing_config_id is distinct from supplied_config_id
+            or prior_checkout.pricing_config_version is distinct from supplied_config_version
+            or prior_checkout.total_cents is distinct from supplied_total_cents
+            or prior_checkout.incentive_cents_per_complete is distinct from supplied_incentive_cents
+            or prior_checkout.line_items_json is distinct from supplied_line_items
+        then raise check_violation; end if;
+        return prior_checkout.id;
+    end if;
     return internal.freeze_gate2_quote_unchecked(supplied_study_id,
         supplied_brief_version, supplied_config_id, supplied_config_version,
         supplied_line_items, supplied_total_cents, supplied_incentive_cents,

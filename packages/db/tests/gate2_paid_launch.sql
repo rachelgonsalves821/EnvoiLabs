@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(24);
+select plan(27);
 
 select is((select tgfoid from pg_trigger where tgname = 'lock_gate2_guide_study'
     and tgrelid = 'public.guide_questions'::regclass),
@@ -90,6 +90,15 @@ select throws_ok($$insert into public.gate2_payment_events (quote_id, study_id,
         '90600000-0000-4000-8000-000000000001', 'cs_duplicate', 'evt_created_again',
         'checkout_created', 500, 'usd', now())$$,
     '23505', null, 'a frozen quote cannot acquire a second checkout identity');
+set local role service_role;
+select is(public.freeze_gate2_quote('90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where active),
+    (select version from public.pricing_configs where active),
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":1,"unitPriceCents":100,"amountCents":500}]',
+    500, 200, '{"expectedCompletes":1,"hours":24}'),
+    'a9900000-0000-4000-8000-000000000001'::uuid,
+    'checkout retry keeps the one frozen quote');
+reset role;
 set local role authenticated;
 select throws_ok($$select public.launch_gate2_paid_study(
     '90600000-0000-4000-8000-000000000001',
@@ -98,6 +107,15 @@ select throws_ok($$select public.launch_gate2_paid_study(
 reset role;
 update public.guide_questions set text = 'Changed after quote'
 where study_id = '90600000-0000-4000-8000-000000000001' and position = 1;
+set local role service_role;
+select throws_ok($$select public.freeze_gate2_quote(
+    '90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where active),
+    (select version from public.pricing_configs where active),
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":1,"unitPriceCents":100,"amountCents":500}]',
+    500, 200, '{"expectedCompletes":1,"hours":24}')$$,
+    '23514', null, 'changed guide cannot open a second checkout quote');
+reset role;
 select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
     'a9900000-0000-4000-8000-000000000001', 'evt_paid'), false,
     'a changed question invalidates the frozen guide digest');
@@ -106,6 +124,15 @@ where study_id = '90600000-0000-4000-8000-000000000001' and position = 1;
 insert into public.brief_versions (study_id, version, brief_json, created_by)
 values ('90600000-0000-4000-8000-000000000001', 2, '{"revision":2}',
     '90400000-0000-4000-8000-000000000001');
+set local role service_role;
+select throws_ok($$select public.freeze_gate2_quote(
+    '90600000-0000-4000-8000-000000000001', 2,
+    (select id from public.pricing_configs where active),
+    (select version from public.pricing_configs where active),
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":1,"unitPriceCents":100,"amountCents":500}]',
+    500, 200, '{"expectedCompletes":1,"hours":24}')$$,
+    '23514', null, 'newer brief cannot open second checkout while first is outstanding');
+reset role;
 select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
     'a9900000-0000-4000-8000-000000000001', 'evt_paid'), false,
     'a newer brief invalidates the frozen quote');
