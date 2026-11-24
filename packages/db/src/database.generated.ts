@@ -1380,6 +1380,7 @@ export type Database = {
           updated_at: string
           whatsapp_waitlist_at: string | null
           ytd_payout_cents: number
+          ytd_payout_year: number
         }
         Insert: {
           age_attested_at: string
@@ -1392,6 +1393,7 @@ export type Database = {
           updated_at?: string
           whatsapp_waitlist_at?: string | null
           ytd_payout_cents?: number
+          ytd_payout_year?: number
         }
         Update: {
           age_attested_at?: string
@@ -1404,6 +1406,7 @@ export type Database = {
           updated_at?: string
           whatsapp_waitlist_at?: string | null
           ytd_payout_cents?: number
+          ytd_payout_year?: number
         }
         Relationships: []
       }
@@ -1711,6 +1714,17 @@ export type Database = {
           supplied_text: string
         }
         Returns: Json
+      }
+      record_gate2_payout_observation: {
+        Args: {
+          requested_amount_cents: number
+          requested_event_id: string
+          requested_kind: string
+          requested_observed_at: string
+          requested_order_id: string
+          requested_payout_id: string
+        }
+        Returns: boolean
       }
       requeue_gate1_answer_job: {
         Args: { supplied_answer_id: string }
