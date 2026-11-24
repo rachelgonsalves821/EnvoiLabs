@@ -51,10 +51,10 @@ export function verifyEvidence(
     else if (!Number.isSafeInteger(evidence.startChar) || !Number.isSafeInteger(evidence.endChar)
       || evidence.startChar < 0 || evidence.endChar <= evidence.startChar
       || evidence.endChar > Array.from(source.redactedText).length) reason = "invalid span";
-    else if (!evidence.exactText.trim()
+    else if (typeof evidence.exactText !== "string" || !evidence.exactText.trim()
       || Array.from(source.redactedText).slice(evidence.startChar, evidence.endChar).join("") !== evidence.exactText)
       reason = "quote differs from redacted source";
-    else if (!evidence.rationale.trim() || !Number.isFinite(evidence.confidence)
+    else if (typeof evidence.rationale !== "string" || !evidence.rationale.trim() || !Number.isFinite(evidence.confidence)
       || evidence.confidence < 0 || evidence.confidence > 1) reason = "invalid provenance";
     if (reason) return { action: "drop", transcriptId: evidence.transcriptId, reason };
     const verified: VerifiedEvidence = {

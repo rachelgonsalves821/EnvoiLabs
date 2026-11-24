@@ -41,6 +41,13 @@ describe("IT-3.2 report evidence integrity", () => {
     expect(verifyEvidence("44444444-4444-4444-8444-444444444444", [quote], [source])[0]?.action).toBe("drop");
   });
 
+  it("fails closed when an old unversioned quote reference reaches the gate", () => {
+    const oldReference = { transcriptId: quote.transcriptId, startChar: quote.startChar, endChar: quote.endChar };
+    expect(verifyEvidence(source.studyId, [oldReference as ProposedEvidence], [source])[0]?.action).toBe("drop");
+    expect(prepareFindings(source.studyId, [{ claim: "Delivery", supporting: [oldReference as ProposedEvidence],
+      contradicting: [] }], [source], publishClaim).findings).toEqual([]);
+  });
+
   it("invalidates report and export findings after re-redaction, withdrawal or deletion", () => {
     const finding = { claim: "Delivery was slow", supporting: [quote], contradicting: [] };
     expect(prepareFindings(source.studyId, [finding], [source], publishClaim).findings).toHaveLength(1);
