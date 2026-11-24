@@ -111,6 +111,10 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
       else {
         const candidate = await decideProbe({ turnId, uploadConfirmedAtMs: ready.browserUploadConfirmedAtMs,
           request: ready.request }, { provider, currentTurnId: () => turnId,
+          authorize: async () => {
+            const current = await port.readReadyTurn(sessionId, turnId);
+            return !!current && sameReady(ready, current);
+          },
           timeoutMs: Math.min(timeoutMs, remainingMs) });
         const advanced = advanceProbeState(state, { type: "decision", turnId, atMs: now(),
           decision: candidate });

@@ -32,6 +32,17 @@ function setup() {
 }
 
 describe("probe decision and render ports", () => {
+  it("rechecks current consent/source authority immediately before model dispatch", async () => {
+    const { port } = setup();
+    port.readReadyTurn = vi.fn().mockResolvedValueOnce(ready).mockResolvedValueOnce(null);
+    const generate = vi.fn(async () => response({ action: "probe", text: "What happened?" }));
+    const result = await runProbeDecision(port, provider(generate), "session-1", "turn-1",
+      500, () => 300);
+    expect(result).toEqual({ status: "stale" });
+    expect(generate).not.toHaveBeenCalled();
+    expect(port.commitDecision).not.toHaveBeenCalled();
+  });
+
   it("does not call the provider for a request without the follow-up purpose", async () => {
     const { port, setCurrent } = setup();
     setCurrent({ ...ready, request: { ...ready.request, purpose: "probe" } });

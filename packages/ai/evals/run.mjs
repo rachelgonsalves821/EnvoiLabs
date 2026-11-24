@@ -113,8 +113,8 @@ async function evaluateProbeRuntime() {
     } };
     const activeTurnId = fixture.activeTurnId ?? fixture.id;
     const decision = await decideProbe({ turnId: fixture.id, uploadConfirmedAtMs: 100,
-      request: { purpose: "probe", promptVersion: "v1", system: "fictional fixture", messages: [] } },
-    { provider, currentTurnId: () => activeTurnId, timeoutMs: 1 });
+      request: { purpose: "ai_followup", promptVersion: "v1", system: "fictional fixture", messages: [] } },
+    { provider, currentTurnId: () => activeTurnId, authorize: async () => true, timeoutMs: 1 });
     const outcome = recordProbeRender(decision, activeTurnId, fixture.renderedAtMs ?? 100);
     outcomes.push(outcome);
     results.push({ id: fixture.id, expectedOutcome: fixture.expectedOutcome,

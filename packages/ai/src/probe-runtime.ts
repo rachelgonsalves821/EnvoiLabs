@@ -18,6 +18,8 @@ export type ProbeDecision =
 export interface ProbeRuntime {
   readonly provider: LLMProvider;
   readonly currentTurnId: () => string;
+  /** Recheck the current purpose grant and source receipt before model dispatch. */
+  readonly authorize: (attempt: ProbeAttempt) => Promise<boolean>;
   readonly timeoutMs: number;
   readonly schedule?: typeof setTimeout;
   readonly cancel?: typeof clearTimeout;
@@ -43,10 +45,13 @@ export async function decideProbe(attempt: ProbeAttempt, runtime: ProbeRuntime):
   if (!attempt.turnId || !Number.isFinite(attempt.uploadConfirmedAtMs)
     || !Number.isSafeInteger(runtime.timeoutMs) || runtime.timeoutMs <= 0) return next("error");
   if (runtime.currentTurnId() !== attempt.turnId) return next("superseded");
+  if (attempt.request.purpose !== "ai_followup") return next("error");
   const schedule = runtime.schedule ?? setTimeout;
   const cancel = runtime.cancel ?? clearTimeout;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    if (!await runtime.authorize(attempt)) return next("error");
+    if (runtime.currentTurnId() !== attempt.turnId) return next("superseded");
     const result = await Promise.race([
       runtime.provider.generate(attempt.request).then(({ output }) => ({ kind: "output" as const, output }),
         () => ({ kind: "error" as const })),
