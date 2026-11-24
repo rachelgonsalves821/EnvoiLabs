@@ -508,6 +508,96 @@ export type Database = {
           },
         ]
       }
+      gate2_screening_events: {
+        Row: {
+          action: string
+          answer_id: string
+          confirmed_fact: boolean | null
+          created_at: string
+          end_char: number | null
+          id: string
+          interpretation: string | null
+          rule_id: string
+          rule_version: number
+          start_char: number | null
+        }
+        Insert: {
+          action: string
+          answer_id: string
+          confirmed_fact?: boolean | null
+          created_at?: string
+          end_char?: number | null
+          id?: string
+          interpretation?: string | null
+          rule_id: string
+          rule_version: number
+          start_char?: number | null
+        }
+        Update: {
+          action?: string
+          answer_id?: string
+          confirmed_fact?: boolean | null
+          created_at?: string
+          end_char?: number | null
+          id?: string
+          interpretation?: string | null
+          rule_id?: string
+          rule_version?: number
+          start_char?: number | null
+        }
+        Relationships: []
+      }
+      gate2_screening_rules: {
+        Row: {
+          approved_at: string
+          approved_by: string
+          created_at: string
+          criterion_id: string
+          criterion_kind: string
+          id: string
+          question: string
+          study_id: string
+          version: number
+        }
+        Insert: {
+          approved_at: string
+          approved_by: string
+          created_at?: string
+          criterion_id: string
+          criterion_kind: string
+          id?: string
+          question: string
+          study_id: string
+          version: number
+        }
+        Update: {
+          approved_at?: string
+          approved_by?: string
+          created_at?: string
+          criterion_id?: string
+          criterion_kind?: string
+          id?: string
+          question?: string
+          study_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate2_screening_rules_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "researchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate2_screening_rules_criterion_id_study_id_fkey"
+            columns: ["criterion_id", "study_id"]
+            isOneToOne: false
+            referencedRelation: "criteria"
+            referencedColumns: ["id", "study_id"]
+          },
+        ]
+      }
       guide_questions: {
         Row: {
           created_at: string
