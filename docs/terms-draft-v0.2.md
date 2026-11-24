@@ -52,7 +52,7 @@ Proposed placement is after the verified email sign-in link and before any voice
 >
 > **Choose how to answer.** You may type. If you choose to record, we send your recording to an approved transcription provider after you agree to the recording and transcription purposes described in the full notice.
 >
-> **Researcher report and analysis.** [Describe the reviewed, redacted text and any AI-assisted report analysis, its provider, data sent, retention and human review after Rachel/counsel approval. Verify exact redaction and export behavior before publication.]
+> **Researcher report and analysis.** [Describe the qualified redacted text and any separate external AI report analysis, including the study context, provider, data sent, retention and human review after Rachel/counsel approval. Verify exact redaction and export behavior before publication.]
 >
 > **How long we keep answers.** [Insert the approved, implemented retention and deletion schedule.]
 >
@@ -60,9 +60,9 @@ Proposed placement is after the verified email sign-in link and before any voice
 >
 > [Toggle, off, proposed only] **Let researchers hear short clips of my voice.** We'll ask you again for each study. Someone who knows you could recognize your voice. Keep this feature off for the first marketplace test.
 >
-> [Separate toggle, off, proposed only] **Let an AI service read my reviewed interview text to suggest follow-up questions.** [Identify the exact provider, data sent and retention terms in approved copy.] If you do not agree, the interview uses the next planned question. This purpose is `ai_followup` and must never be inferred from recording, transcription or researcher-access consent.
+> [Separate toggle, off, proposed only] **Let an AI service read automatically redacted and qualified text from my answer, with the study question, to suggest a follow-up question.** [Identify the exact provider, data sent, qualification rule and retention terms in approved copy.] This happens within the interview; a person does not review each answer before a six-second follow-up. If you do not agree, the interview uses the next planned question. This purpose is `ai_followup` and must never be inferred from recording, transcription or researcher-access consent.
 
-> [Separate toggle, off, proposed only] **Let an AI service read my screener answer to help check whether this study matches my profile.** [Disclose that the full typed or transcribed screener answer may be sent, the exact provider, data categories, purpose, human review, retention and alternative path.] This separate `screening_model` purpose needs Rachel/counsel approval. Declining it must not be treated as consent to another model purpose.
+> [Separate toggle, off, proposed only] **Let an external AI screening service read my screener answer and the approved study criterion to help check whether this study matches my profile.** [Disclose that the full typed or transcribed screener answer, question and criterion may be sent; name the provider, retention and declining path.] This separate `screening_model` purpose needs Rachel/counsel approval. Declining it must not be treated as consent to another model purpose.
 
 > [Separate toggle, off, proposed only] **Let reviewed, redacted answers be used to test and improve future interview questions.** [Specify scope, provider, data sent and retention after approval.] This optional `question_improvement` purpose is independent of report analysis and follow-up questions.
 >
@@ -81,13 +81,13 @@ Proposed rows: `retention` and `researcher_access` as approved prerequisites for
 ### 3.1 Data to disclose and verify
 
 - **Account and profile.** Current signup uses a verified email sign-in link and 18+ attestation; the profile stores answers used for eligibility and matching. The database also has legacy phone fields, whose collection, access and retention need a separate audit. Do not claim current phone verification or Twilio sign-in.
-- **Answers.** Typed answers, optional voice recordings, private raw transcript, reviewed redacted transcript, answer timing, screening decisions and quality signals. Voice collection and sharing require their own approved purpose and tested path.
+- **Answers.** Typed answers, optional voice recordings, private raw transcript, automatically redacted and qualified answer text, answer timing, screening decisions and quality signals. Human review may occur later for a report, but is not part of the six-second probe path. Voice collection and sharing require their own approved purpose and tested path.
 - **Payments and referrals.** Approved per-question rewards, prepaid Visa delivery status, referral attribution and verified-profile count, and any records actually required for tax/accounting. Exact provider and recipient data are pending verification.
-- **Researcher outputs.** Qualified redacted transcripts, findings, quotes and exports only under current consent and source-version checks. Verify withdrawal/deletion behavior across existing exports before making a public promise.
+- **Researcher outputs.** Qualified redacted transcripts, findings, quotes and exports only under current consent and source-version checks. A later withdrawal, deletion or invalid source can withhold future reads; a file already downloaded by a researcher cannot be recalled. Verify actual behavior and approved wording before publication.
 
 ### 3.2 Processing purposes and choices
 
-Account operation, profile-based matching, restricted screening, quality/fraud review and payout each need exact disclosure. `recording` and `transcription_vendor` apply only to voice answers. `researcher_access` concerns qualified redacted text. `report_analysis` needs its own approved disclosure of any model or processor use for a researcher report. `voice_clip_sharing` is separate per study and stays off for the first marketplace test. **`screening_model` is a distinct, proposed, versioned opt-in because the validator can receive the full screener answer. `ai_followup` separately covers reviewed interview text sent to an approved LLM to suggest a probe. `question_improvement` is another optional, separate proposed purpose. None is granted by recording, transcription, report analysis, researcher access or another model purpose. Live screening model input and follow-ups remain disabled until Rachel/counsel approve exact copy, provider and data flow and the server enforces current authorization.** Secondary model evaluation or training is not authorized by this draft.
+Account operation, profile-based matching, restricted screening, quality/fraud review and payout each need exact disclosure. `recording` and `transcription_vendor` apply only to voice answers. `researcher_access` concerns qualified redacted text. External `report_analysis` needs its own approved purpose and disclosure of qualified redacted text, guide/criterion context, recipient provider, declining behavior, current source receipt and any human review. `voice_clip_sharing` is separate per study and stays off for the first marketplace test. **`screening_model` is a distinct, proposed, versioned opt-in because the external validator can receive the full screener answer, question and approved criterion. `ai_followup` separately covers automatically redacted and qualified interview text plus the study question sent to an approved LLM to suggest a probe within seconds, without prior human review. `question_improvement` is another optional, separate proposed purpose. None is granted by recording, transcription, report analysis, researcher access or another model purpose. Live screening model input and follow-ups remain disabled until Rachel/counsel approve exact copy, provider and data flow and the server enforces current authorization.** Secondary model evaluation or training is not authorized by this draft.
 
 ### 3.3 Voice and biometric notice [counsel and implementation hold]
 
@@ -102,7 +102,7 @@ Counsel must supply the applicable release, collection purpose, processor disclo
 | Account/profile and legacy phone fields | [Counsel/Rachel to approve] | Actual collection, access and deletion audit |
 | Payout, referral, consent and tax records | [Counsel/Rachel to approve] | Provider, ledger and legal retention review |
 
-The 60-day, 24-month, 7-year and other periods in v0.1 are proposals only. An expired interview currently cannot be assumed to remove an abandoned audio upload. The right to delete and any records retained by law need counsel-approved language matched to tested behavior, including a proven orphan-object cleanup path.
+The 60-day, 24-month, 7-year and other periods in v0.1 are proposals only. An expired interview currently cannot be assumed to remove an abandoned audio upload. Withdrawal, deletion or invalidation may prevent future report/API/export reads, but cannot recall a researcher file downloaded earlier. The right to delete and any records retained by law need counsel-approved language matched to tested behavior, including a proven orphan-object cleanup path.
 
 ### 3.5 Providers and data transfers [configuration hold]
 
@@ -203,7 +203,7 @@ These placements are design requirements, not claims that the current app has im
 | Quote | Frozen core-question line items, at least 10 respondents, feasibility basis, per-slot refund | Draft Gate 2 quote path; no live payment |
 | Checkout | Exact approved terms version beside the frozen amount | Authenticated route, provider and terms record are not mounted |
 | Study close | Completed-slot count and frozen-price refund receipt | Close trigger and idempotent refund ledger are not implemented |
-| Report/export | Current qualified redacted view and use rules | Gate 3 approval and API/export wiring pending |
+| Report/export | Current qualified redacted view and use rules; warn that earlier researcher downloads cannot be recalled | Gate 3 approval and API/export wiring pending; future reads may be withheld after withdrawal/deletion/source invalidation |
 
 ---
 
