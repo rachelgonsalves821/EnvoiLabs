@@ -11,4 +11,4 @@ Before using a runbook, confirm the environment and the current deployed revisio
 | LLM provider outage or excessive timeouts | [LLM outage](llm-outage.md) |
 | Stripe charge dispute or reversal | [Stripe disputes](stripe-disputes.md) |
 
-Gate 4 audit records: [security review and rate-limit paths](security-review.md) · [isolated limiter proposal](rate-limit-proposal.md) · [integration chaos fixtures](integration-chaos-fixtures.md) · [performance measurement plan](performance-measurement.md) · [readiness evidence](launch-readiness.md).
+Gate 4 audit records: [security review and rate-limit paths](security-review.md) · [limiter proposal](rate-limit-proposal.md) and [exact integration handoff](rate-limit-integration.md) · [integration chaos fixtures](integration-chaos-fixtures.md) · [performance measurement plan](performance-measurement.md) · [readiness evidence](launch-readiness.md).

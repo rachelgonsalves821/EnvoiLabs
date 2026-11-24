@@ -44,7 +44,13 @@ Prepare a disposable integration fixture with two independent app processes poin
 
 Run these cases against the real distributed store in local integration and preview after Gate 1 handoff. The threshold symbol `N` avoids inventing a production policy in this preparatory review.
 
-A concrete [Postgres atomic store, key, and candidate threshold proposal](rate-limit-proposal.md) is available for coordinator review. It has not been implemented or approved.
+The coordinator approved the [Postgres atomic store and HMAC direction](rate-limit-proposal.md) for synthetic preparation. The exact migration and candidate thresholds have not been approved or enabled.
+
+### Isolated limiter security checkpoint
+
+The Gate 4-owned decision module rejects missing or malformed policy, a short HMAC secret, absent/untrimmed source, invalid identity, and store failure before returning `allow`. The synthetic RPC adapter sends only hashed keys and maps null/error/malformed replies to an unavailable result. The standalone response helper uses the existing private, no-store and no-referrer headers with generic 400/429/503 bodies and a bounded `Retry-After`. Focused tests exercise these behaviors and two limiter instances sharing one atomic fixture. This is a code-path review, not proof that a real route is limited.
+
+The [exact migration and route handoff](rate-limit-integration.md) remains a security dependency. Gate 2 must demonstrate all-or-none Postgres increments, disabled-by-default policy, service-only function execution, denied direct table access, cleanup, and generated types. Gate 1/coordinator must identify a verified ingress source and dedicated secret owner. After the exact handler release, integration tests must prove no OTP, reservation, signed URL, or information leak on 429/503, plus recovery across two web processes. Direct signed-object transfer requires separate storage controls. No production limiter is enabled by this checkpoint.
 
 ## Narrow dependency proposal
 

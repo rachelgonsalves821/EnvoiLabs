@@ -2,7 +2,7 @@
 
 This is a Gate 4 proposal for coordinator and Gate 1 review, not an enabled control. The [exact route inventory and acceptance cases](security-review.md#rate-limit-path-inventory-and-acceptance-cases) identify the owned handler paths. Gate 4 will edit them only after Gate 1 releases those paths. The database migration and any shared environment configuration need a separate owner assignment.
 
-The isolated `apps/web/server/gate4/rate-limit.ts` decision module now accepts an injected atomic store port, a dedicated HMAC secret, and a fully supplied policy. It applies one shared email-start quota across respondent and researcher entry points and a separate audio-upload quota. Its local tests use a shared atomic fixture across two limiter instances; they demonstrate the intended contract, not a real distributed database implementation or route protection. No default threshold or production switch is present in code.
+The isolated `apps/web/server/gate4/rate-limit.ts` decision module now accepts an injected atomic store port, a dedicated HMAC secret, and a fully supplied policy. It applies one shared email-start quota across respondent and researcher entry points and a separate audio-upload quota. A standalone RPC adapter and generic HTTP response helper define the expected database and route wire shapes in the [integration handoff](rate-limit-integration.md). Their local tests use a shared atomic fixture across two limiter instances and synthetic RPC replies; they demonstrate the intended contract, not a real distributed database implementation or route protection. No default threshold or production switch is present in code.
 
 ## Store and atomic decision
 
