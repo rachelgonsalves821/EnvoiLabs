@@ -122,6 +122,35 @@ select is((select public.mark_gate3_probe_shown(
     (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
     '90300000-0000-4000-8000-000000000001', 1200)
     from probe_ids), 'recorded', 'shown retry is idempotent');
+select is((select public.read_gate3_respondent_probe(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001') ->> 'text'),
+    'What made speed matter?', 'current respondent sees only the committed probe');
+select is(public.read_gate3_respondent_probe(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000002'), null::jsonb,
+    'another respondent cannot read the probe');
+select is((select public.record_gate3_probe_text_answer(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001',
+    'The short route saved time.') -> 'answer' ->> 'probeId'
+    from probe_ids),
+    (select result -> 'value' ->> 'probeId' from probe_actions),
+    'typed answer belongs to the shown committed probe');
+select is((select public.record_gate3_probe_text_answer(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001',
+    'The short route saved time.') -> 'answer' ->> 'id'
+    from probe_ids), 'a9700000-0000-4000-8000-000000000006',
+    'typed probe answer retry returns the same answer');
+select is(public.read_gate3_respondent_probe(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), null::jsonb,
+    'after probe answer the respondent advances to the static next core question');
 reset role;
 select ok((select shown_at is not null and browser_rendered_ms = 1200
     from internal.gate3_probe_turns where id = (select turn_id from probe_ids)),

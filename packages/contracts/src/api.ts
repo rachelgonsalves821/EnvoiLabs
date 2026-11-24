@@ -90,6 +90,7 @@ export const ResumeSessionRequestSchema = withExample(z.strictObject({ token: re
   { token: "example-resume-token-for-tests-only" });
 export const SessionResponseSchema = withExample(z.strictObject({
   ...sessionId, progress: InterviewProgressSchema, nextQuestion: z.strictObject({ id, text }).nullable(),
+  currentProbe: z.strictObject({ turnId: id, probeId: id, text }).nullable().optional(),
   expiresAt: timestamp,
 }), { ...exampleSession, progress: { ...exampleSession, currentQuestion: 1, coreQuestionCount: gate1CoreQuestionCount, rewardCents: 0 },
   nextQuestion: { id: exampleId, text: "What did you order?" }, expiresAt: "2026-11-20T18:00:00.000Z" });
@@ -121,6 +122,17 @@ export const RecordAnswerResponseSchema = withExample(z.strictObject({
   createdAt: "2026-11-19T18:00:00.000Z", updatedAt: "2026-11-19T18:00:00.000Z",
   kind: "text", probeId: null, durationMs: null, sequence: 1,
 } });
+
+export const RecordProbeTextAnswerRequestSchema = withExample(z.strictObject({
+  ...sessionId, turnId: id, probeId: id, answerId: id, text,
+}), { ...exampleSession, turnId: exampleId, probeId: exampleId,
+  answerId: exampleId, text: "The shorter trip made the choice easier." });
+
+export const MarkProbeShownRequestSchema = withExample(z.strictObject({
+  ...sessionId, turnId: id, probeId: id,
+  browserRenderedAtMs: z.number().finite().nonnegative(),
+}), { ...exampleSession, turnId: exampleId, probeId: exampleId,
+  browserRenderedAtMs: 1200 });
 
 export const SubmitSessionRequestSchema = withExample(z.strictObject(sessionId), exampleSession);
 export const SubmitSessionResponseSchema = withExample(z.strictObject({
