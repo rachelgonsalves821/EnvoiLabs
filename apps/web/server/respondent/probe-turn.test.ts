@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createProbeDecisionPort, type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
 const ids = { sessionId: "session", questionId: "question", answerId: "answer",
-  turnId: "turn", transcriptRevision: "a".repeat(64) };
+  turnId: "turn", transcriptRevision: "a".repeat(64),
+  sourceVersion: "019ac928-4718-7b62-b72d-8c9fb79b337c" };
 const winning = { action: "probe" as const, turnId: ids.turnId,
   text: "What made speed matter?", uploadConfirmedAtMs: 1000 };
 const committed = { ...ids, decision: winning, probeId: "probe" };
@@ -56,6 +57,11 @@ describe("probe persistence boundary", () => {
     const malformed = createProbeDecisionPort(async () => ({ data: { decision: "broken" },
       error: null }), "respondent", buildRequest);
     await expect(malformed.readCommitted("session", "turn"))
+      .rejects.toThrow("invalid committed probe");
+    const badSource = createProbeDecisionPort(async () => ({ data: {
+      ...committed, sourceVersion: "not-a-uuid" }, error: null }),
+    "respondent", buildRequest);
+    await expect(badSource.readCommitted("session", "turn"))
       .rejects.toThrow("invalid committed probe");
   });
 });
