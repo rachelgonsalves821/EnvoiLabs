@@ -167,16 +167,30 @@ export async function presentCommittedProbe(port: ProbeDecisionPort, committed: 
   if (committed.decision.action === "next") return { outcome: committed.decision.outcome };
   if (!committed.probeId) return { outcome: "error" };
   let mounted = false;
-  const outcome = await presentProbeIfCurrent(committed.decision, currentTurnId,
-    (text) => { mounted = true; mount(text); }, frame, now);
+  let outcome: ProbeOutcome;
+  try {
+    outcome = await presentProbeIfCurrent(committed.decision, currentTurnId,
+      (text) => { mounted = true; mount(text); }, frame, now);
+  } catch {
+    if (mounted) clear();
+    return { outcome: "error" };
+  }
   if (outcome.outcome !== "rendered") {
     if (mounted) clear();
     return outcome;
   }
+  if (currentTurnId() !== committed.turnId) {
+    clear();
+    return { outcome: "superseded" };
+  }
   try {
     const stored = await port.markShown({ sessionId: committed.sessionId, turnId: committed.turnId,
       probeId: committed.probeId, browserRenderedAtMs: outcome.renderedAtMs });
-    if (stored === "recorded") return outcome;
+    if (stored === "recorded") {
+      if (currentTurnId() === committed.turnId) return outcome;
+      clear();
+      return { outcome: "superseded" };
+    }
     clear();
     return { outcome: stored === "stale" ? "superseded" : "error" };
   } catch {

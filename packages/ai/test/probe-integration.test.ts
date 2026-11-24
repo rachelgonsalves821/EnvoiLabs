@@ -181,6 +181,51 @@ describe("probe decision and render ports", () => {
     expect(port.markShown).not.toHaveBeenCalled();
   });
 
+  it("retracts mounted text if the browser frame callback fails", async () => {
+    const { port } = setup();
+    const saved = await runProbeDecision(port, provider(async () => response({ action: "probe",
+      text: "What changed?" })), "session-1", "turn-1", 500, () => 300);
+    if (saved.status !== "committed") return;
+    const mount = vi.fn();
+    const retract = vi.fn();
+    expect(await presentCommittedProbe(port, saved.value, () => "turn-1", mount,
+      () => { throw new Error("frame unavailable"); }, () => 500, retract))
+      .toEqual({ outcome: "error" });
+    expect(mount).toHaveBeenCalledTimes(1);
+    expect(retract).toHaveBeenCalledTimes(1);
+    expect(port.markShown).not.toHaveBeenCalled();
+  });
+
+  it("retracts when the turn changes between paint and the shown receipt", async () => {
+    const { port } = setup();
+    const saved = await runProbeDecision(port, provider(async () => response({ action: "probe",
+      text: "What changed?" })), "session-1", "turn-1", 500, () => 300);
+    if (saved.status !== "committed") return;
+    let reads = 0;
+    const retract = vi.fn();
+    expect(await presentCommittedProbe(port, saved.value,
+      () => ++reads < 3 ? "turn-1" : "turn-2",
+      () => undefined, (callback) => callback(), () => 500,
+      retract)).toEqual({ outcome: "superseded" });
+    expect(retract).toHaveBeenCalledTimes(1);
+    expect(port.markShown).not.toHaveBeenCalled();
+  });
+
+  it("retracts when a shown receipt returns after the browser advances", async () => {
+    const { port } = setup();
+    const saved = await runProbeDecision(port, provider(async () => response({ action: "probe",
+      text: "What changed?" })), "session-1", "turn-1", 500, () => 300);
+    if (saved.status !== "committed") return;
+    let activeTurn = "turn-1";
+    port.markShown = vi.fn(async () => { activeTurn = "turn-2"; return "recorded" as const; });
+    const retract = vi.fn();
+    expect(await presentCommittedProbe(port, saved.value, () => activeTurn,
+      () => undefined, (callback) => callback(), () => 500, retract))
+      .toEqual({ outcome: "superseded" });
+    expect(retract).toHaveBeenCalledTimes(1);
+    expect(port.markShown).toHaveBeenCalledTimes(1);
+  });
+
   it("replays a current committed decision without another model call", async () => {
     const { port, setCurrent } = setup();
     const first = await runProbeDecision(port, provider(async () => response({ action: "probe",
