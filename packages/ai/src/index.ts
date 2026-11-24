@@ -40,3 +40,4 @@ export * from "./gate1-answer-processor.js";
 export * from "./providers.js";
 export * from "./report-evidence.js";
 export * from "./probe-metrics.js";
+export * from "./screening-evidence.js";
