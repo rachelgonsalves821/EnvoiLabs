@@ -4,6 +4,29 @@ import { cents, exampleDate, exampleId, exampleRow, id, positive, row, text, tim
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const exampleDigest = "a".repeat(64);
 
+export const MarketplaceFeasibilitySchema = withExample(z.strictObject({
+  studyId: id,
+  eligibleProfileCount: z.int().nonnegative(),
+  history: z.strictObject({ offered: z.int().nonnegative(),
+    accepted: z.int().nonnegative(), completed: z.int().nonnegative() }),
+  projectedCompletes: z.int().nonnegative().nullable(),
+  fillHours: z.null(),
+  basis: z.enum(["insufficient_history", "observed_rates"]),
+  asOf: timestamp,
+}).superRefine((result, ctx) => {
+  if (result.history.accepted > result.history.offered ||
+    result.history.completed > result.history.accepted ||
+    (result.projectedCompletes !== null && result.projectedCompletes > result.eligibleProfileCount) ||
+    (result.basis === "insufficient_history" && result.projectedCompletes !== null) ||
+    (result.basis === "observed_rates" &&
+      (result.history.offered < 30 || result.history.accepted < 10 || result.projectedCompletes === null))) {
+    ctx.addIssue({ code: "custom", message: "Feasibility evidence is inconsistent." });
+  }
+}), { studyId: exampleId, eligibleProfileCount: 1,
+  history: { offered: 1, accepted: 1, completed: 1 },
+  projectedCompletes: null, fillHours: null, basis: "insufficient_history",
+  asOf: exampleDate });
+
 /** Additive quote version. V1 remains readable until its consumers migrate. */
 export const QuoteV2Schema = withExample(z.strictObject({
   ...row,

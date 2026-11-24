@@ -1756,6 +1756,10 @@ export type Database = {
           student: boolean
         }[]
       }
+      read_gate2_marketplace_feasibility: {
+        Args: { supplied_auth_user_id: string; supplied_study_id: string }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
