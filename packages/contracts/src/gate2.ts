@@ -38,6 +38,28 @@ export const QuoteV2Schema = withExample(z.strictObject({
   feasibility: { expectedCompletes: 1, hours: 24 },
 });
 
+/** Additive marketplace quote; V2 stays readable for frozen earlier drafts. */
+export const QuoteV3Schema = withExample(QuoteV2Schema.superRefine((quote, ctx) => {
+  const line = quote.lineItems[0];
+  if (!line || line.respondentCount < 10) ctx.addIssue({ code: "custom",
+    message: "Marketplace quotes need at least ten respondents.",
+    path: ["lineItems", 0, "respondentCount"] });
+  if (line && line.unitPriceCents !== 200) ctx.addIssue({ code: "custom",
+    message: "Current marketplace price is two dollars per core question.",
+    path: ["lineItems", 0, "unitPriceCents"] });
+  if (line && quote.incentiveCentsPerComplete !== line.coreQuestionCount * 100)
+    ctx.addIssue({ code: "custom",
+      message: "Reward is one dollar per answered core question.",
+      path: ["incentiveCentsPerComplete"] });
+}), {
+  ...exampleRow, studyId: exampleId, briefVersion: 1, guideDigest: exampleDigest,
+  pricingConfigId: exampleId, pricingConfigVersion: 101, currency: "usd",
+  totalCents: 10_000, incentiveCentsPerComplete: 500,
+  lineItems: [{ label: "Core questions", coreQuestionCount: 5, respondentCount: 10,
+    unitPriceCents: 200, amountCents: 10_000 }],
+  feasibility: { expectedCompletes: 10, hours: 24 },
+});
+
 /** Payment identity is bound to one frozen quote and its pricing version. */
 export const PaymentV2Schema = withExample(z.strictObject({
   ...row, studyId: id, quoteId: id, pricingConfigVersion: positive,
@@ -76,6 +98,7 @@ export const ScreeningDecisionV1Schema = withExample(z.discriminatedUnion("actio
 ]), { action: "qualify", ruleId: exampleId, ruleVersion: 1, confirmedFact: true });
 
 export type QuoteV2 = z.infer<typeof QuoteV2Schema>;
+export type QuoteV3 = z.infer<typeof QuoteV3Schema>;
 export type PaymentV2 = z.infer<typeof PaymentV2Schema>;
 export type ScreeningRuleV1 = z.infer<typeof ScreeningRuleV1Schema>;
 export type ScreeningInterpretationV1 = z.infer<typeof ScreeningInterpretationV1Schema>;
