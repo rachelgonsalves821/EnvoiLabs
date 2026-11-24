@@ -22,9 +22,18 @@ Start from the merged four-question contract. The [journey map](BUILD_PLAN.md#wh
 
 The shared confirmation service must persist the answer, the audit and the durable job marker together. Resolve typed answers from a restricted record and route the identifier through the redaction job. Recheck consent and the transcript version before researcher publication.
 
+## Hosted publication rehearsal
+
+Run the rehearsal after an independent qualification meets the PRD thresholds and the evidence-preservation review. Record the protected preview deployment revision, the applied preview database migrations, the approved policy digest and the exact passing report SHA-256. The [private worker instructions](../packages/ai/evals/redaction/contextual/spoken_v3/README.md#private-worker-handoff) describe the matching runtime and model checks. Link the [Presidio evaluation and adoption decision](adr/0003-presidio-transcript-redaction-evaluation.md) in the final evidence.
+
+1. Pause only the preview's private answer drain and allow in-flight claims to settle before submitting test answers. Keep invite expiry running. The scheduled drain has no qualified redactor and finishes claimed answers privately.
+2. Have the trusted database operator register the exact policy and report digests on the dedicated preview. Start a fresh synthetic four-question study with a controlled researcher and respondent. Verify the initial locked researcher view and the respondent's current recording, transcription, retention and researcher-access choices.
+3. Run the qualified worker for the selected answer IDs on the trusted host. Exercise voice and typed answers and confirm the tracking page shows the resulting redacted transcripts after researcher MFA. Check that the answer is private when consent is missing, that current withdrawal removes an existing projection, and that another organization cannot read it.
+4. Record timestamps, provider and model metadata, aggregate result counts, and build and qualification fingerprints in [goal #4](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4) and [STATUS](STATUS.md). Keep transcript text and credentials in the protected environment. Revoke temporary rehearsal access and restore the intended preview drain state.
+
 ## Initial upstream evaluation
 
-Five synthetic recordings were decoded and checksummed in preparation for the slice. The recordings cover WebM/Opus, MP4/AAC and WAV. The live transcription check remains part of IT-1.2.
+Five synthetic recordings were decoded and checksummed in preparation for the slice. The recordings cover WebM/Opus, MP4/AAC and WAV. IT-1.2 also has a [live provider smoke](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136) and [hosted private worker evidence](STATUS.md#2026-11-23--gate-1-hosted-scheduler-and-speech-verification).
 
 The offline evaluation of Presidio 2.2.366 and spaCy English small 3.8.0 used 100 fictional snippets. At a score threshold of 0.35, the first pass fully removed 12 of 18 phones, 15 of 18 emails, 17 of 18 names, 13 of 18 employers and none of 18 full addresses. Four of ten clean snippets were altered.
 
