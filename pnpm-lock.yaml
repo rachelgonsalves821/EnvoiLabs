@@ -97,6 +97,9 @@ importers:
       '@envoi-labs/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@envoi-labs/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/testing:
     devDependencies:
