@@ -46,7 +46,7 @@ export class ReportUiController {
     if (this.state.kind !== "ready" || !this.state.canExport) return null;
     const visible = this.state.report;
     const request = ++this.generation;
-    this.setState({ kind: "ready", report: visible, canExport: false });
+    this.setState({ kind: "loading", canExport: false });
     const payload = await exportCurrentReport(this.port, this.studyId);
     if (request !== this.generation) return null;
     if (!payload) {

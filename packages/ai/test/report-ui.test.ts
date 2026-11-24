@@ -19,7 +19,7 @@ describe("researcher report display and export flow", () => {
       report: current });
     expect(await controller.requestExport()).toContain('"A diner ordered soup"');
     expect(port.readCurrent).toHaveBeenCalledTimes(2);
-    expect(states).toEqual(["loading", "loading", "ready", "ready", "ready"]);
+    expect(states).toEqual(["loading", "loading", "ready", "loading", "ready"]);
     unsubscribe();
   });
 
@@ -32,6 +32,21 @@ describe("researcher report display and export flow", () => {
     expect(JSON.stringify(controller.getState())).not.toContain("ordered");
     expect(await controller.requestExport()).toBeNull();
     expect(port.readCurrent).toHaveBeenCalledTimes(2);
+  });
+
+  it("removes old claims while a delayed export authorization read is pending", async () => {
+    let resolveExport: (value: unknown) => void = () => undefined;
+    const port = { readCurrent: vi.fn()
+      .mockResolvedValueOnce(current)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveExport = resolve; })) };
+    const controller = new ReportUiController(port, studyId);
+    await controller.refresh();
+    const pending = controller.requestExport();
+    expect(controller.getState()).toEqual({ kind: "loading", canExport: false });
+    expect(JSON.stringify(controller.getState())).not.toContain("ordered");
+    resolveExport(null);
+    expect(await pending).toBeNull();
+    expect(controller.getState()).toEqual({ kind: "withheld", canExport: false });
   });
 
   it("ignores an old ready response after a newer withheld refresh", async () => {
