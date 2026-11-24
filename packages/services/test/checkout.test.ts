@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { QuoteV3Schema } from "@envoi-labs/contracts";
+import { QuoteV3Schema, QuoteV4Schema } from "@envoi-labs/contracts";
 import { prepareStudyCheckout } from "../src/checkout.js";
 
-const quote = QuoteV3Schema.parse((QuoteV3Schema.meta()?.examples as unknown[])[0]);
+const quote = QuoteV4Schema.parse((QuoteV4Schema.meta()?.examples as unknown[])[0]);
 const scope = { studyId: quote.studyId, briefVersion: quote.briefVersion,
   coreQuestionCount: 5, targetRespondents: 10, feasibility: quote.feasibility };
 const config = { id: quote.pricingConfigId, version: quote.pricingConfigVersion,
@@ -81,6 +81,18 @@ describe("synthetic quote to checkout", () => {
     db.readQuote.mockResolvedValue(quote);
     db.claimCheckoutIntent.mockRejectedValue(new Error("intent unavailable"));
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
+    expect(provider.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses an invented fill time and an older quote before any provider call", async () => {
+    const { db, provider } = setup();
+    db.readApprovedScope.mockResolvedValueOnce({ ...scope, feasibility: {
+      ...scope.feasibility, fillHours: 24 } });
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
+    expect(db.freezeQuote).not.toHaveBeenCalled();
+    db.readQuote.mockResolvedValueOnce(QuoteV3Schema.parse(
+      (QuoteV3Schema.meta()?.examples as unknown[])[0]));
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
     expect(provider.create).not.toHaveBeenCalled();
   });
 

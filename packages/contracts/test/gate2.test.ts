@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import { PaymentV2Schema, QuoteV2Schema, QuoteV3Schema, ScreeningDecisionV1Schema,
+import { PaymentV2Schema, QuoteV2Schema, QuoteV3Schema, QuoteV4Schema, ScreeningDecisionV1Schema,
   ScreeningInterpretationV1Schema, ScreeningRuleV1Schema } from "../src/index.js";
 
 function example(schema: z.ZodType) {
@@ -23,6 +23,20 @@ describe("Gate 2 additive contracts", () => {
     expect(QuoteV3Schema.safeParse({ ...marketplace, lineItems: [{
       ...marketplace.lineItems[0], respondentCount: 9,
       amountCents: 9000 }], totalCents: 9000 }).success).toBe(false);
+  });
+  it("freezes marketplace supply evidence without inventing fill time", () => {
+    const current = QuoteV4Schema.parse(example(QuoteV4Schema));
+    const old = QuoteV3Schema.parse(example(QuoteV3Schema));
+    expect(QuoteV4Schema.safeParse(old).success).toBe(false);
+    expect(QuoteV4Schema.safeParse(current).success).toBe(true);
+    expect(QuoteV4Schema.safeParse({ ...current, feasibility: {
+      ...current.feasibility, fillHours: 24 } }).success).toBe(false);
+    expect(QuoteV4Schema.safeParse({ ...current, feasibility: {
+      ...current.feasibility, studyId: "22222222-2222-4222-8222-222222222222" } }).success).toBe(false);
+    expect(QuoteV4Schema.safeParse({ ...current, feasibility: {
+      ...current.feasibility, projectedCompletes: 11,
+      basis: "observed_rates", history: { offered: 30, accepted: 10, completed: 10 },
+      eligibleProfileCount: 12 } }).success).toBe(false);
   });
   it.each([QuoteV2Schema, PaymentV2Schema, ScreeningRuleV1Schema,
     ScreeningInterpretationV1Schema, ScreeningDecisionV1Schema])("round trips its example", (schema) => {

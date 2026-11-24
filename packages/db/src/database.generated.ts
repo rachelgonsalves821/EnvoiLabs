@@ -1666,10 +1666,10 @@ export type Database = {
       }
       freeze_gate2_marketplace_quote: {
         Args: {
+          supplied_auth_user_id: string
           supplied_brief_version: number
           supplied_config_id: string
           supplied_config_version: number
-          supplied_feasibility: Json
           supplied_incentive_cents: number
           supplied_line_items: Json
           supplied_study_id: string

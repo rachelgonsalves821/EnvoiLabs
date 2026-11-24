@@ -1,4 +1,4 @@
-import type { QuoteV2 } from "@envoi-labs/contracts";
+import type { QuoteV4 } from "@envoi-labs/contracts";
 import type { CheckoutProvider, CheckoutSession } from "@envoi-labs/services/checkout";
 
 type StripeSession = {
@@ -50,7 +50,7 @@ export function createStripeTestCheckoutProvider(config: {
     return validStripeSession(await response.json());
   };
   return {
-    async create(key: string, quote: QuoteV2) {
+    async create(key: string, quote: QuoteV4) {
       if (key !== `gate2-checkout:${quote.id}` || !Number.isSafeInteger(quote.totalCents) ||
         quote.totalCents <= 0) throw new Error("Invalid checkout intent");
       const form = new URLSearchParams({

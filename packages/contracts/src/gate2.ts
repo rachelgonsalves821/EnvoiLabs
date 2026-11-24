@@ -83,6 +83,44 @@ export const QuoteV3Schema = withExample(QuoteV2Schema.superRefine((quote, ctx) 
   feasibility: { expectedCompletes: 10, hours: 24 },
 });
 
+/** Current marketplace evidence is frozen with the quote without a fill-time promise. */
+export const QuoteV4Schema = withExample(z.strictObject({
+  ...QuoteV2Schema.shape,
+  feasibility: MarketplaceFeasibilitySchema,
+}).superRefine((quote, ctx) => {
+  const line = quote.lineItems[0];
+  if (line && (line.coreQuestionCount * line.respondentCount * line.unitPriceCents !== quote.totalCents ||
+    line.amountCents !== quote.totalCents)) ctx.addIssue({ code: "custom",
+    message: "Quote amount must match its line item.", path: ["totalCents"] });
+  if (!line || line.respondentCount < 10) ctx.addIssue({ code: "custom",
+    message: "Marketplace quotes need at least ten respondents.",
+    path: ["lineItems", 0, "respondentCount"] });
+  if (line && line.unitPriceCents !== 200) ctx.addIssue({ code: "custom",
+    message: "Current marketplace price is two dollars per core question.",
+    path: ["lineItems", 0, "unitPriceCents"] });
+  if (line && quote.incentiveCentsPerComplete !== line.coreQuestionCount * 100)
+    ctx.addIssue({ code: "custom",
+      message: "Reward is one dollar per answered core question.",
+      path: ["incentiveCentsPerComplete"] });
+  if (quote.feasibility.studyId !== quote.studyId) ctx.addIssue({ code: "custom",
+    message: "Feasibility must be for this study.", path: ["feasibility", "studyId"] });
+  if (line && quote.feasibility.projectedCompletes !== null &&
+    quote.feasibility.projectedCompletes > line.respondentCount)
+    ctx.addIssue({ code: "custom",
+      message: "Projected completes cannot exceed purchased slots.",
+      path: ["feasibility", "projectedCompletes"] });
+}), {
+  ...exampleRow, studyId: exampleId, briefVersion: 1, guideDigest: exampleDigest,
+  pricingConfigId: exampleId, pricingConfigVersion: 101, currency: "usd",
+  totalCents: 10_000, incentiveCentsPerComplete: 500,
+  lineItems: [{ label: "Core questions", coreQuestionCount: 5, respondentCount: 10,
+    unitPriceCents: 200, amountCents: 10_000 }],
+  feasibility: { studyId: exampleId, eligibleProfileCount: 1,
+    history: { offered: 1, accepted: 1, completed: 1 },
+    projectedCompletes: null, fillHours: null, basis: "insufficient_history",
+    asOf: exampleDate },
+});
+
 /** Payment identity is bound to one frozen quote and its pricing version. */
 export const PaymentV2Schema = withExample(z.strictObject({
   ...row, studyId: id, quoteId: id, pricingConfigVersion: positive,
@@ -122,6 +160,7 @@ export const ScreeningDecisionV1Schema = withExample(z.discriminatedUnion("actio
 
 export type QuoteV2 = z.infer<typeof QuoteV2Schema>;
 export type QuoteV3 = z.infer<typeof QuoteV3Schema>;
+export type QuoteV4 = z.infer<typeof QuoteV4Schema>;
 export type PaymentV2 = z.infer<typeof PaymentV2Schema>;
 export type ScreeningRuleV1 = z.infer<typeof ScreeningRuleV1Schema>;
 export type ScreeningInterpretationV1 = z.infer<typeof ScreeningInterpretationV1Schema>;

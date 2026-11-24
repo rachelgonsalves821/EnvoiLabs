@@ -1,4 +1,5 @@
-import { QuoteV3Schema, type QuoteV3 } from "@envoi-labs/contracts";
+import { MarketplaceFeasibilitySchema, QuoteV4Schema,
+  type QuoteV4 } from "@envoi-labs/contracts";
 import { priceMarketplaceStudy } from "@envoi-labs/core";
 
 export type CheckoutScope = {
@@ -6,7 +7,7 @@ export type CheckoutScope = {
   briefVersion: number;
   coreQuestionCount: number;
   targetRespondents: number;
-  feasibility: { expectedCompletes: number; hours: number };
+  feasibility: ReturnType<typeof MarketplaceFeasibilitySchema.parse>;
 };
 export type CheckoutPricing = {
   id: string;
@@ -40,7 +41,7 @@ export type CheckoutDatabase = {
   recordCheckoutCreated(session: CheckoutSession, eventId: string, observedAt: string): Promise<void>;
 };
 export type CheckoutProvider = {
-  create(key: string, quote: QuoteV3): Promise<CheckoutSession>;
+  create(key: string, quote: QuoteV4): Promise<CheckoutSession>;
   get(checkoutId: string): Promise<CheckoutSession>;
 };
 
@@ -52,7 +53,7 @@ const approvedCheckoutUrl = (value: string) => {
   } catch { return false; }
 };
 
-const matchesQuote = (session: CheckoutSession, quote: QuoteV3) =>
+const matchesQuote = (session: CheckoutSession, quote: QuoteV4) =>
   session.studyId === quote.studyId && session.quoteId === quote.id &&
   session.pricingConfigVersion === quote.pricingConfigVersion &&
   session.amountCents === quote.totalCents && session.currency === quote.currency &&
@@ -61,19 +62,21 @@ const matchesQuote = (session: CheckoutSession, quote: QuoteV3) =>
 
 export async function prepareStudyCheckout(
   db: CheckoutDatabase, provider: CheckoutProvider, studyId: string,
-): Promise<{ status: "ready"; quote: QuoteV3; checkout: CheckoutSession } |
+): Promise<{ status: "ready"; quote: QuoteV4; checkout: CheckoutSession } |
   { status: "blocked" | "unavailable" }> {
   try {
     const scope = await db.readApprovedScope(studyId);
     const config = await db.readSelectedPricing(studyId);
     if (!scope || !config || scope.studyId !== studyId) return { status: "blocked" };
+    const evidence = MarketplaceFeasibilitySchema.safeParse(scope.feasibility);
+    if (!evidence.success || evidence.data.studyId !== studyId) return { status: "blocked" };
     const price = priceMarketplaceStudy({ coreQuestionCount: scope.coreQuestionCount,
       respondentCount: scope.targetRespondents, unitPriceCents: config.unitPriceCents,
       rewardPerQuestionCents: config.incentivePerQuestionCents });
     const quoteId = await db.freezeQuote({ studyId, briefVersion: scope.briefVersion,
       pricingConfigId: config.id, pricingConfigVersion: config.version,
-      ...price, feasibility: scope.feasibility });
-    const parsed = QuoteV3Schema.safeParse(await db.readQuote(studyId, quoteId));
+      ...price, feasibility: evidence.data });
+    const parsed = QuoteV4Schema.safeParse(await db.readQuote(studyId, quoteId));
     if (!parsed.success || parsed.data.studyId !== studyId || parsed.data.id !== quoteId ||
       parsed.data.briefVersion !== scope.briefVersion ||
       parsed.data.pricingConfigId !== config.id ||
