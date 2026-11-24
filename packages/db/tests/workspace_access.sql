@@ -41,7 +41,7 @@ from (values
     ('public.removals'), ('public.gate2_payment_events'), ('public.gate2_payout_events'),
     ('public.gate2_screening_rules'), ('public.gate2_screening_events'),
     ('pii.gate2_screener_answers'), ('pii.gate3_evidence_proposals'),
-    ('pii.gate3_evidence_decisions')
+    ('pii.gate3_evidence_decisions'), ('pii.gate3_report_publications')
 ) as service_only(relation);
 grant select on access_matrix to authenticated, anon;
 

@@ -1678,6 +1678,16 @@ export type Database = {
         }
         Returns: string
       }
+      publish_gate3_qualified_report: {
+        Args: {
+          supplied_claims: Json
+          supplied_policy: string
+          supplied_qualification: string
+          supplied_report_id: string
+          supplied_summary: Json
+        }
+        Returns: boolean
+      }
       read_gate1_audio_reservation: {
         Args: {
           supplied_audio_id: string

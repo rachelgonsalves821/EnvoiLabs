@@ -63,16 +63,35 @@ select is((select count(*) from research.evidence_quotes), 0::bigint, 'quote can
 select throws_ok($$select claim from public.findings$$, '42501', null, 'raw model claim cannot be read');
 reset role;
 
-update public.reports set qualified_summary_json = '{"summary":"One soup order"}',
-    qualified_policy_digest = repeat('a', 64), qualified_qualification_digest = repeat('b', 64)
-where id = 'a9700000-0000-4000-8000-000000000006';
-update public.findings set qualified_claim = 'One respondent ordered soup'
-where id = 'a9700000-0000-4000-8000-000000000007';
+set local role service_role;
+select throws_ok($$update public.reports set qualified_summary_json = '{"raw":"Ada Example"}'
+    where id = 'a9700000-0000-4000-8000-000000000006'$$,
+    '42501', null, 'service cannot directly write a qualified summary');
+select throws_ok($$update public.findings set qualified_claim = 'Ada Example'
+    where id = 'a9700000-0000-4000-8000-000000000007'$$,
+    '42501', null, 'service cannot directly write a qualified claim');
+select ok(public.publish_gate3_qualified_report(
+    'a9700000-0000-4000-8000-000000000006',
+    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    repeat('a', 64), repeat('b', 64)), 'trusted publisher binds exact qualified output');
+reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
 select is((select count(*) from research.reports), 1::bigint, 'qualified report is visible to MFA tenant researcher');
 select is((select claim from research.findings), 'One respondent ordered soup', 'only qualified claim is projected');
 select is((select text from research.evidence_quotes), 'ordered soup', 'exact Unicode codepoint span is projected');
+reset role;
+update public.reports set qualified_summary_json = '{"raw":"Ada Example"}'
+where id = 'a9700000-0000-4000-8000-000000000006';
+set local role authenticated;
+select is((select count(*) from research.reports), 0::bigint,
+    'privileged post-publication text mutation invalidates its receipt');
+reset role;
+update public.reports set qualified_summary_json =
+    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}'
+where id = 'a9700000-0000-4000-8000-000000000006';
+set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
 select is((select count(*) from research.reports), 0::bigint, 'pre-MFA researcher sees no report');
 set local request.jwt.claims = '{"sub":"a9700000-0000-4000-8000-000000000009","role":"authenticated","aal":"aal2"}';
