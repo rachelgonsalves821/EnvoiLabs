@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
 import { scoreProbeHeldout, syntheticProbeHeldout } from "../evals/probe-heldout.mjs";
 
 it("scores all 60 fictional cases without echoing answer text into the report", () => {
@@ -7,6 +8,16 @@ it("scores all 60 fictional cases without echoing answer text into the report", 
   expect(report).toMatchObject({ sampleSize: 60, probes: 60, acceptable: 60,
     qualityRate: 1, offTopicAnswers: 0, rubricPassed: true });
   expect(JSON.stringify(report)).not.toContain("I hesitated at the last step");
+});
+
+it("labels the CLI fixture replay without a pilot rubric pass", () => {
+  const run = spawnSync(process.execPath,
+    ["packages/ai/evals/run-probe-heldout.mjs", "--synthetic"],
+    { cwd: process.cwd(), encoding: "utf8" });
+  expect(run.status).toBe(0);
+  const output = JSON.parse(run.stdout);
+  expect(output).toMatchObject({ evidence: "synthetic-pipeline-smoke-only",
+    rubricPassed: null, fixtureRubricPass: true, sampleSize: 60 });
 });
 
 it("fails the quality or off-topic rubric with reviewed negative labels", () => {

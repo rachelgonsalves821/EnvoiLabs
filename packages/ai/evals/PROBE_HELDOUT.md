@@ -1,6 +1,6 @@
 # Probe held-out evaluation protocol
 
-The `--synthetic` run is a pipeline smoke test. It repeats 12 fictional scenarios across five variants and labels them in code. Its score is **not** evidence of model quality or Gate 3 acceptance.
+The `--synthetic` run is a pipeline smoke test. It repeats 12 fictional scenarios across five variants and labels them in code. Its CLI output sets `rubricPassed` to `null` and reports `fixtureRubricPass` separately. Its score is **not** evidence of model quality or Gate 3 acceptance.
 
 ## Real 60-answer run, after the consent and processing gates
 
