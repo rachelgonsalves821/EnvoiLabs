@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PublishedThemeSetV2Schema } from "@envoi-labs/contracts";
-import { loadQualifiedReport, publishReviewedReport, recordWithheldProposal,
+import { loadCurrentQualifiedReport, loadQualifiedReport, publishReviewedReport, recordWithheldProposal,
   type ReviewedEvidenceDecision } from "../src/reviewed-report-adapter.js";
 
 const content = PublishedThemeSetV2Schema.parse({ version: 2,
@@ -73,5 +73,20 @@ describe("reviewed report database adapter", () => {
     expect(db.rpc).toHaveBeenCalledTimes(2);
     expect(db.rpc).toHaveBeenCalledWith("read_gate3_qualified_report", {
       supplied_study_id: quote.studyId, supplied_report_id: reportId });
+  });
+
+  it("asks for the newest qualified version on every display and export read", async () => {
+    const reportId = "a9700000-0000-4000-8000-000000000030";
+    const payload = { report: { id: reportId, studyId: quote.studyId, summary: content } };
+    const db = { rpc: vi.fn().mockResolvedValueOnce({ data: payload, error: null })
+      .mockResolvedValueOnce({ data: null, error: null }) };
+    expect(await loadCurrentQualifiedReport(db, quote.studyId)).toEqual({
+      reportId, studyId: quote.studyId, summary: content,
+    });
+    expect(await loadCurrentQualifiedReport(db, quote.studyId)).toBeNull();
+    expect(db.rpc).toHaveBeenCalledTimes(2);
+    expect(db.rpc).toHaveBeenCalledWith("read_gate3_current_qualified_report", {
+      supplied_study_id: quote.studyId,
+    });
   });
 });

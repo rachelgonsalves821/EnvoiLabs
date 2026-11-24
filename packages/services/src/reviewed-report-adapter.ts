@@ -123,3 +123,27 @@ export async function loadQualifiedReport(
   return scoped.id === reportId && scoped.studyId === studyId &&
     PublishedThemeSetV2Schema.safeParse(scoped.summary).success ? data : null;
 }
+
+type CurrentQualifiedReportReader = {
+  rpc(name: "read_gate3_current_qualified_report", args: {
+    supplied_study_id: string;
+  }): PromiseLike<{ data: unknown; error: unknown }>;
+};
+
+// Each display and export request must call this port afresh. The database
+// selects the latest version first, so a withheld newest report yields null.
+export async function loadCurrentQualifiedReport(
+  db: CurrentQualifiedReportReader, studyId: string,
+): Promise<{ reportId: string; studyId: string; summary: PublishedThemeSetV2 } | null> {
+  const { data, error } = await db.rpc("read_gate3_current_qualified_report", {
+    supplied_study_id: studyId,
+  });
+  if (error) throw error;
+  if (!data || typeof data !== "object") return null;
+  const report = (data as { report?: unknown }).report;
+  if (!report || typeof report !== "object") return null;
+  const scoped = report as { id?: unknown; studyId?: unknown; summary?: unknown };
+  const summary = PublishedThemeSetV2Schema.safeParse(scoped.summary);
+  return typeof scoped.id === "string" && scoped.studyId === studyId && summary.success
+    ? { reportId: scoped.id, studyId, summary: summary.data } : null;
+}

@@ -347,6 +347,24 @@ select is(public.read_gate3_qualified_report(
     'reader refuses other-tenant access');
 reset role;
 
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate3_current_qualified_report(
+    '90600000-0000-4000-8000-000000000001') #>> '{report,id}',
+    'a9700000-0000-4000-8000-000000000030',
+    'current reader selects latest qualified version');
+reset role;
+update public.reports set qualified_summary_json = '{"raw":"withheld"}'
+where id = 'a9700000-0000-4000-8000-000000000030';
+set local role authenticated;
+select is(public.read_gate3_current_qualified_report(
+    '90600000-0000-4000-8000-000000000001'), null::jsonb,
+    'withheld latest version never falls back to older qualified report');
+reset role;
+update public.reports set qualified_summary_json =
+    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}'
+where id = 'a9700000-0000-4000-8000-000000000030';
+
 insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
 values (repeat('c', 64), repeat('b', 64));
 update public.reports set qualified_policy_digest = repeat('c', 64)

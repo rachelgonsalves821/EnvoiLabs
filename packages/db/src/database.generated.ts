@@ -1719,6 +1719,10 @@ export type Database = {
           student: boolean
         }[]
       }
+      read_gate3_current_qualified_report: {
+        Args: { supplied_study_id: string }
+        Returns: Json
+      }
       read_gate3_qualified_report: {
         Args: { supplied_report_id: string; supplied_study_id: string }
         Returns: Json

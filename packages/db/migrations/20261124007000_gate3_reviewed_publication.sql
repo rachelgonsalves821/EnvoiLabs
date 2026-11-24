@@ -254,3 +254,25 @@ $$;
 revoke all on function public.read_gate3_qualified_report(uuid, uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.read_gate3_qualified_report(uuid, uuid) to authenticated;
+
+-- The latest report identity is read under the same statement snapshot as the
+-- qualified payload. A withheld newer version must not expose an older one.
+create function internal.gate3_latest_report_id(supplied_study_id uuid)
+returns uuid language sql stable security definer set search_path = '' as $$
+    select report.id from public.reports as report
+    where report.study_id = supplied_study_id
+        and internal.researches_study(supplied_study_id)
+    order by report.version desc, report.created_at desc, report.id desc limit 1;
+$$;
+revoke all on function internal.gate3_latest_report_id(uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function internal.gate3_latest_report_id(uuid) to authenticated;
+
+create function public.read_gate3_current_qualified_report(supplied_study_id uuid)
+returns jsonb language sql stable security invoker set search_path = '' as $$
+    select public.read_gate3_qualified_report(supplied_study_id,
+        internal.gate3_latest_report_id(supplied_study_id));
+$$;
+revoke all on function public.read_gate3_current_qualified_report(uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function public.read_gate3_current_qualified_report(uuid) to authenticated;
