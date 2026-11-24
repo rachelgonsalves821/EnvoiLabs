@@ -10,7 +10,7 @@ Reviewed 2026-11-23 on `codex/gate-4-parallel` against the [OWASP Top 10:2025](h
 | A04 Cryptographic Failures | `private-audio.ts` checks byte length, container, and SHA-256 before answer confirmation; `respondent.ts` binds age proof to the email with HMAC. | Verify TLS, encryption at rest, secret rotation, signed URL expiry, and private key handling in the hosted environment. |
 | A05 Injection | API `input` requires JSON and exact origin; service calls pass fixed RPC names and structured arguments. | Review all Gate 2/3 dynamic queries, report rendering, and model output sinks after integration. |
 | A06 Insecure Design | Publication requires qualified redaction policy; failed redaction remains private. Consent and lease checks occur before processing. | Gate 1 independent redaction qualification is open; rehearse withdrawal and delayed-job behavior, then review payment and payout invariants. |
-| A07 Authentication Failures | Respondent/researcher start routes use Supabase OTP; researcher access requires MFA. Provider 429 is relayed. | Enforce application-level limits before OTP dispatch and signed-upload reservation, including distributed concurrency and privacy-preserving keys; test 429 and recovery. See [rate-limit inventory](rate-limit-inventory.md). |
+| A07 Authentication Failures | Respondent/researcher start routes use Supabase OTP; researcher access requires MFA. Provider 429 is relayed. | Enforce application-level limits before OTP dispatch and signed-upload reservation, including distributed concurrency and privacy-preserving keys; test 429 and recovery. See the [rate-limit inventory](#rate-limit-path-inventory-and-acceptance-cases) below. |
 | A08 Software or Data Integrity Failures | The answer path checks recording digest and uses durable leases and idempotent completion. | Test Stripe and Tremendous signature, event order, duplicate delivery, and uncertain outcomes once Gate 2 services integrate. |
 | A09 Security Logging and Alerting Failures | Current workers mask private database/provider errors from scheduler logs. | R-PLAT-12 observability is not complete. Verify structured safe logs, alerting, incident routing, and access to job dashboards. |
 | A10 Mishandling of Exceptional Conditions | Answer processing retries provider failure and keeps redaction failures private. | Complete IT-4.2 on integrated LLM, transcription, and payout paths; rehearse runbooks and confirm no raw response leaks in failure logs. |
@@ -27,6 +27,20 @@ The route file is a thin handler; the service path named here is where a limit m
 | Direct object transfer | Browser uploads to a Supabase signed URL after reservation. | Verify storage-side size, MIME, object path, URL expiry, and service or edge limits; API request limits alone do not bound transfer bandwidth. |
 
 Also inspect `POST /api/respondent/answers/record` for typed-answer abuse and confirmation costs. It is not a substitute for the required sign-in and upload controls. The acceptance test implementation belongs with the eventual limiter after Gate 1 releases these paths.
+
+### Distributed-limit test handoff
+
+Gate 1 owns these exact files until its path-level release: `apps/web/app/api/respondent/auth/start/route.ts`, `apps/web/server/auth/respondent.ts`, `apps/web/app/api/researcher/auth/start/route.ts`, `apps/web/server/auth/researcher.ts`, `apps/web/app/api/respondent/answers/upload/route.ts`, and `apps/web/server/respondent/private-audio.ts`. Gate 4 requests ownership of only the rate-limit insertion and its adjacent tests after that release. The limiter's shared atomic store, key policy, threshold, and window need coordinator approval before implementation; in-memory per-instance counts cannot establish a distributed limit.
+
+Prepare a disposable integration fixture with two independent app processes pointing to one limiter store and one local Auth/storage stack. Freeze or advance the clock at the limiter boundary, and instrument OTP dispatch, `reserve_gate1_audio`, and signed URL creation. Assertions to add alongside the eventual implementation:
+
+1. Send `N + 1` concurrent respondent OTP starts with the same normalized email and source across both processes, where `N` is the configured policy threshold. Exactly `N` may reach OTP dispatch; excess requests must return 429 and no dispatch. Repeat for researcher starts, preserving `shouldCreateUser:false` and a usable PKCE callback for accepted requests.
+2. Vary email while holding source constant, then vary source while holding email constant. Both dimensions must be bounded under the approved policy. Compare unknown and known accounts for the same public response shape. Verify the same normalized email spelling shares a quota without storing plaintext email in the limiter key.
+3. Advance beyond the window and confirm a valid request succeeds; confirm a malformed or cross-origin request is rejected before quota consumption and no account existence or quota balance leaks.
+4. With a synthetic authenticated respondent and eligible answer, send `N + 1` parallel upload-reservation calls through both processes. At most `N` reach the reservation RPC and signed URL creation. Every 429 leaves no new reservation, object path, or signed URL. A second respondent retains a separate allowance; unauthenticated and invalid-answer requests reveal no quota state.
+5. Exercise direct signed object transfer separately for size, MIME, path binding, expiry, and bandwidth policy. The application limit on URL creation does not enforce storage transfer volume.
+
+Run these cases against the real distributed store in local integration and preview after Gate 1 handoff. The threshold symbol `N` avoids inventing a production policy in this preparatory review.
 
 ## Narrow dependency proposal
 
