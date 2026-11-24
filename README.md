@@ -58,6 +58,8 @@ For the dedicated Vercel Preview branch or intentional Production environment, s
 
 To exercise local scheduling, set `ENVOI_GATE1_EXPIRY_ENABLED=1` and `INNGEST_DEV=1` for Next development. Use a disposable Supabase instance on loopback and bind the app to `127.0.0.1`. Run the Inngest Dev Server with `inngest dev -u http://127.0.0.1:3000/api/inngest`, then verify the registered function and a scheduled run. [Local Dev Server](https://www.inngest.com/docs/local-development)
 
+After applying the `list_gate1_expired_audio` migration to a disposable database, set `ENVOI_GATE1_ORPHAN_AUDIO_ENABLED=1` alongside expiry to test removal of expired, unconfirmed uploads. The scheduler runs cleanup after expiry and reports the number of paths requested for removal. Cleanup defaults to off and is available only on a loopback Dev Server or the dedicated Vercel Preview.
+
 ## Scheduled Gate 1 private answer processing
 
 The private answer worker has a separate server-side opt-in. Set `ENVOI_GATE1_PRIVATE_ANSWERS_ENABLED=1` only in the intended environment after configuring an approved `OPENAI_API_KEY` or `GROQ_API_KEY`. The same signed app sync registers `gate1-drain-private-answers`, which checks for up to four due jobs every five minutes. Each step reports whether it found work. The run reports a count. Only the worker and database exchange answer data, and the configured worker keeps transcripts private.
