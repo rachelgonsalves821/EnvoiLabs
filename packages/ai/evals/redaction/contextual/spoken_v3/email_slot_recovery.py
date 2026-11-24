@@ -32,7 +32,8 @@ _WEBSITE = re.compile(
     r"\b(?:browse|click|go to|visit|look at|shop at|check out)\b|"
     r"\b(?:the |a )?(?:website|web site|homepage|menu|product|url)\b"
 )
-_BOUNDARY = {"and", "that", "to", "when", "who", "your", "you"}
+_PROSE_SUFFIX = {"an", "and", "are", "but", "for", "is", "of", "or", "that", "the", "those",
+                 "to", "was", "were", "when", "who", "with", "your", "you"}
 _BLOCK = {"a", "an", "the", "my", "myself", "theirs", "as", "it", "for", "at", "to"}
 _RECEIPT = re.compile(r"\b(?:the|my|our) (?:receipt|confirmation) (?:goes|went) to\s+")
 _ADDRESS_LABEL = re.compile(
@@ -62,7 +63,18 @@ _FUSED_AT = re.compile(r"[^\W\d_]{2,}at[^\W\d_]{3,}\Z")
 _DISCOURSE_WORDS = _BLOCK | {"and", "but", "because", "if", "i", "we", "they", "while"}
 
 
-def _domain_suffix(text, tokens, separator, strong_start, suffixes=_TLDS):
+def _domain_continues(tokens, stop):
+    if stop + 1 >= len(tokens):
+        return False
+    separator, following = tokens[stop:stop + 2]
+    if separator.word == ".":
+        return tokens[stop - 1].end == separator.start and separator.end == following.start and following.word.isalnum()
+    return (
+        separator.word in _DOMAIN_BREAK and following.word.isalpha() and following.word not in _PROSE_SUFFIX
+    )
+
+
+def _domain_suffix(text, tokens, separator, *, suffixes=_TLDS, inferred_limit=0):
     start = separator + 1
     if start >= len(tokens):
         return None
@@ -75,11 +87,13 @@ def _domain_suffix(text, tokens, separator, strong_start, suffixes=_TLDS):
         if first in suffixes and any(len(part) != 1 for part in pieces[1:]):
             continue
         joined = "".join(pieces)
-        if joined in suffixes:
+        if joined in suffixes and not _domain_continues(tokens, stop):
             return stop
+    if _domain_continues(tokens, start + 1):
+        return None
     if first in suffixes:
         return start + 1
-    if strong_start and first.isalpha() and 2 <= len(first) <= 7 and first not in _BOUNDARY:
+    if first.isalpha() and 2 <= len(first) <= inferred_limit and first not in _PROSE_SUFFIX:
         suffix = text[tokens[start].end:]
         if not suffix.strip() or _NEW_CLAUSE.search(suffix):
             return start + 1
@@ -159,7 +173,7 @@ def recover_email_slots(text):
         strong_start = exact_at and (bool(cue) or bool(assign)) and (operators or len(handle) >= 2)
         if separator.word not in _DOMAIN_BREAK and not (strong_start or cue or weak_at and operators):
             continue
-        end = _domain_suffix(lower, tokens, index, strong_start)
+        end = _domain_suffix(lower, tokens, index, inferred_limit=7 if strong_start else 0)
         if end is not None:
             first, last = tokens[start].start, tokens[end - 1].end
             if not _public_mail_reference(lower[first:last], lower[last:]):
@@ -222,13 +236,10 @@ def _recover_labeled_spelling(lower, tokens, offsets):
         for separator in range(first + 1, min(first + 15, len(tokens))):
             if tokens[separator].word not in _DOMAIN_BREAK:
                 continue
-            stop = _domain_suffix(lower, tokens, separator, False, _PRIVATE_SUFFIXES)
+            stop = _domain_suffix(lower, tokens, separator, suffixes=_PRIVATE_SUFFIXES, inferred_limit=63)
             if stop is None or not _labeled_address_shape(tokens, first, separator):
                 continue
             end = tokens[stop - 1].end
-            if (stop + 1 < len(tokens) and tokens[stop].start == end and tokens[stop].word == "."
-                    and tokens[stop + 1].start == tokens[stop].end):
-                continue
             if not _public_mail_reference(lower[start:end], lower[end:]):
                 yield Hit("email", start, end)
 
@@ -244,7 +255,7 @@ def _domain_endings(lower, tokens):
         if word not in _CONFIRMED_DOT:
             continue
         right = index + 1
-        end = _domain_suffix(lower, tokens, index, False)
+        end = _domain_suffix(lower, tokens, index)
         if end is not None:
             yield index, end, False
         elif tuple(item.word for item in tokens[right:right + 2]) == ("and", "valid"):

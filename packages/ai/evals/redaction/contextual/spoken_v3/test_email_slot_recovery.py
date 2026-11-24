@@ -103,6 +103,31 @@ class LabeledSpellingTests(unittest.TestCase):
         text = f"For email use {address} then check the product label."
         self.assertIn(address, self.recovered(text))
 
+    def test_long_domain_endings_accept_mixed_separators_with_a_clear_boundary(self):
+        addresses = (
+            "cedar.manuscript at relay dot mail.technology",
+            "cedar dot manuscriptatrelay.mail dot solutions",
+            "cedar manuscript at relay.mail dot technology",
+            "cedar dot manuscript relay dot mail.solutions",
+            "cedar manuscript at relay dot test.solutions",
+            "cedar manuscript at relay.test dot solutions",
+        )
+        for address in addresses:
+            with self.subTest(address=address):
+                self.assertEqual(self.recovered(f"My inbox is {address}. Shipping took forty minutes."), {address})
+
+    def test_unknown_ending_does_not_consume_public_labels_or_unbounded_prose(self):
+        texts = (
+            "the public website uses cedar manuscript at relay dot technology.",
+            "my inbox is cedar manuscript at relay dot technology improved checkout today",
+            "my email: cedar manuscript at relay dot the. Checkout was fast.",
+            "my inbox is cedar.manuscript at relay dot mail.solutions as the public website.",
+            "my inbox is cedar.manuscript at relay dot test.solutions as the public website.",
+        )
+        for text in texts:
+            with self.subTest(text=text):
+                self.assertEqual(self.recovered(text), set())
+
     def test_public_website_and_feedback_stay_untouched(self):
         texts = (
             "my email is about the catalog at relay dot com",
