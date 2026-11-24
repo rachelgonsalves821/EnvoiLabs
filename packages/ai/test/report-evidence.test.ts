@@ -11,6 +11,7 @@ const quote: ProposedEvidence = {
   startChar: 26, endChar: 43, quote: "delivery was slow", rationale: "Delivery friction",
   confidence: 0.8,
 };
+const publishClaim = (claim: string) => claim;
 
 describe("IT-3.2 report evidence integrity", () => {
   it("accepts only an exact span of the current published redacted source", () => {
@@ -40,24 +41,39 @@ describe("IT-3.2 report evidence integrity", () => {
 
   it("invalidates report and export findings after re-redaction, withdrawal or deletion", () => {
     const finding = { claim: "Delivery was slow", supporting: [quote], contradicting: [] };
-    expect(prepareFindings(source.studyId, [finding], [source]).findings).toHaveLength(1);
+    expect(prepareFindings(source.studyId, [finding], [source], publishClaim).findings).toHaveLength(1);
     for (const changed of [
       { ...source, version: "redaction-v2:answer-2" },
       { ...source, withdrawn: true },
       { ...source, published: false },
     ]) {
-      expect(prepareFindings(source.studyId, [finding], [changed]).findings).toEqual([]);
+      expect(prepareFindings(source.studyId, [finding], [changed], publishClaim).findings).toEqual([]);
     }
-    expect(prepareFindings(source.studyId, [finding], []).findings).toEqual([]);
+    expect(prepareFindings(source.studyId, [finding], [], publishClaim).findings).toEqual([]);
   });
 
   it("drops a fabricated lead quote but retains valid contradictory evidence", () => {
     const result = prepareFindings(source.studyId, [{
       claim: "Delivery was slow", supporting: [quote, { ...quote, quote: "fabricated" }],
       contradicting: [quote],
-    }], [source]);
-    expect(result.findings[0]?.supporting).toEqual([quote]);
-    expect(result.findings[0]?.contradicting).toEqual([quote]);
+    }], [source], publishClaim);
+    expect(result.findings[0]?.supporting).toEqual([expect.objectContaining({ quote: quote.quote, sourceVersion: quote.sourceVersion })]);
+    expect(result.findings[0]?.supporting[0]).not.toHaveProperty("rationale");
+    expect(result.findings[0]?.contradicting).toEqual(result.findings[0]?.supporting);
     expect(result.audit.map((event) => event.action)).toEqual(["accept", "drop", "accept"]);
+  });
+
+  it("withholds model claims without publication approval and never exposes model rationales", () => {
+    const privateName = "Avery Chen";
+    const modelClaim = `${privateName} disliked delivery`;
+    const privateQuote = { ...quote, rationale: `${privateName} works at Example Market` };
+    const proposed = [{ claim: modelClaim, supporting: [privateQuote], contradicting: [] }];
+    expect(prepareFindings(source.studyId, proposed, [source]).findings).toEqual([]);
+    expect(prepareFindings(source.studyId, proposed, [source], () => null).findings).toEqual([]);
+    const result = prepareFindings(source.studyId, proposed, [source], (claim) => claim.replace(privateName, "[PERSON]"));
+    expect(result.findings).toHaveLength(1);
+    expect(JSON.stringify(result)).not.toContain(privateName);
+    expect(JSON.stringify(result)).not.toContain("Example Market");
+    expect(result.findings[0]?.claim).toBe("[PERSON] disliked delivery");
   });
 });

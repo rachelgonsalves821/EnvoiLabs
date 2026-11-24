@@ -20,8 +20,11 @@ export interface ProposedEvidence {
   readonly confidence: number;
 }
 
+/** Contains only text copied from a qualified redacted source. Model rationale stays private. */
+export type VerifiedEvidence = Omit<ProposedEvidence, "rationale">;
+
 export type EvidenceDecision =
-  | { readonly action: "accept"; readonly evidence: ProposedEvidence }
+  | { readonly action: "accept"; readonly evidence: VerifiedEvidence }
   | { readonly action: "drop"; readonly transcriptId: string; readonly reason: string };
 
 export function verifyEvidence(
@@ -50,9 +53,13 @@ export function verifyEvidence(
       reason = "quote differs from redacted source";
     else if (!evidence.rationale.trim() || !Number.isFinite(evidence.confidence)
       || evidence.confidence < 0 || evidence.confidence > 1) reason = "invalid provenance";
-    return reason
-      ? { action: "drop", transcriptId: evidence.transcriptId, reason }
-      : { action: "accept", evidence };
+    if (reason) return { action: "drop", transcriptId: evidence.transcriptId, reason };
+    const verified: VerifiedEvidence = {
+      studyId: evidence.studyId, transcriptId: evidence.transcriptId,
+      sourceVersion: evidence.sourceVersion, startChar: evidence.startChar,
+      endChar: evidence.endChar, quote: evidence.quote, confidence: evidence.confidence,
+    };
+    return { action: "accept", evidence: verified };
   });
 }
 
@@ -62,12 +69,20 @@ export interface ProposedFinding {
   readonly contradicting: readonly ProposedEvidence[];
 }
 
+export interface PublishedFinding {
+  readonly claim: string;
+  readonly supporting: readonly VerifiedEvidence[];
+  readonly contradicting: readonly VerifiedEvidence[];
+}
+
 /** Re-run at every report or export read, so a changed projection revokes stale quotes. */
 export function prepareFindings(
   studyId: string,
   findings: readonly ProposedFinding[],
   sources: readonly RedactedSource[],
-): { findings: ProposedFinding[]; audit: EvidenceDecision[] } {
+  /** Must use the currently qualified publication policy; null withholds the finding. */
+  publishClaim?: (modelClaim: string) => string | null,
+): { findings: PublishedFinding[]; audit: EvidenceDecision[] } {
   const audit: EvidenceDecision[] = [];
   const visible = findings.flatMap((finding) => {
     const supporting = verifyEvidence(studyId, finding.supporting, sources);
@@ -75,7 +90,9 @@ export function prepareFindings(
     audit.push(...supporting, ...contradicting);
     const acceptedSupporting = supporting.flatMap((decision) => decision.action === "accept" ? [decision.evidence] : []);
     if (acceptedSupporting.length === 0) return [];
-    return [{ claim: finding.claim, supporting: acceptedSupporting,
+    const claim = publishClaim?.(finding.claim)?.trim();
+    if (!claim) return [];
+    return [{ claim, supporting: acceptedSupporting,
       contradicting: contradicting.flatMap((decision) => decision.action === "accept" ? [decision.evidence] : []) }];
   });
   return { findings: visible, audit };
