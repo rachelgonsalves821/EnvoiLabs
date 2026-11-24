@@ -1,6 +1,8 @@
 import type { LLMProvider, LLMRequest } from "./index.js";
 import type { ProbeOutcome } from "./probe-metrics.js";
 
+const obviousLeading = /^(?:don't you|wouldn't you|didn't you|isn't it|wasn't it|would you agree)\b/i;
+
 export interface ProbeAttempt {
   /** Unique answer/guide-turn ID; never reuse for another core question. */
   readonly turnId: string;
@@ -27,7 +29,8 @@ function parseDecision(output: unknown): { action: "probe"; text: string } | { a
   if (data.action === "next" && Object.keys(data).length === 1) return { action: "next" };
   if (data.action === "probe" && Object.keys(data).sort().join(",") === "action,text"
     && typeof data.text === "string" && data.text.trim() === data.text
-    && data.text.length > 0 && data.text.length <= 240 && data.text.endsWith("?")) {
+    && data.text.length > 0 && data.text.length <= 240 && data.text.endsWith("?")
+    && !obviousLeading.test(data.text)) {
     return { action: "probe", text: data.text };
   }
   return null;

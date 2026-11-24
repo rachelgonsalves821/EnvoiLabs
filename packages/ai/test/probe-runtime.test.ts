@@ -34,15 +34,18 @@ describe("probe runtime", () => {
       currentTurnId, timeoutMs: 1 });
     const invalid = await decideProbe(attempt, { provider: provider(async () => response({ action: "probe",
       text: "Tell me more" })), currentTurnId, timeoutMs: 50 });
-    expect([next, error, timeout, invalid]).toEqual([
+    const leading = await decideProbe(attempt, { provider: provider(async () => response({ action: "probe",
+      text: "Don't you think checkout was bad?" })), currentTurnId, timeoutMs: 50 });
+    expect([next, error, timeout, invalid, leading]).toEqual([
       { action: "next", turnId: "answer-1", outcome: "no_probe" },
       { action: "next", turnId: "answer-1", outcome: "error" },
       { action: "next", turnId: "answer-1", outcome: "timeout" },
       { action: "next", turnId: "answer-1", outcome: "error" },
+      { action: "next", turnId: "answer-1", outcome: "error" },
     ]);
-    expect(summarizeProbeOutcomes([next, error, timeout, invalid].map((item) =>
+    expect(summarizeProbeOutcomes([next, error, timeout, invalid, leading].map((item) =>
       recordProbeRender(item, currentTurnId(), 0)))).toMatchObject({
-      total: 4, rendered: 0, noProbe: 1, errors: 2, timeouts: 1, renderedP95Ms: null,
+      total: 5, rendered: 0, noProbe: 1, errors: 3, timeouts: 1, renderedP95Ms: null,
     });
   });
 

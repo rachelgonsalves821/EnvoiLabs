@@ -75,7 +75,31 @@ const suites = {
   probe: { prompt: "interviewer", check: checkProbe },
   evidence: { prompt: "analyst", check: checkEvidence },
   "probe-runtime": { prompt: "interviewer", check: checkProbe },
+  "probe-quality": { prompt: "interviewer", check: checkProbe },
 };
+
+async function evaluateProbeQuality() {
+  const fixtures = await loadJson("./probe-quality.json");
+  const results = fixtures.map((fixture) => {
+    const { action, text } = fixture.response;
+    const onGoal = action !== "probe" || fixture.goalTerms.some((term) =>
+      typeof text === "string" && text.toLowerCase().includes(term.toLowerCase()));
+    const neutral = action !== "probe" || !leadingPattern.test(text ?? "");
+    const valid = action === fixture.expectedAction && (action === "next"
+      ? text === undefined
+      : isText(text) && text.trim() === text && text.length <= 240
+        && text.endsWith("?") && neutral && onGoal);
+    return { id: fixture.id, expectedAccept: fixture.expectedAccept, observedAccept: valid,
+      neutral, onGoal, passed: valid === fixture.expectedAccept };
+  });
+  const acceptedProbes = results.filter((item) => item.observedAccept &&
+    fixtures.find((fixture) => fixture.id === item.id)?.response.action === "probe").length;
+  return { suite: "probe-quality", mode: "fixture-replay", passed: fixtures.length > 0
+    && results.every((item) => item.passed), metrics: { cases: results.length, acceptedProbes,
+    rejectedUnsafeProbes: results.filter((item) => !item.observedAccept).length,
+    leadingCases: results.filter((item) => !item.neutral).length,
+    offGoalCases: results.filter((item) => !item.onGoal).length }, results };
+}
 
 async function evaluateProbeRuntime() {
   const fixtures = await loadJson("./probe-runtime.json");
@@ -107,6 +131,10 @@ async function evaluate(names) {
   for (const name of names) {
     if (name === "probe-runtime") {
       reports.push(await evaluateProbeRuntime());
+      continue;
+    }
+    if (name === "probe-quality") {
+      reports.push(await evaluateProbeQuality());
       continue;
     }
     const { prompt, check } = suites[name];

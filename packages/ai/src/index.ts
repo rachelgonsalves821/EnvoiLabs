@@ -41,6 +41,7 @@ export * from "./providers.js";
 export * from "./report-evidence.js";
 export * from "./reviewed-report-bridge.js";
 export * from "./report-reader.js";
+export * from "./report-ui.js";
 export * from "./probe-metrics.js";
 export * from "./probe-runtime.js";
 export * from "./probe-state.js";
