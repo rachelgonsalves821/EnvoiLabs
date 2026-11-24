@@ -394,6 +394,120 @@ export type Database = {
           },
         ]
       }
+      gate2_payment_events: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          event_kind: string
+          id: string
+          provider_checkout_id: string
+          provider_event_id: string
+          provider_observed_at: string
+          quote_id: string
+          study_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency: string
+          event_kind: string
+          id?: string
+          provider_checkout_id: string
+          provider_event_id: string
+          provider_observed_at: string
+          quote_id: string
+          study_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          event_kind?: string
+          id?: string
+          provider_checkout_id?: string
+          provider_event_id?: string
+          provider_observed_at?: string
+          quote_id?: string
+          study_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate2_payment_events_quote_id_study_id_fkey"
+            columns: ["quote_id", "study_id"]
+            isOneToOne: false
+            referencedRelation: "gate2_quote_snapshots"
+            referencedColumns: ["id", "study_id"]
+          },
+        ]
+      }
+      gate2_quote_snapshots: {
+        Row: {
+          brief_version: number
+          created_at: string
+          currency: string
+          feasibility_json: Json
+          guide_digest: string
+          id: string
+          incentive_cents_per_complete: number
+          line_items_json: Json
+          pricing_config_id: string
+          pricing_config_version: number
+          study_id: string
+          total_cents: number
+        }
+        Insert: {
+          brief_version: number
+          created_at?: string
+          currency?: string
+          feasibility_json: Json
+          guide_digest: string
+          id?: string
+          incentive_cents_per_complete: number
+          line_items_json: Json
+          pricing_config_id: string
+          pricing_config_version: number
+          study_id: string
+          total_cents: number
+        }
+        Update: {
+          brief_version?: number
+          created_at?: string
+          currency?: string
+          feasibility_json?: Json
+          guide_digest?: string
+          id?: string
+          incentive_cents_per_complete?: number
+          line_items_json?: Json
+          pricing_config_id?: string
+          pricing_config_version?: number
+          study_id?: string
+          total_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate2_quote_snapshots_pricing_config_id_pricing_config_ver_fkey"
+            columns: ["pricing_config_id", "pricing_config_version"]
+            isOneToOne: false
+            referencedRelation: "pricing_configs"
+            referencedColumns: ["id", "version"]
+          },
+          {
+            foreignKeyName: "gate2_quote_snapshots_study_id_brief_version_fkey"
+            columns: ["study_id", "brief_version"]
+            isOneToOne: false
+            referencedRelation: "brief_versions"
+            referencedColumns: ["study_id", "version"]
+          },
+          {
+            foreignKeyName: "gate2_quote_snapshots_study_id_fkey"
+            columns: ["study_id"]
+            isOneToOne: false
+            referencedRelation: "studies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guide_questions: {
         Row: {
           created_at: string

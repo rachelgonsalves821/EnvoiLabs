@@ -27,6 +27,7 @@ insert into access_matrix values
     ('public.criteria',           array[0, 0, 1, 1, 0, 0, null]),
     ('public.guide_questions',    array[1, 0, 1, 1, 1, 0, null]),
     ('public.quotes',             array[0, 0, 1, 1, 0, 0, null]),
+    ('public.gate2_quote_snapshots', array[0, 0, 0, 0, 0, 0, null]),
     ('public.reports',            array[0, 0, 1, 1, 0, 0, null]),
     ('public.findings',           array[0, 0, 1, 1, 0, 0, null]),
     ('public.transcripts',        array[0, 0, 1, 1, 0, 0, null]),
@@ -37,7 +38,7 @@ from (values
     ('pii.audio_objects'), ('pii.respondent_pii'), ('pii.transcript_raw'),
     ('public.audit_log'), ('public.events'), ('public.llm_calls'), ('public.payments'),
     ('public.pricing_configs'), ('public.push_subscriptions'), ('public.quality_scores'),
-    ('public.removals')
+    ('public.removals'), ('public.gate2_payment_events')
 ) as service_only(relation);
 grant select on access_matrix to authenticated, anon;
 
