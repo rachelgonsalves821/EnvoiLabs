@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { QuoteV2Schema } from "@envoi-labs/contracts";
+import { QuoteV4Schema } from "@envoi-labs/contracts";
 import { createStripeTestCheckoutProvider } from "./gate2-stripe-test";
 
-const quote = QuoteV2Schema.parse((QuoteV2Schema.meta()?.examples as unknown[])[0]);
+const quote = QuoteV4Schema.parse((QuoteV4Schema.meta()?.examples as unknown[])[0]);
 const session = { id: "cs_test_fixture_1", object: "checkout.session", livemode: false,
   mode: "payment", client_reference_id: quote.id, amount_total: quote.totalCents,
   currency: "usd", status: "open", url: "https://checkout.stripe.com/c/pay/cs_test_fixture_1",

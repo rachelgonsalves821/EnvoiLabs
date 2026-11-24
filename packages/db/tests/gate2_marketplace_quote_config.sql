@@ -9,7 +9,7 @@ select is((select params_json from public.pricing_configs where version = 101),
 select ok((select marketplace_active and not active from public.pricing_configs
     where version = 101), 'Gate 1 preview pricing stays separate');
 select ok(not has_function_privilege('authenticated',
-    'public.freeze_gate2_marketplace_quote(uuid,integer,uuid,integer,jsonb,integer,integer,jsonb)',
+    'public.freeze_gate2_marketplace_quote(uuid,integer,uuid,integer,jsonb,integer,integer,uuid)',
     'EXECUTE'), 'clients cannot bypass the service quote freeze');
 
 update public.studies set state = 'brief_ready', target_completes = 10
@@ -22,25 +22,43 @@ select '90600000-0000-4000-8000-000000000001', position,
     'Marketplace question ' || position from generate_series(1, 5) as position;
 
 set local role service_role;
+select throws_ok($$select public.freeze_gate2_quote(
+    '90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where version = 101), 101,
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
+    10000, 500, '{"expectedCompletes":10,"hours":24}')$$,
+    '23514', null, 'legacy privileged writer cannot insert invented fill time');
 select ok(public.freeze_gate2_marketplace_quote(
     '90600000-0000-4000-8000-000000000001', 1,
     (select id from public.pricing_configs where version = 101), 101,
     '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
-    10000, 500, '{"expectedCompletes":10,"hours":24}') is not null,
+    10000, 500, '90200000-0000-4000-8000-000000000001') is not null,
     'service freezes the exact 10-person marketplace quote');
 select is(public.freeze_gate2_marketplace_quote(
     '90600000-0000-4000-8000-000000000001', 1,
     (select id from public.pricing_configs where version = 101), 101,
     '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
-    10000, 500, '{"expectedCompletes":10,"hours":24}')::text,
+    10000, 500, '90200000-0000-4000-8000-000000000001')::text,
     (select id::text from public.gate2_quote_snapshots
         where study_id = '90600000-0000-4000-8000-000000000001'),
     'exact retry retains the frozen quote ID');
+select is((select feasibility_json ->> 'basis' from public.gate2_quote_snapshots
+    where study_id = '90600000-0000-4000-8000-000000000001'),
+    'insufficient_history', 'quote stores the current server-read evidence basis');
+select is((select feasibility_json -> 'fillHours' from public.gate2_quote_snapshots
+    where study_id = '90600000-0000-4000-8000-000000000001'),
+    'null'::jsonb, 'quote cannot freeze an invented fill time');
+select throws_ok($$select public.freeze_gate2_marketplace_quote(
+    '90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where version = 101), 101,
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
+    10000, 500, '90300000-0000-4000-8000-000000000001')$$,
+    '42501', null, 'another user cannot freeze this researcher quote');
 select throws_ok($$select public.freeze_gate2_marketplace_quote(
     '90600000-0000-4000-8000-000000000001', 1,
     (select id from public.pricing_configs where version = 100), 100,
     '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":100,"amountCents":5000}]',
-    5000, 200, '{"expectedCompletes":10,"hours":24}')$$,
+    5000, 200, '90200000-0000-4000-8000-000000000001')$$,
     '23514', null, 'old active Gate 1 pricing cannot make a marketplace quote');
 reset role;
 update public.studies set target_completes = 9
@@ -50,7 +68,7 @@ select throws_ok($$select public.freeze_gate2_marketplace_quote(
     '90600000-0000-4000-8000-000000000001', 1,
     (select id from public.pricing_configs where version = 101), 101,
     '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":9,"unitPriceCents":200,"amountCents":9000}]',
-    9000, 500, '{"expectedCompletes":9,"hours":24}')$$,
+    9000, 500, '90200000-0000-4000-8000-000000000001')$$,
     '23514', null, 'fewer than ten respondents cannot freeze a new marketplace quote');
 select throws_ok($$select public.freeze_gate2_quote(
     '90600000-0000-4000-8000-000000000001', 1,

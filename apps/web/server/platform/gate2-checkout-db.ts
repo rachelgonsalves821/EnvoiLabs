@@ -1,10 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CheckoutDatabase, CheckoutSession } from "@envoi-labs/services/checkout";
+import { MarketplaceFeasibilitySchema } from "@envoi-labs/contracts";
 import type { Database } from "../../../../packages/db/src/database.generated";
 
-type Feasibility = { expectedCompletes: number; hours: number };
-type FeasibilityEstimator = (studyId: string) => Promise<Feasibility | null>;
-type Researcher = { id: string; organizationId: string };
+type Researcher = { id: string; organizationId: string; authUserId: string };
 type Tables = Database["public"]["Tables"];
 type StudyRow = Tables["studies"]["Row"];
 type BriefRow = Tables["brief_versions"]["Row"];
@@ -29,11 +28,12 @@ function readData<T>(result: { data: T | null; error: unknown }): T | null {
 }
 
 export function createGate2CheckoutDatabase(
-  client: SupabaseClient<Database>, researcher: Researcher, estimateFeasibility: FeasibilityEstimator,
+  client: SupabaseClient<Database>, researcher: Researcher,
 ): CheckoutDatabase {
   const allowedStudy = async (studyId: string) => {
     const membership = readData(await client.from("researchers")
       .select("*").eq("id", researcher.id).eq("organization_id", researcher.organizationId)
+      .eq("auth_user_id", researcher.authUserId)
       .maybeSingle());
     if (!membership) return null;
     return readData(await client.from("studies")
@@ -49,13 +49,14 @@ export function createGate2CheckoutDatabase(
         .order("version", { ascending: false }).limit(1).maybeSingle()) as BriefRow | null;
       const questions = readData(await client.from("guide_questions")
         .select("*").eq("study_id", studyId)) as GuideRow[] | null;
-      const feasibility = await estimateFeasibility(studyId);
-      if (!brief || !questions || questions.length < 4 || questions.length > 10 || !feasibility ||
-        !Number.isSafeInteger(feasibility.expectedCompletes) ||
-        feasibility.expectedCompletes < 0 || feasibility.expectedCompletes > study.target_completes ||
-        !Number.isSafeInteger(feasibility.hours) || feasibility.hours < 1) return null;
+      if (!brief || !questions || questions.length < 4 || questions.length > 10) return null;
+      const feasibility = MarketplaceFeasibilitySchema.safeParse(readData(await client.rpc(
+        "read_gate2_marketplace_feasibility", {
+          supplied_study_id: studyId, supplied_auth_user_id: researcher.authUserId,
+        })));
+      if (!feasibility.success || feasibility.data.studyId !== studyId) return null;
       return { studyId, briefVersion: brief.version, coreQuestionCount: questions.length,
-        targetRespondents: study.target_completes, feasibility };
+        targetRespondents: study.target_completes, feasibility: feasibility.data };
     },
     async readSelectedPricing(studyId) {
       const study = await allowedStudy(studyId);
@@ -85,7 +86,7 @@ export function createGate2CheckoutDatabase(
         supplied_config_version: input.pricingConfigVersion,
         supplied_line_items: input.lineItems, supplied_total_cents: input.totalCents,
         supplied_incentive_cents: input.incentiveCentsPerComplete,
-        supplied_feasibility: input.feasibility,
+        supplied_auth_user_id: researcher.authUserId,
       }));
       if (!id) throw new Error("Quote freeze returned no identity");
       return id;
