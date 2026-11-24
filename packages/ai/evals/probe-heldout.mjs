@@ -20,6 +20,7 @@ export function scoreProbeHeldout(inputs, outputs, judgments) {
   const judgmentById = indexed(judgments, "judgments");
   let probes = 0; let acceptable = 0; let offTopicAnswers = 0;
   let noProbes = 0; let errors = 0; let timeouts = 0;
+  const followUpAnswerIds = new Set();
   const results = [];
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
@@ -31,14 +32,18 @@ export function scoreProbeHeldout(inputs, outputs, judgments) {
     if (output.action === "probe") {
       if (!nonblank(output.text) || !output.text.trim().endsWith("?")
         || typeof judgment.nonLeading !== "boolean" || typeof judgment.onGoal !== "boolean"
-        || typeof judgment.offTopicFollowUp !== "boolean")
+        || typeof judgment.offTopicFollowUp !== "boolean"
+        || !nonblank(judgment.followUpAnswerId)
+        || followUpAnswerIds.has(judgment.followUpAnswerId))
         throw new Error(`Incomplete probe judgment ${id}`);
+      followUpAnswerIds.add(judgment.followUpAnswerId);
       probes++;
       if (judgment.decisionAppropriate && judgment.nonLeading && judgment.onGoal) acceptable++;
       if (judgment.offTopicFollowUp) offTopicAnswers++;
     } else {
       if (output.text !== undefined || judgment.nonLeading !== null
-        || judgment.onGoal !== null || judgment.offTopicFollowUp !== null)
+        || judgment.onGoal !== null || judgment.offTopicFollowUp !== null
+        || judgment.followUpAnswerId !== null)
         throw new Error(`Invalid no-probe judgment ${id}`);
       if (output.action === "next") noProbes++;
       if (output.action === "error") errors++;
@@ -82,7 +87,8 @@ export function syntheticProbeHeldout() {
       inputs.push({ id, coreQuestion, answer: `${answer} This happened ${variant}.`, guideGoal });
       outputs.push({ id, action: "probe", text });
       judgments.push({ id, reviewerId: "synthetic-script", decisionAppropriate: true,
-        nonLeading: true, onGoal: true, offTopicFollowUp: false });
+        nonLeading: true, onGoal: true, offTopicFollowUp: false,
+        followUpAnswerId: `${id}-fictional-follow-up` });
     }
   }
   return { inputs, outputs, judgments };

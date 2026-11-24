@@ -34,4 +34,12 @@ it("refuses incomplete, duplicate or mismatched held-out evidence", () => {
     ? { ...row, id: "extra-case" } : row);
   expect(() => scoreProbeHeldout(data.inputs, mismatched, data.judgments))
     .toThrow("Incomplete held-out case");
+  const noFollowUp = data.judgments.map((row, index) => index === 0
+    ? { ...row, followUpAnswerId: null } : row);
+  expect(() => scoreProbeHeldout(data.inputs, data.outputs, noFollowUp))
+    .toThrow("Incomplete probe judgment");
+  const duplicateFollowUp = data.judgments.map((row, index) => index === 1
+    ? { ...row, followUpAnswerId: data.judgments[0].followUpAnswerId } : row);
+  expect(() => scoreProbeHeldout(data.inputs, data.outputs, duplicateFollowUp))
+    .toThrow("Incomplete probe judgment");
 });
