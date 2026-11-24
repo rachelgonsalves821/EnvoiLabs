@@ -1,11 +1,17 @@
 "use client";
 
-import { Button, Echo } from "@envoi-labs/ui";
+import { Button } from "@envoi-labs/ui";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { interviewCopy as copy } from "./copy";
 import { useVoiceCapture, type VoiceTake } from "./use-voice-capture";
 import { voiceCopy as voice } from "./voice-copy";
 import { confirmVoiceTake, stageVoiceTake, type VoiceTransfer } from "./voice-transfer";
+
+const InterviewEcho = dynamic(() => import("./interview-echo"), {
+  ssr: false,
+  loading: () => <span className="ev-echo" style={{ inlineSize: 96, blockSize: 96 }} aria-hidden="true" />,
+});
 
 function formatTimer(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -75,7 +81,7 @@ export function VoiceAnswer({ sessionId, questionId, onUseText, onSaved }: {
         <Button variant="ghost" className="respondent-record-button" aria-disabled={locked} aria-pressed={recording}
           aria-label={recording ? voice.stop : voice.start}
           onClick={() => recording ? capture.stop() : !locked && void capture.start()}>
-          <Echo state={recording ? "listen" : "idle"} size={96} />
+          <InterviewEcho state={recording ? "listen" : "idle"} size={96} />
           <span>{recording ? voice.stop : voice.start}</span>
         </Button>
       )}
