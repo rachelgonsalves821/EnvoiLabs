@@ -39,6 +39,8 @@ export * from "./fixtures.js";
 export * from "./gate1-answer-processor.js";
 export * from "./providers.js";
 export * from "./report-evidence.js";
+export * from "./reviewed-report-bridge.js";
 export * from "./probe-metrics.js";
 export * from "./probe-runtime.js";
+export * from "./probe-state.js";
 export * from "./screening-evidence.js";
