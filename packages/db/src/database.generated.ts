@@ -1478,6 +1478,13 @@ export type Database = {
         }
         Returns: Json
       }
+      read_gate3_respondent_probe: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_session_id: string
+        }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -1485,6 +1492,17 @@ export type Database = {
           supplied_replace_answer_id?: string
           supplied_session_id: string
           supplied_text: string
+        }
+        Returns: Json
+      }
+      record_gate3_probe_text_answer: {
+        Args: {
+          supplied_answer_id: string
+          supplied_auth_user_id: string
+          supplied_probe_id: string
+          supplied_session_id: string
+          supplied_text: string
+          supplied_turn_id: string
         }
         Returns: Json
       }
