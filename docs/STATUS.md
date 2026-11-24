@@ -832,3 +832,15 @@ Needs from others. None for the current development checks.
 Contract or schema changes. None.
 
 Risks. The candidate still falls below the paired recall floors. Researcher transcript publication remains disabled.
+
+### 2026-11-24 Gate 1 combined redaction replay
+
+Done. Replayed the guarded address, email and identity additions on the 242-recording development set. Speech full masks on the paired denominators were 124/124 phones, 97/125 emails, 47/61 names, 42/58 employers and 53/58 addresses. The additions left the measured evidence and clean-answer masking at the baseline levels of 29/258 and 17/60. The quote model was evaluated on annotation-selected gaps, so its performance across all answer types remains unverified. Two complementary local token classifiers added no complete name or employer masks. [Combined replay](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7134036614) · [Complementary detectors](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7134223322)
+
+Next. Close the remaining speech redaction and evidence-preservation gaps, then run the sealed independent benchmark against a frozen candidate. Rehearse hosted researcher publication only after a passing report.
+
+Needs from others. None for the current development checks.
+
+Contract or schema changes. None.
+
+Risks. The replay falls below the paired recall floors. Researcher transcript publication remains disabled.
