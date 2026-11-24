@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(23);
+select plan(24);
 
 select is((select tgfoid from pg_trigger where tgname = 'lock_gate2_guide_study'
     and tgrelid = 'public.guide_questions'::regclass),
@@ -84,6 +84,12 @@ insert into public.gate2_payment_events (quote_id, study_id, provider_checkout_i
 values ('a9900000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'cs_fixture', 'evt_created',
     'checkout_created', 500, 'usd', now());
+select throws_ok($$insert into public.gate2_payment_events (quote_id, study_id,
+    provider_checkout_id, provider_event_id, event_kind, amount_cents, currency, provider_observed_at)
+    values ('a9900000-0000-4000-8000-000000000001',
+        '90600000-0000-4000-8000-000000000001', 'cs_duplicate', 'evt_created_again',
+        'checkout_created', 500, 'usd', now())$$,
+    '23505', null, 'a frozen quote cannot acquire a second checkout identity');
 set local role authenticated;
 select throws_ok($$select public.launch_gate2_paid_study(
     '90600000-0000-4000-8000-000000000001',

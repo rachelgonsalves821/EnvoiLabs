@@ -1,0 +1,98 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "../../../../packages/db/src/database.generated";
+import { createGate2CheckoutDatabase } from "./gate2-checkout-db";
+
+const studyId = "90600000-0000-4000-8000-000000000001";
+const quoteId = "a9900000-0000-4000-8000-000000000001";
+const organizationId = "90100000-0000-4000-8000-000000000001";
+const researcher = { id: "90400000-0000-4000-8000-000000000001", organizationId };
+const session = { id: "cs_test_1", studyId, quoteId,
+  pricingConfigVersion: 100, amountCents: 500, currency: "usd" as const,
+  status: "open" as const, url: "https://checkout.stripe.test/cs_test_1" };
+
+function fixture({ otherOrganization = false, existingCheckout = false } = {}) {
+  const rows: Record<string, Record<string, unknown>[]> = {
+    researchers: [{ id: researcher.id, organization_id: organizationId }],
+    studies: [{ id: studyId, organization_id: otherOrganization ? "other" : organizationId,
+      state: "brief_ready", target_completes: 1 }],
+    brief_versions: [{ study_id: studyId, version: 1 }],
+    guide_questions: Array.from({ length: 5 }, (_, index) => ({ study_id: studyId, position: index + 1 })),
+    organizations: [{ id: organizationId, pricing_override_id: null }],
+    pricing_configs: [{ id: "a9900000-0000-4000-8000-000000000002", version: 100,
+      active: true, params_json: { unitPriceCents: 100, incentivePerQuestionCents: 40 } }],
+    gate2_quote_snapshots: [{ id: quoteId, study_id: studyId, brief_version: 1,
+      guide_digest: "a".repeat(64), pricing_config_id: "a9900000-0000-4000-8000-000000000002",
+      pricing_config_version: 100, currency: "usd", total_cents: 500,
+      incentive_cents_per_complete: 200, line_items_json: [{ label: "Core questions",
+        coreQuestionCount: 5, respondentCount: 1, unitPriceCents: 100, amountCents: 500 }],
+      feasibility_json: { expectedCompletes: 1, hours: 24 }, created_at: "2026-11-23T20:00:00Z" }],
+    gate2_payment_events: existingCheckout ? [{ quote_id: quoteId, study_id: studyId,
+      provider_checkout_id: session.id, provider_event_id: `checkout-created:${session.id}`,
+      event_kind: "checkout_created", amount_cents: 500, currency: "usd" }] : [],
+  };
+  const from = vi.fn((table: string) => {
+    let values = [...(rows[table] ?? [])];
+    const query = {
+      select: () => query,
+      eq: (field: string, value: unknown) => { values = values.filter((row) => row[field] === value); return query; },
+      order: (field: string, options: { ascending: boolean }) => {
+        values.sort((a, b) => options.ascending
+          ? Number(a[field]) - Number(b[field]) : Number(b[field]) - Number(a[field])); return query;
+      },
+      limit: (count: number) => { values = values.slice(0, count); return query; },
+      maybeSingle: async () => ({ data: values[0] ?? null, error: null }),
+      then: (resolve: (value: unknown) => unknown) => resolve({ data: values, error: null }),
+      insert: async (row: Record<string, unknown>) => {
+        if (rows[table]?.some((existing) => existing.quote_id === row.quote_id &&
+          existing.event_kind === "checkout_created")) return { error: { code: "23505" } };
+        rows[table]!.push(row); return { error: null };
+      },
+    };
+    return query;
+  });
+  const rpc = vi.fn().mockResolvedValue({ data: quoteId, error: null });
+  const client = { from, rpc } as unknown as SupabaseClient<Database>;
+  const estimate = vi.fn().mockResolvedValue({ expectedCompletes: 1, hours: 24 });
+  return { db: createGate2CheckoutDatabase(client, researcher, estimate), from, rpc, rows, estimate };
+}
+
+describe("Gate 2 checkout database scope", () => {
+  it("reads the approved scope and selected version, then freezes exact economics", async () => {
+    const { db, rpc } = fixture();
+    expect(await db.readApprovedScope(studyId)).toEqual({ studyId, briefVersion: 1,
+      coreQuestionCount: 5, targetRespondents: 1,
+      feasibility: { expectedCompletes: 1, hours: 24 } });
+    expect(await db.readSelectedPricing(studyId)).toEqual({ id: "a9900000-0000-4000-8000-000000000002",
+      version: 100, unitPriceCents: 100, incentivePerQuestionCents: 40 });
+    expect(await db.freezeQuote({ studyId, briefVersion: 1,
+      pricingConfigId: "a9900000-0000-4000-8000-000000000002", pricingConfigVersion: 100,
+      lineItems: [{ label: "Core questions", coreQuestionCount: 5, respondentCount: 1,
+        unitPriceCents: 100, amountCents: 500 }], totalCents: 500,
+      incentiveCentsPerComplete: 200, feasibility: { expectedCompletes: 1, hours: 24 } }))
+      .toBe(quoteId);
+    expect(rpc).toHaveBeenCalledWith("freeze_gate2_quote", expect.objectContaining({
+      supplied_study_id: studyId, supplied_total_cents: 500,
+      supplied_config_version: 100 }));
+  });
+
+  it("rejects another organization's study before quote or checkout writes", async () => {
+    const { db, rpc, rows } = fixture({ otherOrganization: true });
+    expect(await db.readApprovedScope(studyId)).toBeNull();
+    expect(await db.readSelectedPricing(studyId)).toBeNull();
+    expect(await db.readCheckoutId(quoteId)).toBeNull();
+    await expect(db.recordCheckoutCreated(session, `checkout-created:${session.id}`,
+      "2026-11-23T20:00:00Z")).rejects.toThrow("scope");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(rows.gate2_payment_events).toHaveLength(0);
+  });
+
+  it("accepts an exact checkout replay and refuses a conflicting identity", async () => {
+    const { db } = fixture({ existingCheckout: true });
+    expect(await db.readCheckoutId(quoteId)).toBe(session.id);
+    await expect(db.recordCheckoutCreated(session, `checkout-created:${session.id}`,
+      "2026-11-23T20:00:00Z")).resolves.toBeUndefined();
+    await expect(db.recordCheckoutCreated({ ...session, id: "cs_other" }, "checkout-created:cs_other",
+      "2026-11-23T20:00:00Z")).rejects.toEqual({ code: "23505" });
+  });
+});

@@ -24,7 +24,7 @@ export type CheckoutSession = {
   status: "open" | "expired" | "completed";
   url: string;
 };
-type CheckoutDatabase = {
+export type CheckoutDatabase = {
   readApprovedScope(studyId: string): Promise<CheckoutScope | null>;
   readSelectedPricing(studyId: string): Promise<CheckoutPricing | null>;
   freezeQuote(input: {
