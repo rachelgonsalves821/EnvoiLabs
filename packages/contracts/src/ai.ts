@@ -34,6 +34,33 @@ export const EvidenceQuoteReferenceSchema = withExample(z.strictObject({
   message: "The end offset must follow the start offset.",
 }), exampleQuote);
 
+// Offsets count Unicode code points in the exact qualified redacted source,
+// starting at zero. PostgreSQL substr(text, startChar + 1, length) uses the
+// corresponding one-based character position.
+const evidenceQuoteV2Fields = {
+  studyId: z.uuid(),
+  transcriptId: z.uuid(),
+  sourceVersion: z.uuid(),
+  startChar: count,
+  endChar: z.int().positive(),
+  exactText: nonBlank,
+  confidence: z.number().min(0).max(1),
+};
+export const EvidenceQuoteCandidateV2Schema = withExample(z.strictObject({
+  ...evidenceQuoteV2Fields, rationale: nonBlank,
+}).refine(({ startChar, endChar }) => endChar > startChar, {
+  path: ["endChar"], message: "The end offset must follow the start offset.",
+}), { studyId: exampleId, transcriptId: exampleId, sourceVersion: exampleId,
+  startChar: 0, endChar: 7, exactText: "ordered", rationale: "Describes a past order.", confidence: 0.9 });
+
+// Only this shape may leave the private evidence gate. Model rationale is not
+// exposed through researcher report or export contracts.
+export const VerifiedEvidenceQuoteV2Schema = withExample(z.strictObject(evidenceQuoteV2Fields)
+  .refine(({ startChar, endChar }) => endChar > startChar, {
+    path: ["endChar"], message: "The end offset must follow the start offset.",
+  }), { studyId: exampleId, transcriptId: exampleId, sourceVersion: exampleId,
+  startChar: 0, endChar: 7, exactText: "ordered", confidence: 0.9 });
+
 export const ThemeSchema = withExample(z.strictObject({
   claim: nonBlank,
   count: z.int().positive(),
@@ -62,5 +89,7 @@ export type ScopingTurn = z.infer<typeof ScopingTurnSchema>;
 export type ProbeDecision = z.infer<typeof ProbeDecisionSchema>;
 export type QualitySignals = z.infer<typeof QualitySignalsSchema>;
 export type EvidenceQuoteReference = z.infer<typeof EvidenceQuoteReferenceSchema>;
+export type EvidenceQuoteCandidateV2 = z.infer<typeof EvidenceQuoteCandidateV2Schema>;
+export type VerifiedEvidenceQuoteV2 = z.infer<typeof VerifiedEvidenceQuoteV2Schema>;
 export type Theme = z.infer<typeof ThemeSchema>;
 export type ThemeSet = z.infer<typeof ThemeSetSchema>;
