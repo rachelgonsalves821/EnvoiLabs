@@ -24,6 +24,12 @@ _DESTINATION = re.compile(
     r"\b(?:ended up (?:at|outside)|(?:shared|split|took) a ride to|"
     r"(?:driver|courier)[^.!?;]{0,52}?\bstop (?:at|it))\s+", re.I,
 )
+_DELIVERY_ADDRESS = re.compile(r"\bthe delivery address (?:is|was)[ \t]*[:,]?[ \t]+", re.I)
+_PUBLIC_DELIVERY_DESTINATION = re.compile(
+    r"(?:[ \t]*,[ \t]*(?:(?:which|that) (?:is|was) )?|[ \t]+for[ \t]+)"
+    r"(?:the |a )?public (?:(?:delivery|parcel|pickup) )?(?:counter|depot|hub|warehouse)\b",
+    re.I,
+)
 _CLAUSE_END = re.compile(
     r"[,.!?;:]|\b(?:at the time|for (?:the|my|our)|before|after|by heart|"
     r"(?:i|we|they|he|she) (?:was|were|am|are|walked|called|took)|"
@@ -74,6 +80,12 @@ _CORROBORATED_STREET_TYPES = _STREET_SUFFIXES | _MISHEARD_SUFFIX | {
     "curt", "dry", "elaine", "plays", "streat", "terrorists", "weigh",
 }
 _STREET_WORD = re.compile(r"[^\W\d_]+(?:[-’'][^\W\d_]+)*\Z")
+_STREET_ABBREVIATIONS = {"st", "ave", "rd", "dr", "ln", "blvd", "ct", "pl", "ter", "cir", "pkwy", "hwy", "trl", "sq"}
+_WRITTEN_UNIT = re.compile(
+    r"(?P<street_period>\.)?,?[ \t]+(?:apt(?P<unit_period>\.)?|apartment|suite|unit|flat)[ \t]+"
+    r"(?:[0-9]{1,4}[a-z]?(?!\.[0-9])(?=$|[ \t\r\n,.;:!?])|[a-z](?=$|[\r\n,.;:!?]))",
+    re.I | re.ASCII,
+)
 
 
 def _house_number_end(tokens, start):
@@ -118,6 +130,18 @@ def _unit_end(tokens, street_end):
     return end
 
 
+def _written_unit_offset(text, street_type):
+    if street_type.word not in _STREET_SUFFIXES:
+        return None
+    written = _WRITTEN_UNIT.match(text, street_type.end)
+    # A period after a full street type can end the sentence. Only conventional abbreviations bridge it.
+    if written and (written.group("street_period") or written.group("unit_period")) and (
+        not written.group("street_period") or street_type.word in _STREET_ABBREVIATIONS
+    ):
+        return written.end()
+    return None
+
+
 def _qualified_unit_end(text, start, stop):
     unit = _QUALIFIED_UNIT.match(text, start, stop)
     if not unit:
@@ -138,7 +162,7 @@ def _qualified_unit_end(text, start, stop):
 def recover_address_slots(text):
     tokens = tokenize(text)
     offsets = {token.start: index for index, token in enumerate(tokens)}
-    for cue in (_PRIVATE_LOCATION, _DESTINATION):
+    for cue in (_PRIVATE_LOCATION, _DELIVERY_ADDRESS, _DESTINATION):
         private = cue is _PRIVATE_LOCATION
         for prefix in cue.finditer(text):
             start = offsets.get(prefix.end())
@@ -156,9 +180,15 @@ def recover_address_slots(text):
                 limit += 1
             tail = text[tokens[first - 1].end:stop]
             end = _street_end(tokens, first, limit, private)
+            written_offset = None
             if end > first and (reliable or private or parts >= 3):
                 if _NON_ADDRESS.search(text[tokens[first - 1].end:tokens[end - 1].end]):
                     continue
+                street_type = tokens[end - 1]
+                if cue is _DELIVERY_ADDRESS and _PUBLIC_DELIVERY_DESTINATION.match(text, street_type.end):
+                    continue
+                if private or cue is _DELIVERY_ADDRESS:
+                    written_offset = _written_unit_offset(text, street_type)
                 end = _unit_end(tokens, end)
             elif private and reliable >= 2 and parts >= 2 and not _NON_ADDRESS.search(tail):
                 end = next((unit for index in range(first + 2, min(limit, first + 6))
@@ -167,14 +197,15 @@ def recover_address_slots(text):
                     continue
             else:
                 continue
-            yield Hit("address", tokens[start].start, tokens[end - 1].end)
+            yield Hit("address", tokens[start].start, written_offset or tokens[end - 1].end)
 
 
 def recover_corroborated_addresses(text):
     """Use stronger location relations when the spoken street type is damaged."""
     tokens = tokenize(text)
     offsets = {token.start: index for index, token in enumerate(tokens)}
-    for cue in (_PRIVATE_LOCATION, _DIRECT_LOCATION, _PRIVATE_PREMISES, _APPOINTMENT, _DELIVERY_TURN, _ROUTE_ENDPOINT):
+    for cue in (_PRIVATE_LOCATION, _DELIVERY_ADDRESS, _DIRECT_LOCATION, _PRIVATE_PREMISES, _APPOINTMENT, _DELIVERY_TURN,
+                _ROUTE_ENDPOINT):
         for match in cue.finditer(text):
             start = offsets.get(match.end())
             if start is None:
@@ -200,9 +231,10 @@ def recover_corroborated_addresses(text):
             premises = cue is _PRIVATE_PREMISES
             if len(street) < 2 or _NON_ADDRESS.search(tail) or (not premises and _WAYPOINT.search(tail)):
                 continue
+            street_types = _STREET_SUFFIXES if cue is _DELIVERY_ADDRESS else _CORROBORATED_STREET_TYPES
             street_end = next((first + index + 1 for index, token in enumerate(street)
-                               if index and token.word in _CORROBORATED_STREET_TYPES), None)
-            if street_end is None:
+                               if index and token.word in street_types), None)
+            if street_end is None and cue is not _DELIVERY_ADDRESS:
                 street_end = next((first + index + 2 for index, _ in enumerate(street[:-1])
                                    if index and (street[index].word, street[index + 1].word) in {
                                        ("a", "venue"), ("av", "enue"),
@@ -215,17 +247,24 @@ def recover_corroborated_addresses(text):
                         street_end = street_ends[suffix.end()]
                         break
             if street_end is not None and (cue is not _ROUTE_ENDPOINT or reliable >= 2):
-                last = _unit_end(tokens, street_end)
+                street_type = tokens[street_end - 1]
+                if cue is _DELIVERY_ADDRESS and _PUBLIC_DELIVERY_DESTINATION.match(text, street_type.end):
+                    continue
+                last_offset = tokens[_unit_end(tokens, street_end) - 1].end
+                written_offset = (
+                    _written_unit_offset(text, street_type)
+                    if cue in (_PRIVATE_LOCATION, _DELIVERY_ADDRESS, _DIRECT_LOCATION, _PRIVATE_PREMISES) else None
+                )
             elif (cue is _ROUTE_ENDPOINT and reliable >= 3 and len(house) >= 3 and (boundary or end == len(text))
                   and 2 <= len(street) <= 4 and not text[street[-1].end:end].strip()):
-                last = first + len(street)
+                last_offset = street[-1].end
+                written_offset = None
             else:
                 continue
-            last_offset = tokens[last - 1].end
             if premises:
                 street_offset = tokens[street_end - 1].end
                 last_offset = _qualified_unit_end(text, last_offset if last_offset <= end else street_offset, end)
                 if (_WAYPOINT.search(text, house[-1].end, street_offset)
                         or _WAYPOINT.search(text, last_offset, end)):
                     continue
-            yield Hit("address", tokens[start].start, last_offset)
+            yield Hit("address", tokens[start].start, written_offset or last_offset)

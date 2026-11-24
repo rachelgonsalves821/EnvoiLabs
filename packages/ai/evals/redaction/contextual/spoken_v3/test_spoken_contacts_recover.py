@@ -8,6 +8,42 @@ def masked_spans(text):
 
 
 class SpokenContactRecoveryTests(unittest.TestCase):
+    def test_spelled_at_and_handle_separator_accept_unlisted_dns_suffix(self):
+        for phrase in (
+            "alder dot delta at copperworks dot technology",
+            "quartz.cedar at pineport.solutions",
+            "linden underscore book at marigold dot example",
+        ):
+            with self.subTest(phrase=phrase):
+                text = "I wrote down the entry, " + phrase + ". The search page kept resetting."
+                emails = [text[hit.start:hit.end] for hit in recovered_contacts(text) if hit.label == "email"]
+                self.assertIn(phrase, emails)
+
+    def test_unlisted_suffix_still_needs_complete_spelled_email_shape(self):
+        for text in (
+            "We shop at copperworks dot technology. Their menus load quickly.",
+            "Look at pine dot guide at copperworks dot technology. The page shows the refund rules.",
+            "The painted cedar dot border at north dot is a graphics label.",
+            "I wrote down the entry, quartz at pineport dot solutions took a while.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(any(hit.label == "email" for hit in recovered_contacts(text)))
+
+    def test_unlisted_mailbox_can_end_at_adjacent_phone(self):
+        email = "alder dot rill at copperworks dot solutions"
+        text = f"They transcribed {email} and +1 202-555-0146 for processing."
+        emails = [text[hit.start:hit.end] for hit in recovered_contacts(text) if hit.label == "email"]
+        self.assertEqual(emails, [email])
+
+    def test_adjacent_phone_does_not_steal_website_or_intervening_prose(self):
+        for text in (
+            "Look at alder dot rill at copperworks dot solutions and +1 202-555-0146 for processing.",
+            "They sell at copperworks dot solutions and refunded the order so I called +1 202-555-0146.",
+            "I wrote the phrase at copperworks dot rapidly erased wording before I dialed +1 202-555-0146.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(any(hit.label == "email" for hit in recovered_contacts(text)))
+
     def test_international_phone_with_spoken_country_code(self):
         number = "plus four four seven seven zero zero nine zero zero one two three"
         self.assertEqual(masked_spans(f"call me at {number} after four"), [("phone", number)])

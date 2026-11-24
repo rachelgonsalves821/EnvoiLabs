@@ -32,7 +32,8 @@ _WEBSITE = re.compile(
     r"\b(?:browse|click|go to|visit|look at|shop at|check out)\b|"
     r"\b(?:the |a )?(?:website|web site|homepage|menu|product|url)\b"
 )
-_BOUNDARY = {"and", "that", "to", "when", "who", "your", "you"}
+_PROSE_SUFFIX = {"an", "and", "are", "but", "for", "is", "of", "or", "that", "the", "those",
+                 "to", "was", "were", "when", "who", "with", "your", "you"}
 _BLOCK = {"a", "an", "the", "my", "myself", "theirs", "as", "it", "for", "at", "to"}
 _RECEIPT = re.compile(r"\b(?:the|my|our) (?:receipt|confirmation) (?:goes|went) to\s+")
 _ADDRESS_LABEL = re.compile(
@@ -44,28 +45,55 @@ _ADDRESS_LABEL = re.compile(
 _CONFIRMATION = re.compile(r"^\s+for (?:the|my|our) (?:order |booking |delivery )?confirmation\b")
 _PUBLIC_REFERENCE = re.compile(r"\b(?:public (?:page|site|link|guide)|product (?:label|name)|vendor site)\b")
 _PUBLIC_SUFFIX = re.compile(r"^\s+(?:as|for|on) (?:the |a |this )?(?:public |product |vendor )?(?:website|site|page|catalog|menu)\b")
+_NON_MAIL_VALUE = re.compile(
+    r"^(?:about (?:the|a|this|that)\b|(?:open|down|closed)\s+(?:and|while|until)\b)|"
+    r"\b(?:but|while|because) (?:i|we|they|you)\b"
+)
+_PRIVATE_LABEL = re.compile(
+    r"\b(?:(?:e-?mail(?: address)?|inbox|mailbox)(?: (?:is|was|as))?\s*:\s*|"
+    r"(?:e-?mail(?: address)?|inbox|mailbox) (?:is|was|as)\s+|(?:write|email) me (?:to|at)\s+|"
+    r"(?:for e-?mail (?:use|try)|(?:the )?written reply (?:goes to|use))\s+)"
+)
 _CONFIRMED_AT = _STRONG_AT | {"ad", "add", "an", "and", "et", "said", "set", "at's"}
 _AT_PAIRS = {("as", "an"), ("at", "sign")}
 _CONFIRMED_DOT = _DOMAIN_BREAK | _DISTORTED_DOT | {"dott", "drug"}
 _HOST_WORD = re.compile(r"[^\W\d_]{2,}(?:-[^\W\d_]{2,})*\Z")
+_PRIVATE_SUFFIXES = _TLDS | {"example"}
+_FUSED_AT = re.compile(r"[^\W\d_]{2,}at[^\W\d_]{3,}\Z")
+_DISCOURSE_WORDS = _BLOCK | {"and", "but", "because", "if", "i", "we", "they", "while"}
 
 
-def _domain_suffix(text, tokens, separator, strong_start):
+def _domain_continues(tokens, stop):
+    if stop + 1 >= len(tokens):
+        return False
+    separator, following = tokens[stop:stop + 2]
+    if separator.word == ".":
+        return tokens[stop - 1].end == separator.start and separator.end == following.start and following.word.isalnum()
+    return (
+        separator.word in _DOMAIN_BREAK and following.word.isalpha() and following.word not in _PROSE_SUFFIX
+    )
+
+
+def _domain_suffix(text, tokens, separator, *, suffixes=_TLDS, inferred_limit=0):
     start = separator + 1
     if start >= len(tokens):
         return None
     first = tokens[start].word
-    if first in _TLDS:
-        return start + 1
     for size in (2, 3, 4):
         stop = start + size
         pieces = [part.word for part in tokens[start:stop]]
         if len(pieces) != size or not all(part.isalpha() for part in pieces):
             continue
+        if first in suffixes and any(len(part) != 1 for part in pieces[1:]):
+            continue
         joined = "".join(pieces)
-        if joined in _TLDS:
+        if joined in suffixes and not _domain_continues(tokens, stop):
             return stop
-    if strong_start and first.isalpha() and 2 <= len(first) <= 7 and first not in _BOUNDARY:
+    if _domain_continues(tokens, start + 1):
+        return None
+    if first in suffixes:
+        return start + 1
+    if first.isalpha() and 2 <= len(first) <= inferred_limit and first not in _PROSE_SUFFIX:
         suffix = text[tokens[start].end:]
         if not suffix.strip() or _NEW_CLAUSE.search(suffix):
             return start + 1
@@ -93,14 +121,14 @@ def _recover_fused_host(lower, tokens, domain):
         return None
     if any(not token.word.isalnum() and token.word not in _HANDLE_BREAK for token in handle):
         return None
+    if _public_mail_reference(lower[start:host.end], tail):
+        return None
     return Hit("email", start, host.end)
 
 
 def recover_email_slots(text):
     tokens = tokenize(text)
-    lower = text.casefold()
-    if len(lower) != len(text):
-        return
+    lower = _offset_preserving_lower(text)
     for index in range(3, len(tokens)):
         separator = tokens[index]
         fused = _recover_fused_host(lower, tokens, index)
@@ -145,9 +173,75 @@ def recover_email_slots(text):
         strong_start = exact_at and (bool(cue) or bool(assign)) and (operators or len(handle) >= 2)
         if separator.word not in _DOMAIN_BREAK and not (strong_start or cue or weak_at and operators):
             continue
-        end = _domain_suffix(lower, tokens, index, strong_start)
+        end = _domain_suffix(lower, tokens, index, inferred_limit=7 if strong_start else 0)
         if end is not None:
-            yield Hit("email", tokens[start].start, tokens[end - 1].end)
+            first, last = tokens[start].start, tokens[end - 1].end
+            if not _public_mail_reference(lower[first:last], lower[last:]):
+                yield Hit("email", first, last)
+
+
+def _public_mail_reference(value, following):
+    return "@" not in value and (
+        _NON_MAIL_VALUE.search(value) or _PUBLIC_REFERENCE.search(value) or _PUBLIC_SUFFIX.match(following)
+    )
+
+
+def _offset_preserving_lower(text):
+    folded = text.casefold()
+    if len(folded) == len(text):
+        return folded
+    return "".join(part if len(part) == 1 else original for original, part in zip(text, map(str.casefold, text)))
+
+
+def _handle_atom(word):
+    return word.isalnum() and word not in _DISCOURSE_WORDS and word not in _HANDLE_BREAK
+
+
+def _spelled_handle(handle):
+    return (
+        1 <= len(handle) <= 8 and _handle_atom(handle[0].word) and _handle_atom(handle[-1].word)
+        and all(
+            _handle_atom(token.word)
+            or index > 0 and token.word in _HANDLE_BREAK and _handle_atom(handle[index - 1].word)
+            for index, token in enumerate(handle)
+        )
+    )
+
+
+def _labeled_address_shape(tokens, first, separator):
+    host = separator - 1
+    while host >= first and _HOST_WORD.fullmatch(tokens[host].word):
+        marker = host - 1
+        if marker > first and tokens[marker].word == "sign" and tokens[marker - 1].word == "at":
+            marker -= 1
+        if marker > first and tokens[marker].word in _STRONG_AT and _spelled_handle(tokens[first:marker]):
+            return True
+        if _FUSED_AT.fullmatch(tokens[host].word) and _spelled_handle(tokens[first:host + 1]):
+            return True
+        if host - first >= 2 and _spelled_handle(tokens[first:host]):
+            return True
+        if host - first < 2 or tokens[host - 1].word not in _DOMAIN_BREAK:
+            return False
+        host -= 2
+    return False
+
+
+def _recover_labeled_spelling(lower, tokens, offsets):
+    """Read a mailbox after a direct label, including fused or missing spoken separators."""
+    starts = sorted({label.end() for pattern in (_PRIVATE_LABEL, _ADDRESS_LABEL) for label in pattern.finditer(lower)})
+    for start in starts:
+        first = offsets.get(start)
+        if first is None:
+            continue
+        for separator in range(first + 1, min(first + 15, len(tokens))):
+            if tokens[separator].word not in _DOMAIN_BREAK:
+                continue
+            stop = _domain_suffix(lower, tokens, separator, suffixes=_PRIVATE_SUFFIXES, inferred_limit=63)
+            if stop is None or not _labeled_address_shape(tokens, first, separator):
+                continue
+            end = tokens[stop - 1].end
+            if not _public_mail_reference(lower[start:end], lower[end:]):
+                yield Hit("email", start, end)
 
 
 def _domain_endings(lower, tokens):
@@ -161,7 +255,7 @@ def _domain_endings(lower, tokens):
         if word not in _CONFIRMED_DOT:
             continue
         right = index + 1
-        end = _domain_suffix(lower, tokens, index, False)
+        end = _domain_suffix(lower, tokens, index)
         if end is not None:
             yield index, end, False
         elif tuple(item.word for item in tokens[right:right + 2]) == ("and", "valid"):
@@ -184,12 +278,11 @@ def _handle_endings(tokens, host_end):
 
 def recover_corroborated_mailboxes(text):
     """Combine damaged address structure with an explicit or corroborated contact value."""
-    lower = text.casefold()
-    if len(lower) != len(text):
-        return
+    lower = _offset_preserving_lower(text)
     tokens = tokenize(text)
     phones = tuple(_phone_runs(text, tokens))
     offsets = {token.start: index for index, token in enumerate(tokens)}
+    yield from _recover_labeled_spelling(lower, tokens, offsets)
     for host_end, stop, fused_host in _domain_endings(lower, tokens):
         end = tokens[stop - 1].end
         following = lower[end:end + 100]
@@ -208,7 +301,7 @@ def recover_corroborated_mailboxes(text):
             if not 1 <= handle_end - first <= (8 if labels else 6):
                 continue
             value = lower[start:end]
-            if _WEBSITE.search(value) or _PUBLIC_REFERENCE.search(value) or _PUBLIC_SUFFIX.match(following):
+            if _WEBSITE.search(value) or _public_mail_reference(value, following):
                 continue
             handle = tokens[first:handle_end]
             if not all(item.word.isalnum() or item.word in _HANDLE_BREAK for item in handle):

@@ -44,6 +44,47 @@ class AddressSlotRecoveryTests(unittest.TestCase):
         self.assertEqual(self.corroborated("Walk along Sedge Elm boulevard to the side entrance at eight thirty."), [])
         self.assertEqual(self.corroborated("My doorstep is at eight thirty by the public gate."), [])
 
+    def test_transaction_delivery_address_requires_an_explicit_label_and_street_type(self):
+        value = "34 Heath Rill Road block bee"
+        text = f"The delivery address is {value} and the doorbell was useful."
+        self.assertEqual(self.recovered(text), [value])
+        self.assertEqual(self.corroborated(text), [value])
+        for public in (
+            "The store's advertised delivery address is 34 Heath Rill Road.",
+            "The delivery address for the public depot is 34 Heath Rill Road.",
+            "The delivery address is 34 Heath Rill Road, which is the public pickup counter.",
+            "The delivery address is 34 at the public pickup counter.",
+            "The delivery address is two three four queue line marker.",
+        ):
+            with self.subTest(text=public):
+                self.assertEqual(self.recovered(public), [])
+                self.assertEqual(self.corroborated(public), [])
+
+    def test_written_unit_punctuation_preserves_original_offsets(self):
+        for value in (
+            "22 Orchid Knoll Rd., Apt. 6",
+            "22 Orchid Knoll Rd. Apt. 6B",
+            "22 Orchid Knoll Road, Apt. 6",
+            "15 Nettle Ash Ave., Unit C",
+        ):
+            text = f"I live at {value}. The filter showed two choices."
+            with self.subTest(text=text):
+                self.assertEqual(self.recovered(text), [value])
+                self.assertEqual(self.corroborated(text), [value])
+        value = "15 Nettle Ash Ave., Apt. 6"
+        self.assertEqual(self.corroborated(f"My doorstep is {value}. The filter showed two choices."), [value])
+
+    def test_written_unit_does_not_cross_a_sentence_or_mask_pickup_evidence(self):
+        for text, value in (
+            ("I live at 23 Amber Firth Road. Unit 6 was the model I tried.", "23 Amber Firth Road"),
+            ("I live at 23 Amber Firth Rd. Pickup code 152 was easy to see.", "23 Amber Firth Rd"),
+            ("I live at 23 Amber Firth Rd., Apt. pricing changed overnight.", "23 Amber Firth Rd"),
+            ("I live at 23 Amber Firth Rd., Apt. 34567 was the order ID.", "23 Amber Firth Rd"),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self.recovered(text), [value])
+                self.assertEqual(self.corroborated(text), [value])
+
     def recovered(self, text):
         return [text[hit.start:hit.end] for hit in recover_address_slots(text)]
 
