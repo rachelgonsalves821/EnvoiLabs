@@ -1,0 +1,61 @@
+import { describe, expect, it } from "vitest";
+import { createProbeDecisionPort, type ProbeRpc } from "@envoi-labs/services/probe-turn";
+
+const ids = { sessionId: "session", questionId: "question", answerId: "answer",
+  turnId: "turn", transcriptRevision: "a".repeat(64) };
+const winning = { action: "probe" as const, turnId: ids.turnId,
+  text: "What made speed matter?", uploadConfirmedAtMs: 1000 };
+const committed = { ...ids, decision: winning, probeId: "probe" };
+const buildRequest = ({ sourceText, questionText }: {
+  sourceText: string; questionText: string }) => ({ purpose: "probe",
+  promptVersion: "synthetic-1", system: questionText,
+  messages: [{ role: "user" as const, content: sourceText }] });
+
+describe("probe persistence boundary", () => {
+  it("passes only current redacted source to the AI request builder", async () => {
+    let source = "";
+    const call: ProbeRpc = async () => ({ error: null, data: { ...ids,
+      probesUsed: 0, maxProbes: 2, decisionDeadlineAtMs: 6000,
+      serverUploadConfirmedAtMs: 0, browserUploadConfirmedAtMs: 1000,
+      transcriptReadyAtMs: 100, sourceText: "Qualified synthetic answer",
+      questionText: "What happened?" } });
+    const port = createProbeDecisionPort(call, "respondent", (value) => {
+      source = value.sourceText;
+      return buildRequest(value);
+    });
+    const ready = await port.readReadyTurn(ids.sessionId, ids.turnId);
+    expect(source).toBe("Qualified synthetic answer");
+    expect(ready?.request.messages[0]?.content).toBe(source);
+    expect(ready?.turn).toEqual({ sessionId: "session", questionId: "question",
+      answerId: "answer", turnId: "turn", probesUsed: 0, maxProbes: 2,
+      decisionDeadlineAtMs: 6000 });
+    expect(ready).not.toHaveProperty("sourceText");
+  });
+
+  it("returns the database winner when a competing decision loses the race", async () => {
+    const call: ProbeRpc = async (name) => ({ error: null,
+      data: name === "commit_gate3_probe_decision"
+        ? { status: "committed", value: committed } : committed });
+    const port = createProbeDecisionPort(call, "respondent", buildRequest);
+    const saved = await port.commitDecision({ ...ids,
+      decision: { action: "next", turnId: "turn", outcome: "no_probe" } });
+    expect(saved).toEqual({ status: "committed", value: committed });
+    expect(await port.readCommitted("session", "turn")).toEqual(committed);
+  });
+
+  it("does not accept a mismatched or unavailable database result", async () => {
+    const bad: ProbeRpc = async () => ({ error: null,
+      data: { status: "committed", value: { ...committed, sessionId: "other" } } });
+    const port = createProbeDecisionPort(bad, "respondent", buildRequest);
+    expect(await port.commitDecision({ ...ids, decision: winning }))
+      .toEqual({ status: "unavailable" });
+    const outage = createProbeDecisionPort(async () => ({ data: null, error: Error("offline") }),
+      "respondent", buildRequest);
+    expect(await outage.markShown({ sessionId: "session", turnId: "turn",
+      probeId: "probe", browserRenderedAtMs: 1200 })).toBe("unavailable");
+    const malformed = createProbeDecisionPort(async () => ({ data: { decision: "broken" },
+      error: null }), "respondent", buildRequest);
+    await expect(malformed.readCommitted("session", "turn"))
+      .rejects.toThrow("invalid committed probe");
+  });
+});
