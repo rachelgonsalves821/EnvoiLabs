@@ -856,3 +856,15 @@ Needs from others. None for redaction development and testing.
 Contract or schema changes. None. The next qualification must use the updated worker source fingerprint.
 
 Risks. Researcher transcript publication remains disabled pending a passing independent result and the hosted rehearsal.
+
+### 2026-11-24 Gate 1 abandoned upload cleanup
+
+Done. Draft PR #148 adds an opt-in cleanup step after interview expiry. The application handler and proposed service-only query removed a synthetic abandoned upload through disposable Storage. A valid confirmation that stayed open past expiry and an unexpired upload remained available. Cleanup removed a late upload on the next sweep, and a repeat found zero objects. Workspace typecheck, lint and 83 web tests passed. [Cleanup draft](https://github.com/rachelgonsalves821/EnvoiLabs/pull/148)
+
+Next. Integrate the shared migration and database types with Platform, then repeat the lifecycle tests on the integrated revision. [Gate 1 evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7141104642)
+
+Needs from others. The Platform migration owner has the tested query and generated signature for integration. No action is needed from the project owner.
+
+Contract or schema changes. Proposed service-only `list_gate1_expired_audio` RPC. The app uses an explicit cleanup flag scoped to local development and Vercel Preview.
+
+Risks. Cleanup is off by default. The disposable result leaves hosted cleanup and researcher transcript qualification open.
