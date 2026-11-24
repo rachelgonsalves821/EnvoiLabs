@@ -42,6 +42,8 @@ Prepare a disposable integration fixture with two independent app processes poin
 
 Run these cases against the real distributed store in local integration and preview after Gate 1 handoff. The threshold symbol `N` avoids inventing a production policy in this preparatory review.
 
+A concrete [Postgres atomic store, key, and candidate threshold proposal](rate-limit-proposal.md) is available for coordinator review. It has not been implemented or approved.
+
 ## Narrow dependency proposal
 
 The locked `gcp-metadata@8.1.4` requires exactly `gaxios@7.1.3`, which pulls `rimraf@5.0.10` and the two affected packages. The published `gaxios@7.1.4` has the same major API line and removes its `rimraf` dependency. A targeted pnpm override for `gcp-metadata@8.1.4>gaxios` to `7.1.4` is the narrowest candidate found; it changes the pinned parent's declared version, so it still requires integration tests and a runtime check of the GCP metadata path. The [upstream issue](https://github.com/googleapis/google-cloud-node-core/issues/925) also identifies the old pin. Wait for Gate 2/3 dependency changes, then apply the override and regenerated lockfile as one reviewed change, re-run `pnpm audit --prod --json`, build, CI and affected scheduler tests. Do not override `glob` directly to v14 across the incompatible `rimraf` major boundary.
