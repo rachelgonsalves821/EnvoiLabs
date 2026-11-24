@@ -1712,6 +1712,17 @@ export type Database = {
         }
         Returns: Json
       }
+      record_gate2_payout_observation: {
+        Args: {
+          requested_amount_cents: number
+          requested_event_id: string
+          requested_kind: string
+          requested_observed_at: string
+          requested_order_id: string
+          requested_payout_id: string
+        }
+        Returns: boolean
+      }
       requeue_gate1_answer_job: {
         Args: { supplied_answer_id: string }
         Returns: boolean
