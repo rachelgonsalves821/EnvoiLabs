@@ -285,6 +285,41 @@ select is((select item ->> 'outcome' from jsonb_array_elements(
         '90600000-0000-4000-8000-000000000001') -> 'items') as item
     where item ->> 'answerId' = 'a9720000-0000-4000-8000-000000000009'),
     'pending_render', 'an unshown probe is not counted as rendered');
+select ok(not has_function_privilege('authenticated',
+    'public.record_gate3_probe_render_terminal(uuid,uuid)', 'EXECUTE'),
+    'only the trusted worker can settle an unshown probe');
+select is((select public.record_gate3_probe_render_terminal(turn_id,
+    '90300000-0000-4000-8000-000000000001') ->> 'status'
+    from first_writer_turn), 'not_due',
+    'an unshown probe remains pending during the receipt grace window');
+reset role;
+-- Advance only the test fixture clock past the 30-second render grace.
+alter table internal.gate3_probe_turns disable trigger gate3_keep_probe_turn_identity;
+update internal.gate3_probe_turns set decided_at = clock_timestamp() - interval '31 seconds'
+where id = (select turn_id from first_writer_turn);
+alter table internal.gate3_probe_turns enable trigger gate3_keep_probe_turn_identity;
+set local role service_role;
+create temporary table render_terminal (result jsonb not null);
+grant select, insert on render_terminal to service_role;
+insert into render_terminal select public.record_gate3_probe_render_terminal(turn_id,
+    '90300000-0000-4000-8000-000000000001') from first_writer_turn;
+select is((select result ->> 'outcome' from render_terminal), 'timeout',
+    'unshown committed probe receives a durable render timeout');
+select is((select public.record_gate3_probe_render_terminal(turn_id,
+    '90300000-0000-4000-8000-000000000001') ->> 'outcome'
+    from first_writer_turn), 'timeout',
+    'render-terminal retry returns the first outcome');
+select is((select public.mark_gate3_probe_shown(
+    'a9720000-0000-4000-8000-000000000004', turn_id,
+    (select (result -> 'value' ->> 'probeId')::uuid from first_writer_probe),
+    '90300000-0000-4000-8000-000000000001', 3200)
+    from first_writer_turn), 'stale',
+    'a late shown receipt cannot replace the terminal render timeout');
+select is((select item ->> 'outcome' from jsonb_array_elements(
+    public.read_gate3_probe_opportunity_snapshot(
+        '90600000-0000-4000-8000-000000000001') -> 'items') as item
+    where item ->> 'answerId' = 'a9720000-0000-4000-8000-000000000009'),
+    'timeout', 'private snapshot uses the stored render terminal outcome');
 reset role;
 update public.transcripts set redacted_source_version = gen_random_uuid()
 where answer_id = 'a9720000-0000-4000-8000-000000000009';

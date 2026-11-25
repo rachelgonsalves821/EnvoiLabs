@@ -156,6 +156,22 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
       return result?.status === "committed" && saved?.answerId === answerId
         ? { status: "committed", value: saved } : { status: "unavailable" };
     },
+    async recordRenderTerminal(turnId: string): Promise<
+      { status: "resolved"; outcome: "shown" | "timeout" | "superseded" } |
+      { status: "not_due" | "stale" | "unavailable" }> {
+      if (!uuid(turnId)) return { status: "stale" };
+      const { data, error } = await call("record_gate3_probe_render_terminal", {
+        supplied_turn_id: turnId, supplied_auth_user_id: authUserId });
+      if (error) return { status: "unavailable" };
+      const result = record(data);
+      if (result?.status === "not_due" || result?.status === "stale")
+        return { status: result.status };
+      if (result?.status === "resolved" && result.turnId === turnId &&
+        (result.outcome === "shown" || result.outcome === "timeout" ||
+          result.outcome === "superseded"))
+        return { status: "resolved", outcome: result.outcome };
+      return { status: "unavailable" };
+    },
   };
 }
 
