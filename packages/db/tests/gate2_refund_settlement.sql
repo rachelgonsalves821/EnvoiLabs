@@ -48,6 +48,36 @@ select ok(public.reserve_gate2_unfilled_slot_refund(
     '90200000-0000-4000-8000-000000000001') is not null,
     'closed unfilled study has one immutable refund reservation');
 reset role;
+insert into auth.users (id) values ('a9850000-0000-4000-8000-000000000099');
+insert into public.organizations (id, name)
+values ('a9850000-0000-4000-8000-000000000098', 'Other receipt tenant');
+insert into public.researchers (auth_user_id, organization_id,
+    terms_version, terms_accepted_at)
+values ('a9850000-0000-4000-8000-000000000099',
+    'a9850000-0000-4000-8000-000000000098', 'fixture', now());
+select ok(not has_function_privilege('anon',
+    'public.read_gate2_current_researcher_receipt(uuid)', 'EXECUTE'),
+    'anonymous clients cannot read a money receipt');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') ->> 'paymentStatus',
+    'paid', 'current authorized receipt requires provider paid evidence');
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') -> 'refund' ->> 'status',
+    'reserved', 'a reservation is shown separately from settled refund');
+select is((public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') ->> 'totalCents')::integer,
+    10000, 'receipt keeps frozen researcher quote total');
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001'), null::jsonb,
+    'MFA loss revokes a current receipt read');
+set local request.jwt.claims = '{"sub":"a9850000-0000-4000-8000-000000000099","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001'), null::jsonb,
+    'other organization cannot read a payment or refund receipt');
+reset role;
 select ok(not has_function_privilege('authenticated',
     'public.claim_gate2_refund_intent(uuid,uuid)', 'EXECUTE'),
     'clients cannot request provider refunds');
@@ -106,6 +136,14 @@ select ok(public.record_gate2_refund_observation(
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
     're_test_refund_1', 'pending', 10000, clock_timestamp()),
     'known pending provider refund is recorded once');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') -> 'refund' ->> 'status',
+    'pending', 'current receipt updates to provider pending observation');
+reset role;
+set local role service_role;
 select is(public.claim_gate2_refund_intent(
     (select id from public.gate2_refund_reservations
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
@@ -121,6 +159,17 @@ select ok(public.record_gate2_refund_observation(
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
     're_test_refund_1', 'succeeded', 10000, clock_timestamp()),
     'observed provider success settles the reserved amount');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') -> 'refund' ->> 'status',
+    'succeeded', 'current receipt reflects settled provider success');
+select is((public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') -> 'refund' ->> 'amountCents')::integer,
+    10000, 'settled receipt uses the original reserved amount');
+reset role;
+set local role service_role;
 select ok(not public.record_gate2_refund_observation(
     (select id from public.gate2_refund_reservations
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
@@ -129,5 +178,31 @@ select ok(not public.record_gate2_refund_observation(
 reset role;
 select is((select attempts from internal.gate2_refund_intents), 1,
     'a known provider refund retains the original one-attempt intent');
+insert into public.gate2_payment_events (quote_id, study_id,
+    provider_checkout_id, provider_event_id, event_kind, amount_cents,
+    currency, provider_observed_at)
+select id, study_id, 'cs_test_refund_settlement',
+    'partial-refund:receipt', 'refunded', 2000, 'usd', clock_timestamp()
+from public.gate2_quote_snapshots
+where study_id = 'a9850000-0000-4000-8000-000000000001';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') ->> 'paymentStatus',
+    'partially_refunded', 'partial observed refund is never labeled full');
+reset role;
+insert into public.gate2_payment_events (quote_id, study_id,
+    provider_checkout_id, provider_event_id, event_kind, amount_cents,
+    currency, provider_observed_at)
+select id, study_id, 'cs_test_refund_settlement',
+    'full-refund:receipt', 'refunded', 10000, 'usd', clock_timestamp()
+from public.gate2_quote_snapshots
+where study_id = 'a9850000-0000-4000-8000-000000000001';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9850000-0000-4000-8000-000000000001') ->> 'paymentStatus',
+    'refunded', 'full observed refund is labeled full');
+reset role;
 select * from finish();
 rollback;
