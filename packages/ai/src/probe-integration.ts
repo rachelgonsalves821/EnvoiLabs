@@ -95,7 +95,10 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
     const previous = await port.readCommitted(sessionId, turnId);
     if (previous) return validCommitted(previous, sessionId, turnId)
       ? { status: "committed", value: previous } : { status: "unavailable" };
-    const ready = await port.readReadyTurn(sessionId, turnId);
+    const rawReady = await port.readReadyTurn(sessionId, turnId);
+    // A service adapter may reuse an object across reads. Keep the exact
+    // authorized request and source receipt fixed through the model wait.
+    const ready = rawReady ? structuredClone(rawReady) as ReadyProbeTurn : null;
     if (!ready || ready.turn.sessionId !== sessionId || ready.turn.turnId !== turnId
       || !ready.transcriptRevision || !uuid.test(ready.sourceVersion)
       || !Number.isFinite(ready.serverUploadConfirmedAtMs)

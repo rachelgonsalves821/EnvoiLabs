@@ -44,6 +44,37 @@ describe("probe decision and render ports", () => {
     expect(port.commitDecision).not.toHaveBeenCalled();
   });
 
+  it("withholds when a reused ready-turn object changes during authorization", async () => {
+    const reused = structuredClone(ready);
+    const { port } = setup();
+    port.readReadyTurn = vi.fn(async () => {
+      if (vi.mocked(port.readReadyTurn).mock.calls.length === 2) {
+        reused.sourceVersion = "019ac928-4718-7b62-b72d-8c9fb79b337d";
+      }
+      return reused;
+    });
+    const generate = vi.fn(async () => response({ action: "probe", text: "What happened?" }));
+    expect(await runProbeDecision(port, provider(generate), "session-1", "turn-1", 500,
+      () => 300)).toEqual({ status: "stale" });
+    expect(generate).not.toHaveBeenCalled();
+    expect(port.commitDecision).not.toHaveBeenCalled();
+  });
+
+  it("withholds when a reused model request changes before dispatch", async () => {
+    const reused = structuredClone(ready);
+    const { port } = setup();
+    port.readReadyTurn = vi.fn(async () => {
+      if (vi.mocked(port.readReadyTurn).mock.calls.length === 2)
+        reused.request.messages[0]!.content = "Changed fictional answer";
+      return reused;
+    });
+    const generate = vi.fn(async () => response({ action: "probe", text: "What happened?" }));
+    expect(await runProbeDecision(port, provider(generate), "session-1", "turn-1", 500,
+      () => 300)).toEqual({ status: "stale" });
+    expect(generate).not.toHaveBeenCalled();
+    expect(port.commitDecision).not.toHaveBeenCalled();
+  });
+
   it("does not call the provider for a request without the follow-up purpose", async () => {
     const { port, setCurrent } = setup();
     setCurrent({ ...ready, request: { ...ready.request, purpose: "probe" } });
