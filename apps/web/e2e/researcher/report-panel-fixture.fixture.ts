@@ -23,6 +23,7 @@ test("keeps export focus and removes a revoked fictional report", async ({ page 
   const exportButton = panel.getByRole("button", { name: "Download themes and quotes CSV" });
   await expect(exportButton).toBeVisible();
   await expect(panel.getByText("A receipt helps.")).toBeVisible();
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-pause]")?.click());
   await exportButton.focus();
   await page.keyboard.press("Enter");
   const pending = panel.getByRole("button", { name: "Checking report…" });
@@ -30,6 +31,7 @@ test("keeps export focus and removes a revoked fictional report", async ({ page 
   await expect(pending).toHaveAttribute("aria-disabled", "true");
   await expect(panel.getByText("A receipt helps.")).toHaveCount(0);
   await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-revoke]")?.click());
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-resume]")?.click());
   const retry = panel.getByRole("button", { name: "Check again" });
   await expect(retry).toBeFocused();
   await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
