@@ -40,6 +40,17 @@ describe("probe runtime", () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it("labels a turn changed during denied authorization as superseded", async () => {
+    let active = "answer-1";
+    const generate = vi.fn(async () => response({ action: "probe", text: "What happened?" }));
+    expect(await decideProbe(attempt, { provider: provider(generate),
+      currentTurnId: () => active,
+      authorize: async () => { active = "answer-2"; return false; },
+      timeoutMs: 20 })).toEqual({ action: "next", turnId: "answer-1",
+        outcome: "superseded" });
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("shares one deadline between authorization and model inference", async () => {
     vi.useFakeTimers();
     try {

@@ -67,8 +67,8 @@ export async function decideProbe(attempt: ProbeAttempt, runtime: ProbeRuntime):
     ]);
     if (authorized.kind === "timeout") return runtime.currentTurnId() === attempt.turnId
       ? next("timeout") : next("superseded");
-    if (authorized.kind === "error" || !authorized.value) return next("error");
     if (runtime.currentTurnId() !== attempt.turnId) return next("superseded");
+    if (authorized.kind === "error" || !authorized.value) return next("error");
     const result = await Promise.race([
       runtime.provider.generate(attempt.request).then(({ output }) => ({ kind: "output" as const, output }),
         () => ({ kind: "error" as const })),
