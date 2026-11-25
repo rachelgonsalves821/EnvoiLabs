@@ -4,7 +4,7 @@ const baseURL = "http://127.0.0.1:3107";
 
 export default defineConfig({
   testDir: "./apps/web/e2e/researcher",
-  testMatch: "report-panel-fixture.spec.ts",
+  testMatch: "report-panel-fixture.fixture.ts",
   use: { baseURL, trace: "retain-on-failure" },
   projects: [
     { name: "fixture-chromium", use: devices["Desktop Chrome"] },
