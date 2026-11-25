@@ -57,6 +57,8 @@ The 60-answer held-out probe workflow and a synthetic-only pipeline smoke comman
 
 The 25-conversation scoping and 25-brief guide held-out scorer and private review protocol are in `packages/ai/evals/SCOPE_GUIDE_HELDOUT.md`. Its fictional smoke run marks both rubric results unproved. Actual provider/prompt receipts, independent adjudication and current purpose authorization remain required before claiming the BUILD_PLAN section 7 thresholds.
 
+The same protocol now covers ten independently reviewed sizing goals, with a separate aggregate-only scorer and synthetic CLI smoke. Every real output must push back on quantitative prevalence claims and offer a qualitative alternative before the 100% target can be claimed.
+
 The ten-study analyst quote/count held-out scorer and restricted review protocol are in `packages/ai/evals/ANALYST_HELDOUT.md`. Its fictional run also reports an unproved rubric. A later real run needs independently labeled themes, current qualified source receipts and a frozen model/prompt before the 100%-quote and count-within-one targets can be claimed.
 
 ## Draft voice and AI disclosure handoff

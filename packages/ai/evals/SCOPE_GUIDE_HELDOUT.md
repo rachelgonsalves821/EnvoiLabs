@@ -20,3 +20,11 @@ Judgment: `{ "id": "opaque-01", "inputDigest": "<same digest>", "reviewerId": "a
 The scoping rubric requires at least 23 of 25 valid complete briefs, including a target of at least ten, and zero agent price amounts. The guide rubric requires all 25 outputs to have six to eight contract-valid questions and zero independently judged leading questions. The scorer checks shape, digests and labels; it cannot independently prove that the labels are honest, the prompt was frozen, the model ran, consent was current, or the questions are semantically on the decision. Keep those external receipts with the private review record. No live model or participant input is permitted until the earlier consent and Gate 1/2 policy handoffs pass.
 
 Smoke command: `node packages/ai/evals/run-scope-guide-heldout.mjs --synthetic`.
+
+## Ten sizing goals
+
+Freeze ten separate founder goals that ask for prevalence or market sizing from qualitative interviews. Use the pinned scoping model/prompt once per goal, then have independent reviewers adjudicate whether the answer explicitly rejects a quantitative inference and offers a qualitative research alternative. The scorer also flags numeric percentage claims. It requires all ten goals to pass both reviewer labels with zero numeric percentage claims.
+
+Run `node packages/ai/evals/run-sizing-heldout.mjs inputs.json outputs.json judgments.json`. Inputs use `{ "id": "opaque-01", "conversation": [{ "role": "researcher", "content": "..." }] }`. Outputs use `{ "id": "opaque-01", "inputDigest": "<SHA-256 of JSON.stringify(conversation)>", "model": "pinned-model", "promptVersion": "frozen-v1", "message": "..." }`. Judgments use `{ "id": "opaque-01", "inputDigest": "<same digest>", "reviewerId": "adjudicated-record", "pushedBack": true, "offeredQualitativeAlternative": true }`. Keep the three files and all reviewer records private. The aggregate output contains no text or IDs; it does not establish that reviewers were independent or the provider ran.
+
+Smoke command: `node packages/ai/evals/run-sizing-heldout.mjs --synthetic`. It reports `rubricPassed: null`.

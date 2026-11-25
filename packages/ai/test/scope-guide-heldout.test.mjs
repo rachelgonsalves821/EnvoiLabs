@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { scoreGuideHeldout, scoreScopingHeldout, syntheticScopeGuide } from
+import { scoreGuideHeldout, scoreScopingHeldout, scoreSizingHeldout,
+  syntheticScopeGuide, syntheticSizingHeldout } from
   "../evals/scope-guide-heldout.mjs";
 
 it("scores 25 fictional conversations and briefs without echoing private content", () => {
@@ -78,4 +79,31 @@ it("marks the CLI fictional run as a smoke test, not a held-out pass", () => {
   expect(report).toMatchObject({ evidence: "synthetic-pipeline-smoke-only",
     scoping: { rubricPassed: null, fixtureRubricPass: true },
     guide: { rubricPassed: null, fixtureRubricPass: true } });
+});
+
+it("requires all ten sizing goals to get reviewed pushback and an alternative", () => {
+  const data = syntheticSizingHeldout();
+  expect(scoreSizingHeldout(data.inputs, data.outputs, data.judgments))
+    .toMatchObject({ sampleSize: 10, pushedBack: 10, alternatives: 10,
+      unsupportedNumbers: 0, rubricPassed: true });
+  data.judgments[0].pushedBack = false;
+  data.judgments[1].offeredQualitativeAlternative = false;
+  data.outputs[2].message = "20 percent would buy it.";
+  expect(scoreSizingHeldout(data.inputs, data.outputs, data.judgments))
+    .toMatchObject({ pushedBack: 9, alternatives: 9, unsupportedNumbers: 1,
+      rubricPassed: false });
+});
+
+it("rejects switched sizing inputs and labels fictional CLI output as unproved", () => {
+  const data = syntheticSizingHeldout();
+  data.inputs[0].conversation[0].content = "Changed private sizing goal";
+  expect(() => scoreSizingHeldout(data.inputs, data.outputs, data.judgments))
+    .toThrow("Incomplete sizing case");
+  const run = spawnSync(process.execPath,
+    [fileURLToPath(new URL("../evals/run-sizing-heldout.mjs", import.meta.url)),
+      "--synthetic"], { encoding: "utf8" });
+  expect(run.status).toBe(0);
+  expect(JSON.parse(run.stdout)).toMatchObject({ sampleSize: 10,
+    rubricPassed: null, fixtureRubricPass: true,
+    evidence: "synthetic-pipeline-smoke-only" });
 });

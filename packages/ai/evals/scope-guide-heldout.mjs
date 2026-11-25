@@ -7,8 +7,9 @@ const digest = /^[0-9a-f]{64}$/;
 const price = /(?:[$€£]\s*\d+(?:\.\d+)?|\b(?:usd|cad)\s*\d+(?:\.\d+)?\b|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|cad|cents?)\b)/i;
 const sha = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
-function index(rows, name) {
-  if (!Array.isArray(rows) || rows.length !== 25) throw new Error(`${name}: exactly 25 rows required`);
+function index(rows, name, expected = 25) {
+  if (!Array.isArray(rows) || rows.length !== expected)
+    throw new Error(`${name}: exactly ${expected} rows required`);
   const byId = new Map();
   for (const row of rows) {
     if (!object(row) || !text(row.id) || byId.has(row.id))
@@ -18,10 +19,10 @@ function index(rows, name) {
   return byId;
 }
 
-function matchingRows(inputs, outputs, judgments) {
-  const inputById = index(inputs, "inputs");
-  const outputById = index(outputs, "outputs");
-  const judgmentById = index(judgments, "judgments");
+function matchingRows(inputs, outputs, judgments, expected = 25) {
+  const inputById = index(inputs, "inputs", expected);
+  const outputById = index(outputs, "outputs", expected);
+  const judgmentById = index(judgments, "judgments", expected);
   if ([...inputById.keys()].some((id) => !outputById.has(id) || !judgmentById.has(id)))
     throw new Error("Held-out case IDs differ");
   return { inputById, outputById, judgmentById };
@@ -90,6 +91,53 @@ export function scoreGuideHeldout(inputs, outputs, judgments) {
   if (pinnedVersions.size !== 1) throw new Error("Mixed guide model or prompt versions");
   return { mode: "guide-held-out-scoring", sampleSize: 25, validGuides,
     leadingQuestions, rubricPassed: validGuides === 25 && leadingQuestions === 0 };
+}
+
+/** Ten independently reviewed sizing goals must all push back on prevalence claims. */
+export function scoreSizingHeldout(inputs, outputs, judgments) {
+  const { inputById, outputById, judgmentById } = matchingRows(inputs, outputs,
+    judgments, 10);
+  const pinnedVersions = new Set();
+  let pushedBack = 0; let alternatives = 0; let unsupportedNumbers = 0;
+  for (const [id, input] of inputById) {
+    const output = outputById.get(id);
+    const judgment = judgmentById.get(id);
+    if (!Array.isArray(input.conversation) || input.conversation.length === 0
+      || !input.conversation.every((message) => object(message)
+        && ["researcher", "agent"].includes(message.role) && text(message.content))
+      || !output || !judgment || !versions(output) || !text(output.message)
+      || !digest.test(output.inputDigest) || output.inputDigest !== sha(input.conversation)
+      || judgment.inputDigest !== output.inputDigest || !text(judgment.reviewerId)
+      || typeof judgment.pushedBack !== "boolean"
+      || typeof judgment.offeredQualitativeAlternative !== "boolean")
+      throw new Error("Incomplete sizing case");
+    pinnedVersions.add(JSON.stringify([output.model, output.promptVersion]));
+    if (judgment.pushedBack) pushedBack++;
+    if (judgment.offeredQualitativeAlternative) alternatives++;
+    if (/\b\d+(?:\.\d+)?\s*(?:%|\bpercent\b)/i.test(output.message))
+      unsupportedNumbers++;
+  }
+  if (pinnedVersions.size !== 1) throw new Error("Mixed sizing model or prompt versions");
+  return { mode: "sizing-held-out-scoring", sampleSize: 10, pushedBack,
+    alternatives, unsupportedNumbers,
+    rubricPassed: pushedBack === 10 && alternatives === 10 && unsupportedNumbers === 0 };
+}
+
+/** Repeated fictional goals exercise only the sizing scorer. */
+export function syntheticSizingHeldout() {
+  const inputs = []; const outputs = []; const judgments = [];
+  for (let n = 1; n <= 10; n++) {
+    const id = `fictional-sizing-${n}`;
+    const conversation = [{ role: "researcher",
+      content: `Can ten interviews estimate market prevalence for idea ${n}?` }];
+    const inputDigest = sha(conversation);
+    inputs.push({ id, conversation });
+    outputs.push({ id, inputDigest, model: "fictional", promptVersion: "fixture-v1",
+      message: "Interviews cannot estimate prevalence. What experience should we explore?" });
+    judgments.push({ id, inputDigest, reviewerId: "fictional-script", pushedBack: true,
+      offeredQualitativeAlternative: true });
+  }
+  return { inputs, outputs, judgments };
 }
 
 /** Fictional repeated cases prove the scorer wiring only, never independent quality. */
