@@ -132,11 +132,27 @@ select is((select public.commit_gate3_probe_decision(
 select is((select count(*) from public.probes where answer_id =
     'a9700000-0000-4000-8000-000000000004'), 1::bigint,
     'first-writer replay creates one probe');
+-- The fixture advances the server clock fields without weakening production
+-- immutability, to model a timely browser paint whose RPC arrives later.
+reset role;
+alter table internal.gate3_probe_turns disable trigger gate3_keep_probe_turn_identity;
+update internal.gate3_probe_turns set
+    server_upload_confirmed_at = clock_timestamp() - interval '10 seconds',
+    transcript_ready_at = clock_timestamp() - interval '9 seconds',
+    decision_deadline_at = clock_timestamp() - interval '4 seconds'
+where id = (select turn_id from probe_ids);
+alter table internal.gate3_probe_turns enable trigger gate3_keep_probe_turn_identity;
+set local role service_role;
 select is((select public.mark_gate3_probe_shown(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
     '90300000-0000-4000-8000-000000000001', 1200)
-    from probe_ids), 'recorded', 'shown receipt is recorded');
+    from probe_ids), 'recorded', 'paint before cutoff survives delayed RPC receipt');
+reset role;
+select ok((select shown_at > decision_deadline_at
+    from internal.gate3_probe_turns where id = (select turn_id from probe_ids)),
+    'shown receipt records after the server decision deadline');
+set local role service_role;
 select is((select public.mark_gate3_probe_shown(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
@@ -223,6 +239,13 @@ select is((select public.read_gate3_respondent_probe(
     'a9700000-0000-4000-8000-000000000003',
     '90300000-0000-4000-8000-000000000001') ->> 'text'),
     'What else made the route useful?', 'second probe is the current respondent prompt');
+select is((select public.mark_gate3_probe_shown(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    (public.read_gate3_respondent_probe(
+        'a9700000-0000-4000-8000-000000000003',
+        '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
+    '90300000-0000-4000-8000-000000000001', 7401)
+    from second_probe_turn), 'stale', 'late browser paint cannot claim a timely receipt');
 select is((select public.mark_gate3_probe_shown(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (public.read_gate3_respondent_probe(

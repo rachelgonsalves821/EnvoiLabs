@@ -6,8 +6,8 @@ import { useRef, useState, type SubmitEvent } from "react";
 import { interviewRequest } from "../../interview-request";
 import { interviewCopy as copy } from "./copy";
 
-export function ProbeTextAnswer({ sessionId, turnId, probeId, onSaved }: {
-  sessionId: string; turnId: string; probeId: string; onSaved: () => void;
+export function ProbeTextAnswer({ sessionId, turnId, probeId, shown, onSaved }: {
+  sessionId: string; turnId: string; probeId: string; shown: boolean; onSaved: () => void;
 }) {
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
@@ -16,7 +16,7 @@ export function ProbeTextAnswer({ sessionId, turnId, probeId, onSaved }: {
 
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    if (pending || !shown) return;
     const text = value.trim();
     if (!text) { setError(copy.answerNeeded); return; }
     if (attempt.current?.text !== text) attempt.current = { id: crypto.randomUUID(), text };
@@ -37,10 +37,11 @@ export function ProbeTextAnswer({ sessionId, turnId, probeId, onSaved }: {
   return <form className="respondent-interview-form" onSubmit={(event) => void save(event)} noValidate>
     <div className="ev-field">
       <label htmlFor="probe-typed-answer">{copy.answerLabel}</label>
-      <textarea id="probe-typed-answer" rows={5} value={value} readOnly={pending} required
+      <textarea id="probe-typed-answer" rows={5} value={value} disabled={!shown || pending} required
         onChange={(event) => { setValue(event.currentTarget.value); setError(""); }} />
     </div>
-    <Button type="submit" variant="pulse" aria-disabled={pending}>{copy.saveAnswer}</Button>
+    <Button type="submit" variant="pulse" disabled={!shown || pending}>{copy.saveAnswer}</Button>
+    {!shown && <p role="status">{copy.preparingFollowup}</p>}
     {pending && <p role="status">{copy.savingAnswer}</p>}
     {error && <p role="alert">{error}</p>}
   </form>;

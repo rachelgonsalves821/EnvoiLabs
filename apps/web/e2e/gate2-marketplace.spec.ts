@@ -238,10 +238,56 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const secondLink = await deliveredEmail(secondRespondent, secondEmail, origin,
             "/api/respondent/auth/callback");
           await secondRespondent.goto(secondLink.href);
+          const probeTurnId = randomUUID();
+          const probeId = randomUUID();
+          let answerCalls = 0;
+          let sessionId = "";
+          let questionId = "";
+          let releaseReceipt: () => void = () => {};
+          const receiptGate = new Promise<void>((resolve) => { releaseReceipt = resolve; });
+          let signalShown: () => void = () => {};
+          const shownSeen = new Promise<void>((resolve) => { signalShown = resolve; });
+          await secondRespondent.route("**/api/respondent/sessions/start", async (route) => {
+            const response = await route.fetch();
+            const current = await response.json() as {
+              sessionId: string; nextQuestion: { id: string; text: string } | null;
+            };
+            sessionId = current.sessionId;
+            questionId = current.nextQuestion?.id ?? "";
+            await route.fulfill({ response, json: { ...current,
+              currentProbe: answerCalls === 0 ? { turnId: probeTurnId, probeId,
+                text: "What shaped your choice?" } : null } });
+          });
+          await secondRespondent.route("**/api/respondent/probes/shown", async (route) => {
+            signalShown();
+            await receiptGate;
+            await route.fulfill({ status: 200, contentType: "application/json",
+              body: JSON.stringify({ status: "recorded" }) });
+          });
+          await secondRespondent.route("**/api/respondent/probes/answer", async (route) => {
+            answerCalls += 1;
+            const posted = route.request().postDataJSON() as { answerId: string };
+            const now = new Date().toISOString();
+            await route.fulfill({ status: 200, contentType: "application/json",
+              body: JSON.stringify({ answer: { id: posted.answerId, sessionId,
+                guideQuestionId: questionId, kind: "text", probeId,
+                durationMs: null, sequence: 1011, createdAt: now, updatedAt: now } }) });
+          });
           await secondRespondent.goto("/r");
           await secondRespondent.getByRole("button", { name: "Start answering" }).click();
           await expect(secondRespondent).toHaveURL(origin + `/r/interviews/${second.id}`);
+          await expect(secondRespondent.getByRole("heading", { name: "What shaped your choice?" }))
+            .toBeVisible();
+          await shownSeen;
+          await expect(secondRespondent.getByRole("button", { name: "Save answer" })).toBeDisabled();
+          await expect(secondRespondent.getByLabel("Type your answer")).toBeDisabled();
+          expect(answerCalls).toBe(0);
+          releaseReceipt();
+          await expect(secondRespondent.getByRole("button", { name: "Save answer" })).toBeEnabled();
+          await secondRespondent.getByLabel("Type your answer").fill("A shorter wait mattered.");
+          await secondRespondent.getByRole("button", { name: "Save answer" }).click();
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toBeVisible();
+          expect(answerCalls).toBe(1);
           const withdrawn = await db.from("consents").insert({
             respondent_id: second.respondent_id, purpose: "retention", granted: false,
             text_version: "synthetic-marketplace-withdrawal",
