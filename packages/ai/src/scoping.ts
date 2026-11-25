@@ -54,6 +54,16 @@ function validPatch(stage: ScopingInput["stage"], previous: Partial<Brief>, patc
   return keep.every((item) => patch.criteria!.some((next) => next.kind === item.kind && next.text === item.text));
 }
 
+function attributedStimulusPrice(patch: BriefPatch,
+  messages: LLMRequest["messages"]): boolean {
+  if (!patch.stimulus) return true;
+  const amounts = [...patch.stimulus.matchAll(new RegExp(price.source, "gi"))]
+    .map((match) => match[0].toLowerCase().replace(/\s+/gu, ""));
+  const researcherText = messages.filter((message) => message.role === "user")
+    .map((message) => message.content.toLowerCase().replace(/\s+/gu, "")).join(" ");
+  return amounts.every((amount) => researcherText.includes(amount));
+}
+
 /** A private, synthetic-ready scoping turn. Platform must still authorize every real dispatch. */
 export async function runScopingTurn(port: ScopingPort, provider: LLMProvider,
   input: ScopingInput): Promise<ScopingTurn | null> {
@@ -70,7 +80,8 @@ export async function runScopingTurn(port: ScopingPort, provider: LLMProvider,
     if (generated.model !== input.providerModel) return null;
     const turn = ScopingTurnSchema.safeParse(generated.output);
     if (!turn.success || !validTurn(turn.data)
-      || !validPatch(input.stage, brief, turn.data.briefPatch)) return null;
+      || !validPatch(input.stage, brief, turn.data.briefPatch)
+      || !attributedStimulusPrice(turn.data.briefPatch, messages)) return null;
     const latestUser = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (/\b(?:what percent|market size|prevalence)\b/i.test(latestUser)
       && !/\b(?:cannot|can't|won't|does not)\b/i.test(turn.data.message)) return null;

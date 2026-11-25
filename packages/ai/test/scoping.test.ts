@@ -72,8 +72,10 @@ describe("fictional researcher scoping boundary", () => {
 
   it("retains a researcher-provided price in stimulus without generating a price", async () => {
     const { port, provider } = setup({ ...turn, briefPatch: { stimulus: "A fictional $5 offer" } });
-    expect((await runScopingTurn(port, provider, { ...base, stage: "stimulus" }))?.briefPatch.stimulus)
+    expect((await runScopingTurn(port, provider, { ...base, stage: "stimulus",
+      messages: [{ role: "user", content: "Please show a fictional $5 offer." }] }))?.briefPatch.stimulus)
       .toBe("A fictional $5 offer");
+    expect(await runScopingTurn(port, provider, { ...base, stage: "stimulus" })).toBeNull();
   });
 
   it("preserves earlier eligibility while asking exclusions", async () => {
