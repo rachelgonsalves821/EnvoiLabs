@@ -90,8 +90,19 @@ it("does not accept a quote added by mutation during the authorization wait", as
       source.redactedText = "fabricated";
       return true;
     }) };
-  expect(await screenAnalystV2Evidence(port, draft)).toMatchObject({
-    themes: [], decisions: [{ action: "drop", reason: "quote differs from redacted source" }],
-  });
+  expect(await screenAnalystV2Evidence(port, draft)).toBeNull();
   expect(source.redactedText).toBe("fabricated");
+});
+
+it("withholds if source version or analysis grant changes after authorization", async () => {
+  const { draft } = await draftWith();
+  const rotated = { ...snapshot, sources: [{ ...snapshot.sources[0]!, sourceVersion: id(4) }] };
+  const sourcePort = { readCurrent: vi.fn().mockResolvedValueOnce(snapshot)
+    .mockResolvedValueOnce(rotated), authorize: vi.fn().mockResolvedValue(true) };
+  expect(await screenAnalystV2Evidence(sourcePort, draft)).toBeNull();
+  expect(sourcePort.readCurrent).toHaveBeenCalledTimes(2);
+  const grantPort = { readCurrent: vi.fn().mockResolvedValue(snapshot),
+    authorize: vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false) };
+  expect(await screenAnalystV2Evidence(grantPort, draft)).toBeNull();
+  expect(grantPort.authorize).toHaveBeenCalledTimes(2);
 });

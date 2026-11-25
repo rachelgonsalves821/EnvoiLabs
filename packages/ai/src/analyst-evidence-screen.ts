@@ -33,6 +33,28 @@ function frozenCurrent(source: AnalystSourceSnapshot): AnalystSourceSnapshot {
   });
 }
 
+async function matchingCurrent(raw: AnalystSourceSnapshot | null,
+  draft: AnalystDraftResult): Promise<AnalystSourceSnapshot | null> {
+  if (!raw || raw.studyId !== draft.studyId || !nonblank(raw.decisionQuestion)
+    || !Array.isArray(raw.sources) || raw.sources.length !== draft.sources.length) return null;
+  const current = frozenCurrent(raw);
+  if (await analystTextDigest(current.decisionQuestion) !== draft.decisionQuestionDigest) return null;
+  const matched = new Set<string>();
+  for (const source of current.sources) {
+    if (!source || source.studyId !== draft.studyId || !uuid.test(source.transcriptId)
+      || !uuid.test(source.sourceVersion) || !nonblank(source.redactedText)
+      || !digest.test(source.policyDigest) || !digest.test(source.qualificationDigest)
+      || matched.has(source.transcriptId.toLowerCase())) return null;
+    matched.add(source.transcriptId.toLowerCase());
+    const original = draft.sources.find((item) => item.transcriptId === source.transcriptId);
+    if (!original || original.sourceVersion !== source.sourceVersion
+      || original.policyDigest !== source.policyDigest
+      || original.qualificationDigest !== source.qualificationDigest
+      || await analystTextDigest(source.redactedText) !== original.redactedDigest) return null;
+  }
+  return current;
+}
+
 function quote(value: unknown): value is ProposedEvidence {
   return record(value) && exact(value, ["studyId", "transcriptId", "sourceVersion",
     "startChar", "endChar", "exactText", "rationale", "confidence"])
@@ -70,29 +92,16 @@ export async function screenAnalystV2Evidence(port: AnalystDraftPort,
       || !digest.test(draft.decisionQuestionDigest) || !nonblank(draft.model)
       || !nonblank(draft.promptVersion) || !Array.isArray(draft.sources)
       || draft.sources.length === 0 || !privateV2(draft.output)) return null;
-    const currentRaw = await port.readCurrent(draft.studyId);
-    if (!currentRaw || currentRaw.studyId !== draft.studyId
-      || !nonblank(currentRaw.decisionQuestion) || !Array.isArray(currentRaw.sources)
-      || currentRaw.sources.length !== draft.sources.length) return null;
-    const current = frozenCurrent(currentRaw);
-    if (await analystTextDigest(current.decisionQuestion) !== draft.decisionQuestionDigest) return null;
-    const matched = new Set<string>();
-    for (const source of current.sources) {
-      if (!source || source.studyId !== draft.studyId || !uuid.test(source.transcriptId)
-        || !uuid.test(source.sourceVersion) || !nonblank(source.redactedText)
-        || !digest.test(source.policyDigest) || !digest.test(source.qualificationDigest)
-        || matched.has(source.transcriptId.toLowerCase())) return null;
-      matched.add(source.transcriptId.toLowerCase());
-      const original = draft.sources.find((item) => item.transcriptId === source.transcriptId);
-      if (!original || original.sourceVersion !== source.sourceVersion
-        || original.policyDigest !== source.policyDigest
-        || original.qualificationDigest !== source.qualificationDigest
-        || await analystTextDigest(source.redactedText) !== original.redactedDigest) return null;
-    }
+    const current = await matchingCurrent(await port.readCurrent(draft.studyId), draft);
+    if (!current) return null;
     if (!await port.authorize({ purpose: "ai_analysis", providerModel: draft.model,
       promptVersion: draft.promptVersion, promptDigest: draft.promptDigest,
       snapshot: current })) return null;
-    const sources = current.sources.map((source) => ({ ...source,
+    const after = await matchingCurrent(await port.readCurrent(draft.studyId), draft);
+    if (!after || !await port.authorize({ purpose: "ai_analysis", providerModel: draft.model,
+      promptVersion: draft.promptVersion, promptDigest: draft.promptDigest,
+      snapshot: after })) return null;
+    const sources = after.sources.map((source) => ({ ...source,
       published: true, withdrawn: false }));
     const decisions: ScreenedAnalystEvidence["decisions"][number][] = [];
     const themes: ScreenedAnalystEvidence["themes"][number][] = [];
