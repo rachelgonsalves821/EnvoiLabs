@@ -1,6 +1,7 @@
 export type ProbeOutcome =
   | { readonly outcome: "rendered"; readonly uploadConfirmedAtMs: number; readonly renderedAtMs: number }
-  | { readonly outcome: "no_probe" | "error" | "timeout" | "superseded" };
+  | { readonly outcome: "timeout"; readonly stage?: "decision" | "render" }
+  | { readonly outcome: "no_probe" | "error" | "superseded" };
 
 export interface ProbeMetrics {
   readonly total: number;
@@ -9,6 +10,9 @@ export interface ProbeMetrics {
   readonly noProbe: number;
   readonly errors: number;
   readonly timeouts: number;
+  readonly decisionTimeouts: number;
+  readonly renderTimeouts: number;
+  readonly unclassifiedTimeouts: number;
   readonly superseded: number;
   readonly noProbeRate: number;
   readonly errorRate: number;
@@ -113,6 +117,9 @@ export function summarizeCompleteProbeOpportunityLog(
 
 /** Upload confirmation to browser render, excluding intentional no-probe decisions from latency. */
 export function summarizeProbeOutcomes(outcomes: readonly ProbeOutcome[]): ProbeMetrics {
+  if (outcomes.some((item) => item.outcome === "timeout" && item.stage !== undefined
+    && item.stage !== "decision" && item.stage !== "render"))
+    throw new Error("Invalid probe timeout stage");
   const latencies = outcomes.filter((item): item is Extract<ProbeOutcome, { outcome: "rendered" }> =>
     item.outcome === "rendered").map((item) => item.renderedAtMs - item.uploadConfirmedAtMs);
   if (latencies.some((ms) => !Number.isFinite(ms) || ms < 0)) throw new Error("Invalid probe timestamps");
@@ -122,11 +129,17 @@ export function summarizeProbeOutcomes(outcomes: readonly ProbeOutcome[]): Probe
   const noProbe = count("no_probe");
   const errors = count("error");
   const timeouts = count("timeout");
+  const decisionTimeouts = outcomes.filter((item) => item.outcome === "timeout"
+    && item.stage === "decision").length;
+  const renderTimeouts = outcomes.filter((item) => item.outcome === "timeout"
+    && item.stage === "render").length;
   const superseded = count("superseded");
   return {
     total: outcomes.length, rendered: latencies.length,
     renderedP95Ms: latencies.length === 0 ? null : latencies[Math.ceil(0.95 * latencies.length) - 1] ?? null,
-    noProbe, errors, timeouts, superseded, noProbeRate: rate(noProbe), errorRate: rate(errors),
+    noProbe, errors, timeouts, decisionTimeouts, renderTimeouts,
+    unclassifiedTimeouts: timeouts - decisionTimeouts - renderTimeouts,
+    superseded, noProbeRate: rate(noProbe), errorRate: rate(errors),
     timeoutRate: rate(timeouts), supersededRate: rate(superseded),
   };
 }

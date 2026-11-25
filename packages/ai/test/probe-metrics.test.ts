@@ -17,6 +17,21 @@ it("reports rendered p95 and separate no-probe, error and timeout rates", () => 
     .toThrow("Invalid probe timestamps");
 });
 
+it("keeps persisted decision and render timeouts separate without guessing unlabeled stages", () => {
+  const result = summarizeProbeOutcomes([
+    { outcome: "timeout", stage: "decision" },
+    { outcome: "timeout", stage: "render" },
+    { outcome: "timeout" },
+    { outcome: "no_probe" },
+  ]);
+  expect(result).toMatchObject({ total: 4, timeouts: 3, timeoutRate: 0.75,
+    decisionTimeouts: 1, renderTimeouts: 1, unclassifiedTimeouts: 1 });
+  expect(() => summarizeProbeOutcomes([
+    { outcome: "timeout", stage: "browser" } as unknown as
+      Parameters<typeof summarizeProbeOutcomes>[0][number],
+  ])).toThrow("Invalid probe timeout stage");
+});
+
 it("summarizes unique fictional turns by device without claiming a physical timing pass", () => {
   const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
   const records = [
