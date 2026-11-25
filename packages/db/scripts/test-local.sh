@@ -37,6 +37,7 @@ if [[ ${1:-} == '--update-types' ]]; then
     mkdir -p -- "$(dirname -- "$types_file")"
     cp -- "$generated" "$types_file"
 elif ! cmp -s -- "$generated" "$types_file"; then
+    diff -u -- "$types_file" "$generated" || true
     printf 'Database types are out of date. Run bash packages/db/scripts/test-local.sh --update-types.\n' >&2
     exit 1
 fi

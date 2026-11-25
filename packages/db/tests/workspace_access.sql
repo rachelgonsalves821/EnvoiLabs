@@ -28,10 +28,10 @@ insert into access_matrix values
     ('public.guide_questions',    array[1, 0, 1, 1, 1, 0, null]),
     ('public.quotes',             array[0, 0, 1, 1, 0, 0, null]),
     ('public.gate2_quote_snapshots', array[0, 0, 0, 0, 0, 0, null]),
-    ('public.reports',            array[0, 0, 1, 1, 0, 0, null]),
-    ('public.findings',           array[0, 0, 1, 1, 0, 0, null]),
+    ('public.reports',            array[0, 0, 0, 0, 0, 0, null]),
+    ('public.findings',           array[0, 0, 0, 0, 0, 0, null]),
     ('public.transcripts',        array[0, 0, 1, 1, 0, 0, null]),
-    ('public.evidence_quotes',    array[0, 0, 1, 1, 0, 0, null]);
+    ('public.evidence_quotes',    array[0, 0, 0, 0, 0, 0, null]);
 insert into access_matrix
 select relation, array_fill(null::bigint, array[7])
 from (values
@@ -182,7 +182,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}';
 select * from pg_temp.check_access('Tenant researcher with MFA', 3);
 select is((select redacted_text from research.transcripts), 'I ordered soup.', 'Consented text is available to the MFA tenant researcher');
-select is((select text from research.evidence_quotes), 'ordered', 'Evidence is read from the consented redacted transcript');
+select is((select count(*) from research.evidence_quotes), 0::bigint, 'Unqualified legacy evidence stays hidden');
 select throws_ok($$select text from public.evidence_quotes$$, '42501', null, 'Stored quote text is private to the server');
 
 set local request.jwt.claims = '{"sub":"90000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';

@@ -302,6 +302,7 @@ export type Database = {
           end_char: number
           finding_id: string
           id: string
+          source_version: string | null
           start_char: number
           study_id: string
           text: string
@@ -313,6 +314,7 @@ export type Database = {
           end_char: number
           finding_id: string
           id?: string
+          source_version?: string | null
           start_char: number
           study_id: string
           text: string
@@ -324,6 +326,7 @@ export type Database = {
           end_char?: number
           finding_id?: string
           id?: string
+          source_version?: string | null
           start_char?: number
           study_id?: string
           text?: string
@@ -355,6 +358,7 @@ export type Database = {
           created_at: string
           id: string
           position: number
+          qualified_claim: string | null
           report_id: string
           study_id: string
           total: number
@@ -367,6 +371,7 @@ export type Database = {
           created_at?: string
           id?: string
           position: number
+          qualified_claim?: string | null
           report_id: string
           study_id: string
           total: number
@@ -379,6 +384,7 @@ export type Database = {
           created_at?: string
           id?: string
           position?: number
+          qualified_claim?: string | null
           report_id?: string
           study_id?: string
           total?: number
@@ -1436,6 +1442,9 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          qualified_policy_digest: string | null
+          qualified_qualification_digest: string | null
+          qualified_summary_json: Json | null
           state: string
           study_id: string
           summary_json: Json
@@ -1445,6 +1454,9 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          qualified_policy_digest?: string | null
+          qualified_qualification_digest?: string | null
+          qualified_summary_json?: Json | null
           state: string
           study_id: string
           summary_json: Json
@@ -1454,6 +1466,9 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          qualified_policy_digest?: string | null
+          qualified_qualification_digest?: string | null
+          qualified_summary_json?: Json | null
           state?: string
           study_id?: string
           summary_json?: Json
@@ -1691,6 +1706,7 @@ export type Database = {
           latency_ms: number
           model: string
           provider: string
+          redacted_source_version: string
           redacted_text: string | null
           study_id: string
           updated_at: string
@@ -1703,6 +1719,7 @@ export type Database = {
           latency_ms: number
           model: string
           provider: string
+          redacted_source_version?: string
           redacted_text?: string | null
           study_id: string
           updated_at?: string
@@ -1715,6 +1732,7 @@ export type Database = {
           latency_ms?: number
           model?: string
           provider?: string
+          redacted_source_version?: string
           redacted_text?: string | null
           study_id?: string
           updated_at?: string
@@ -1734,6 +1752,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      begin_gate3_probe_turn: {
+        Args: {
+          supplied_answer_id: string
+          supplied_auth_user_id: string
+          supplied_browser_upload_ms: number
+        }
+        Returns: string
+      }
       claim_gate1_answer_job: {
         Args: { supplied_answer_id?: string }
         Returns: Json
@@ -1763,6 +1789,19 @@ export type Database = {
           requested_rule_id: string
           requested_start: number
           requested_version: number
+        }
+        Returns: Json
+      }
+      commit_gate3_probe_decision: {
+        Args: {
+          supplied_answer_id: string
+          supplied_auth_user_id: string
+          supplied_decision: Json
+          supplied_question_id: string
+          supplied_session_id: string
+          supplied_source_version: string
+          supplied_transcript_revision: string
+          supplied_turn_id: string
         }
         Returns: Json
       }
@@ -1914,6 +1953,16 @@ export type Database = {
       list_gate1_home_invites: { Args: never; Returns: Json }
       list_gate2_nudge_candidates: { Args: never; Returns: Json }
       list_gate2_nudge_dispatchable: { Args: never; Returns: Json }
+      mark_gate3_probe_shown: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_browser_rendered_ms: number
+          supplied_probe_id: string
+          supplied_session_id: string
+          supplied_turn_id: string
+        }
+        Returns: string
+      }
       observe_gate2_nudge_delivery: {
         Args: {
           supplied_claim_id: string
@@ -1982,6 +2031,26 @@ export type Database = {
         Args: { supplied_invite_id: string }
         Returns: Json
       }
+      read_gate3_committed_probe: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_session_id: string
+          supplied_turn_id: string
+        }
+        Returns: Json
+      }
+      read_gate3_ready_probe_turn: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_session_id: string
+          supplied_turn_id: string
+        }
+        Returns: Json
+      }
+      read_gate3_respondent_probe: {
+        Args: { supplied_auth_user_id: string; supplied_session_id: string }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -2012,6 +2081,17 @@ export type Database = {
           requested_reservation_id: string
         }
         Returns: boolean
+      }
+      record_gate3_probe_text_answer: {
+        Args: {
+          supplied_answer_id: string
+          supplied_auth_user_id: string
+          supplied_probe_id: string
+          supplied_session_id: string
+          supplied_text: string
+          supplied_turn_id: string
+        }
+        Returns: Json
       }
       register_gate2_push_subscription: {
         Args: {
