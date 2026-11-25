@@ -9,7 +9,9 @@ insert into public.guide_questions (id, study_id, position, text, max_probes)
 values ('a9720000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 1, 'Why did you choose it?', 2),
     ('a9720000-0000-4000-8000-000000000002',
-    '90600000-0000-4000-8000-000000000001', 2, 'What happened next?', 2);
+    '90600000-0000-4000-8000-000000000001', 2, 'What happened next?', 2),
+    ('a9720000-0000-4000-8000-00000000000b',
+    '90600000-0000-4000-8000-000000000001', 3, 'What made it helpful?', 2);
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 values ('a9720000-0000-4000-8000-000000000003',
     '90600000-0000-4000-8000-000000000001',
@@ -151,6 +153,92 @@ reset role;
 select is((select count(*) from public.probes where answer_id =
     'a9720000-0000-4000-8000-000000000007'), 0::bigint,
     'provider timeout creates no probe');
+
+-- A committed probe wins even when a later timeout caller observes an expired
+-- deadline. Keep the pre-deadline and existing-decision branches explicit.
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence, created_at, updated_at)
+values ('a9720000-0000-4000-8000-000000000009',
+    'a9720000-0000-4000-8000-000000000004',
+    '90600000-0000-4000-8000-000000000001',
+    'a9720000-0000-4000-8000-00000000000b', 'text', 3,
+    clock_timestamp() - interval '1 second', clock_timestamp());
+insert into public.transcripts (id, answer_id, study_id, redacted_text,
+    provider, model, latency_ms, cost_micros)
+values ('a9720000-0000-4000-8000-00000000000a',
+    'a9720000-0000-4000-8000-000000000009',
+    '90600000-0000-4000-8000-000000000001',
+    'The clear steps helped.', 'typed', 'none', 0, 0);
+insert into internal.gate1_answer_jobs (answer_id, source_hash,
+    completed_at, result_status, publication_policy_digest,
+    publication_qualification_digest)
+values ('a9720000-0000-4000-8000-000000000009',
+    decode(repeat('e', 64), 'hex'), clock_timestamp(), 'published',
+    repeat('a', 64), repeat('b', 64));
+set local role service_role;
+select is(public.record_gate3_probe_timeout(
+    'a9720000-0000-4000-8000-000000000009',
+    '90300000-0000-4000-8000-000000000001') ->> 'status', 'not_due',
+    'a qualified answer before its deadline is not timed out');
+create temporary table first_writer_turn (turn_id uuid not null);
+grant select, insert on first_writer_turn to service_role;
+insert into first_writer_turn select public.begin_gate3_probe_turn(
+    'a9720000-0000-4000-8000-000000000009',
+    '90300000-0000-4000-8000-000000000001', 3000);
+select ok((select turn_id is not null from first_writer_turn),
+    'current qualified answer opens a timely turn');
+select is(public.record_gate3_probe_timeout(
+    'a9720000-0000-4000-8000-000000000009',
+    '90300000-0000-4000-8000-000000000001') ->> 'status', 'not_due',
+    'an opened turn before its deadline is not timed out');
+create temporary table first_writer_probe (result jsonb not null);
+grant select, insert on first_writer_probe to service_role;
+insert into first_writer_probe select public.commit_gate3_probe_decision(
+    'a9720000-0000-4000-8000-000000000004',
+    'a9720000-0000-4000-8000-00000000000b',
+    'a9720000-0000-4000-8000-000000000009', turn_id,
+    '90300000-0000-4000-8000-000000000001',
+    (public.read_gate3_ready_probe_turn(
+        'a9720000-0000-4000-8000-000000000004', turn_id,
+        '90300000-0000-4000-8000-000000000001') ->> 'sourceVersion')::uuid,
+    public.read_gate3_ready_probe_turn(
+        'a9720000-0000-4000-8000-000000000004', turn_id,
+        '90300000-0000-4000-8000-000000000001') ->> 'transcriptRevision',
+    jsonb_build_object('action', 'probe', 'turnId', turn_id,
+        'uploadConfirmedAtMs', 3000, 'text', 'What made those steps clear?'))
+from first_writer_turn;
+select is((select result ->> 'status' from first_writer_probe), 'committed',
+    'probe is the first committed decision');
+reset role;
+alter table internal.gate3_probe_turns disable trigger gate3_keep_probe_turn_identity;
+update internal.gate3_probe_turns set
+    decision_deadline_at = clock_timestamp() - interval '1 second'
+where id = (select turn_id from first_writer_turn);
+alter table internal.gate3_probe_turns enable trigger gate3_keep_probe_turn_identity;
+set local role service_role;
+create temporary table first_writer_timeout (result jsonb not null);
+grant select, insert on first_writer_timeout to service_role;
+insert into first_writer_timeout select public.record_gate3_probe_timeout(
+    'a9720000-0000-4000-8000-000000000009',
+    '90300000-0000-4000-8000-000000000001');
+select is((select result -> 'value' -> 'decision' from first_writer_timeout),
+    (select result -> 'value' -> 'decision' from first_writer_probe),
+    'expired timeout caller preserves the complete first probe decision');
+select is((select result -> 'value' ->> 'probeId' from first_writer_timeout),
+    (select result -> 'value' ->> 'probeId' from first_writer_probe),
+    'expired timeout caller preserves the first probe identity');
+select is((select result -> 'value' ->> 'sourceVersion' from first_writer_timeout),
+    (select result -> 'value' ->> 'sourceVersion' from first_writer_probe),
+    'expired timeout caller preserves the qualified source version');
+reset role;
+select is((select id::text from public.probes where answer_id =
+    'a9720000-0000-4000-8000-000000000009'),
+    (select result -> 'value' ->> 'probeId' from first_writer_probe),
+    'original probe row identity remains after timeout replay');
+select is((select count(*) from public.probes where answer_id =
+    'a9720000-0000-4000-8000-000000000009'), 1::bigint,
+    'timeout replay does not remove or duplicate the first probe');
+
 insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'ai_followup', false,
