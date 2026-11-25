@@ -6,7 +6,7 @@
 
 1. Confirm the environment and affected payout IDs from the payout dashboard or restricted ledger. Separate `pending`, provider-rejected, and outcome-unknown orders. Do not copy recipient email, gift card URL, or provider payload into an incident ticket.
 2. Pause automatic retry for an affected payout if the provider may have accepted the order but the response or webhook was lost. Keep its ledger entry `pending`; do not mark it paid or create a new key.
-3. Check quality approval, current consent and deletion state, annual cap reservation, amount, currency, reward choice, and the original idempotency key before any recovery action.
+3. Check quality approval, current consent and deletion state, annual cap reservation, amount, currency, reward choice, and the original idempotency key before any recovery action. For a marketplace study, compare the amount with distinct recorded, answered **core** questions at the frozen $1-per-question reward; probes, blank answers and repeat recordings of one core question must not increase the payout. Gate 2 draft #165 now enforces this at the database reservation boundary, with a local two-client annual-cap rehearsal; the final provider and Earnings integration is still absent. Do not treat a full offer reward as the earned amount.
 
 ## Reconcile and recover
 
@@ -17,4 +17,4 @@
 
 ## Close
 
-Verify exactly one provider order per approved payout, no cap breach, matching ledger and provider status, respondent visibility, and an audit trail of every attempt. Record affected count and time to resolution. Do not re-enable retries until the unknown-outcome path is tested.
+Verify exactly one provider order per approved payout, no cap breach, the approved answered-core amount, matching ledger and provider status, respondent visibility, and an audit trail of every attempt. Record affected count and time to resolution. Do not re-enable retries until the unknown-outcome path is tested.
