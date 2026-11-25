@@ -190,7 +190,7 @@ select is(public.claim_gate2_nudge_delivery(
     'a9870000-0000-4000-8000-000000000024'), null::jsonb,
     'revocation between preparation and claim prevents dispatch');
 select is(jsonb_array_length(public.prepare_gate2_nudge_deliveries(
-    'a9870000-0000-4000-8000-000000000022'), 0,
+    'a9870000-0000-4000-8000-000000000022')), 0,
     'queued deadline reminder cannot prepare delivery after revocation');
 reset role;
 select is((select count(*)::integer from internal.gate2_nudge_outbox), 2,
