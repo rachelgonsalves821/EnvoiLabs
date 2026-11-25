@@ -28,6 +28,33 @@ describe("probe runtime", () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it("bounds a stalled authorization and ignores its late approval", async () => {
+    let release: (allowed: boolean) => void = () => undefined;
+    const authorization = new Promise<boolean>((resolve) => { release = resolve; });
+    const generate = vi.fn(async () => response({ action: "probe", text: "What happened?" }));
+    const pending = decideProbe(attempt, { provider: provider(generate),
+      currentTurnId: () => "answer-1", authorize: () => authorization, timeoutMs: 1 });
+    expect(await pending).toEqual({ action: "next", turnId: "answer-1", outcome: "timeout" });
+    release(true);
+    await Promise.resolve();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("shares one deadline between authorization and model inference", async () => {
+    vi.useFakeTimers();
+    try {
+      const generate = vi.fn(() => new Promise<LLMResponse>(() => undefined));
+      const pending = decideProbe(attempt, { provider: provider(generate),
+        currentTurnId: () => "answer-1",
+        authorize: () => new Promise((resolve) => setTimeout(() => resolve(true), 5)),
+        timeoutMs: 10 });
+      await vi.advanceTimersByTimeAsync(5);
+      expect(generate).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(5);
+      expect(await pending).toEqual({ action: "next", turnId: "answer-1", outcome: "timeout" });
+    } finally { vi.useRealTimers(); }
+  });
+
   it("renders a valid probe and measures confirmation through browser paint", async () => {
     const decision = await decideProbe(attempt, { provider: provider(async () => response({ action: "probe",
       text: "What happened next?" })), currentTurnId: () => "answer-1", authorize, timeoutMs: 50 });

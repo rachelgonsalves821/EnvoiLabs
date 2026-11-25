@@ -115,6 +115,8 @@ Gate 2 draft #190 `93b4924` gates the typed answer on a confirmed shown receipt 
 
 The Gate 3 AI paint helper now bounds a suspended two-frame wait by the remaining six-second upload-to-paint window, retracts mounted text on timeout and sends no shown receipt. It also classifies a frame that finally fires after the window as timeout. This is local synthetic runtime behavior; Gate 2's respondent view has its own frame/receipt path and needs its integrated browser and database checks.
 
+The AI decision helper now starts its timeout before the current `ai_followup` authorization recheck and shares that one deadline with provider inference. A stalled grant/source read returns a static-next timeout without dispatching the model, and a late authorization response cannot start inference. The enclosing Platform ready-turn and commit reads still require bounded service behavior and a durable timeout outcome; this local safeguard is not an end-to-end six-second proof.
+
 | Check | Synthetic evidence possible now | Required integrated evidence |
 | --- | --- | --- |
 | IT-3.1 full journey | Fixture replay of one answer, first-writer probe decision, timeout/static-next and report reader states | Paid matched offer → current screening rule and purpose grant → qualified or screened-out transition → accept → 4–10-question recording/typed session → persisted probe → two-frame paint receipt → answer/reload → qualified report. Revoke/regrant consent after the offer and prove the old card cannot reactivate; no live provider until approved |

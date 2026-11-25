@@ -57,14 +57,22 @@ export async function decideProbe(attempt: ProbeAttempt, runtime: ProbeRuntime):
   const cancel = runtime.cancel ?? clearTimeout;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    if (!await runtime.authorize(attempt)) return next("error");
+    const deadline = new Promise<{ kind: "timeout" }>((resolve) => {
+      timer = schedule(() => resolve({ kind: "timeout" }), runtime.timeoutMs);
+    });
+    const authorized = await Promise.race([
+      runtime.authorize(attempt).then((value) => ({ kind: "authorized" as const, value }),
+        () => ({ kind: "error" as const })),
+      deadline,
+    ]);
+    if (authorized.kind === "timeout") return runtime.currentTurnId() === attempt.turnId
+      ? next("timeout") : next("superseded");
+    if (authorized.kind === "error" || !authorized.value) return next("error");
     if (runtime.currentTurnId() !== attempt.turnId) return next("superseded");
     const result = await Promise.race([
       runtime.provider.generate(attempt.request).then(({ output }) => ({ kind: "output" as const, output }),
         () => ({ kind: "error" as const })),
-      new Promise<{ kind: "timeout" }>((resolve) => {
-        timer = schedule(() => resolve({ kind: "timeout" }), runtime.timeoutMs);
-      }),
+      deadline,
     ]);
     if (runtime.currentTurnId() !== attempt.turnId) return next("superseded");
     if (result.kind === "timeout") return next("timeout");
