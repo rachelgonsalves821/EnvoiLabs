@@ -98,7 +98,7 @@ test.describe("Gate 2 private screening sheet", () => {
       const stranger = await browser.newContext({ baseURL: origin });
       try {
         const response = await stranger.request.get(`/api/respondent/screening/${offer.data.id}`);
-        expect(response.status()).toBe(404);
+        expect(response.status()).toBe(403);
       } finally {
         await stranger.close();
       }
