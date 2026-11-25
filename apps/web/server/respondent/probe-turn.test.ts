@@ -93,11 +93,21 @@ describe("probe persistence boundary", () => {
         ? [{ answerId, authUserId }]
         : { status: "committed", value: { ...committed, answerId } } }));
     expect(await sweepDueProbeTimeouts(call, 1)).toEqual({
-      scanned: 1, committed: 1, notDue: 0, stale: 0, unavailable: 0 });
+      scanned: 1, timedOut: 0, alreadyDecided: 1,
+      notDue: 0, stale: 0, unavailable: 0 });
     expect(call).toHaveBeenNthCalledWith(1, "list_gate3_probe_due", { supplied_limit: 1 });
     expect(call).toHaveBeenNthCalledWith(2, "record_gate3_probe_timeout", {
       supplied_answer_id: answerId, supplied_auth_user_id: authUserId });
     expect(call).toHaveBeenCalledTimes(2);
+    const timeout = { ...committed, answerId, probeId: null,
+      decision: { action: "next", turnId: ids.turnId, outcome: "timeout" } };
+    call.mockImplementation(async (name) => ({ error: null,
+      data: name === "list_gate3_probe_due"
+        ? [{ answerId, authUserId }]
+        : { status: "committed", value: timeout } }));
+    expect(await sweepDueProbeTimeouts(call, 1)).toEqual({
+      scanned: 1, timedOut: 1, alreadyDecided: 0,
+      notDue: 0, stale: 0, unavailable: 0 });
     await expect(sweepDueProbeTimeouts(async () => ({ error: null,
       data: [{ answerId, authUserId: "browser-supplied" }] })))
       .rejects.toThrow("invalid private timeout candidate");

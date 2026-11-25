@@ -161,7 +161,8 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
 
 export interface ProbeTimeoutSweepResult {
   readonly scanned: number;
-  readonly committed: number;
+  readonly timedOut: number;
+  readonly alreadyDecided: number;
   readonly notDue: number;
   readonly stale: number;
   readonly unavailable: number;
@@ -177,7 +178,10 @@ export async function sweepDueProbeTimeouts(call: ProbeRpc,
   if (error) throw error;
   if (!Array.isArray(data) || data.length > limit)
     throw new Error("invalid private timeout sweep");
-  const counts = { scanned: 0, committed: 0, notDue: 0, stale: 0, unavailable: 0 };
+  // These are sweep observations, not an authoritative metric numerator:
+  // concurrent workers may each observe the same first-writer timeout.
+  const counts = { scanned: 0, timedOut: 0, alreadyDecided: 0,
+    notDue: 0, stale: 0, unavailable: 0 };
   for (const value of data) {
     const item = record(value);
     if (!item || !uuid(item.answerId) || !uuid(item.authUserId))
@@ -187,7 +191,11 @@ export async function sweepDueProbeTimeouts(call: ProbeRpc,
     });
     const result = await port.recordTimeout(item.answerId);
     counts.scanned++;
-    if (result.status === "committed") counts.committed++;
+    if (result.status === "committed") {
+      if (result.value.decision.action === "next"
+        && result.value.decision.outcome === "timeout") counts.timedOut++;
+      else counts.alreadyDecided++;
+    }
     else if (result.status === "not_due") counts.notDue++;
     else if (result.status === "stale") counts.stale++;
     else counts.unavailable++;
