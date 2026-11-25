@@ -1,5 +1,44 @@
 -- Marketplace payouts use the frozen per-core-question reward. Probe answers
 -- and repeated answers to the same core question never increase earnings.
+create function internal.gate2_marketplace_earned_cents(requested_session_id uuid)
+returns integer language plpgsql security definer set search_path = '' as $$
+declare
+    frozen public.gate2_quote_snapshots%rowtype;
+    core_count integer;
+    offered_reward integer;
+    answered_count integer;
+begin
+    select quote.* into frozen
+    from public.sessions as interview
+    join public.gate2_quote_snapshots as quote on quote.study_id = interview.study_id
+    where interview.id = requested_session_id and interview.state = 'approved'
+        and quote.pricing_config_version >= 101
+        and exists (select 1 from public.gate2_payment_events as paid
+            where paid.quote_id = quote.id and paid.event_kind = 'paid')
+    order by quote.created_at desc, quote.id desc limit 1;
+    if not found then return null; end if;
+    select offer.reward_cents into offered_reward
+    from public.sessions as interview
+    join public.invites as offer on offer.id = interview.invite_id
+    where interview.id = requested_session_id;
+    core_count := (frozen.line_items_json -> 0 ->> 'coreQuestionCount')::integer;
+    if core_count is null or core_count <= 0
+        or frozen.incentive_cents_per_complete <> core_count * 100
+        or offered_reward <> frozen.incentive_cents_per_complete
+    then return null; end if;
+    select count(distinct answer.guide_question_id) into answered_count
+    from public.answers as answer
+    join public.transcripts as transcript on transcript.answer_id = answer.id
+    join pii.transcript_raw as raw on raw.transcript_id = transcript.id
+    where answer.session_id = requested_session_id and answer.probe_id is null
+        and btrim(raw.raw_text) <> '';
+    if answered_count < 1 or answered_count > core_count then return null; end if;
+    return answered_count * 100;
+end;
+$$;
+revoke all on function internal.gate2_marketplace_earned_cents(uuid)
+    from public, anon, authenticated, service_role;
+
 create or replace function public.reserve_gate2_session_payout(
     requested_session_id uuid, requested_respondent_id uuid,
     requested_amount_cents integer, annual_cap_cents integer,
@@ -8,9 +47,6 @@ create or replace function public.reserve_gate2_session_payout(
 declare
     existing public.payouts%rowtype;
     approved_reward integer;
-    frozen public.gate2_quote_snapshots%rowtype;
-    core_count integer;
-    answered_count integer;
     delivered_cents bigint;
     outstanding_cents bigint;
     current_year integer;
@@ -48,27 +84,7 @@ begin
             where id = requested_session_id)
             and marketplace.pricing_config_version >= 101)
     then
-        select quote.* into frozen from public.gate2_quote_snapshots as quote
-        where quote.study_id = (select study_id from public.sessions
-                where id = requested_session_id)
-            and quote.pricing_config_version >= 101
-            and exists (select 1 from public.gate2_payment_events as paid
-                where paid.quote_id = quote.id and paid.event_kind = 'paid')
-        order by quote.created_at desc, quote.id desc limit 1;
-        if not found then raise check_violation; end if;
-        core_count := (frozen.line_items_json -> 0 ->> 'coreQuestionCount')::integer;
-        if core_count is null or core_count <= 0
-            or frozen.incentive_cents_per_complete <> core_count * 100
-            or approved_reward <> frozen.incentive_cents_per_complete
-        then raise check_violation; end if;
-        select count(distinct answer.guide_question_id) into answered_count
-        from public.answers as answer
-        join public.transcripts as transcript on transcript.answer_id = answer.id
-        join pii.transcript_raw as raw on raw.transcript_id = transcript.id
-        where answer.session_id = requested_session_id and answer.probe_id is null
-            and btrim(raw.raw_text) <> '';
-        if answered_count < 1 or answered_count > core_count then raise check_violation; end if;
-        approved_reward := answered_count * 100;
+        approved_reward := internal.gate2_marketplace_earned_cents(requested_session_id);
     end if;
     if approved_reward is distinct from requested_amount_cents
     then raise check_violation; end if;
