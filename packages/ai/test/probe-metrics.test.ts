@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { summarizeProbeAttemptLog, summarizeProbeOutcomes } from "../src/probe-metrics.js";
+import { summarizeCompleteProbeOpportunityLog, summarizeProbeAttemptLog,
+  summarizeProbeOutcomes } from "../src/probe-metrics.js";
 
 it("reports rendered p95 and separate no-probe, error and timeout rates", () => {
   const result = summarizeProbeOutcomes([
@@ -43,4 +44,37 @@ it("summarizes unique fictional turns by device without claiming a physical timi
   expect(() => summarizeProbeAttemptLog([{ ...records[0]!,
     result: { outcome: "rendered" as const, uploadConfirmedAtMs: 100,
       renderedAtMs: Number.NaN } }])).toThrow("Invalid or duplicate probe attempt");
+});
+
+it("requires every qualified source-version opportunity in the timing denominator", () => {
+  const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const opportunities = [
+    { turnId: id(1), sourceVersion: id(11), device: "ios-safari" as const,
+      evidence: "fixture" as const },
+    { turnId: id(2), sourceVersion: id(12), device: "android-chrome" as const,
+      evidence: "fixture" as const },
+  ];
+  const measured = [
+    { ...opportunities[0]!, result: { outcome: "rendered" as const,
+      uploadConfirmedAtMs: 100, renderedAtMs: 5200 } },
+    { ...opportunities[1]!, result: { outcome: "timeout" as const } },
+  ];
+  expect(summarizeCompleteProbeOpportunityLog(opportunities, measured)).toMatchObject({
+    overall: { total: 2, rendered: 1, renderedP95Ms: 5100, timeouts: 1,
+      timeoutRate: 0.5 },
+  });
+  expect(() => summarizeCompleteProbeOpportunityLog(opportunities, measured.slice(0, 1)))
+    .toThrow("Incomplete probe opportunity outcomes");
+  expect(() => summarizeCompleteProbeOpportunityLog(opportunities,
+    [measured[0]!, { ...measured[1]!, sourceVersion: id(13) }]))
+    .toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeCompleteProbeOpportunityLog(opportunities,
+    [measured[0]!, { ...measured[1]!, turnId: id(3) }]))
+    .toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeCompleteProbeOpportunityLog(opportunities,
+    [measured[0]!, { ...measured[1]!, device: "ios-safari" as const }]))
+    .toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeCompleteProbeOpportunityLog(
+    [opportunities[0]!, opportunities[0]!], measured))
+    .toThrow("Invalid or duplicate probe opportunity");
 });

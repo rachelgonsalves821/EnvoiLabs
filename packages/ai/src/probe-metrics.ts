@@ -23,6 +23,18 @@ export interface ProbeAttemptRecord {
   readonly result: ProbeOutcome;
 }
 
+/** Platform supplies this complete, current-qualified opportunity manifest independently of outcomes. */
+export interface ProbeOpportunity {
+  readonly turnId: string;
+  readonly sourceVersion: string;
+  readonly device: ProbeAttemptRecord["device"];
+  readonly evidence: ProbeAttemptRecord["evidence"];
+}
+
+export interface ProbeMeasuredAttempt extends ProbeAttemptRecord {
+  readonly sourceVersion: string;
+}
+
 export interface ProbeAttemptLogSummary {
   readonly evidence: "fixture" | "physical-device" | "none";
   readonly overall: ProbeMetrics;
@@ -59,6 +71,34 @@ export function summarizeProbeAttemptLog(records: readonly ProbeAttemptRecord[])
     overall: summarizeProbeOutcomes(records.map((record) => record.result)),
     iosSafari: summarizeProbeOutcomes(ios), androidChrome: summarizeProbeOutcomes(android),
     bothDeviceLabelsPresent: ios.length > 0 && android.length > 0 };
+}
+
+/** Do not score a selected subset of successful probes or replay an old source version. */
+export function summarizeCompleteProbeOpportunityLog(
+  opportunities: readonly ProbeOpportunity[], records: readonly ProbeMeasuredAttempt[],
+): ProbeAttemptLogSummary {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const expected = new Map<string, ProbeOpportunity>();
+  for (const opportunity of opportunities) {
+    if (!opportunity || !uuid.test(opportunity.turnId)
+      || !uuid.test(opportunity.sourceVersion)
+      || !["ios-safari", "android-chrome"].includes(opportunity.device)
+      || !["fixture", "physical-device"].includes(opportunity.evidence)
+      || expected.has(opportunity.turnId.toLowerCase()))
+      throw new Error("Invalid or duplicate probe opportunity");
+    expected.set(opportunity.turnId.toLowerCase(), opportunity);
+  }
+  if (records.length !== expected.size) throw new Error("Incomplete probe opportunity outcomes");
+  for (const record of records) {
+    if (!record || typeof record.turnId !== "string")
+      throw new Error("Probe outcome does not match current opportunity");
+    const opportunity = expected.get(record.turnId.toLowerCase());
+    if (!uuid.test(record.sourceVersion) || !opportunity
+      || opportunity.sourceVersion.toLowerCase() !== record.sourceVersion.toLowerCase()
+      || opportunity.device !== record.device || opportunity.evidence !== record.evidence)
+      throw new Error("Probe outcome does not match current opportunity");
+  }
+  return summarizeProbeAttemptLog(records);
 }
 
 /** Upload confirmation to browser render, excluding intentional no-probe decisions from latency. */
