@@ -2087,6 +2087,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      record_gate3_probe_render_terminal: {
+        Args: { supplied_auth_user_id: string; supplied_turn_id: string }
+        Returns: Json
+      }
       record_gate3_probe_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -2100,10 +2104,6 @@ export type Database = {
       }
       record_gate3_probe_timeout: {
         Args: { supplied_answer_id: string; supplied_auth_user_id: string }
-        Returns: Json
-      }
-      record_gate3_probe_render_terminal: {
-        Args: { supplied_auth_user_id: string; supplied_turn_id: string }
         Returns: Json
       }
       register_gate2_push_subscription: {
