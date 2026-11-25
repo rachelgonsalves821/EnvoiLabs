@@ -1954,6 +1954,10 @@ export type Database = {
         Args: { requested_reservation_id: string }
         Returns: Json
       }
+      read_gate2_screening_sheet: {
+        Args: { supplied_invite_id: string }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -2066,6 +2070,16 @@ export type Database = {
       }
       submit_gate1_session: {
         Args: { supplied_session_id: string }
+        Returns: Json
+      }
+      submit_gate2_screening_text: {
+        Args: {
+          supplied_invite_id: string
+          supplied_key: string
+          supplied_rule_id: string
+          supplied_text: string
+          supplied_version: number
+        }
         Returns: Json
       }
       update_gate1_invite: {
