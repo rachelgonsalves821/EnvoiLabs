@@ -1,0 +1,51 @@
+:global(body):has(.workspace) { margin: 0; }
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.chat,
+.brief {
+  min-width: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.chat h2,
+.brief h2 { margin-block-start: 0; font: var(--text-h2); }
+.messages { display: grid; gap: var(--space-4); padding-inline-start: var(--space-6); }
+.messages li { overflow-wrap: anywhere; }
+.messages p { margin-block: var(--space-2) 0; }
+.replies { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-4); }
+.composer,
+.fields { display: grid; gap: var(--space-3); }
+.fields { grid-template-columns: minmax(0, 1fr); }
+.composer label,
+.fields label { display: grid; min-width: 0; gap: var(--space-2); font: var(--text-label); }
+.composer textarea,
+.fields textarea,
+.fields input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--text-body);
+}
+.composer textarea:focus-visible,
+.fields textarea:focus-visible,
+.fields input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.announcement { grid-column: 1 / -1; margin: 0; }
+
+@media (max-width: 850px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+}

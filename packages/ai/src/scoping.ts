@@ -47,6 +47,7 @@ function validTurn(turn: ScopingTurn): boolean {
 
 function validPatch(stage: ScopingInput["stage"], previous: Partial<Brief>, patch: BriefPatch): boolean {
   if (Object.keys(patch).some((field) => !patchFields[stage].includes(field as keyof BriefPatch))) return false;
+  if (patch.targetCompletes !== undefined && patch.targetCompletes < 10) return false;
   if (!patch.criteria) return true;
   const prior = previous.criteria ?? [];
   const keep = stage === "exclusions" ? prior.filter((item) => item.kind !== "exclude") : prior;

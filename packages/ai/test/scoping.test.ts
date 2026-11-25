@@ -102,6 +102,15 @@ describe("fictional researcher scoping boundary", () => {
       stage: "exclusions", brief: { criteria: [prior] } })).not.toBeNull();
   });
 
+  it("requires the approved ten-complete minimum in a model brief patch", async () => {
+    const nine = setup({ ...turn, briefPatch: { targetCompletes: 9 } });
+    expect(await runScopingTurn(nine.port, nine.provider, { ...base,
+      stage: "targetCompletes" })).toBeNull();
+    const ten = setup({ ...turn, briefPatch: { targetCompletes: 10 } });
+    expect((await runScopingTurn(ten.port, ten.provider, { ...base,
+      stage: "targetCompletes" }))?.briefPatch.targetCompletes).toBe(10);
+  });
+
   it("drafts a shape-valid guide only from a complete brief and current authorization", async () => {
     const { port, provider, generate } = setup(guide);
     expect(await runGuideDraft(port, provider, { ...base, brief: completeBrief })).toEqual(guide);
