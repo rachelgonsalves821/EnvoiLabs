@@ -50,6 +50,7 @@ export * from "./analyst-evidence-screen.js";
 export * from "./marketplace-feasibility-view.js";
 export * from "./marketplace-feasibility-browser.js";
 export * from "./probe-metrics.js";
+export * from "./probe-opportunity-coverage.js";
 export * from "./probe-runtime.js";
 export * from "./probe-state.js";
 export * from "./probe-integration.js";
