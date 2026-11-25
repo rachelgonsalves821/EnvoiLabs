@@ -127,5 +127,109 @@ select is((select count(*)::integer from public.invites
 select is((select min(reward_cents) from public.invites
     where study_id = 'a9840000-0000-4000-8000-000000000001'), 500,
     'each five-question offer carries frozen $1 per question reward');
+select ok(not has_function_privilege('authenticated',
+    'public.decide_gate2_marketplace_quality(uuid,uuid,uuid,uuid,text,integer,jsonb,text)',
+    'EXECUTE'), 'clients cannot directly decide quality or send replacements');
+select ok(not has_table_privilege('service_role', 'public.quality_scores', 'INSERT'),
+    'service must use the restricted reviewed decision');
+-- A newly verified matching profile joins after the paid initial wave.
+update auth.users set email_confirmed_at = clock_timestamp()
+where id = '90300000-0000-4000-8000-000000000034';
+insert into public.profile_attributes (respondent_id, key, value_json, source)
+select '90500000-0000-4000-8000-000000000034', item.key, item.value_json, 'signup'
+from (values
+    ('age_range', '"25-34"'::jsonb), ('gender', '"undisclosed"'::jsonb),
+    ('student_year', '"not_student"'::jsonb),
+    ('online_shopping_frequency', '"weekly"'::jsonb),
+    ('region_zip', '"10001"'::jsonb),
+    ('interests', '["food"]'::jsonb)) as item(key, value_json);
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000034', 'retention', true,
+    'synthetic-matching-only'),
+    ('90500000-0000-4000-8000-000000000034', 'researcher_access', true,
+    'synthetic-matching-only');
+update public.invites set state = 'accepted'
+where id = (select id from public.invites
+    where study_id = 'a9840000-0000-4000-8000-000000000001'
+    order by respondent_id limit 1);
+insert into public.sessions (id, invite_id, study_id, state,
+    started_at, submitted_at)
+select 'a9840000-0000-4000-8000-000000000099', id, study_id,
+    'quality_hold', now() - interval '2 hours', now() - interval '1 hour'
+from public.invites where study_id = 'a9840000-0000-4000-8000-000000000001'
+    and state = 'accepted';
+set local role service_role;
+select throws_ok($$update public.sessions set state = 'removed'
+    where id = 'a9840000-0000-4000-8000-000000000099'$$,
+    '23514', null, 'direct quality removal cannot bypass the decision record');
+select throws_ok($$select public.decide_gate2_marketplace_quality(
+    'a9840000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9840000-0000-4000-8000-000000000001'),
+    'a9840000-0000-4000-8000-000000000099',
+    '90300000-0000-4000-8000-000000000021',
+    'remove', 20, '{}'::jsonb, 'synthetic quality failure')$$,
+    '42501', null, 'respondent cannot decide a research study quality result');
+select is((public.decide_gate2_marketplace_quality(
+    'a9840000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9840000-0000-4000-8000-000000000001'),
+    'a9840000-0000-4000-8000-000000000099',
+    '90200000-0000-4000-8000-000000000001',
+    'remove', 20, '{}'::jsonb, 'synthetic quality failure')
+    -> 'replacement' ->> 'created')::integer, 1,
+    'reviewed removal creates one replacement within purchased capacity');
+select is((public.decide_gate2_marketplace_quality(
+    'a9840000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9840000-0000-4000-8000-000000000001'),
+    'a9840000-0000-4000-8000-000000000099',
+    '90200000-0000-4000-8000-000000000001',
+    'remove', 20, '{}'::jsonb, 'synthetic quality failure')
+    -> 'replacement' ->> 'created')::integer, 0,
+    'same decision replay creates no second replacement');
+reset role;
+select is((select count(*)::integer from public.invites
+    where study_id = 'a9840000-0000-4000-8000-000000000001'), 11,
+    'quality removal plus replacement preserves one extra historical offer');
+select is((select count(*)::integer from public.invites
+    where study_id = 'a9840000-0000-4000-8000-000000000001'
+        and state in ('invited', 'accepted', 'screening')), 10,
+    'exactly ten active offers remain after replacement');
+select is((select count(*)::integer from public.removals
+    where session_id = 'a9840000-0000-4000-8000-000000000099'), 1,
+    'reviewed removal has one private reason record');
+update public.invites set state = 'accepted'
+where id = (select id from public.invites
+    where study_id = 'a9840000-0000-4000-8000-000000000001'
+        and state = 'invited' order by respondent_id limit 1);
+insert into public.sessions (id, invite_id, study_id, state,
+    started_at, submitted_at)
+select 'a9840000-0000-4000-8000-000000000098', id, study_id,
+    'quality_hold', now() - interval '2 hours', now() - interval '1 hour'
+from public.invites where study_id = 'a9840000-0000-4000-8000-000000000001'
+    and state = 'accepted' and not exists (select 1 from public.sessions
+        where invite_id = public.invites.id);
+set local role service_role;
+select is(public.decide_gate2_marketplace_quality(
+    'a9840000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9840000-0000-4000-8000-000000000001'),
+    'a9840000-0000-4000-8000-000000000098',
+    '90200000-0000-4000-8000-000000000001',
+    'approve', 80, '{}'::jsonb, null) ->> 'decision',
+    'approve', 'reviewed approval records a qualified completed slot');
+select is(public.decide_gate2_marketplace_quality(
+    'a9840000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9840000-0000-4000-8000-000000000001'),
+    'a9840000-0000-4000-8000-000000000098',
+    '90200000-0000-4000-8000-000000000001',
+    'approve', 80, '{}'::jsonb, null) ->> 'decision',
+    'approve', 'approved quality decision replays without another effect');
+reset role;
+select is((select state from public.sessions
+    where id = 'a9840000-0000-4000-8000-000000000098'),
+    'approved', 'approved session remains in purchased capacity');
 select * from finish();
 rollback;
