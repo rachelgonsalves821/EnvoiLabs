@@ -19,13 +19,28 @@ alter table internal.gate3_probe_opportunities enable row level security;
 revoke all on internal.gate3_probe_opportunities
     from public, anon, authenticated, service_role;
 
+create function internal.gate3_probe_consent_receipt(
+    supplied_respondent_id uuid, supplied_study_id uuid
+) returns text language sql stable security definer set search_path = '' as $$
+    select encode(sha256(convert_to(coalesce(jsonb_agg(jsonb_build_array(
+        consent.purpose, consent.study_id, consent.recorded_sequence,
+        consent.granted, consent.text_version)
+        order by consent.recorded_sequence), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    from public.consents as consent
+    where consent.respondent_id = supplied_respondent_id
+        and (consent.study_id is null or consent.study_id = supplied_study_id)
+        and consent.purpose in ('retention', 'researcher_access',
+            'ai_followup', 'recording', 'transcription_vendor');
+$$;
+revoke all on function internal.gate3_probe_consent_receipt(uuid, uuid)
+    from public, anon, authenticated, service_role;
+
 create function internal.gate3_capture_probe_opportunity()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
     owner_id uuid;
     owner_auth_id uuid;
     position_number integer;
-    consent_hash text;
 begin
     select respondent.id, respondent.auth_user_id, question.position
     into owner_id, owner_auth_id, position_number
@@ -37,23 +52,13 @@ begin
         and question.study_id = new.study_id;
     if owner_id is null or not internal.gate3_probe_current_for_answer(
         new.id, owner_auth_id) then return new; end if;
-    select encode(sha256(convert_to(coalesce(jsonb_agg(jsonb_build_array(
-        consent.purpose, consent.study_id, consent.recorded_sequence,
-        consent.granted, consent.text_version)
-        order by consent.recorded_sequence), '[]'::jsonb)::text, 'UTF8')), 'hex')
-    into consent_hash
-    from public.consents as consent
-    where consent.respondent_id = owner_id
-        and (consent.study_id is null or consent.study_id = new.study_id)
-        and consent.purpose in ('retention', 'researcher_access',
-            'ai_followup', 'recording', 'transcription_vendor');
     insert into internal.gate3_probe_opportunities (
         answer_id, study_id, session_id, guide_question_id, respondent_id,
         question_position, is_followup, server_upload_confirmed_at,
         consent_receipt)
     values (new.id, new.study_id, new.session_id, new.guide_question_id,
         owner_id, position_number, new.probe_id is not null, new.created_at,
-        consent_hash);
+        internal.gate3_probe_consent_receipt(owner_id, new.study_id));
     return new;
 end;
 $$;
@@ -84,6 +89,8 @@ returns jsonb language sql volatile security definer set search_path = '' as $$
                 opportunity.study_id, 'researcher_access') as access_current,
             internal.gate1_consent(opportunity.respondent_id,
                 opportunity.study_id, 'ai_followup') as followup_current,
+            internal.gate3_probe_consent_receipt(opportunity.respondent_id,
+                opportunity.study_id) as current_consent_receipt,
             exists (select 1 from public.answers as later
                 join public.guide_questions as later_question
                     on later_question.id = later.guide_question_id
@@ -103,7 +110,9 @@ returns jsonb language sql volatile security definer set search_path = '' as $$
         select captured.*,
             coalesce((current_revision is not null and current_source_version is not null
                 and respondent_status = 'active' and retention_current
-                and access_current and followup_current), false) as current_qualified,
+                and access_current and followup_current
+                and consent_receipt = current_consent_receipt), false)
+                as current_qualified,
             coalesce((turn_id is not null and turn_source_version = current_source_version
                 and turn_revision = current_revision), false) as current_turn
         from captured
