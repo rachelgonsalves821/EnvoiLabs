@@ -1,4 +1,4 @@
-type Reservation = {
+export type Reservation = {
   id: string;
   sessionId: string;
   respondentId: string;
@@ -8,7 +8,7 @@ type Reservation = {
   state: "pending" | "ordered" | "delivered" | "failed";
   providerOrderId: string | null;
 };
-type ProviderOrder = {
+export type ProviderOrder = {
   id: string;
   eventId: string;
   recipientId: string;
@@ -17,7 +17,7 @@ type ProviderOrder = {
   status: "ordered" | "delivered" | "failed";
   observedAt: string;
 };
-type PayoutDatabase = {
+export type PayoutDatabase = {
   // The reservation implementation must call the respondent-locked Gate 2 RPC
   // and derive recipient, product and amount from the approved session/config.
   // An exact retry must pass the same key, including after a transient error.
@@ -29,10 +29,12 @@ type PayoutDatabase = {
 export class PayoutReservationDenied extends Error {
   constructor() { super("Payout reservation denied"); }
 }
-type PayoutProvider = {
+export type PayoutProvider = {
   createOrder(input: { recipientId: string; productId: string;
     amountCents: number; idempotencyKey: string }): Promise<void>;
-  getOrderByKey(idempotencyKey: string): Promise<ProviderOrder | null>;
+  getOrderByKey(idempotencyKey: string, expected: {
+    recipientId: string; productId: string; amountCents: number;
+  }): Promise<ProviderOrder | null>;
 };
 
 export async function issueReservedPayout(
@@ -51,9 +53,11 @@ export async function issueReservedPayout(
   }
   if (reserved.state === "delivered" || reserved.state === "failed") return reserved.state;
   const key = `gate2-payout:${reserved.id}`;
+  const expected = { recipientId: reserved.recipientId,
+    productId: reserved.productId, amountCents: reserved.amountCents };
   let observed: ProviderOrder | null;
   try {
-    observed = await provider.getOrderByKey(key);
+    observed = await provider.getOrderByKey(key, expected);
   } catch {
     return "unavailable";
   }
@@ -66,7 +70,7 @@ export async function issueReservedPayout(
       // The provider may have created the order before this request timed out.
     }
     try {
-      observed = await provider.getOrderByKey(key);
+      observed = await provider.getOrderByKey(key, expected);
     } catch {
       return "unavailable";
     }
