@@ -11,6 +11,7 @@ export const interviewCopy = {
   answerLabel: "Type your answer",
   saveAnswer: "Save answer",
   savingAnswer: "Saving your answer…",
+  preparingFollowup: "Preparing this follow-up…",
   answerNeeded: "Enter an answer before saving.",
   saveFailed: "Your answer couldn’t be saved. Try again.",
   answerConflict: "This answer couldn’t be saved. Review your privacy choices or reopen the interview.",

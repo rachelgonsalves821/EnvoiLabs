@@ -18,6 +18,7 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   const [attempt, setAttempt] = useState(0);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [confirmedProbeId, setConfirmedProbeId] = useState<string | null>(null);
   const submitting = useRef(false);
   const prompt = useRef<HTMLHeadingElement>(null);
   const currentState = useRef(state.kind);
@@ -26,6 +27,7 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   useEffect(() => {
     const recheck = () => {
       if (currentState.current !== "open" && currentState.current !== "opening") return;
+      setConfirmedProbeId(null);
       setState({ kind: "opening" });
       if (document.visibilityState === "visible") setAttempt((value) => value + 1);
     };
@@ -66,7 +68,9 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
           sessionId, turnId: probe.turnId, probeId: probe.probeId,
           browserRenderedAtMs: performance.now(),
         }).then((result) => {
-          if (active && result.status !== 200) retry();
+          if (!active) return;
+          if (result.status === 200) setConfirmedProbeId(probe.probeId);
+          else retry();
         });
       });
     });
@@ -78,6 +82,7 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   }, [state]);
 
   function retry() {
+    setConfirmedProbeId(null);
     setState({ kind: "opening" });
     setAttempt((value) => value + 1);
   }
@@ -109,7 +114,8 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
           {state.session.currentProbe
             ? <ProbeTextAnswer key={state.session.currentProbe.probeId}
                 sessionId={state.session.sessionId} turnId={state.session.currentProbe.turnId}
-                probeId={state.session.currentProbe.probeId} onSaved={retry} />
+                probeId={state.session.currentProbe.probeId}
+                shown={confirmedProbeId === state.session.currentProbe.probeId} onSaved={retry} />
             : state.session.nextQuestion
             ? <AnswerComposer key={state.session.nextQuestion.id} canRecord={canRecord} sessionId={state.session.sessionId}
               questionId={state.session.nextQuestion.id} onSaved={retry} />
