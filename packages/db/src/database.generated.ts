@@ -1922,6 +1922,7 @@ export type Database = {
         Args: { supplied_study_id: string }
         Returns: Json
       }
+      read_gate2_current_respondent_earnings: { Args: never; Returns: Json }
       read_gate2_marketplace_feasibility: {
         Args: { supplied_auth_user_id: string; supplied_study_id: string }
         Returns: Json

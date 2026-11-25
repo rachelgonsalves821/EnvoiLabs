@@ -76,6 +76,24 @@ select id, case when answer_id = 'a9860000-0000-4000-8000-000000000025'
 from public.transcripts where answer_id in
     ('a9860000-0000-4000-8000-000000000024',
     'a9860000-0000-4000-8000-000000000025');
+select ok(not has_function_privilege('anon',
+    'public.read_gate2_current_respondent_earnings()', 'EXECUTE'),
+    'anonymous clients cannot read respondent earnings');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is((public.read_gate2_current_respondent_earnings()
+    ->> 'earnedCents')::integer, 300,
+    'approved substantive core answers appear before payout reservation');
+select is(public.read_gate2_current_respondent_earnings()
+    -> 'sessions' -> 0 ->> 'payoutStatus', 'awaiting_reservation',
+    'earned amount is not mislabeled delivered before reservation');
+select ok(public.read_gate2_current_respondent_earnings()::text
+    not like '%Meaningful answer%', 'earnings never exposes answer text');
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000002","role":"authenticated"}';
+select is((public.read_gate2_current_respondent_earnings()
+    ->> 'earnedCents')::integer, 0,
+    'another respondent cannot read this earned balance');
+reset role;
 set local role service_role;
 select throws_ok($$select public.reserve_gate2_session_payout(
     'a9860000-0000-4000-8000-000000000003',
@@ -98,5 +116,18 @@ reset role;
 select is((select amount_cents from public.payouts where session_id =
     'a9860000-0000-4000-8000-000000000003'), 300,
     'stored payout preserves the earned answer amount');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_current_respondent_earnings()
+    -> 'sessions' -> 0 ->> 'payoutStatus', 'pending',
+    'current earnings read distinguishes reserved from delivered payout');
+reset role;
+update public.respondents set status = 'deleted'
+where id = '90500000-0000-4000-8000-000000000001';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_current_respondent_earnings(), null::jsonb,
+    'deleted respondent no longer has an earnings read');
+reset role;
 select * from finish();
 rollback;
