@@ -1950,6 +1950,7 @@ export type Database = {
         Args: { supplied_auth_user_id: string; supplied_study_id: string }
         Returns: Json
       }
+      read_gate2_referral_self: { Args: never; Returns: Json }
       read_gate2_refund_webhook_claim: {
         Args: { requested_reservation_id: string }
         Returns: Json
