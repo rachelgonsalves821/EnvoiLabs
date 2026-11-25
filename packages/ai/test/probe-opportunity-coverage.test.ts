@@ -18,13 +18,14 @@ it("separates surviving terminal decisions from unresolved and withheld opportun
     row(6, { outcome: "withheld", currentQualified: false }),
     row(7, { outcome: "pending", currentTurn: false }),
     row(8, { outcome: "superseded", currentTurn: false }),
+    row(9, { outcome: "superseded", renderOutcome: "superseded" }),
   ];
   expect(assessPersistedProbeCoverage({ recordedCount: items.length, items }))
-    .toEqual({ survivingRecorded: 8, withheld: 1, invalidated: 1,
-      pending: 1, pendingRender: 1, terminal: 4,
+    .toEqual({ survivingRecorded: 9, withheld: 1, invalidated: 1,
+      pending: 1, pendingRender: 1, terminal: 5,
       decisionTimeouts: 1, renderTimeouts: 1,
       terminalCoverageComplete: false });
-  expect(assessPersistedProbeCoverage({ recordedCount: 6,
+  expect(assessPersistedProbeCoverage({ recordedCount: 7,
     items: items.filter((item) => item.outcome !== "pending"
       && item.outcome !== "pending_render") }).terminalCoverageComplete).toBe(true);
   expect(assessPersistedProbeCoverage({ recordedCount: 0, items: [] })
@@ -41,6 +42,8 @@ it("fails closed on missing, duplicate or inconsistent persisted outcomes", () =
     row(2, { outcome: "rendered", renderOutcome: null }),
     row(2, { outcome: "pending_render", renderOutcome: "timeout" }),
     row(2, { outcome: "timeout", renderOutcome: "shown" }),
+    row(2, { outcome: "timeout", renderOutcome: "superseded" }),
+    row(2, { outcome: "superseded", renderOutcome: "superseded", currentTurn: false }),
     row(2, { outcome: "rendered", renderOutcome: "shown", currentTurn: false }),
     row(2, { outcome: "withheld", currentQualified: true }),
     row(2, { outcome: "invalidated", currentTurn: true }),

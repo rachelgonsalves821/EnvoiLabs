@@ -49,6 +49,7 @@ export function assessPersistedProbeCoverage(snapshot: PersistedProbeSnapshot): 
       || (!item.currentQualified && item.outcome !== "withheld")
       || (item.outcome === "withheld" && item.currentQualified)
       || (item.outcome === "invalidated" && (!item.currentQualified || item.currentTurn))
+      || (item.renderOutcome !== null && item.currentQualified && !item.currentTurn)
       || (["rendered", "no_probe", "error", "timeout", "pending_render"]
         .includes(item.outcome) && !item.currentTurn)
       || (item.outcome === "rendered" && item.renderOutcome !== "shown")
