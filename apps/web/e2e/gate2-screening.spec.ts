@@ -89,6 +89,17 @@ test.describe("Gate 2 private screening sheet", () => {
       await expect(page.getByText("Your answer is awaiting review.")).toBeVisible();
       await expect(page.getByText(answerText)).toHaveCount(0);
 
+      const withdrawal = await db.from("consents").insert({
+        respondent_id: account.data.id, purpose: "retention", granted: false,
+        text_version: "synthetic-screening-withdrawal",
+      });
+      expect(withdrawal.error).toBeNull();
+      await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await expect(page.getByText(question)).toHaveCount(0);
+      await expect(page.getByLabel("Your answer")).toHaveCount(0);
+      await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
+      expect((await page.request.get(`/api/respondent/screening/${offer.data.id}`)).status()).toBe(404);
+
       const events = await db.from("gate2_screening_events").select("id").eq("rule_id", rule.data.id);
       expect(events.error).toBeNull();
       expect(events.data).toEqual([]);

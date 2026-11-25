@@ -1,23 +1,55 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { parseScreeningSheet, type ScreeningSheet } from "../../../../../server/respondent/screening-sheet";
 
 export function ScreeningSheetView({ inviteId }: { inviteId: string }) {
-  const [sheet, setSheet] = useState<ScreeningSheet | null>(null);
+  const [loaded, setLoaded] = useState<{ inviteId: string; sheet: ScreeningSheet } | null>(null);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [text, setText] = useState<Record<string, string>>({});
   const retry = useRef<Record<string, { text: string; key: string }>>({});
-  useEffect(() => {
-    let live = true;
-    fetch(`/api/respondent/screening/${encodeURIComponent(inviteId)}`, {
-      credentials: "same-origin", cache: "no-store",
-    }).then(async (response) => response.ok ? parseScreeningSheet(await response.json()) : null)
-      .then((value) => { if (live) { setSheet(value); setError(!value); } })
-      .catch(() => { if (live) setError(true); });
-    return () => { live = false; };
+  const currentInvite = useRef(inviteId);
+  currentInvite.current = inviteId;
+  const readNumber = useRef(0);
+  const currentRead = useRef<AbortController | null>(null);
+  const sheet = loaded?.inviteId === inviteId ? loaded.sheet : null;
+  const refresh = useCallback(async () => {
+    const number = ++readNumber.current;
+    currentRead.current?.abort();
+    const controller = new AbortController();
+    currentRead.current = controller;
+    setLoaded(null);
+    setText({});
+    setError(false);
+    try {
+      const response = await fetch(`/api/respondent/screening/${encodeURIComponent(inviteId)}`, {
+        credentials: "same-origin", cache: "no-store", signal: controller.signal,
+      });
+      const value = response.ok ? parseScreeningSheet(await response.json()) : null;
+      if (controller.signal.aborted || number !== readNumber.current ||
+        currentInvite.current !== inviteId) return;
+      setLoaded(value ? { inviteId, sheet: value } : null);
+      setError(!value);
+    } catch {
+      if (!controller.signal.aborted && number === readNumber.current &&
+        currentInvite.current === inviteId) {
+        setLoaded(null);
+        setError(true);
+      }
+    }
   }, [inviteId]);
+  useEffect(() => {
+    retry.current = {};
+    void refresh();
+    const onVisibility = () => { if (document.visibilityState === "visible") void refresh(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      ++readNumber.current;
+      currentRead.current?.abort();
+    };
+  }, [refresh]);
   async function submit(ruleId: string, ruleVersion: number) {
     const answer = text[ruleId]?.trim() ?? "";
     if (!answer || busy) return;
@@ -32,10 +64,16 @@ export function ScreeningSheetView({ inviteId }: { inviteId: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ruleId, ruleVersion, text: answer, key }),
       });
+      if (currentInvite.current !== inviteId) return;
       if (!response.ok) throw new Error("Screening answer unavailable");
-      setSheet((current) => current && { ...current, questions: current.questions.map((item) =>
-        item.ruleId === ruleId ? { ...item, status: "pending_review" } : item) });
-    } catch { setError(true); }
+      await refresh();
+    } catch {
+      if (currentInvite.current === inviteId) {
+        setLoaded(null);
+        setText({});
+        setError(true);
+      }
+    }
     finally { setBusy(null); }
   }
   return <main className="respondent-studies">
@@ -43,7 +81,8 @@ export function ScreeningSheetView({ inviteId }: { inviteId: string }) {
     <h1>Screening questions</h1>
     <p>Answer a few questions to check whether this study is a fit. An answer does not confirm a place.</p>
     {!sheet && !error && <p role="status">Loading questions…</p>}
-    {error && <p role="alert">We could not save or load your answer. Please try again.</p>}
+    {error && <><p role="alert">We could not save or load your answer. Please try again.</p>
+      <button type="button" className="ev-button" onClick={() => void refresh()}>Try again</button></>}
     {sheet?.questions.length === 0 && <p role="status">No approved questions are available yet.</p>}
     {sheet?.questions.map((question, index) => <section key={question.ruleId}
       className="respondent-invite">

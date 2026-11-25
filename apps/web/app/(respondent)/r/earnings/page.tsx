@@ -11,7 +11,7 @@ import { ReferralEntry } from "./referral-entry";
 export const metadata: Metadata = { title: "Earnings" };
 export const dynamic = "force-dynamic";
 const labels = {
-  awaiting_reservation: "Approved · preparing payout",
+  awaiting_reservation: "Reward approved · payout not scheduled",
   pending: "Payout pending",
   ordered: "Payout ordered",
   delivered: "Delivered",

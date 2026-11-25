@@ -223,7 +223,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           .toBeVisible();
         await expect(respondent.getByRole("heading", { name: "Delivered" }).locator("..").getByText("$0.00"))
           .toBeVisible();
-        await expect(respondent.getByText("Approved · preparing payout")).toBeVisible();
+        await expect(respondent.getByText("Reward approved · payout not scheduled")).toBeVisible();
       } finally {
         await respondentContext.close();
       }
