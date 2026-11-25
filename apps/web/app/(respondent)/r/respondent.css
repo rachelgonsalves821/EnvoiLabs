@@ -70,6 +70,23 @@ body:has(.respondent-shell) { margin: 0; }
   font-variant-numeric: tabular-nums;
 }
 .respondent-invite-privacy { font: var(--text-body-s); }
+.respondent-earnings { display: grid; gap: var(--space-5); }
+.respondent-earnings h1, .respondent-earnings h2, .respondent-earnings p { margin: 0; }
+.respondent-earnings h1 { font: var(--text-display-l); }
+.respondent-earnings h2 { font: var(--text-h2); }
+.respondent-earnings > a { align-items: center; color: var(--ink); display: inline-flex; min-block-size: 44px; }
+.respondent-earnings > a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.respondent-earnings-summary { display: grid; gap: var(--space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.respondent-earnings-summary > *, .respondent-earnings-list > li > *, .respondent-earnings-referral {
+  border-radius: var(--radius-lg); padding: var(--space-4);
+}
+.respondent-earnings-summary > * { display: grid; gap: var(--space-2); }
+.respondent-earnings-summary strong, .respondent-earnings-list strong { font-variant-numeric: tabular-nums; }
+.respondent-earnings-summary strong { font-size: 1.5rem; }
+.respondent-earnings-list { display: grid; gap: var(--space-3); list-style: none; margin: 0; padding: 0; }
+.respondent-earnings-list > li > * { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.respondent-earnings-list strong { margin-inline-start: auto; }
+.respondent-earnings-referral { display: grid; gap: var(--space-2); }
 .respondent-interview-form { display: grid; gap: var(--space-4); }
 .respondent-interview-form textarea {
   background: var(--paper-sunk);

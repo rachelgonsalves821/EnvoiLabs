@@ -7,7 +7,8 @@ import { RespondentInvites } from "./invites";
 export default async function RespondentHome() {
   const respondent = await getRespondent();
   if (respondent) {
-    return <RespondentInvites invites={await loadHomeInvites()} now={Date.now()} respondentId={respondent.id} />;
+    return <RespondentInvites invites={await loadHomeInvites()} now={Date.now()}
+      respondentId={respondent.id} earningsEnabled={process.env.ENVOI_GATE2_EARNINGS_ENABLED === "true"} />;
   }
 
   return (
