@@ -1,6 +1,9 @@
 import "@envoi-labs/ui/styles.css";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { EndpointReportFixture, ReportFixture } from "./report-fixture";
+
+export const metadata: Metadata = { title: "Envoi Labs" };
 
 /** Fictional browser harness; never serve this route from a production build. */
 export default async function Gate3ReportFixturePage({ searchParams }: {

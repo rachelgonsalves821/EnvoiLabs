@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { text } from "node:stream/consumers";
 import axe from "axe-core";
 
-async function seriousAxeViolations(panel: import("@playwright/test").Locator) {
-  return panel.evaluate(async (element) => {
+async function seriousAxeViolations(root: import("@playwright/test").Locator) {
+  return root.evaluate(async (element) => {
     const browserAxe = (window as unknown as { axe: typeof axe }).axe;
     const results = await browserAxe.run(element, { runOnly: { type: "tag",
       values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] } });
@@ -76,24 +76,25 @@ test("requires review and another current read before exporting a replaced repor
   expect(downloads).toHaveLength(1);
 });
 
-test("has no serious or critical axe findings through fictional report states", async ({ page }) => {
+test("has no serious or critical whole-page axe findings through fictional report states", async ({ page }) => {
   await page.goto("/gate3-report-fixture");
   await page.addScriptTag({ content: axe.source });
   const panel = page.getByRole("region", { name: "Research report" });
+  const pageRoot = page.locator("html");
   await expect(panel.getByText("A receipt helps.")).toBeVisible();
-  expect(await seriousAxeViolations(panel)).toEqual([]);
+  expect(await seriousAxeViolations(pageRoot)).toEqual([]);
   await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-replace]")?.click());
   await panel.getByRole("button", { name: "Download themes and quotes CSV" }).click();
   await expect(panel.getByText("The report changed. Review the current version before downloading.")).toBeVisible();
-  expect(await seriousAxeViolations(panel)).toEqual([]);
+  expect(await seriousAxeViolations(pageRoot)).toEqual([]);
   await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-pause]")?.click());
   await panel.getByRole("button", { name: "Download themes and quotes CSV" }).click();
   await expect(panel.getByRole("button", { name: "Checking report…" })).toBeVisible();
-  expect(await seriousAxeViolations(panel)).toEqual([]);
+  expect(await seriousAxeViolations(pageRoot)).toEqual([]);
   await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-revoke]")?.click());
   await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-resume]")?.click());
   await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
-  expect(await seriousAxeViolations(panel)).toEqual([]);
+  expect(await seriousAxeViolations(pageRoot)).toEqual([]);
 });
 
 test("rechecks fictional private no-store endpoint on display, export and retry", async ({ page }) => {
