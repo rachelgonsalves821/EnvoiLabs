@@ -6,6 +6,7 @@ import { requireRespondent } from "../../../../server/auth/identity";
 import { sessionClient } from "../../../../server/auth/supabase";
 import { readCurrentEarnings } from "../../../../server/respondent/earnings";
 import { formatReward } from "../reward";
+import { ReferralEntry } from "./referral-entry";
 
 export const metadata: Metadata = { title: "Earnings" };
 export const dynamic = "force-dynamic";
@@ -50,6 +51,8 @@ export default async function RespondentEarningsPage() {
           <p>{earnings.referral.vestedBonusCents > 0
             ? `${formatReward(earnings.referral.vestedBonusCents)} bonus vested · delivery pending`
             : `A ${formatReward(500)} bonus vests after five verified profiles.`}</p>
+          {process.env.ENVOI_GATE2_REFERRAL_ENABLED === "true" &&
+            <ReferralEntry initialCode={jar.get("gate2-ref")?.value ?? ""} />}
         </Card>
       </>}
     </section>
