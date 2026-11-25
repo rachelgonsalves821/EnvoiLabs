@@ -55,6 +55,11 @@ describe("Stripe test-mode paid observation", () => {
     const expired = setup([{ ...session, status: "expired", payment_status: "unpaid",
       payment_intent: null }]);
     expect(await expired.provider.getCheckout(session.id)).toMatchObject({ status: "failed" });
+    const asynchronousFailure = setup([{ ...session, payment_status: "unpaid" },
+      { ...payment, status: "requires_payment_method", amount_received: 0 }]);
+    expect(await asynchronousFailure.provider.getCheckout(session.id))
+      .toMatchObject({ status: "failed" });
+    expect(asynchronousFailure.request).toHaveBeenCalledTimes(2);
   });
 
   it("fails closed on incomplete refund pages or mismatched provider identity", async () => {
