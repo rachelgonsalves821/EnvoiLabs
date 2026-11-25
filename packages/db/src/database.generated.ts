@@ -1902,6 +1902,7 @@ export type Database = {
         Returns: boolean
       }
       list_gate1_home_invites: { Args: never; Returns: Json }
+      list_gate2_nudge_candidates: { Args: never; Returns: Json }
       provision_email_respondent: {
         Args: { supplied_user_id: string }
         Returns: string
@@ -1913,6 +1914,15 @@ export type Database = {
           supplied_user_id: string
         }
         Returns: string
+      }
+      queue_gate2_nudge: {
+        Args: {
+          supplied_invite_id: string
+          supplied_key: string
+          supplied_kind: string
+          supplied_session_id: string
+        }
+        Returns: boolean
       }
       read_gate1_audio_reservation: {
         Args: {
@@ -2020,6 +2030,10 @@ export type Database = {
       }
       save_gate1_consent: { Args: { decisions: Json }; Returns: boolean }
       save_gate1_profile: { Args: { attributes: Json }; Returns: boolean }
+      snooze_gate2_nudge: {
+        Args: { supplied_invite_id: string }
+        Returns: string
+      }
       start_gate1_session: {
         Args: { supplied_invite_id: string }
         Returns: Json
