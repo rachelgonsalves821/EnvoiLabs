@@ -1814,6 +1814,19 @@ export type Database = {
         Args: { supplied_quote_id: string; supplied_study_id: string }
         Returns: Json
       }
+      decide_gate2_marketplace_quality: {
+        Args: {
+          supplied_actor_auth_id: string
+          supplied_components: Json
+          supplied_decision: string
+          supplied_quote_id: string
+          supplied_reason: string
+          supplied_score: number
+          supplied_session_id: string
+          supplied_study_id: string
+        }
+        Returns: Json
+      }
       expire_gate1_interviews: {
         Args: { supplied_cutoff: string }
         Returns: Json

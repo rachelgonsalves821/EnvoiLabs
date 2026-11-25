@@ -64,6 +64,12 @@ select throws_ok($$select public.reserve_gate2_unfilled_slot_refund(
     '90200000-0000-4000-8000-000000000001')$$,
     '23514', null, 'quality hold must resolve before any refund reservation');
 reset role;
+insert into public.quality_scores (session_id, score, components_json,
+    decision, decided_by)
+select id, 20, '{}'::jsonb, 'remove',
+    '90400000-0000-4000-8000-000000000001'
+from public.sessions where study_id = 'a9820000-0000-4000-8000-000000000001'
+    and state = 'quality_hold';
 update public.sessions set state = 'removed'
 where study_id = 'a9820000-0000-4000-8000-000000000001'
     and state = 'quality_hold';
