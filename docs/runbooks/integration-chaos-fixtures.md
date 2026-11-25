@@ -20,6 +20,15 @@ Gate 3 draft #114 defines `ProbeDecisionPort` with `readCommitted`, `readReadyTu
 
 ## Current draft-specific assertions to add at integration
 
+### Paid-offer consent and replacement rehearsal, November 24
+
+Gate 4 combined its draft with Gate 2 paid-offer #157 `89d81ac` in disposable local source commit `8877baa9d738f768a5eda8e8d4d8e75bb90f90d8`. All 26 database test files and 740 assertions passed; the offer-creation RPC granted EXECUTE only to `service_role`, and all 38 public tables had RLS. Two additional rolled-back SQL scenarios expose handoff behavior that the owner suite does not cover:
+
+1. With a fictional four-question fielding study and an already issued `invited` offer, current retention consent changed from true to false. `internal.gate1_consent` returned false, but the exact respondent `list_gate1_home_invites` still included the offer, `update_gate1_invite(...,'accept')` returned `accepted`, and `start_gate1_session` returned a session ID. This test inserted the invite directly to isolate the downstream path; it did not invoke the Gate 2 paid matcher or a live user. Gate 2 should require current retention and researcher-access grants at Home, accept, start and screening, with a revoke/regrant race. The offer must not become active again merely because a later grant appears.
+2. A complete, consented fictional profile appeared in `internal.gate2_marketplace_candidates` before an offer. After an expired `invited` offer for the same study was inserted, the candidate read excluded it (`true` before, `false` after). The current predicate excludes any same-study offer regardless of expiry. This prevents repeated same-study invitations, but can leave newly available purchased capacity unfilled if the eligible pool is exhausted. Gate 2 should decide the replacement/cadence policy explicitly and test expired, declined and active-interview cases against the paid-slot cap before launch.
+
+The four-question start in the first scenario does not resolve Gate 3's separate finding that a paid five-question offer cannot start under the current exactly-four core-question check. A full paid matched-offer → screening → consent recheck → 4–10-question session remains an integrated Gate 2/3 dependency.
+
 ### New refund and referral ledger draft boundaries, November 24
 
 Gate 2 draft #155 `ddf7948` now has a service-only `reserve_gate2_unfilled_slot_refund` RPC and immutable `gate2_refund_reservations`. Its pgTAP fixture covers the exact 12-paid/11-approved five-question case at 1,000 cents, an unresolved quality hold, same-reservation retry, and late approval/removal rejection. This advances the frozen-price checkpoint, but the provider refund call, settlement event and two-process race are absent. At integration, run two independent reservation callers against one study while a twelfth quality decision competes for the study lock. Require exactly one reservation/provider key and a fulfilled count consistent with the serialized winner; then inject a fake provider timeout after accepting the refund and reconcile by the same key before any second create. A pending or action-required refund must not count as settled.
