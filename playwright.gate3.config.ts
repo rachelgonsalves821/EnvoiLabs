@@ -12,7 +12,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "pnpm --filter @envoi-labs/web exec next dev --hostname 127.0.0.1 --port 3107",
-    env: { ENVOI_GATE3_REPORT_FIXTURE: "1" },
+    env: { ENVOI_GATE3_REPORT_FIXTURE: "1", ENVOI_GATE3_FEASIBILITY_FIXTURE: "1" },
     url: `${baseURL}/gate3-report-fixture`,
     reuseExistingServer: false,
     timeout: 120_000,
