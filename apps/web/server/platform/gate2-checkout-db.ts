@@ -19,7 +19,8 @@ export function mapGate2Quote(row: QuoteRow) {
     pricingConfigVersion: row.pricing_config_version, currency: row.currency,
     totalCents: row.total_cents, incentiveCentsPerComplete: row.incentive_cents_per_complete,
     lineItems: row.line_items_json, feasibility: row.feasibility_json,
-    createdAt: row.created_at, updatedAt: row.created_at };
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.created_at).toISOString() };
 }
 
 function readData<T>(result: { data: T | null; error: unknown }): T | null {
