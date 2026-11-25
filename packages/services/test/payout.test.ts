@@ -26,6 +26,9 @@ describe("payout issue and reconciliation", () => {
       productId: reservation.productId, amountCents: reservation.amountCents,
       idempotencyKey: `gate2-payout:${reservation.id}` });
     expect(provider.getOrderByKey).toHaveBeenCalledTimes(2);
+    expect(provider.getOrderByKey).toHaveBeenCalledWith(`gate2-payout:${reservation.id}`,
+      { recipientId: reservation.recipientId, productId: reservation.productId,
+        amountCents: reservation.amountCents });
     expect(db.recordOrder).toHaveBeenCalledWith(reservation.id, order);
   });
 
