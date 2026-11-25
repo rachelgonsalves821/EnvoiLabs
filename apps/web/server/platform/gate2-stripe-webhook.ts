@@ -1,15 +1,20 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type StripeCheckoutHint = { eventId: string; type: string; checkoutId: string };
-const accepted = new Set([
+export type StripeRefundHint = { eventId: string; type: string;
+  refundId: string; reservationId: string };
+type SignatureInput = { rawBody: Uint8Array; signature: string | null;
+  secret: string; now?: () => number };
+const checkoutEvents = new Set([
   "checkout.session.completed", "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed", "checkout.session.expired",
 ]);
 
-export function verifyStripeTestCheckoutHint(input: {
-  rawBody: Uint8Array; signature: string | null; secret: string;
-  now?: () => number;
-}): StripeCheckoutHint | null {
+const refundEvents = new Set(["refund.created", "refund.updated", "refund.failed"]);
+
+function verifiedStripeEvent(input: SignatureInput): {
+  eventId: string; type: string; source: Record<string, unknown>
+} | null {
   if (!input.secret.startsWith("whsec_") || !input.signature ||
     input.rawBody.byteLength === 0 || input.rawBody.byteLength > 131072)
     return null;
@@ -34,13 +39,36 @@ export function verifyStripeTestCheckoutHint(input: {
   const event = decoded as Record<string, unknown>;
   if (event.object !== "event" || event.livemode !== false ||
     typeof event.id !== "string" || !/^evt_[A-Za-z0-9_]+$/.test(event.id) ||
-    typeof event.type !== "string" || !accepted.has(event.type) ||
+    typeof event.type !== "string" ||
     !event.data || typeof event.data !== "object" || Array.isArray(event.data))
     return null;
   const source = (event.data as Record<string, unknown>).object;
   if (!source || typeof source !== "object" || Array.isArray(source)) return null;
-  const checkout = source as Record<string, unknown>;
+  return { eventId: event.id, type: event.type,
+    source: source as Record<string, unknown> };
+}
+
+export function verifyStripeTestCheckoutHint(input: SignatureInput): StripeCheckoutHint | null {
+  const event = verifiedStripeEvent(input);
+  if (!event || !checkoutEvents.has(event.type)) return null;
+  const checkout = event.source;
   if (checkout.object !== "checkout.session" || typeof checkout.id !== "string" ||
     !/^cs_test_[A-Za-z0-9_]+$/.test(checkout.id)) return null;
-  return { eventId: event.id, type: event.type, checkoutId: checkout.id };
+  return { eventId: event.eventId, type: event.type, checkoutId: checkout.id };
+}
+
+export function verifyStripeTestRefundHint(input: SignatureInput): StripeRefundHint | null {
+  const event = verifiedStripeEvent(input);
+  if (!event || !refundEvents.has(event.type)) return null;
+  const refund = event.source;
+  if (refund.object !== "refund" || typeof refund.id !== "string" ||
+    !/^re_[A-Za-z0-9_]+$/.test(refund.id) ||
+    !refund.metadata || typeof refund.metadata !== "object" ||
+    Array.isArray(refund.metadata)) return null;
+  const reservationId = (refund.metadata as Record<string, unknown>).reservationId;
+  if (typeof reservationId !== "string" ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+      .test(reservationId)) return null;
+  return { eventId: event.eventId, type: event.type,
+    refundId: refund.id, reservationId };
 }

@@ -1910,6 +1910,10 @@ export type Database = {
         Args: { supplied_auth_user_id: string; supplied_study_id: string }
         Returns: Json
       }
+      read_gate2_refund_webhook_claim: {
+        Args: { requested_reservation_id: string }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string

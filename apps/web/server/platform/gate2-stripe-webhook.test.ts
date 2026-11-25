@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { verifyStripeTestCheckoutHint } from "./gate2-stripe-webhook";
+import { verifyStripeTestCheckoutHint,
+  verifyStripeTestRefundHint } from "./gate2-stripe-webhook";
 
 const secret = "whsec_fixture";
 const now = () => 1_795_526_400_000;
@@ -36,5 +37,17 @@ describe("signed Stripe test Checkout hint", () => {
       secret, now })).toBeNull();
     expect(verifyStripeTestCheckoutHint({ rawBody: raw(payload),
       signature: `${signed(payload)},t=1795526400`, secret, now })).toBeNull();
+  });
+  it("authenticates a refund hint but not its asserted payment status", () => {
+    const body = JSON.stringify({ id: "evt_refund_1", object: "event", livemode: false,
+      type: "refund.updated", data: { object: { object: "refund", id: "re_test_1",
+        status: "succeeded", metadata: {
+          reservationId: "33333333-3333-4333-8333-333333333333" } } } });
+    expect(verifyStripeTestRefundHint({ rawBody: raw(body),
+      signature: signed(body), secret, now })).toEqual({
+      eventId: "evt_refund_1", type: "refund.updated", refundId: "re_test_1",
+      reservationId: "33333333-3333-4333-8333-333333333333" });
+    expect(verifyStripeTestRefundHint({ rawBody: raw(body.replace("re_test_1", "re_other")),
+      signature: signed(body), secret, now })).toBeNull();
   });
 });

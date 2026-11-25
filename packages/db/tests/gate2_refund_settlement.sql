@@ -50,10 +50,17 @@ reset role;
 select ok(not has_function_privilege('authenticated',
     'public.claim_gate2_refund_intent(uuid,uuid)', 'EXECUTE'),
     'clients cannot request provider refunds');
+select ok(not has_function_privilege('authenticated',
+    'public.read_gate2_refund_webhook_claim(uuid)', 'EXECUTE'),
+    'clients cannot read the webhook refund reservation');
 select ok(not has_table_privilege('service_role',
     'internal.gate2_refund_events', 'INSERT'),
     'service cannot insert a settlement event directly');
 set local role service_role;
+select is(public.read_gate2_refund_webhook_claim(
+    (select id from public.gate2_refund_reservations
+        where study_id = 'a9850000-0000-4000-8000-000000000001')),
+    null::jsonb, 'no refund webhook claim exists before a durable intent');
 select throws_ok($$select public.claim_gate2_refund_intent(
     (select id from public.gate2_refund_reservations
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
@@ -64,6 +71,15 @@ select is(public.claim_gate2_refund_intent(
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
     '90200000-0000-4000-8000-000000000001') ->> 'status',
     'create', 'one provider create lease is claimed before network use');
+select is(public.read_gate2_refund_webhook_claim(
+    (select id from public.gate2_refund_reservations
+        where study_id = 'a9850000-0000-4000-8000-000000000001')) ->> 'checkoutId',
+    'cs_test_refund_settlement',
+    'signed refund event can map intent to exact stored Checkout');
+select is((public.read_gate2_refund_webhook_claim(
+    (select id from public.gate2_refund_reservations
+        where study_id = 'a9850000-0000-4000-8000-000000000001')) ->> 'amountCents')::integer,
+    10000, 'webhook lookup keeps the frozen proportional amount');
 select is(public.claim_gate2_refund_intent(
     (select id from public.gate2_refund_reservations
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
