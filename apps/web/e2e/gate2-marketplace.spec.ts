@@ -182,6 +182,48 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         await respondent.goto("/r");
         await expect(respondent.getByText("$5.00")).toBeVisible();
         await expect(respondent.getByRole("button", { name: "Start answering" })).toBeVisible();
+        await respondent.goto("/r/earnings");
+        await expect(respondent.getByText("No approved study rewards yet.")).toBeVisible();
+        await respondent.goto("/r");
+        await respondent.getByRole("button", { name: "Start answering" }).click();
+        await expect(respondent).toHaveURL(origin + `/r/interviews/${first.id}`);
+        for (const [index, question] of core.entries()) {
+          await expect(respondent.getByRole("heading", { name: question })).toBeVisible();
+          await respondent.getByRole("textbox", { name: "Type your answer" })
+            .fill(`Synthetic answer ${index + 1} about a meal decision`);
+          await respondent.getByRole("button", { name: "Save answer" }).click();
+        }
+        await expect(respondent.getByRole("heading", { name: "You’ve answered every question" })).toBeVisible();
+        await respondent.getByRole("button", { name: "Submit interview" }).click();
+        await expect(respondent.getByText("Pending quality check")).toBeVisible();
+        const session = await db.from("sessions").select("id,state,submitted_at")
+          .eq("invite_id", first.id).single();
+        expect(session.error).toBeNull();
+        expect(session.data?.state).toBe("quality_hold");
+        if (!session.data) throw new Error("Submitted synthetic session was not found.");
+        await respondent.goto("/r/earnings");
+        await expect(respondent.getByText("No approved study rewards yet.")).toBeVisible();
+        const reviewed = await db.rpc("decide_gate2_marketplace_quality", {
+          supplied_study_id: study.data.id, supplied_quote_id: prepared.quote.id,
+          supplied_session_id: session.data.id, supplied_actor_auth_id: account.data.user.id,
+          supplied_decision: "approve", supplied_score: 100,
+          supplied_components: { synthetic: true }, supplied_reason: null,
+        });
+        expect(reviewed.error).toBeNull();
+        expect(reviewed.data).toMatchObject({ decision: "approve", sessionId: session.data.id });
+        const replay = await db.rpc("decide_gate2_marketplace_quality", {
+          supplied_study_id: study.data.id, supplied_quote_id: prepared.quote.id,
+          supplied_session_id: session.data.id, supplied_actor_auth_id: account.data.user.id,
+          supplied_decision: "approve", supplied_score: 100,
+          supplied_components: { synthetic: true }, supplied_reason: null,
+        });
+        expect(replay.error).toBeNull();
+        await respondent.reload();
+        await expect(respondent.getByRole("heading", { name: "Earned" }).locator("..").getByText("$5.00"))
+          .toBeVisible();
+        await expect(respondent.getByRole("heading", { name: "Delivered" }).locator("..").getByText("$0.00"))
+          .toBeVisible();
+        await expect(respondent.getByText("Approved · preparing payout")).toBeVisible();
       } finally {
         await respondentContext.close();
       }
