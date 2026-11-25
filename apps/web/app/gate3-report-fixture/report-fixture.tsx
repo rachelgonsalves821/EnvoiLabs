@@ -22,8 +22,17 @@ const replacementReport = { ...fictionalReport, reportId: id(5), summary: {
       transcriptId: id(6), sourceVersion: id(7), endChar: 26,
       exactText: "The current receipt helps." }] }],
 } };
+const secondStudyId = id(8);
+const secondStudyReport = { ...fictionalReport, reportId: id(9), studyId: secondStudyId,
+  summary: { ...fictionalReport.summary,
+    executiveAnswer: "A different fictional study favors short instructions.",
+    themes: [{ ...fictionalReport.summary.themes[0]!, claim: "Short instructions help",
+      supportingQuotes: [{ ...fictionalReport.summary.themes[0]!.supportingQuotes[0]!,
+        studyId: secondStudyId, sourceVersion: id(10), transcriptId: id(11),
+        endChar: 24, exactText: "Short instructions help." }] }] } };
 
 export function ReportFixture() {
+  const [secondStudy, setSecondStudy] = useState(false);
   const [fixture] = useState(() => {
     let current: typeof fictionalReport | null = fictionalReport;
     let paused: Promise<void> | null = null;
@@ -35,7 +44,10 @@ export function ReportFixture() {
         return current;
       },
     }, studyId);
-    return { controller, revoke: () => { current = null; },
+    const secondController = new ReportUiController({
+      async readCurrent() { return secondStudyReport; },
+    }, secondStudyId);
+    return { controller, secondController, revoke: () => { current = null; },
       replace: () => { current = replacementReport; },
       pause: () => { if (!paused) paused = new Promise<void>((resolve) => { release = resolve; }); },
       resume: () => { release?.(); paused = null; release = null; } };
@@ -43,7 +55,8 @@ export function ReportFixture() {
 
   return <main style={{ maxWidth: 760, marginInline: "auto", padding: 16 }}>
     <h1>Fictional report fixture</h1>
-    <StudyReportPanel controller={fixture.controller} />
+    <StudyReportPanel controller={secondStudy ? fixture.secondController : fixture.controller} />
+    <button data-fixture-switch type="button" onClick={() => setSecondStudy(true)}>Switch fictional study</button>
     <button data-fixture-revoke type="button" onClick={fixture.revoke}>Revoke fictional report</button>
     <button data-fixture-replace type="button" onClick={fixture.replace}>Replace fictional report</button>
     <button data-fixture-pause type="button" onClick={fixture.pause}>Pause fictional read</button>

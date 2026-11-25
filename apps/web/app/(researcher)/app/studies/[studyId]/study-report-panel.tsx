@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import styles from "./tracking.module.css";
 
 type Evidence = { exactText: string; transcriptId: string };
@@ -31,12 +31,20 @@ function saveCsv(content: string) {
 export function StudyReportPanel({ controller, save = saveCsv }: {
   controller: ReportPanelController; save?: (content: string) => void;
 }) {
-  const [state, setState] = useState<State>(() => controller.getState());
-  const [exportNotice, setExportNotice] = useState(false);
+  const currentController = useRef(controller);
+  currentController.current = controller;
+  const [view, setView] = useState(() => ({ controller, state: controller.getState() }));
+  const state: State = view.controller === controller
+    ? view.state : { kind: "loading", canExport: false };
+  const [notice, setNotice] = useState(() => ({ controller, visible: false }));
+  const exportNotice = notice.controller === controller && notice.visible;
+  const setExportNotice = (visible: boolean) => setNotice({ controller, visible });
   const headingId = useId();
 
   useEffect(() => {
-    const unsubscribe = controller.subscribe(setState);
+    const unsubscribe = controller.subscribe((next) => {
+      if (currentController.current === controller) setView({ controller, state: next });
+    });
     void controller.refresh();
     const refresh = () => { if (!document.hidden) { setExportNotice(false); void controller.refresh(); } };
     document.addEventListener("visibilitychange", refresh);
@@ -46,6 +54,7 @@ export function StudyReportPanel({ controller, save = saveCsv }: {
   async function download() {
     setExportNotice(false);
     const payload = await controller.requestExport();
+    if (currentController.current !== controller) return;
     if (!payload) {
       // The withheld state already explains a revoked report. A newer ready
       // version needs review before its first download.

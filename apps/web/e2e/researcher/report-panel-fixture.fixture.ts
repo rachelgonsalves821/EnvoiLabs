@@ -168,3 +168,20 @@ test("withholds export when a same-ID fictional report receives a re-redacted qu
     .toBeVisible();
   expect(downloads).toEqual([]);
 });
+
+test("hides the old study immediately and discards its in-flight export after a route switch", async ({ page }) => {
+  const downloads: string[] = [];
+  page.on("download", (item) => downloads.push(item.suggestedFilename()));
+  await page.goto("/gate3-report-fixture");
+  const panel = page.getByRole("region", { name: "Research report" });
+  await expect(panel.getByText("A receipt helps.")).toBeVisible();
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-pause]")?.click());
+  await panel.getByRole("button", { name: "Download themes and quotes CSV" }).click();
+  await expect(panel.getByRole("button", { name: "Checking report…" })).toBeVisible();
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-switch]")?.click());
+  await expect(panel.getByText("A receipt helps.")).toHaveCount(0);
+  await expect(panel.getByText("Short instructions help.")).toBeVisible();
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("[data-fixture-resume]")?.click());
+  await expect(panel.getByText("A receipt helps.")).toHaveCount(0);
+  expect(downloads).toEqual([]);
+});
