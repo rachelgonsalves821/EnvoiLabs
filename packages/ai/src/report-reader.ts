@@ -53,7 +53,9 @@ function quote(value: unknown, studyId: string): value is PublicReportQuote {
     && uuid.test(String(value.sourceVersion)) && Number.isSafeInteger(value.startChar)
     && Number.isSafeInteger(value.endChar) && (value.startChar as number) >= 0
     && (value.endChar as number) > (value.startChar as number)
-    && nonblank(value.exactText) && typeof value.confidence === "number"
+    && nonblank(value.exactText)
+    && Array.from(value.exactText).length === (value.endChar as number) - (value.startChar as number)
+    && typeof value.confidence === "number"
     && Number.isFinite(value.confidence) && value.confidence >= 0 && value.confidence <= 1;
 }
 

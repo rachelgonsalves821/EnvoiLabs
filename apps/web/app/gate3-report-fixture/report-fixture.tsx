@@ -19,7 +19,8 @@ const replacementReport = { ...fictionalReport, reportId: id(5), summary: {
   executiveAnswer: "A newer fictional report favors a current receipt.",
   themes: [{ ...fictionalReport.summary.themes[0]!, claim: "Current receipts help",
     supportingQuotes: [{ ...fictionalReport.summary.themes[0]!.supportingQuotes[0]!,
-      transcriptId: id(6), sourceVersion: id(7), exactText: "The current receipt helps." }] }],
+      transcriptId: id(6), sourceVersion: id(7), endChar: 26,
+      exactText: "The current receipt helps." }] }],
 } };
 
 export function ReportFixture() {

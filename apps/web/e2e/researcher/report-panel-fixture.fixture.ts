@@ -137,3 +137,34 @@ test("rechecks fictional private no-store endpoint on display, export and retry"
   await expect(panel.getByText("A receipt helps.")).toBeVisible();
   expect(requests).toBe(initialRequests + 3);
 });
+
+test("withholds export when a same-ID fictional report receives a re-redacted quote", async ({ page }) => {
+  const studyId = "a9700000-0000-4000-8000-000000000001";
+  const reportId = "a9700000-0000-4000-8000-000000000002";
+  let currentQuote = "An old receipt.";
+  let currentVersion = "a9700000-0000-4000-8000-000000000004";
+  const downloads: string[] = [];
+  page.on("download", (item) => downloads.push(item.suggestedFilename()));
+  await page.route("**/api/researcher/studies/*/report", async (route) => {
+    await route.fulfill({ status: 200, headers: { "cache-control": "private, no-store" },
+      json: { reportId, studyId, summary: { version: 2,
+        executiveAnswer: "A fictional receipt answer", hypotheses: [],
+        themes: [{ claim: "Receipts help", count: 1, total: 1, confidence: "medium",
+          supportingQuotes: [{ studyId,
+            transcriptId: "a9700000-0000-4000-8000-000000000003",
+            sourceVersion: currentVersion, startChar: 0,
+            endChar: Array.from(currentQuote).length, exactText: currentQuote,
+            confidence: 0.9 }], contradictingQuotes: [] }] } } });
+  });
+  await page.goto("/gate3-report-fixture?endpoint=1");
+  const panel = page.getByRole("region", { name: "Research report" });
+  await expect(panel.getByText("An old receipt.")).toBeVisible();
+  currentQuote = "A current receipt.";
+  currentVersion = "a9700000-0000-4000-8000-000000000005";
+  await panel.getByRole("button", { name: "Download themes and quotes CSV" }).click();
+  await expect(panel.getByText("A current receipt.")).toBeVisible();
+  await expect(panel.getByText("An old receipt.")).toHaveCount(0);
+  await expect(panel.getByText("The report changed. Review the current version before downloading."))
+    .toBeVisible();
+  expect(downloads).toEqual([]);
+});

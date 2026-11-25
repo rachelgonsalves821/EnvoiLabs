@@ -61,4 +61,20 @@ describe("qualified report view and export boundary", () => {
       expect(await exportCurrentReport(port, studyId)).toBeNull();
     }
   });
+
+  it("withholds a public quote whose Unicode span length does not match its exact text", async () => {
+    const bad = { ...current, summary: { ...current.summary,
+      themes: [{ ...current.summary.themes[0]!, supportingQuotes: [
+        { ...quote, exactText: "ordered 🍲" },
+      ] }] } };
+    expect(await readReportDisplay({ readCurrent: async () => bad }, studyId))
+      .toEqual({ kind: "withheld", exportAvailable: false });
+    const unicode = { ...bad, summary: { ...bad.summary, themes: [
+      { ...bad.summary.themes[0]!, supportingQuotes: [
+        { ...quote, endChar: 9, exactText: "ordered 🍲" },
+      ] },
+    ] } };
+    expect((await readReportDisplay({ readCurrent: async () => unicode }, studyId)).kind)
+      .toBe("ready");
+  });
 });

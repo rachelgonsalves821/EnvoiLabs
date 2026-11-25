@@ -73,6 +73,20 @@ describe("researcher report display and export flow", () => {
     expect(await controller.requestExport()).toContain('"A diner ordered soup"');
   });
 
+  it("requires review if a quote changes under the same report ID", async () => {
+    const changed = { ...current, summary: { ...current.summary,
+      themes: [{ ...current.summary.themes[0]!, supportingQuotes: [
+        { ...quote, sourceVersion: id(6), exactText: "revised" },
+      ] }] } };
+    const port = { readCurrent: vi.fn().mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(changed).mockResolvedValue(changed) };
+    const controller = new ReportUiController(port, studyId);
+    await controller.refresh();
+    expect(await controller.requestExport()).toBeNull();
+    expect(controller.getState()).toMatchObject({ kind: "ready", report: changed });
+    expect(await controller.requestExport()).toContain('"revised"');
+  });
+
   it("never offers export for malformed or failed current reads", async () => {
     const port = { readCurrent: vi.fn().mockResolvedValue({ ...current, privateRationale: "secret" }) };
     const controller = new ReportUiController(port, studyId);
