@@ -216,12 +216,25 @@ update internal.gate3_probe_turns set
 where id = (select turn_id from first_writer_turn);
 alter table internal.gate3_probe_turns enable trigger gate3_keep_probe_turn_identity;
 set local role service_role;
-select is(public.record_gate3_probe_timeout(
+create temporary table first_writer_timeout (result jsonb not null);
+grant select, insert on first_writer_timeout to service_role;
+insert into first_writer_timeout select public.record_gate3_probe_timeout(
     'a9720000-0000-4000-8000-000000000009',
-    '90300000-0000-4000-8000-000000000001') -> 'value' -> 'decision' ->> 'text',
-    (select result -> 'value' -> 'decision' ->> 'text' from first_writer_probe),
-    'expired timeout caller observes the original probe decision');
+    '90300000-0000-4000-8000-000000000001');
+select is((select result -> 'value' -> 'decision' from first_writer_timeout),
+    (select result -> 'value' -> 'decision' from first_writer_probe),
+    'expired timeout caller preserves the complete first probe decision');
+select is((select result -> 'value' ->> 'probeId' from first_writer_timeout),
+    (select result -> 'value' ->> 'probeId' from first_writer_probe),
+    'expired timeout caller preserves the first probe identity');
+select is((select result -> 'value' ->> 'sourceVersion' from first_writer_timeout),
+    (select result -> 'value' ->> 'sourceVersion' from first_writer_probe),
+    'expired timeout caller preserves the qualified source version');
 reset role;
+select is((select id::text from public.probes where answer_id =
+    'a9720000-0000-4000-8000-000000000009'),
+    (select result -> 'value' ->> 'probeId' from first_writer_probe),
+    'original probe row identity remains after timeout replay');
 select is((select count(*) from public.probes where answer_id =
     'a9720000-0000-4000-8000-000000000009'), 1::bigint,
     'timeout replay does not remove or duplicate the first probe');
