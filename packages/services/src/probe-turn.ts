@@ -158,3 +158,39 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
     },
   };
 }
+
+export interface ProbeTimeoutSweepResult {
+  readonly scanned: number;
+  readonly committed: number;
+  readonly notDue: number;
+  readonly stale: number;
+  readonly unavailable: number;
+}
+
+// Use a service-role RPC only. The selector supplies respondent identity from
+// current database rows; no browser or model output can choose who is swept.
+export async function sweepDueProbeTimeouts(call: ProbeRpc,
+  limit = 100): Promise<ProbeTimeoutSweepResult> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    throw new Error("timeout sweep limit must be between 1 and 100");
+  const { data, error } = await call("list_gate3_probe_due", { supplied_limit: limit });
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length > limit)
+    throw new Error("invalid private timeout sweep");
+  const counts = { scanned: 0, committed: 0, notDue: 0, stale: 0, unavailable: 0 };
+  for (const value of data) {
+    const item = record(value);
+    if (!item || !uuid(item.answerId) || !uuid(item.authUserId))
+      throw new Error("invalid private timeout candidate");
+    const port = createProbeDecisionPort(call, item.authUserId, () => {
+      throw new Error("timeout sweep cannot build a model request");
+    });
+    const result = await port.recordTimeout(item.answerId);
+    counts.scanned++;
+    if (result.status === "committed") counts.committed++;
+    else if (result.status === "not_due") counts.notDue++;
+    else if (result.status === "stale") counts.stale++;
+    else counts.unavailable++;
+  }
+  return counts;
+}
