@@ -231,5 +231,41 @@ reset role;
 select is((select state from public.sessions
     where id = 'a9840000-0000-4000-8000-000000000098'),
     'approved', 'approved session remains in purchased capacity');
+update public.invites set state = 'accepted'
+where study_id = 'a9840000-0000-4000-8000-000000000001'
+    and state = 'invited';
+insert into public.sessions (invite_id, study_id, state, started_at, submitted_at)
+select offer.id, offer.study_id, 'quality_hold',
+    now() - interval '2 hours', now() - interval '1 hour'
+from public.invites as offer
+where offer.study_id = 'a9840000-0000-4000-8000-000000000001'
+    and offer.state = 'accepted'
+    and not exists (select 1 from public.sessions as prior
+        where prior.invite_id = offer.id);
+set local role service_role;
+do $$
+declare candidate uuid;
+begin
+    for candidate in select id from public.sessions
+        where study_id = 'a9840000-0000-4000-8000-000000000001'
+            and state = 'quality_hold'
+    loop
+        perform public.decide_gate2_marketplace_quality(
+            'a9840000-0000-4000-8000-000000000001',
+            (select id from public.gate2_quote_snapshots
+                where study_id = 'a9840000-0000-4000-8000-000000000001'),
+            candidate, '90200000-0000-4000-8000-000000000001',
+            'approve', 80, '{}'::jsonb, null);
+    end loop;
+end;
+$$;
+reset role;
+select is((select count(*)::integer from public.sessions
+    where study_id = 'a9840000-0000-4000-8000-000000000001'
+        and state = 'approved'), 10,
+    'reviewed replacement wave reaches all ten purchased approved completes');
+select is((select count(*)::integer from public.invites
+    where study_id = 'a9840000-0000-4000-8000-000000000001'), 11,
+    'target attainment creates no further replacement offer');
 select * from finish();
 rollback;
