@@ -65,6 +65,18 @@ it("requires every qualified source-version opportunity in the timing denominato
     overall: { total: 2, rendered: 1, renderedP95Ms: 5100, timeouts: 1,
       timeoutRate: 0.5 },
   });
+  expect(summarizeCompleteProbeOpportunityLog(
+    [opportunities[0]!, { ...opportunities[1]!, browserUploadConfirmedAtMs: null }],
+    measured,
+  )).toMatchObject({ overall: { total: 2, rendered: 1, timeouts: 1 } });
+  expect(() => summarizeCompleteProbeOpportunityLog(
+    [{ ...opportunities[0]!, browserUploadConfirmedAtMs: null }, opportunities[1]!],
+    measured,
+  )).toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeCompleteProbeOpportunityLog(
+    [opportunities[0]!, { ...opportunities[1]!, browserUploadConfirmedAtMs: null }],
+    [measured[0]!, { ...measured[1]!, result: { outcome: "no_probe" as const } }],
+  )).toThrow("Probe outcome does not match current opportunity");
   expect(() => summarizeCompleteProbeOpportunityLog(opportunities, measured.slice(0, 1)))
     .toThrow("Incomplete probe opportunity outcomes");
   expect(() => summarizeCompleteProbeOpportunityLog(opportunities,

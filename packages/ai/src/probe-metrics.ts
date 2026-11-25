@@ -27,8 +27,8 @@ export interface ProbeAttemptRecord {
 export interface ProbeOpportunity {
   readonly turnId: string;
   readonly sourceVersion: string;
-  /** Browser monotonic timestamp recorded at the upload-confirmation boundary. */
-  readonly browserUploadConfirmedAtMs: number;
+  /** Absent for a qualified timeout recorded before a browser turn existed. */
+  readonly browserUploadConfirmedAtMs: number | null;
   readonly device: ProbeAttemptRecord["device"];
   readonly evidence: ProbeAttemptRecord["evidence"];
 }
@@ -84,8 +84,9 @@ export function summarizeCompleteProbeOpportunityLog(
   for (const opportunity of opportunities) {
     if (!opportunity || !uuid.test(opportunity.turnId)
       || !uuid.test(opportunity.sourceVersion)
-      || !Number.isFinite(opportunity.browserUploadConfirmedAtMs)
-      || opportunity.browserUploadConfirmedAtMs < 0
+      || (opportunity.browserUploadConfirmedAtMs !== null
+        && (!Number.isFinite(opportunity.browserUploadConfirmedAtMs)
+          || opportunity.browserUploadConfirmedAtMs < 0))
       || !["ios-safari", "android-chrome"].includes(opportunity.device)
       || !["fixture", "physical-device"].includes(opportunity.evidence)
       || expected.has(opportunity.turnId.toLowerCase()))
@@ -101,7 +102,10 @@ export function summarizeCompleteProbeOpportunityLog(
       || opportunity.sourceVersion.toLowerCase() !== record.sourceVersion.toLowerCase()
       || opportunity.device !== record.device || opportunity.evidence !== record.evidence
       || (record.result?.outcome === "rendered"
-        && record.result.uploadConfirmedAtMs !== opportunity.browserUploadConfirmedAtMs))
+        && (opportunity.browserUploadConfirmedAtMs === null
+          || record.result.uploadConfirmedAtMs !== opportunity.browserUploadConfirmedAtMs))
+      || (opportunity.browserUploadConfirmedAtMs === null
+        && record.result?.outcome !== "timeout"))
       throw new Error("Probe outcome does not match current opportunity");
   }
   return summarizeProbeAttemptLog(records);
