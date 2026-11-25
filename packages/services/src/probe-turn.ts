@@ -218,3 +218,47 @@ export async function sweepDueProbeTimeouts(call: ProbeRpc,
   }
   return counts;
 }
+
+export interface ProbeRenderSweepResult {
+  readonly scanned: number;
+  readonly shown: number;
+  readonly timedOut: number;
+  readonly superseded: number;
+  readonly notDue: number;
+  readonly stale: number;
+  readonly unavailable: number;
+}
+
+// This is an injected, service-role worker boundary. The selector never
+// determines the terminal outcome; the session-locked RPC rechecks it.
+export async function sweepDueProbeRenders(call: ProbeRpc,
+  limit = 100): Promise<ProbeRenderSweepResult> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    throw new Error("render sweep limit must be between 1 and 100");
+  const { data, error } = await call("list_gate3_probe_render_due", {
+    supplied_limit: limit });
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length > limit)
+    throw new Error("invalid private render sweep");
+  // Counts are worker observations, not authoritative metric numerators.
+  const counts = { scanned: 0, shown: 0, timedOut: 0, superseded: 0,
+    notDue: 0, stale: 0, unavailable: 0 };
+  for (const value of data) {
+    const item = record(value);
+    if (!item || !uuid(item.turnId) || !uuid(item.authUserId))
+      throw new Error("invalid private render candidate");
+    const port = createProbeDecisionPort(call, item.authUserId, () => {
+      throw new Error("render sweep cannot build a model request");
+    });
+    const result = await port.recordRenderTerminal(item.turnId);
+    counts.scanned++;
+    if (result.status === "resolved") {
+      if (result.outcome === "shown") counts.shown++;
+      else if (result.outcome === "timeout") counts.timedOut++;
+      else counts.superseded++;
+    } else if (result.status === "not_due") counts.notDue++;
+    else if (result.status === "stale") counts.stale++;
+    else counts.unavailable++;
+  }
+  return counts;
+}

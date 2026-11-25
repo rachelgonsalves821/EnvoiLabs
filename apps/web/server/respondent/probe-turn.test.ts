@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProbeDecisionPort, sweepDueProbeTimeouts,
+import { createProbeDecisionPort, sweepDueProbeRenders, sweepDueProbeTimeouts,
   type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
 const ids = { sessionId: "session", questionId: "question", answerId: "answer",
@@ -130,5 +130,32 @@ describe("probe persistence boundary", () => {
       .rejects.toThrow("invalid private timeout candidate");
     await expect(sweepDueProbeTimeouts(call, 101))
       .rejects.toThrow("timeout sweep limit");
+  });
+
+  it("settles only private overdue render candidates through the locked writer", async () => {
+    const turnId = "a9720000-0000-4000-8000-000000000007";
+    const authUserId = "90300000-0000-4000-8000-000000000001";
+    const call = vi.fn<ProbeRpc>().mockImplementation(async (name) => ({ error: null,
+      data: name === "list_gate3_probe_render_due"
+        ? [{ turnId, authUserId }]
+        : { status: "resolved", outcome: "timeout", turnId } }));
+    expect(await sweepDueProbeRenders(call, 1)).toEqual({
+      scanned: 1, shown: 0, timedOut: 1, superseded: 0,
+      notDue: 0, stale: 0, unavailable: 0 });
+    expect(call).toHaveBeenNthCalledWith(1, "list_gate3_probe_render_due",
+      { supplied_limit: 1 });
+    expect(call).toHaveBeenNthCalledWith(2, "record_gate3_probe_render_terminal",
+      { supplied_turn_id: turnId, supplied_auth_user_id: authUserId });
+    expect(call).toHaveBeenCalledTimes(2);
+    call.mockImplementation(async (name) => ({ error: null,
+      data: name === "list_gate3_probe_render_due"
+        ? [{ turnId, authUserId }]
+        : { status: "resolved", outcome: "shown", turnId } }));
+    expect((await sweepDueProbeRenders(call, 1)).shown).toBe(1);
+    await expect(sweepDueProbeRenders(async () => ({ error: null,
+      data: [{ turnId, authUserId: "unverified" }] })))
+      .rejects.toThrow("invalid private render candidate");
+    await expect(sweepDueProbeRenders(call, 101))
+      .rejects.toThrow("render sweep limit");
   });
 });
