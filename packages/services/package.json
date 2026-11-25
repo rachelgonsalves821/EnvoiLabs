@@ -13,7 +13,8 @@
     "./study-tracking": "./src/study-tracking.ts",
     "./marketplace-feasibility": "./src/marketplace-feasibility.ts",
     "./refunds": "./src/refunds.ts",
-    "./refund-settlement": "./src/refund-settlement.ts"
+    "./refund-settlement": "./src/refund-settlement.ts",
+    "./nudges": "./src/nudges.ts"
   },
   "scripts": {
     "lint": "cd ../.. && eslint --no-error-on-unmatched-pattern packages/services",
