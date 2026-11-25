@@ -1,9 +1,12 @@
 import "@envoi-labs/ui/styles.css";
+import type { Metadata } from "next";
 import { requireResearcher } from "../../../server/auth/identity";
 import { allowsTestLaunch } from "../../../server/studies/launch";
 import { researcherCopy as copy } from "./copy";
 import { StudyDraftForm } from "./study-draft-form";
 import styles from "./researcher.module.css";
+
+export const metadata: Metadata = { title: `${copy.title} | Envoi Labs` };
 
 export default async function ResearcherPage() {
   await requireResearcher();
