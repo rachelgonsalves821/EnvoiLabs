@@ -20,9 +20,10 @@ const profile = [
   ["food_orders_per_week", 2], ["interests", ["Food and drink"]],
 ] as const;
 
+// The background-tab regression needs the real browser window visibility signal.
+test.use({ headless: false });
+
 test.describe("Gate 2 marketplace fixture replay", () => {
-  // The background-tab regression needs the real browser window visibility signal.
-  test.use({ headless: false });
   test.skip(process.env.ENVOI_TEST_LOCAL_SUPABASE !== "1", "Requires disposable local Auth and database.");
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
