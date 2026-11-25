@@ -5,8 +5,8 @@ import { homeCopy as copy } from "./copy";
 import { InviteActions } from "./invite-actions";
 import { formatReward } from "./reward";
 
-export function RespondentInvites({ invites, now, respondentId }: {
-  invites: HomeInvite[] | null; now: number; respondentId: string;
+export function RespondentInvites({ invites, now, respondentId, earningsEnabled }: {
+  invites: HomeInvite[] | null; now: number; respondentId: string; earningsEnabled: boolean;
 }) {
   const firstOffer = invites?.find(({ state }) => state === "invited")?.id;
   return (
@@ -14,6 +14,8 @@ export function RespondentInvites({ invites, now, respondentId }: {
       <div className="respondent-studies-heading">
         <h1 id="respondent-studies-heading" tabIndex={-1}>{copy.title}</h1>
         <a className="ev-button respondent-signup-link" href="/r/onboarding" data-variant="secondary">{copy.profile}</a>
+        {earningsEnabled && <a className="ev-button respondent-signup-link" href="/r/earnings"
+          data-variant="secondary">Earnings</a>}
       </div>
       {invites === null && <p role="alert">{copy.loadError}</p>}
       {invites?.length === 0 && (
