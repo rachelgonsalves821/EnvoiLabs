@@ -95,6 +95,30 @@ describe("private analyst draft dispatch", () => {
     expect(await runAnalystDraft(port, provider, input)).toBeNull();
   });
 
+  it("drops output when a port reuses and mutates its source object during inference", async () => {
+    const mutable = { ...snapshot, sources: [{ ...snapshot.sources[0]! }] };
+    const { port, provider, readCurrent, generate } = setup();
+    readCurrent.mockResolvedValue(mutable);
+    generate.mockImplementationOnce(async () => {
+      mutable.sources[0]!.redactedText = "A different redacted source.";
+      return response;
+    });
+    expect(await runAnalystDraft(port, provider, input)).toBeNull();
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not dispatch when a reused source object changes during authorization", async () => {
+    const mutable = { ...snapshot, sources: [{ ...snapshot.sources[0]! }] };
+    const { port, provider, readCurrent, authorize, generate } = setup();
+    readCurrent.mockResolvedValue(mutable);
+    authorize.mockImplementationOnce(async () => {
+      mutable.sources[0]!.redactedText = "Changed before provider dispatch.";
+      return true;
+    });
+    expect(await runAnalystDraft(port, provider, input)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("drops model output when analysis consent is revoked during inference", async () => {
     const { port, provider, authorize, generate } = setup();
     authorize.mockResolvedValueOnce(true).mockResolvedValueOnce(true)

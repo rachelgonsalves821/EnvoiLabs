@@ -67,6 +67,17 @@ function valid(snapshot: AnalystSourceSnapshot | null, studyId: string): snapsho
   return true;
 }
 
+function frozen(snapshot: AnalystSourceSnapshot): AnalystSourceSnapshot {
+  return Object.freeze({ studyId: snapshot.studyId,
+    decisionQuestion: snapshot.decisionQuestion,
+    sources: Object.freeze(snapshot.sources.map((source) => Object.freeze({
+      studyId: source.studyId, transcriptId: source.transcriptId,
+      sourceVersion: source.sourceVersion, redactedText: source.redactedText,
+      policyDigest: source.policyDigest, qualificationDigest: source.qualificationDigest,
+    }))),
+  });
+}
+
 function same(left: AnalystSourceSnapshot, right: AnalystSourceSnapshot): boolean {
   const normalized = (snapshot: AnalystSourceSnapshot) => JSON.stringify({
     studyId: snapshot.studyId, decisionQuestion: snapshot.decisionQuestion,
@@ -82,13 +93,16 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
   if (!uuid.test(input.studyId) || !nonblank(input.providerModel)
     || !nonblank(input.promptVersion) || !nonblank(input.systemPrompt)) return null;
   try {
-    const snapshot = await port.readCurrent(input.studyId);
+    const first = await port.readCurrent(input.studyId);
+    if (!valid(first, input.studyId)) return null;
+    const snapshot = frozen(first);
     const promptDigest = await analystTextDigest(input.systemPrompt);
-    if (!valid(snapshot, input.studyId)
-      || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
+    if (!await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
         promptVersion: input.promptVersion, promptDigest, snapshot })) return null;
-    const beforeDispatch = await port.readCurrent(input.studyId);
-    if (!valid(beforeDispatch, input.studyId) || !same(snapshot, beforeDispatch)
+    const beforeRaw = await port.readCurrent(input.studyId);
+    if (!valid(beforeRaw, input.studyId)) return null;
+    const beforeDispatch = frozen(beforeRaw);
+    if (!same(snapshot, beforeDispatch)
       || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
         promptVersion: input.promptVersion, promptDigest, snapshot: beforeDispatch })) return null;
     const request: LLMRequest = { purpose: "ai_analysis", promptVersion: input.promptVersion,
@@ -107,8 +121,10 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
       policyDigest: source.policyDigest, qualificationDigest: source.qualificationDigest,
     })));
     const decisionQuestionDigest = await analystTextDigest(snapshot.decisionQuestion);
-    const afterDispatch = await port.readCurrent(input.studyId);
-    if (!valid(afterDispatch, input.studyId) || !same(snapshot, afterDispatch)
+    const afterRaw = await port.readCurrent(input.studyId);
+    if (!valid(afterRaw, input.studyId)) return null;
+    const afterDispatch = frozen(afterRaw);
+    if (!same(snapshot, afterDispatch)
       || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
         promptVersion: input.promptVersion, promptDigest, snapshot: afterDispatch })) return null;
     return { output: result.output, model: result.model, promptVersion: input.promptVersion,
