@@ -7,7 +7,9 @@ it("scores all 60 fictional cases without echoing answer text into the report", 
   const { inputs, outputs, judgments, answerReceipts } = syntheticProbeHeldout();
   const report = scoreProbeHeldout(inputs, outputs, judgments, answerReceipts);
   expect(report).toMatchObject({ sampleSize: 60, probes: 60, acceptable: 60,
-    qualityRate: 1, offTopicAnswers: 0, rubricPassed: true });
+    qualityRate: 1, probeCoverageRate: 1, appropriateDecisions: 60,
+    decisionAppropriateRate: 1, inappropriateNoProbeDecisions: 0,
+    offTopicAnswers: 0, rubricPassed: true });
   expect(JSON.stringify(report)).not.toContain("I hesitated at the last step");
   expect(report).not.toHaveProperty("results");
 });
@@ -47,6 +49,24 @@ it("fails the quality or off-topic rubric with reviewed negative labels", () => 
     data.answerReceipts);
   expect(report).toMatchObject({ probes: 60, acceptable: 59, offTopicAnswers: 1,
     rubricPassed: false });
+});
+
+it("reports inappropriate skipped probes separately from emitted-probe quality", () => {
+  const data = syntheticProbeHeldout();
+  for (const [index, appropriate] of [false, true].entries()) {
+    data.outputs[index] = { id: data.outputs[index].id, action: "next" };
+    data.judgments[index] = { ...data.judgments[index], decisionAppropriate: appropriate,
+      nonLeading: null, onGoal: null, offTopicFollowUp: null, followUpAnswerId: null };
+  }
+  data.answerReceipts.splice(0, 2);
+  const report = scoreProbeHeldout(data.inputs, data.outputs, data.judgments,
+    data.answerReceipts);
+  expect(report).toMatchObject({ probes: 58, noProbes: 2, acceptable: 58,
+    qualityRate: 1, probeCoverageRate: 58 / 60, appropriateDecisions: 59,
+    decisionAppropriateRate: 59 / 60, inappropriateNoProbeDecisions: 1 });
+  // The documented 90% target judges emitted probes. Decision coverage and
+  // skipped opportunities remain visible for the separate human review.
+  expect(report.rubricPassed).toBe(true);
 });
 
 it("refuses incomplete, duplicate or mismatched held-out evidence", () => {

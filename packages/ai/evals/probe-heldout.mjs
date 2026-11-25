@@ -32,6 +32,7 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   }
   let probes = 0; let acceptable = 0; let offTopicAnswers = 0;
   let noProbes = 0; let errors = 0; let timeouts = 0;
+  let appropriateDecisions = 0; let inappropriateNoProbeDecisions = 0;
   const followUpAnswerIds = new Set();
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
@@ -40,6 +41,7 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
       || !output || !judgment || !actions.has(output.action)
       || !nonblank(judgment.reviewerId) || typeof judgment.decisionAppropriate !== "boolean")
       throw new Error("Incomplete held-out case");
+    if (judgment.decisionAppropriate) appropriateDecisions++;
     if (output.action === "probe") {
       if (!nonblank(output.text) || !output.text.trim().endsWith("?")
         || typeof judgment.nonLeading !== "boolean" || typeof judgment.onGoal !== "boolean"
@@ -58,6 +60,8 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
         || judgment.followUpAnswerId !== null)
         throw new Error("Invalid no-probe judgment");
       if (output.action === "next") noProbes++;
+      if (output.action === "next" && !judgment.decisionAppropriate)
+        inappropriateNoProbeDecisions++;
       if (output.action === "error") errors++;
       if (output.action === "timeout") timeouts++;
     }
@@ -69,8 +73,11 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
     || [...receiptById.keys()].some((id) => !followUpAnswerIds.has(id)))
     throw new Error("Unmatched answer receipts");
   const qualityRate = probes === 0 ? null : acceptable / probes;
+  const probeCoverageRate = probes / inputById.size;
+  const decisionAppropriateRate = appropriateDecisions / inputById.size;
   return { mode: "held-out-scoring", sampleSize: 60, probes, acceptable, qualityRate,
-    offTopicAnswers, noProbes, errors, timeouts,
+    probeCoverageRate, appropriateDecisions, decisionAppropriateRate,
+    inappropriateNoProbeDecisions, offTopicAnswers, noProbes, errors, timeouts,
     rubricPassed: probes > 0 && qualityRate >= 0.9 && offTopicAnswers === 0 };
 }
 
