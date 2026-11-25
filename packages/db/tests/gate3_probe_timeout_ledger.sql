@@ -299,6 +299,12 @@ update internal.gate3_probe_turns set decided_at = clock_timestamp() - interval 
 where id = (select turn_id from first_writer_turn);
 alter table internal.gate3_probe_turns enable trigger gate3_keep_probe_turn_identity;
 set local role service_role;
+select is((select public.mark_gate3_probe_shown(
+    'a9720000-0000-4000-8000-000000000004', turn_id,
+    (select (result -> 'value' ->> 'probeId')::uuid from first_writer_probe),
+    '90300000-0000-4000-8000-000000000001', 3200)
+    from first_writer_turn), 'stale',
+    'browser-clock claim cannot mark shown after the server render grace');
 create temporary table render_terminal (result jsonb not null);
 grant select, insert on render_terminal to service_role;
 insert into render_terminal select public.record_gate3_probe_render_terminal(turn_id,

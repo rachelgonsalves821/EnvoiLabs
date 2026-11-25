@@ -57,6 +57,8 @@ begin
         or not internal.gate3_probe_current(turn.id, supplied_auth_user_id)
     then return 'stale'; end if;
     if turn.shown_at is not null then return 'recorded'; end if;
+    if turn.decided_at + interval '30 seconds' <= clock_timestamp()
+    then return 'stale'; end if;
     if supplied_browser_rendered_ms > turn.browser_upload_confirmed_ms + 6000
         or supplied_browser_rendered_ms < turn.browser_upload_confirmed_ms
     then return 'stale'; end if;
