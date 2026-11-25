@@ -45,6 +45,7 @@ export * from "./report-csv.js";
 export * from "./report-ui.js";
 export * from "./current-report-port.js";
 export * from "./report-browser-port.js";
+export * from "./analyst-draft.js";
 export * from "./probe-metrics.js";
 export * from "./probe-runtime.js";
 export * from "./probe-state.js";
