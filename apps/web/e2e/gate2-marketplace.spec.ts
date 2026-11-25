@@ -313,6 +313,10 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           holdNextRead = true;
           await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
           await readStarted;
+          // Playwright emulates focus on every page; remove that override so
+          // Chromium can report the real tab-strip visibility transition.
+          const focusSession = await secondContext.newCDPSession(secondRespondent);
+          await focusSession.send("Emulation.setFocusEmulationEnabled", { enabled: false });
           const background = await secondContext.newPage();
           await background.goto("about:blank");
           await background.bringToFront();
@@ -334,6 +338,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
           await expect(secondRespondent.getByRole("alert")).toBeVisible();
           await background.close();
+          await focusSession.detach();
         } finally {
           await secondContext.close();
         }
