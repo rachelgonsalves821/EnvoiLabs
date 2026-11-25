@@ -12,5 +12,6 @@
     "test": "vitest run && node evals/run.mjs all",
     "eval": "node evals/run.mjs",
     "transcription:smoke": "node evals/transcription-smoke.mjs"
-  }
+  },
+  "dependencies": { "@envoi-labs/contracts": "workspace:*" }
 }

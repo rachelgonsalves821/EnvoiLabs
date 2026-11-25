@@ -54,3 +54,4 @@ export * from "./probe-runtime.js";
 export * from "./probe-state.js";
 export * from "./probe-integration.js";
 export * from "./screening-evidence.js";
+export * from "./scoping.js";
