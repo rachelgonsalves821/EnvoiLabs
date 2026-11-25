@@ -288,6 +288,13 @@ select is((select item ->> 'outcome' from jsonb_array_elements(
 select ok(not has_function_privilege('authenticated',
     'public.record_gate3_probe_render_terminal(uuid,uuid)', 'EXECUTE'),
     'only the trusted worker can settle an unshown probe');
+select ok(not has_function_privilege('authenticated',
+    'public.list_gate3_probe_render_due(integer)', 'EXECUTE'),
+    'respondents cannot enumerate private render candidates');
+select is((select count(*) from jsonb_array_elements(
+    public.list_gate3_probe_render_due(10)) as due
+    where due ->> 'turnId' = (select turn_id::text from first_writer_turn)),
+    0::bigint, 'unshown probe is not due inside the receipt grace');
 select is((select public.record_gate3_probe_render_terminal(turn_id,
     '90300000-0000-4000-8000-000000000001') ->> 'status'
     from first_writer_turn), 'not_due',
@@ -299,6 +306,10 @@ update internal.gate3_probe_turns set decided_at = clock_timestamp() - interval 
 where id = (select turn_id from first_writer_turn);
 alter table internal.gate3_probe_turns enable trigger gate3_keep_probe_turn_identity;
 set local role service_role;
+select is((select count(*) from jsonb_array_elements(
+    public.list_gate3_probe_render_due(10)) as due
+    where due ->> 'turnId' = (select turn_id::text from first_writer_turn)),
+    1::bigint, 'expired unshown probe is selected for terminal resolution');
 select is((select public.mark_gate3_probe_shown(
     'a9720000-0000-4000-8000-000000000004', turn_id,
     (select (result -> 'value' ->> 'probeId')::uuid from first_writer_probe),
@@ -311,6 +322,10 @@ insert into render_terminal select public.record_gate3_probe_render_terminal(tur
     '90300000-0000-4000-8000-000000000001') from first_writer_turn;
 select is((select result ->> 'outcome' from render_terminal), 'timeout',
     'unshown committed probe receives a durable render timeout');
+select is((select count(*) from jsonb_array_elements(
+    public.list_gate3_probe_render_due(10)) as due
+    where due ->> 'turnId' = (select turn_id::text from first_writer_turn)),
+    0::bigint, 'resolved probe is no longer selected');
 select is((select public.record_gate3_probe_render_terminal(turn_id,
     '90300000-0000-4000-8000-000000000001') ->> 'outcome'
     from first_writer_turn), 'timeout',
