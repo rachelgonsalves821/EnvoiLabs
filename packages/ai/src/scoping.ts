@@ -18,7 +18,8 @@ export interface ScopingInput {
   readonly systemPrompt: string;
 }
 
-const nonblank = (value: string): boolean => value.trim().length > 0;
+const nonblank = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
 const price = /(?:[$€£]\s*\d+(?:\.\d+)?|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|cad|cents?)\b)/i;
 const patchFields: Record<ScopingInput["stage"], readonly (keyof BriefPatch)[]> = {
   decision: ["title", "decision"], hypotheses: ["hypotheses"],
@@ -136,3 +137,77 @@ export async function runGuideDraft(port: ScopingPort, provider: LLMProvider,
 }
 
 export type { BriefPatch };
+
+export interface CurrentGuideSnapshot {
+  readonly revision: string;
+  readonly brief: Brief;
+  readonly questions: readonly string[];
+}
+
+export interface GuideRewritePort extends ScopingPort {
+  /** Current authorized researcher/org guide read; return null after access or version loss. */
+  readCurrent(revision: string): Promise<CurrentGuideSnapshot | null>;
+}
+
+export interface GuideRewriteSuggestion {
+  readonly revision: string;
+  readonly index: number;
+  readonly question: string;
+}
+
+const leading = /\b(?:don't you agree|wouldn't you|how much do you love|would you pay)\b/i;
+
+function validGuideSnapshot(value: CurrentGuideSnapshot | null,
+  revision: string, index: number): value is CurrentGuideSnapshot {
+  return !!value && value.revision === revision && BriefSchema.safeParse(value.brief).success
+    && Array.isArray(value.questions) && value.questions.length >= 4
+    && value.questions.length <= 10 && index >= 0 && index < value.questions.length
+    && value.questions.every((question) => typeof question === "string" && nonblank(question));
+}
+
+function copyGuide(value: CurrentGuideSnapshot): CurrentGuideSnapshot {
+  return Object.freeze({ revision: value.revision,
+    brief: structuredClone(value.brief),
+    questions: Object.freeze([...value.questions]),
+  });
+}
+
+/** Private suggestion only; Platform must compare-and-set it as an unapproved guide edit. */
+export async function runGuideRewrite(port: GuideRewritePort, provider: LLMProvider,
+  input: { readonly revision: string; readonly index: number; readonly providerModel: string;
+    readonly promptVersion: string; readonly systemPrompt: string }): Promise<GuideRewriteSuggestion | null> {
+  if (!nonblank(input.revision) || !Number.isSafeInteger(input.index) || input.index < 0
+    || !nonblank(input.providerModel) || !nonblank(input.promptVersion)
+    || !nonblank(input.systemPrompt)) return null;
+  try {
+    const first = await port.readCurrent(input.revision);
+    if (!validGuideSnapshot(first, input.revision, input.index)) return null;
+    const guide = copyGuide(first);
+    const { revision, index, providerModel, promptVersion, systemPrompt } = input;
+    const authorization = { purpose: "researcher_scoping" as const,
+      providerModel, promptVersion, promptDigest: await promptDigest(systemPrompt) };
+    if (!await port.authorize(authorization)) return null;
+    const before = await port.readCurrent(revision);
+    if (!validGuideSnapshot(before, revision, index)
+      || JSON.stringify(copyGuide(before)) !== JSON.stringify(guide)) return null;
+    const generated = await provider.generate({ purpose: "researcher_scoping", promptVersion,
+      system: systemPrompt, messages: [{ role: "user", content: JSON.stringify({
+        brief: guide.brief, questions: guide.questions, rewriteIndex: index,
+        task: "Suggest one open question about the respondent's past behavior",
+      }) }] });
+    if (generated.model !== providerModel || !generated.output
+      || typeof generated.output !== "object" || Array.isArray(generated.output)) return null;
+    const output = generated.output as Record<string, unknown>;
+    if (Object.keys(output).join(",") !== "question" || !nonblank(output.question)
+      || output.question.trim().split(/\s+/u).length >= 80
+      || !output.question.trim().endsWith("?") || price.test(output.question)
+      || leading.test(output.question)) return null;
+    const after = await port.readCurrent(revision);
+    if (!validGuideSnapshot(after, revision, index)
+      || JSON.stringify(copyGuide(after)) !== JSON.stringify(guide)
+      || !await port.authorize(authorization)) return null;
+    return { revision, index, question: output.question.trim() };
+  } catch {
+    return null;
+  }
+}
