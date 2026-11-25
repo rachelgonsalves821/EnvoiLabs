@@ -310,9 +310,12 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           holdNextRead = true;
           await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
           await readStarted;
-          const background = await secondContext.newPage();
-          await background.goto("about:blank");
-          await background.bringToFront();
+          // Headless Chromium can keep every Playwright page visible. Emulate the
+          // browser visibility signal to exercise the in-flight response race.
+          await secondRespondent.evaluate(() => {
+            Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+            document.dispatchEvent(new Event("visibilitychange"));
+          });
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("hidden");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
@@ -324,13 +327,15 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             text_version: "synthetic-marketplace-withdrawal",
           });
           expect(withdrawn.error).toBeNull();
-          await secondRespondent.bringToFront();
+          await secondRespondent.evaluate(() => {
+            Reflect.deleteProperty(document, "visibilityState");
+            document.dispatchEvent(new Event("visibilitychange"));
+          });
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("visible");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
           await expect(secondRespondent.getByRole("alert")).toBeVisible();
-          await background.close();
         } finally {
           await secondContext.close();
         }
