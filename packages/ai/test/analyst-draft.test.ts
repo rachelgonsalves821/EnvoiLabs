@@ -32,6 +32,7 @@ describe("private analyst draft dispatch", () => {
       inputTokens: 10, outputTokens: 20, costMicros: 0,
     });
     expect(readCurrent).toHaveBeenCalledTimes(3);
+    expect(authorize).toHaveBeenCalledTimes(3);
     expect(authorize).toHaveBeenCalledWith({ purpose: "ai_analysis",
       providerModel: "fictional-model", promptVersion: "analyst-v2",
       promptDigest: expect.stringMatching(/^[0-9a-f]{64}$/), snapshot });
@@ -68,6 +69,13 @@ describe("private analyst draft dispatch", () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it("does not dispatch if analysis consent is revoked with unchanged source text", async () => {
+    const { port, provider, authorize, generate } = setup();
+    authorize.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await runAnalystDraft(port, provider, input)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("drops a draft when source changes during inference or the provider fails", async () => {
     const { port, provider, readCurrent, generate } = setup();
     readCurrent.mockResolvedValueOnce(snapshot).mockResolvedValueOnce(snapshot)
@@ -76,6 +84,14 @@ describe("private analyst draft dispatch", () => {
     expect(generate).toHaveBeenCalledTimes(1);
     generate.mockRejectedValueOnce(new Error("fictional outage"));
     expect(await runAnalystDraft(port, provider, input)).toBeNull();
+  });
+
+  it("drops model output when analysis consent is revoked during inference", async () => {
+    const { port, provider, authorize, generate } = setup();
+    authorize.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    expect(await runAnalystDraft(port, provider, input)).toBeNull();
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
   it("rejects missing qualification receipts and duplicated transcripts", async () => {

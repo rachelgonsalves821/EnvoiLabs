@@ -83,7 +83,9 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
       || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
         promptVersion: input.promptVersion, promptDigest, snapshot })) return null;
     const beforeDispatch = await port.readCurrent(input.studyId);
-    if (!valid(beforeDispatch, input.studyId) || !same(snapshot, beforeDispatch)) return null;
+    if (!valid(beforeDispatch, input.studyId) || !same(snapshot, beforeDispatch)
+      || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
+        promptVersion: input.promptVersion, promptDigest, snapshot: beforeDispatch })) return null;
     const request: LLMRequest = { purpose: "ai_analysis", promptVersion: input.promptVersion,
       system: input.systemPrompt, messages: [{ role: "user", content: JSON.stringify({
         studyId: snapshot.studyId, decisionQuestion: snapshot.decisionQuestion,
@@ -95,7 +97,9 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
       || ![result.inputTokens, result.outputTokens, result.latencyMs, result.costMicros]
         .every((value) => Number.isSafeInteger(value) && value >= 0)) return null;
     const afterDispatch = await port.readCurrent(input.studyId);
-    if (!valid(afterDispatch, input.studyId) || !same(snapshot, afterDispatch)) return null;
+    if (!valid(afterDispatch, input.studyId) || !same(snapshot, afterDispatch)
+      || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
+        promptVersion: input.promptVersion, promptDigest, snapshot: afterDispatch })) return null;
     return { output: result.output, model: result.model, promptVersion: input.promptVersion,
       promptDigest,
       studyId: snapshot.studyId, sources: snapshot.sources.map(({ transcriptId, sourceVersion }) =>
