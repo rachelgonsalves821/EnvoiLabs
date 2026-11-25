@@ -5,9 +5,11 @@ export function reportBrowserPort(fetcher: typeof fetch = fetch): QualifiedRepor
   return {
     async readCurrent(studyId) {
       const response = await fetcher(`/api/researcher/studies/${encodeURIComponent(studyId)}/report`, {
-        cache: "no-store", credentials: "same-origin", headers: { accept: "application/json" },
+        cache: "no-store", credentials: "same-origin", redirect: "error",
+        headers: { accept: "application/json" },
         signal: AbortSignal.timeout(10_000),
       });
+      if (response.redirected) throw new Error("Current report redirect unavailable");
       if (response.status === 403 || response.status === 404) return null;
       if (!response.ok) throw new Error("Current report unavailable");
       const cacheControl = response.headers.get("cache-control")?.toLowerCase().split(",")

@@ -55,6 +55,8 @@ The qualified report read port needs an authorized single-snapshot result `{repo
 
 Gate 2 draft PR #138 now exposes `loadCurrentQualifiedReport(db, studyId)` with this exact shape and a newest-version-first database read. Gate 3's `currentQualifiedReportPort(db, loadCurrentQualifiedReport)` structurally connects it to `ReportUiController` using an authenticated request-scoped client. The browser-facing `reportBrowserPort` expects a future `GET /api/researcher/studies/{studyId}/report` that invokes that loader on every request and sends `Cache-Control: private, no-store` on 200. It withholds a 200 response missing either directive. Both display and export call this endpoint afresh. No route is mounted yet; Gate 2's stacked service must land and the Gate 1 qualification handoff must pass before the page uses it.
 
+The browser report port also sets `redirect: error` and rejects a followed redirect. A report-shaped 200 reached through an authentication or cross-origin redirect cannot become a current authorized view. The synthetic regression checks this refusal; the real route still needs its own authenticated display/export and revocation tests.
+
 The 60-answer held-out probe workflow and a synthetic-only pipeline smoke command are documented in `packages/ai/evals/PROBE_HELDOUT.md`. The synthetic score must never be reported as independent model quality.
 
 The 25-conversation scoping and 25-brief guide held-out scorer and private review protocol are in `packages/ai/evals/SCOPE_GUIDE_HELDOUT.md`. Its fictional smoke run marks both rubric results unproved. Actual provider/prompt receipts, independent adjudication and current purpose authorization remain required before claiming the BUILD_PLAN section 7 thresholds.

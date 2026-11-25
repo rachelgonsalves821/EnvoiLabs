@@ -16,7 +16,18 @@ it("uses a fresh same-origin report request for display and export", async () =>
   expect(fetcher).toHaveBeenCalledTimes(2);
   expect(fetcher).toHaveBeenCalledWith(`/api/researcher/studies/${studyId}/report`,
     expect.objectContaining({ cache: "no-store", credentials: "same-origin",
+      redirect: "error",
       signal: expect.any(AbortSignal) }));
+});
+
+it("withholds a followed redirect even if it returns report-shaped JSON", async () => {
+  const response = new Response(JSON.stringify(report), { status: 200,
+    headers: { "cache-control": "private, no-store" } });
+  Object.defineProperty(response, "redirected", { value: true });
+  const fetcher = vi.fn().mockResolvedValue(response);
+  const controller = new ReportUiController(reportBrowserPort(fetcher), studyId);
+  expect(await controller.refresh()).toEqual({ kind: "withheld", canExport: false });
+  expect(await controller.requestExport()).toBeNull();
 });
 
 it("withholds a previously visible report when a fresh request returns 404 or fails", async () => {
