@@ -227,6 +227,25 @@ describe("probe decision and render ports", () => {
     expect(port.markShown).not.toHaveBeenCalled();
   });
 
+  it("retracts an unpainted probe when browser frames remain suspended", async () => {
+    const { port } = setup();
+    const saved = await runProbeDecision(port, provider(async () => response({ action: "probe",
+      text: "What changed?" })), "session-1", "turn-1", 500, () => 300);
+    if (saved.status !== "committed") return;
+    const mount = vi.fn();
+    const retract = vi.fn();
+    vi.useFakeTimers();
+    try {
+      const pending = presentCommittedProbe(port, saved.value, () => "turn-1", mount,
+        () => undefined, () => 500, retract, { timeoutMs: 1 });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toEqual({ outcome: "timeout" });
+      expect(mount).toHaveBeenCalledTimes(1);
+      expect(retract).toHaveBeenCalledTimes(1);
+      expect(port.markShown).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
   it("retracts when the turn changes between paint and the shown receipt", async () => {
     const { port } = setup();
     const saved = await runProbeDecision(port, provider(async () => response({ action: "probe",

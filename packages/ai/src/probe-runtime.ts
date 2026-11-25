@@ -25,6 +25,13 @@ export interface ProbeRuntime {
   readonly cancel?: typeof clearTimeout;
 }
 
+export interface ProbePaintWait {
+  /** Maximum additional wait; the six-second upload-to-paint deadline is still enforced. */
+  readonly timeoutMs?: number;
+  readonly schedule?: typeof setTimeout;
+  readonly cancel?: typeof clearTimeout;
+}
+
 function parseDecision(output: unknown): { action: "probe"; text: string } | { action: "next" } | null {
   if (!output || typeof output !== "object" || Array.isArray(output)) return null;
   const data = output as Record<string, unknown>;
@@ -86,16 +93,43 @@ export function recordProbeRender(decision: ProbeDecision, currentTurnId: string
 
 /** Browser hook: invoke after mounting the probe; the second frame observes its paint. */
 export async function recordProbeAfterPaint(decision: ProbeDecision, currentTurnId: () => string,
-  frame: (callback: () => void) => void, now: () => number): Promise<ProbeOutcome> {
+  frame: (callback: () => void) => void, now: () => number,
+  wait: ProbePaintWait = {}): Promise<ProbeOutcome> {
   if (decision.action === "next") return { outcome: decision.outcome };
-  await new Promise<void>((resolve) => frame(() => frame(resolve)));
-  return recordProbeRender(decision, currentTurnId(), now());
+  const remaining = Math.min(wait.timeoutMs ?? 6000,
+    decision.uploadConfirmedAtMs + 6000 - now());
+  if (!Number.isFinite(remaining) || remaining <= 0) return { outcome: "timeout" };
+  const schedule = wait.schedule ?? setTimeout;
+  const cancel = wait.cancel ?? clearTimeout;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const painted = new Promise<"painted">((resolve, reject) => {
+      try {
+        frame(() => {
+          try { frame(() => resolve("painted")); }
+          catch (error) { reject(error); }
+        });
+      } catch (error) { reject(error); }
+    });
+    const limit = new Promise<"timeout">((resolve) => {
+      timer = schedule(() => resolve("timeout"), remaining);
+    });
+    if (await Promise.race([painted, limit]) === "timeout")
+      return { outcome: currentTurnId() === decision.turnId ? "timeout" : "superseded" };
+  } finally {
+    if (timer !== undefined) cancel(timer);
+  }
+  const current = currentTurnId();
+  if (current !== decision.turnId) return { outcome: "superseded" };
+  const renderedAt = now();
+  if (renderedAt > decision.uploadConfirmedAtMs + 6000) return { outcome: "timeout" };
+  return recordProbeRender(decision, current, renderedAt);
 }
 
 /** Only the active answer may mount a probe; then measure its browser paint. */
 export async function presentProbeIfCurrent(decision: ProbeDecision, currentTurnId: () => string,
   mount: (text: string) => void, frame: (callback: () => void) => void,
-  now: () => number): Promise<ProbeOutcome> {
+  now: () => number, wait: ProbePaintWait = {}): Promise<ProbeOutcome> {
   if (decision.action === "next") return { outcome: decision.outcome };
   if (currentTurnId() !== decision.turnId) return { outcome: "superseded" };
   try {
@@ -103,5 +137,5 @@ export async function presentProbeIfCurrent(decision: ProbeDecision, currentTurn
   } catch {
     return { outcome: "error" };
   }
-  return recordProbeAfterPaint(decision, currentTurnId, frame, now);
+  return recordProbeAfterPaint(decision, currentTurnId, frame, now, wait);
 }

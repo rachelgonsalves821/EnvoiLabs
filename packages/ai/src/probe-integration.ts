@@ -1,5 +1,6 @@
 import type { LLMProvider, LLMRequest } from "./index.js";
-import { decideProbe, presentProbeIfCurrent, type ProbeDecision } from "./probe-runtime.js";
+import { decideProbe, presentProbeIfCurrent, type ProbeDecision,
+  type ProbePaintWait } from "./probe-runtime.js";
 import { advanceProbeState, beginProbeTurn, type ProbeTurn } from "./probe-state.js";
 import type { ProbeOutcome } from "./probe-metrics.js";
 
@@ -182,7 +183,7 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
 export async function presentCommittedProbe(port: ProbeDecisionPort, committed: CommittedProbe,
   currentTurnId: () => string, mount: (text: string) => void,
   frame: (callback: () => void) => void, now: () => number,
-  retract: () => void = () => undefined): Promise<ProbeOutcome> {
+  retract: () => void = () => undefined, wait: ProbePaintWait = {}): Promise<ProbeOutcome> {
   const clear = () => { try { retract(); } catch { /* Keep the failed render unmeasured. */ } };
   let value: CommittedProbe | null;
   try { value = committedSnapshot(committed, committed.sessionId, committed.turnId); }
@@ -194,7 +195,7 @@ export async function presentCommittedProbe(port: ProbeDecisionPort, committed: 
   let outcome: ProbeOutcome;
   try {
     outcome = await presentProbeIfCurrent(value.decision, currentTurnId,
-      (text) => { mounted = true; mount(text); }, frame, now);
+      (text) => { mounted = true; mount(text); }, frame, now, wait);
   } catch {
     if (mounted) clear();
     return { outcome: "error" };

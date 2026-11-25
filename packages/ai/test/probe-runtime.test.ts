@@ -40,6 +40,25 @@ describe("probe runtime", () => {
     expect(outcome).toEqual({ outcome: "rendered", uploadConfirmedAtMs: 100, renderedAtMs: 650 });
   });
 
+  it("times out an unpainted probe when browser frames stop", async () => {
+    vi.useFakeTimers();
+    try {
+      const decision = { action: "probe" as const, turnId: "answer-1",
+        text: "What happened?", uploadConfirmedAtMs: 100 };
+      const pending = recordProbeAfterPaint(decision, () => "answer-1",
+        () => undefined, () => 200, { timeoutMs: 1 });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toEqual({ outcome: "timeout" });
+      expect(await recordProbeAfterPaint(decision, () => "answer-1",
+        () => undefined, () => 6100)).toEqual({ outcome: "timeout" });
+      expect(await recordProbeAfterPaint(decision, () => "answer-1",
+        (frame) => frame(), (() => {
+          let calls = 0;
+          return () => ++calls === 1 ? 200 : 6101;
+        })())).toEqual({ outcome: "timeout" });
+    } finally { vi.useRealTimers(); }
+  });
+
   it("advances without a probe on intentional next, provider error, timeout or invalid output", async () => {
     const currentTurnId = () => "answer-1";
     const next = await decideProbe(attempt, { provider: provider(async () => response({ action: "next" })),
