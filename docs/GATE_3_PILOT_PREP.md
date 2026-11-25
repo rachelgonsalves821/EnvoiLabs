@@ -95,6 +95,8 @@ Review of #142's later respondent transition at `1255b7a`: `SessionResponse.curr
 
 ## Gate 3 integration evidence queue
 
+The screening held-out path is now prepared with five fictional typed/synthetic-audio pairs covering supported, contradicted, ambiguous, invalid-provider and timeout cases. `packages/ai/evals/SCREENING_HELDOUT.md` specifies the private independently reviewed input/output/judgment records and aggregate-only CLI. It separately counts wrongful exclusions, ambiguous clear decisions, unsafe fallbacks and paired disagreement, and leaves the acceptable exclusion-error budget and pass verdict unset. This is scorer verification only: it does not establish a current `ai_screening` grant, real model quality, audio equivalence or a completed marketplace screening path.
+
 Latest independent review of Gate 2 #142 `f8b9773` and #184 `ed783d8`: the probe draft now permits questions after position four through `question.position > 0` and per-question `max_probes`; it retains a shown unanswered probe beyond the decision deadline and records browser paint after two animation frames. These correct earlier draft findings recorded above. The four-to-ten core interview RPC widening in #184 is a separate stack, so an integrated position-five/position-ten probe and source/consent/reload replay remains required before IT-3.1. The pending Earnings phrase “Approved · preparing payout” also needs a factual-copy decision before enablement because this stack does not schedule or dispatch a Visa order.
 
 | Check | Synthetic evidence possible now | Required integrated evidence |
