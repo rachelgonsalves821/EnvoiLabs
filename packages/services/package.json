@@ -17,7 +17,8 @@
     "./nudges": "./src/nudges.ts",
     "./nudge-delivery": "./src/nudge-delivery.ts",
     "./visa-product": "./src/visa-product.ts",
-    "./probe-turn": "./src/probe-turn.ts"
+    "./probe-turn": "./src/probe-turn.ts",
+    "./probe-opportunities": "./src/probe-opportunities.ts"
   },
   "scripts": {
     "lint": "cd ../.. && eslint --no-error-on-unmatched-pattern packages/services",

@@ -2040,6 +2040,10 @@ export type Database = {
         }
         Returns: Json
       }
+      read_gate3_probe_opportunity_snapshot: {
+        Args: { supplied_study_id: string }
+        Returns: Json
+      }
       read_gate3_ready_probe_turn: {
         Args: {
           supplied_auth_user_id: string

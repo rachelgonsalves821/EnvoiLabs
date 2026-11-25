@@ -11,7 +11,9 @@ values ('a9720000-0000-4000-8000-000000000001',
     ('a9720000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001', 2, 'What happened next?', 2),
     ('a9720000-0000-4000-8000-00000000000b',
-    '90600000-0000-4000-8000-000000000001', 3, 'What made it helpful?', 2);
+    '90600000-0000-4000-8000-000000000001', 3, 'What made it helpful?', 2),
+    ('a9720000-0000-4000-8000-00000000000c',
+    '90600000-0000-4000-8000-000000000001', 4, 'Anything else?', 2);
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 values ('a9720000-0000-4000-8000-000000000003',
     '90600000-0000-4000-8000-000000000001',
@@ -55,6 +57,12 @@ select ok(not has_function_privilege('authenticated',
 select ok(not has_function_privilege('authenticated',
     'public.list_gate3_probe_due(integer)', 'EXECUTE'),
     'respondents cannot enumerate private overdue answers');
+select ok(not has_function_privilege('authenticated',
+    'public.read_gate3_probe_opportunity_snapshot(uuid)', 'EXECUTE'),
+    'respondents cannot read private probe opportunity metrics');
+select ok(not has_table_privilege('authenticated',
+    'internal.gate3_probe_opportunities', 'SELECT'),
+    'opportunity receipts have no direct respondent read');
 set local role service_role;
 select is(public.begin_gate3_probe_turn(
     'a9720000-0000-4000-8000-000000000005',
@@ -253,6 +261,38 @@ select is((select id::text from public.probes where answer_id =
 select is((select count(*) from public.probes where answer_id =
     'a9720000-0000-4000-8000-000000000009'), 1::bigint,
     'timeout replay does not remove or duplicate the first probe');
+select is((select count(*) from internal.gate3_probe_opportunities
+    where study_id = '90600000-0000-4000-8000-000000000001'),
+    3::bigint, 'upload captured all three eligible answer opportunities');
+set local role service_role;
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001') ->> 'recordedCount',
+    '3', 'private study snapshot includes all persisted opportunities');
+select is((select item ->> 'outcome' from jsonb_array_elements(
+    public.read_gate3_probe_opportunity_snapshot(
+        '90600000-0000-4000-8000-000000000001') -> 'items') as item
+    where item ->> 'answerId' = 'a9720000-0000-4000-8000-000000000005'),
+    'timeout', 'late transcription is represented by its stored timeout');
+select ok((select item -> 'browserUploadConfirmedMs' = 'null'::jsonb
+    from jsonb_array_elements(public.read_gate3_probe_opportunity_snapshot(
+        '90600000-0000-4000-8000-000000000001') -> 'items') as item
+    where item ->> 'answerId' = 'a9720000-0000-4000-8000-000000000005'),
+    'timeout-only opportunity retains a null browser clock');
+select is((select item ->> 'outcome' from jsonb_array_elements(
+    public.read_gate3_probe_opportunity_snapshot(
+        '90600000-0000-4000-8000-000000000001') -> 'items') as item
+    where item ->> 'answerId' = 'a9720000-0000-4000-8000-000000000009'),
+    'pending_render', 'an unshown probe is not counted as rendered');
+reset role;
+update public.transcripts set redacted_source_version = gen_random_uuid()
+where answer_id = 'a9720000-0000-4000-8000-000000000009';
+set local role service_role;
+select is((select item ->> 'outcome' from jsonb_array_elements(
+    public.read_gate3_probe_opportunity_snapshot(
+        '90600000-0000-4000-8000-000000000001') -> 'items') as item
+    where item ->> 'answerId' = 'a9720000-0000-4000-8000-000000000009'),
+    'invalidated', 're-redaction invalidates an older committed probe');
+reset role;
 
 insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001',
@@ -267,6 +307,26 @@ reset role;
 select is((select count(*) from internal.gate3_probe_turns
     where decision_json ->> 'outcome' = 'timeout'), 2::bigint,
     'private audit retains both timeout outcomes after withdrawal');
+set local role service_role;
+select is((select count(*) from jsonb_array_elements(
+    public.read_gate3_probe_opportunity_snapshot(
+        '90600000-0000-4000-8000-000000000001') -> 'items') as item
+    where item ->> 'outcome' = 'withheld'), 3::bigint,
+    'consent withdrawal withholds all current-qualified opportunity outcomes');
+reset role;
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence)
+values ('a9720000-0000-4000-8000-00000000000d',
+    'a9720000-0000-4000-8000-000000000004',
+    '90600000-0000-4000-8000-000000000001',
+    'a9720000-0000-4000-8000-00000000000c', 'text', 4);
+select is((select count(*) from internal.gate3_probe_opportunities
+    where study_id = '90600000-0000-4000-8000-000000000001'),
+    3::bigint, 'a new answer after follow-up withdrawal is not captured');
+delete from public.answers where id = 'a9720000-0000-4000-8000-000000000009';
+select is((select count(*) from internal.gate3_probe_opportunities
+    where study_id = '90600000-0000-4000-8000-000000000001'),
+    2::bigint, 'deleting an answer cascades to its opportunity receipt');
 
 select * from finish();
 rollback;
