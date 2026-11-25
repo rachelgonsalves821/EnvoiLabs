@@ -10,5 +10,6 @@ Before using a runbook, confirm the environment and the current deployed revisio
 | Scheduled or queued work stops progressing | [Stuck jobs](stuck-jobs.md) |
 | LLM provider outage or excessive timeouts | [LLM outage](llm-outage.md) |
 | Stripe charge dispute or reversal | [Stripe disputes](stripe-disputes.md) |
+| Partial study refund pending, failed, or outcome unknown | [Refund reconciliation](refund-reconciliation.md) |
 
 Gate 4 audit records: [security review and rate-limit paths](security-review.md) · [limiter proposal](rate-limit-proposal.md) and [exact integration handoff](rate-limit-integration.md) · [integration chaos fixtures](integration-chaos-fixtures.md) · [performance measurement plan](performance-measurement.md) · [readiness evidence](launch-readiness.md).
