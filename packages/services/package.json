@@ -15,6 +15,7 @@
     "./refunds": "./src/refunds.ts",
     "./refund-settlement": "./src/refund-settlement.ts",
     "./nudges": "./src/nudges.ts",
+    "./nudge-delivery": "./src/nudge-delivery.ts",
     "./visa-product": "./src/visa-product.ts"
   },
   "scripts": {
