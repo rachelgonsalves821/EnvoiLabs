@@ -19,7 +19,10 @@ begin
     if not found then return null; end if;
     payment_status := case
         when exists (select 1 from public.gate2_payment_events
-            where quote_id = frozen.id and event_kind = 'refunded') then 'refunded'
+            where quote_id = frozen.id and event_kind = 'refunded'
+                and amount_cents >= frozen.total_cents) then 'refunded'
+        when exists (select 1 from public.gate2_payment_events
+            where quote_id = frozen.id and event_kind = 'refunded') then 'partially_refunded'
         when exists (select 1 from public.gate2_payment_events
             where quote_id = frozen.id and event_kind = 'paid') then 'paid'
         when exists (select 1 from public.gate2_payment_events
