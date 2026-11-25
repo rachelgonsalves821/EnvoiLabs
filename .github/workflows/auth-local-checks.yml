@@ -39,3 +39,11 @@ jobs:
       - run: pnpm build
       - name: Exercise production auth against disposable Supabase
         run: xvfb-run -a bash packages/db/scripts/test-local-auth.sh
+      - name: Keep failed synthetic browser trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate2-auth-trace-${{ matrix.link }}
+          path: test-results/**/trace.zip
+          if-no-files-found: warn
+          retention-days: 1

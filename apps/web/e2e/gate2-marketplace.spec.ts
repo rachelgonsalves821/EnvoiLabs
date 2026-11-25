@@ -326,8 +326,8 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             document.body.append(link);
           });
           const [background] = await Promise.all([
-            secondContext.waitForEvent("page"),
-            secondRespondent.locator("[data-gate2-background]").click(),
+            secondContext.waitForEvent("page", { timeout: 10_000 }),
+            secondRespondent.locator("[data-gate2-background]").click({ timeout: 10_000 }),
           ]);
           await background.bringToFront();
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
