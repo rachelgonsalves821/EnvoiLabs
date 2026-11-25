@@ -1,6 +1,7 @@
 "use client";
 
 import { readMarketplaceFeasibilityView, type FeasibilityView } from "@envoi-labs/ai";
+import { Button } from "@envoi-labs/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StudyFeasibilityPanel } from "./study-feasibility-panel";
 
@@ -33,8 +34,8 @@ export function StudyFeasibilityLivePanel({ studyId, targetRespondents }: {
       <StudyFeasibilityPanel view={current.view} targetRespondents={targetRespondents} />}
     {current.kind === "loading" && <p role="status">Checking the current matching outlook…</p>}
     {current.kind === "unavailable" && <p role="status">Matching outlook is currently unavailable.</p>}
-    <button type="button" disabled={current.kind === "loading"} onClick={() => { void load(); }}>
+    <Button variant="secondary" disabled={current.kind === "loading"} onClick={() => { void load(); }}>
       {current.kind === "loading" ? "Checking matching outlook…" : "Check matching outlook again"}
-    </button>
+    </Button>
   </div>;
 }

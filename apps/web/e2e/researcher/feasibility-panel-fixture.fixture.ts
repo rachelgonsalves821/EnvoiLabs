@@ -26,11 +26,11 @@ test("clears a prior outlook while rechecking and withholds it on revocation", a
   await page.getByRole("button", { name: "Check matching outlook again" }).click();
   await expect(page.getByRole("status")).toHaveText("Checking the current matching outlook…");
   await expect(page.getByText("about 15 people")).toHaveCount(0);
-  expect(requests).toBe(initial + 1);
+  await expect.poll(() => requests).toBe(initial + 1);
   available = false;
   release?.();
   await expect(page.getByRole("status")).toHaveText("Matching outlook is currently unavailable.");
-  expect(page.getByText("about 15 people")).toHaveCount(0);
+  await expect(page.getByText("about 15 people")).toHaveCount(0);
 });
 
 test("requires a fresh private no-store response before showing an outlook", async ({ page }) => {
@@ -40,11 +40,11 @@ test("requires a fresh private no-store response before showing an outlook", asy
   }));
   await page.goto("/gate3-feasibility-fixture");
   await expect(page.getByRole("status")).toHaveText("Matching outlook is currently unavailable.");
-  expect(page.getByText("about 15 people")).toHaveCount(0);
+  await expect(page.getByText("about 15 people")).toHaveCount(0);
   cacheControl = "private, no-store";
   await page.getByRole("button", { name: "Check matching outlook again" }).click();
   await expect(page.getByText("about 15 people")).toBeVisible();
-  expect(page.getByText(/finish within/i)).toHaveCount(0);
+  await expect(page.getByText(/finish within/i)).toHaveCount(0);
 });
 
 test("has no serious or critical whole-page axe findings and reflows at mobile width", async ({ page }) => {
@@ -55,6 +55,8 @@ test("has no serious or critical whole-page axe findings and reflows at mobile w
   await page.goto("/gate3-feasibility-fixture");
   await page.addScriptTag({ content: axe.source });
   await expect(page.getByText("about 15 people")).toBeVisible();
+  expect((await page.getByRole("button", { name: "Check matching outlook again" })
+    .boundingBox())?.height).toBeGreaterThanOrEqual(44);
   expect(await seriousAxeViolations(page)).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   await page.evaluate(() => { document.body.style.zoom = "2"; });
