@@ -171,6 +171,32 @@ test("withholds export when a same-ID fictional report receives a re-redacted qu
   expect(downloads).toEqual([]);
 });
 
+test("rechecks the qualified endpoint when the fictional report page returns to the foreground", async ({ page }) => {
+  const studyId = "a9700000-0000-4000-8000-000000000001";
+  let available = true;
+  let reads = 0;
+  await page.route("**/api/researcher/studies/*/report", async (route) => {
+    reads++;
+    await route.fulfill(available
+      ? { status: 200, headers: { "cache-control": "private, no-store" },
+        json: { reportId: "a9700000-0000-4000-8000-000000000002", studyId,
+          summary: { version: 2, executiveAnswer: "Fictional foreground answer",
+            themes: [], hypotheses: [] } } }
+      : { status: 404 });
+  });
+  await page.goto("/gate3-report-fixture?endpoint=1");
+  const panel = page.getByRole("region", { name: "Research report" });
+  await expect(panel.getByText("Fictional foreground answer")).toBeVisible();
+  const initialReads = reads;
+  available = false;
+  // Simulate the foreground notification; this fixture does not prove that
+  // the hosted browser has actually hidden and restored the document.
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(panel.getByText("Fictional foreground answer")).toHaveCount(0);
+  await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
+  expect(reads).toBe(initialReads + 1);
+});
+
 test("hides the old study immediately and discards its in-flight export after a route switch", async ({ page }) => {
   const downloads: string[] = [];
   page.on("download", (item) => downloads.push(item.suggestedFilename()));
