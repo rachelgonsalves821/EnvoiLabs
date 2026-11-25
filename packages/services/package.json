@@ -11,7 +11,8 @@
     "./study-draft": "./src/study-draft.ts",
     "./study-draft-criteria": "./src/study-draft-criteria.ts",
     "./study-tracking": "./src/study-tracking.ts",
-    "./marketplace-feasibility": "./src/marketplace-feasibility.ts"
+    "./marketplace-feasibility": "./src/marketplace-feasibility.ts",
+    "./refunds": "./src/refunds.ts"
   },
   "scripts": {
     "lint": "cd ../.. && eslint --no-error-on-unmatched-pattern packages/services",

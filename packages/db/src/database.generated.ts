@@ -549,6 +549,53 @@ export type Database = {
           },
         ]
       }
+      gate2_refund_reservations: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          fulfilled_slots: number
+          id: string
+          idempotency_key: string
+          purchased_slots: number
+          quote_id: string
+          slot_price_cents: number
+          study_id: string
+          unfilled_slots: number
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          fulfilled_slots: number
+          id?: string
+          idempotency_key: string
+          purchased_slots: number
+          quote_id: string
+          slot_price_cents: number
+          study_id: string
+          unfilled_slots: number
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          fulfilled_slots?: number
+          id?: string
+          idempotency_key?: string
+          purchased_slots?: number
+          quote_id?: string
+          slot_price_cents?: number
+          study_id?: string
+          unfilled_slots?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate2_refund_reservations_quote_id_study_id_fkey"
+            columns: ["quote_id", "study_id"]
+            isOneToOne: false
+            referencedRelation: "gate2_quote_snapshots"
+            referencedColumns: ["id", "study_id"]
+          },
+        ]
+      }
       gate2_screening_events: {
         Row: {
           action: string
@@ -1803,6 +1850,14 @@ export type Database = {
           requested_session_id: string
         }
         Returns: string
+      }
+      reserve_gate2_unfilled_slot_refund: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_quote_id: string
+          supplied_study_id: string
+        }
+        Returns: Json
       }
       retry_gate1_answer_job: {
         Args: {
