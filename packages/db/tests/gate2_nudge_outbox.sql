@@ -171,12 +171,24 @@ reset role;
 update internal.gate2_nudge_outbox
 set id = 'a9870000-0000-4000-8000-000000000022'
 where kind = 'two_hours_left';
+set local role service_role;
+select is(jsonb_array_length(public.prepare_gate2_nudge_deliveries(
+    'a9870000-0000-4000-8000-000000000022')), 1,
+    'current deadline reminder prepares one private delivery');
+reset role;
+update internal.gate2_nudge_deliveries
+set id = 'a9870000-0000-4000-8000-000000000023'
+where outbox_id = 'a9870000-0000-4000-8000-000000000022';
 insert into public.consents (respondent_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001',
     'push_notifications', false, 'synthetic-push-revoked');
 set local role service_role;
 select is(jsonb_array_length(public.list_gate2_nudge_candidates()), 0,
     'revoked push consent removes candidate from current read');
+select is(public.claim_gate2_nudge_delivery(
+    'a9870000-0000-4000-8000-000000000023',
+    'a9870000-0000-4000-8000-000000000024'), null::jsonb,
+    'revocation between preparation and claim prevents dispatch');
 select is(jsonb_array_length(public.prepare_gate2_nudge_deliveries(
     'a9870000-0000-4000-8000-000000000022'), 0,
     'queued deadline reminder cannot prepare delivery after revocation');
