@@ -61,8 +61,7 @@ export function StudyReportPanel({ controller, save = saveCsv }: {
       <h2 id={headingId}>Research report</h2>
       {state.kind === "loading" && <p role="status">Checking the current report…</p>}
       {state.kind === "withheld" && (
-        <><p role="status">The report is currently unavailable.</p>
-          <button type="button" onClick={() => { setExportNotice(false); void controller.refresh(); }}>Check again</button></>
+        <p role="status">The report is currently unavailable.</p>
       )}
       {state.kind === "ready" && (
         <>
@@ -90,11 +89,19 @@ export function StudyReportPanel({ controller, save = saveCsv }: {
             <ul>{state.report.summary.hypotheses.map((item, index) =>
               <li key={index}>{item.hypothesis} · {item.result}</li>)}</ul>
           </>}
-          <button type="button" disabled={!state.canExport} onClick={() => void download()}>
-            {state.canExport ? "Download themes and quotes CSV" : "Checking report…"}
-          </button>
         </>
       )}
+      <button type="button" aria-disabled={state.kind === "loading"
+        || (state.kind === "ready" && !state.canExport)} onClick={() => {
+          if (state.kind === "withheld") {
+            setExportNotice(false);
+            void controller.refresh();
+          } else if (state.kind === "ready" && state.canExport) void download();
+        }}>
+        {state.kind === "withheld" ? "Check again"
+          : state.kind === "ready" && state.canExport
+            ? "Download themes and quotes CSV" : "Checking report…"}
+      </button>
       {exportNotice && state.kind === "ready" &&
         <p role="status">The report changed. Review the current version before downloading.</p>}
     </section>
