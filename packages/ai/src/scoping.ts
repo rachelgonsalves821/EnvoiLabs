@@ -5,7 +5,7 @@ import type { LLMProvider, LLMRequest } from "./index.js";
 export interface ScopingPort {
   /** A current researcher/provider policy decision. No live adapter is supplied by this module. */
   authorize(input: { readonly purpose: "researcher_scoping"; readonly providerModel: string;
-    readonly promptVersion: string }): Promise<boolean>;
+    readonly promptVersion: string; readonly promptDigest: string }): Promise<boolean>;
 }
 
 export interface ScopingInput {
@@ -19,7 +19,7 @@ export interface ScopingInput {
 }
 
 const nonblank = (value: string): boolean => value.trim().length > 0;
-const price = /(?:[$€£]\s*\d|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|cad|cents?)\b)/i;
+const price = /(?:[$€£]\s*\d+(?:\.\d+)?|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|cad|cents?)\b)/i;
 const patchFields: Record<ScopingInput["stage"], readonly (keyof BriefPatch)[]> = {
   decision: ["title", "decision"], hypotheses: ["hypotheses"],
   eligibility: ["criteria"], exclusions: ["criteria"],
@@ -54,14 +54,20 @@ function validPatch(stage: ScopingInput["stage"], previous: Partial<Brief>, patc
   return keep.every((item) => patch.criteria!.some((next) => next.kind === item.kind && next.text === item.text));
 }
 
-function attributedStimulusPrice(patch: BriefPatch,
+function attributedPatchPrices(patch: BriefPatch,
   messages: LLMRequest["messages"]): boolean {
-  if (!patch.stimulus) return true;
-  const amounts = [...patch.stimulus.matchAll(new RegExp(price.source, "gi"))]
+  const amounts = [...JSON.stringify(patch).matchAll(new RegExp(price.source, "gi"))]
     .map((match) => match[0].toLowerCase().replace(/\s+/gu, ""));
-  const researcherText = messages.filter((message) => message.role === "user")
-    .map((message) => message.content.toLowerCase().replace(/\s+/gu, "")).join(" ");
-  return amounts.every((amount) => researcherText.includes(amount));
+  const researcherAmounts = new Set(messages.filter((message) => message.role === "user")
+    .flatMap((message) => [...message.content.matchAll(new RegExp(price.source, "gi"))]
+      .map((match) => match[0].toLowerCase().replace(/\s+/gu, ""))));
+  return amounts.every((amount) => researcherAmounts.has(amount));
+}
+
+async function promptDigest(systemPrompt: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256",
+    new TextEncoder().encode(systemPrompt)));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** A private, synthetic-ready scoping turn. Platform must still authorize every real dispatch. */
@@ -71,24 +77,25 @@ export async function runScopingTurn(port: ScopingPort, provider: LLMProvider,
   try {
     const brief = structuredClone(input.brief);
     const messages = input.messages.map(({ role, content }) => ({ role, content }));
-    if (!await port.authorize({ purpose: "researcher_scoping", providerModel: input.providerModel,
-      promptVersion: input.promptVersion })) return null;
-    const request: LLMRequest = { purpose: "researcher_scoping", promptVersion: input.promptVersion,
-      system: input.systemPrompt, messages: [...messages,
-        { role: "user", content: JSON.stringify({ currentBrief: brief, currentStage: input.stage }) }] };
+    const { stage, providerModel, promptVersion, systemPrompt } = input;
+    const authorization = { purpose: "researcher_scoping" as const,
+      providerModel, promptVersion, promptDigest: await promptDigest(systemPrompt) };
+    if (!await port.authorize(authorization)) return null;
+    const request: LLMRequest = { purpose: "researcher_scoping", promptVersion,
+      system: systemPrompt, messages: [...messages,
+        { role: "user", content: JSON.stringify({ currentBrief: brief, currentStage: stage }) }] };
     const generated = await provider.generate(request);
-    if (generated.model !== input.providerModel) return null;
+    if (generated.model !== providerModel) return null;
     const turn = ScopingTurnSchema.safeParse(generated.output);
     if (!turn.success || !validTurn(turn.data)
-      || !validPatch(input.stage, brief, turn.data.briefPatch)
-      || !attributedStimulusPrice(turn.data.briefPatch, messages)) return null;
+      || !validPatch(stage, brief, turn.data.briefPatch)
+      || !attributedPatchPrices(turn.data.briefPatch, messages)) return null;
     const latestUser = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (/\b(?:what percent|market size|prevalence)\b/i.test(latestUser)
       && !/\b(?:cannot|can't|won't|does not)\b/i.test(turn.data.message)) return null;
     const merged = { ...brief, ...turn.data.briefPatch };
     if (!BriefPatchSchema.safeParse(merged).success) return null;
-    if (!await port.authorize({ purpose: "researcher_scoping", providerModel: input.providerModel,
-      promptVersion: input.promptVersion })) return null;
+    if (!await port.authorize(authorization)) return null;
     return turn.data;
   } catch {
     return null;
@@ -107,19 +114,20 @@ export async function runGuideDraft(port: ScopingPort, provider: LLMProvider,
   try {
     const brief = structuredClone(input.brief);
     const messages = input.messages.map(({ role, content }) => ({ role, content }));
-    if (!await port.authorize({ purpose: "researcher_scoping", providerModel: input.providerModel,
-      promptVersion: input.promptVersion })) return null;
+    const { providerModel, promptVersion, systemPrompt } = input;
+    const authorization = { purpose: "researcher_scoping" as const,
+      providerModel, promptVersion, promptDigest: await promptDigest(systemPrompt) };
+    if (!await port.authorize(authorization)) return null;
     const generated = await provider.generate({ purpose: "researcher_scoping",
-      promptVersion: input.promptVersion, system: input.systemPrompt,
+      promptVersion, system: systemPrompt,
       messages: [...messages, { role: "user", content: JSON.stringify({
         completedBrief: brief, task: "draft six to eight open questions about past behavior",
       }) }] });
-    if (generated.model !== input.providerModel) return null;
+    if (generated.model !== providerModel) return null;
     const guide = GuideDraftSchema.safeParse(generated.output);
     if (!guide.success || guide.data.coreQuestions.some((question) => price.test(question)
       || !question.includes("?"))) return null;
-    if (!await port.authorize({ purpose: "researcher_scoping", providerModel: input.providerModel,
-      promptVersion: input.promptVersion })) return null;
+    if (!await port.authorize(authorization)) return null;
     return guide.data;
   } catch {
     return null;

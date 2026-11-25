@@ -30,7 +30,8 @@ describe("fictional researcher scoping boundary", () => {
       briefPatch: { decision: "Change checkout" }, quickReplies: turn.quickReplies });
     expect(authorize).toHaveBeenCalledTimes(2);
     expect(authorize).toHaveBeenCalledWith({ purpose: "researcher_scoping",
-      providerModel: "fictional-model", promptVersion: "scoping-v1" });
+      providerModel: "fictional-model", promptVersion: "scoping-v1",
+      promptDigest: expect.stringMatching(/^[0-9a-f]{64}$/) });
     expect(generate).toHaveBeenCalledWith(expect.objectContaining({
       purpose: "researcher_scoping", promptVersion: "scoping-v1" }));
     expect(generate.mock.calls[0]![0].messages.at(-1).content)
@@ -76,6 +77,17 @@ describe("fictional researcher scoping boundary", () => {
       messages: [{ role: "user", content: "Please show a fictional $5 offer." }] }))?.briefPatch.stimulus)
       .toBe("A fictional $5 offer");
     expect(await runScopingTurn(port, provider, { ...base, stage: "stimulus" })).toBeNull();
+    expect(await runScopingTurn(port, provider, { ...base, stage: "stimulus",
+      messages: [{ role: "user", content: "Please show a fictional $50 offer." }] })).toBeNull();
+  });
+
+  it("rejects an invented price in a decision and binds authorization to prompt text", async () => {
+    const priced = setup({ ...turn, briefPatch: { decision: "Test a $5 fee" } });
+    expect(await runScopingTurn(priced.port, priced.provider, base)).toBeNull();
+    const { port, provider, authorize, generate } = setup();
+    authorize.mockImplementation(async (attempt) => attempt.promptDigest === "0".repeat(64));
+    expect(await runScopingTurn(port, provider, base)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
   });
 
   it("preserves earlier eligibility while asking exclusions", async () => {
