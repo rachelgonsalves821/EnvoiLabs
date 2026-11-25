@@ -49,9 +49,11 @@ it("summarizes unique fictional turns by device without claiming a physical timi
 it("requires every qualified source-version opportunity in the timing denominator", () => {
   const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
   const opportunities = [
-    { turnId: id(1), sourceVersion: id(11), device: "ios-safari" as const,
+    { turnId: id(1), sourceVersion: id(11), browserUploadConfirmedAtMs: 100,
+      device: "ios-safari" as const,
       evidence: "fixture" as const },
-    { turnId: id(2), sourceVersion: id(12), device: "android-chrome" as const,
+    { turnId: id(2), sourceVersion: id(12), browserUploadConfirmedAtMs: 200,
+      device: "android-chrome" as const,
       evidence: "fixture" as const },
   ];
   const measured = [
@@ -74,6 +76,14 @@ it("requires every qualified source-version opportunity in the timing denominato
   expect(() => summarizeCompleteProbeOpportunityLog(opportunities,
     [measured[0]!, { ...measured[1]!, device: "ios-safari" as const }]))
     .toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeCompleteProbeOpportunityLog(opportunities,
+    [{ ...measured[0]!, result: { ...measured[0]!.result,
+      uploadConfirmedAtMs: 200 } }, measured[1]!]))
+    .toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeCompleteProbeOpportunityLog(
+    [{ ...opportunities[0]!, browserUploadConfirmedAtMs: Number.NaN },
+      opportunities[1]!], measured))
+    .toThrow("Invalid or duplicate probe opportunity");
   expect(() => summarizeCompleteProbeOpportunityLog(
     [opportunities[0]!, opportunities[0]!], measured))
     .toThrow("Invalid or duplicate probe opportunity");

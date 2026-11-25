@@ -27,6 +27,8 @@ export interface ProbeAttemptRecord {
 export interface ProbeOpportunity {
   readonly turnId: string;
   readonly sourceVersion: string;
+  /** Browser monotonic timestamp recorded at the upload-confirmation boundary. */
+  readonly browserUploadConfirmedAtMs: number;
   readonly device: ProbeAttemptRecord["device"];
   readonly evidence: ProbeAttemptRecord["evidence"];
 }
@@ -82,6 +84,8 @@ export function summarizeCompleteProbeOpportunityLog(
   for (const opportunity of opportunities) {
     if (!opportunity || !uuid.test(opportunity.turnId)
       || !uuid.test(opportunity.sourceVersion)
+      || !Number.isFinite(opportunity.browserUploadConfirmedAtMs)
+      || opportunity.browserUploadConfirmedAtMs < 0
       || !["ios-safari", "android-chrome"].includes(opportunity.device)
       || !["fixture", "physical-device"].includes(opportunity.evidence)
       || expected.has(opportunity.turnId.toLowerCase()))
@@ -95,7 +99,9 @@ export function summarizeCompleteProbeOpportunityLog(
     const opportunity = expected.get(record.turnId.toLowerCase());
     if (!uuid.test(record.sourceVersion) || !opportunity
       || opportunity.sourceVersion.toLowerCase() !== record.sourceVersion.toLowerCase()
-      || opportunity.device !== record.device || opportunity.evidence !== record.evidence)
+      || opportunity.device !== record.device || opportunity.evidence !== record.evidence
+      || (record.result?.outcome === "rendered"
+        && record.result.uploadConfirmedAtMs !== opportunity.browserUploadConfirmedAtMs))
       throw new Error("Probe outcome does not match current opportunity");
   }
   return summarizeProbeAttemptLog(records);

@@ -107,6 +107,8 @@ Gate 2 draft #188 `e69f28c` now combines the qualified source UUID and probe led
 
 Gate 3's latency summarizer now has a complete-opportunity variant. Platform must produce an independent private manifest of every current-qualified probe opportunity with `turnId`, immutable `sourceVersion`, device and fixture/physical evidence label, plus exactly one persisted outcome for each matching turn/version. The scorer refuses missing outcomes, extra turns, rotated versions and device/evidence mismatches before calculating p95 and separate rates. The manifest must include authorized attempts that miss transcription or provider deadlines; otherwise timeout rates and p95 can be biased by omitted failures. A fixture label cannot be promoted to physical-device evidence by this helper; actual device/run receipts and authorization remain separate acceptance proof.
 
+Each manifest row now also carries the browser-monotonic upload-confirmation timestamp. A rendered outcome must use exactly that timestamp, so substituting a later start time cannot improve p95. The browser paint timestamp still requires a persisted, same-turn shown receipt and independent device/run evidence; the scorer alone cannot prove a browser actually painted the prompt.
+
 The integrated #188 respondent UI also still allows a fast typed probe answer before the asynchronous shown receipt finishes, while the answer SQL requires `shown_at`. Gate 2 must make that first answer save wait or reconcile safely, and test a delayed shown receipt without a false answer conflict. This is separate from the six-second render metric.
 
 | Check | Synthetic evidence possible now | Required integrated evidence |
