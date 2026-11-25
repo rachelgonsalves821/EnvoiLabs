@@ -224,6 +224,35 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         await expect(respondent.getByRole("heading", { name: "Delivered" }).locator("..").getByText("$0.00"))
           .toBeVisible();
         await expect(respondent.getByText("Reward approved · payout not scheduled")).toBeVisible();
+        const second = offers.data?.[1];
+        const secondEmail = second && respondentEmails[respondentIds.indexOf(second.respondent_id)];
+        const firstQuestion = core[0];
+        if (!second || !secondEmail || !firstQuestion) throw new Error("Second synthetic offer is missing.");
+        const secondContext = await browser.newContext({ baseURL: origin });
+        try {
+          const secondRespondent = await secondContext.newPage();
+          await secondRespondent.goto("/r/signup");
+          await secondRespondent.getByLabel("Email address").fill(secondEmail);
+          await secondRespondent.getByRole("checkbox", { name: /18 or older/ }).check();
+          await secondRespondent.getByRole("button", { name: "Email me a sign-in link" }).click();
+          const secondLink = await deliveredEmail(secondRespondent, secondEmail, origin,
+            "/api/respondent/auth/callback");
+          await secondRespondent.goto(secondLink.href);
+          await secondRespondent.goto("/r");
+          await secondRespondent.getByRole("button", { name: "Start answering" }).click();
+          await expect(secondRespondent).toHaveURL(origin + `/r/interviews/${second.id}`);
+          await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toBeVisible();
+          const withdrawn = await db.from("consents").insert({
+            respondent_id: second.respondent_id, purpose: "retention", granted: false,
+            text_version: "synthetic-marketplace-withdrawal",
+          });
+          expect(withdrawn.error).toBeNull();
+          await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+          await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
+          await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
+        } finally {
+          await secondContext.close();
+        }
       } finally {
         await respondentContext.close();
       }

@@ -20,11 +20,23 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   const [submitError, setSubmitError] = useState("");
   const submitting = useRef(false);
   const prompt = useRef<HTMLHeadingElement>(null);
+  const currentState = useRef(state.kind);
+  currentState.current = state.kind;
+
+  useEffect(() => {
+    const recheck = () => {
+      if (currentState.current !== "open" && currentState.current !== "opening") return;
+      setState({ kind: "opening" });
+      if (document.visibilityState === "visible") setAttempt((value) => value + 1);
+    };
+    document.addEventListener("visibilitychange", recheck);
+    return () => document.removeEventListener("visibilitychange", recheck);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     void interviewRequest("/api/respondent/sessions/start", { inviteId }, controller.signal).then((result) => {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || document.visibilityState !== "visible") return;
       const session = SessionResponseSchema.safeParse(result.data);
       if (session.success && session.data.sessionId === session.data.progress.sessionId) {
         setState({ kind: "open", session: session.data });
