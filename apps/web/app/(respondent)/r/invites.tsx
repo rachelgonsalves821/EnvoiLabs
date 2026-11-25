@@ -5,8 +5,9 @@ import { homeCopy as copy } from "./copy";
 import { InviteActions } from "./invite-actions";
 import { formatReward } from "./reward";
 
-export function RespondentInvites({ invites, now, respondentId, earningsEnabled }: {
+export function RespondentInvites({ invites, now, respondentId, earningsEnabled, screeningEnabled = false }: {
   invites: HomeInvite[] | null; now: number; respondentId: string; earningsEnabled: boolean;
+  screeningEnabled?: boolean;
 }) {
   const firstOffer = invites?.find(({ state }) => state === "invited")?.id;
   return (
@@ -52,6 +53,11 @@ export function RespondentInvites({ invites, now, respondentId, earningsEnabled 
                   </div>
                   <p>{invite.state === "screening" ? copy.screening : invite.whyYou ?? copy.matched}</p>
                   <p className="respondent-invite-privacy">{copy.privacy}</p>
+                  {invite.state === "screening" && screeningEnabled &&
+                    <a className="ev-button respondent-signup-link"
+                      href={`/r/screening/${invite.id}`} data-variant="secondary">
+                      Answer screening questions
+                    </a>}
                   {invite.state === "invited" && <InviteActions inviteId={invite.id} primary={invite.id === firstOffer} />}
                   {invite.state === "accepted" && (
                     <a className="ev-button respondent-signup-link" href={resumeLink ?? `/r/interviews/${invite.id}`} data-variant="secondary">
