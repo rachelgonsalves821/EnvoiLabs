@@ -11,6 +11,14 @@ test_dir="$(mktemp -d "${TMPDIR:-/tmp}/envoi-db-test-XXXXXXXX")"
 trap 'supabase stop --workdir "$test_dir" --no-backup || true; rm -r -- "$test_dir"' EXIT
 
 supabase init --workdir "$test_dir"
+if [[ -n ${ENVOI_DB_TEST_PORT:-} ]]; then
+    if [[ ! $ENVOI_DB_TEST_PORT =~ ^[0-9]+$ ]] ||
+        (( ENVOI_DB_TEST_PORT < 1024 || ENVOI_DB_TEST_PORT > 65535 )); then
+        printf 'ENVOI_DB_TEST_PORT must be a valid nonprivileged port.\n' >&2
+        exit 2
+    fi
+    sed -i "s/^port = 54322$/port = $ENVOI_DB_TEST_PORT/" "$test_dir/supabase/config.toml"
+fi
 cp -R -- "$db_dir/migrations" "$test_dir/supabase/migrations"
 cp -R -- "$db_dir/tests" "$test_dir/supabase/tests"
 cp -- "$db_dir/seed.sql" "$test_dir/supabase/seed.sql"

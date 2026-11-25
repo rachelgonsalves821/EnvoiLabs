@@ -549,6 +549,93 @@ export type Database = {
           },
         ]
       }
+      gate2_referral_profile_verifications: {
+        Row: {
+          id: string
+          normalized_email_hash: string
+          profile_digest: string
+          referee_id: string
+          referral_id: string
+          referrer_id: string
+          verified_at: string
+        }
+        Insert: {
+          id?: string
+          normalized_email_hash: string
+          profile_digest: string
+          referee_id: string
+          referral_id: string
+          referrer_id: string
+          verified_at?: string
+        }
+        Update: {
+          id?: string
+          normalized_email_hash?: string
+          profile_digest?: string
+          referee_id?: string
+          referral_id?: string
+          referrer_id?: string
+          verified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate2_referral_profile_verifications_referee_id_fkey"
+            columns: ["referee_id"]
+            isOneToOne: true
+            referencedRelation: "respondents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate2_referral_profile_verifications_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: true
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate2_referral_profile_verifications_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "respondents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gate2_referral_vestings: {
+        Row: {
+          bonus_cents: number
+          id: string
+          idempotency_key: string
+          referrer_id: string
+          verified_profile_count: number
+          vested_at: string
+        }
+        Insert: {
+          bonus_cents: number
+          id?: string
+          idempotency_key: string
+          referrer_id: string
+          verified_profile_count: number
+          vested_at?: string
+        }
+        Update: {
+          bonus_cents?: number
+          id?: string
+          idempotency_key?: string
+          referrer_id?: string
+          verified_profile_count?: number
+          vested_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate2_referral_vestings_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: true
+            referencedRelation: "respondents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gate2_refund_reservations: {
         Row: {
           amount_cents: number
@@ -1828,6 +1915,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      register_gate2_referral: {
+        Args: { supplied_referral_code: string }
+        Returns: string
+      }
       requeue_gate1_answer_job: {
         Args: { supplied_answer_id: string }
         Returns: boolean
@@ -1899,6 +1990,7 @@ export type Database = {
         Args: { supplied_answer_id: string; supplied_lease_id: string }
         Returns: boolean
       }
+      verify_gate2_referred_profile: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
