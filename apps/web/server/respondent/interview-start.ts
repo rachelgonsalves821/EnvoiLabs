@@ -3,7 +3,7 @@ import {
 } from "@envoi-labs/contracts";
 import type { NextRequest } from "next/server";
 import { failure, input, reply } from "../auth/http";
-import { requestSession } from "../auth/supabase";
+import { requestSession, trustedClient } from "../auth/supabase";
 
 function mutationFailure(error: { code: string } | null) {
   if (error?.code === "42501") return failure(404);
@@ -40,5 +40,16 @@ export async function startInterview(request: NextRequest) {
   const { data, error } = await session.client.rpc("start_gate1_session", { supplied_invite_id: selection.data.inviteId });
   const result = SessionResponseSchema.safeParse(data);
   if (error || !result.success) return mutationFailure(error);
-  return session.commit(reply(200, result.data));
+  const trusted = trustedClient();
+  if (!trusted) return failure(503);
+  const current = await trusted.rpc("read_gate3_respondent_probe", {
+    supplied_session_id: result.data.sessionId,
+    supplied_auth_user_id: identity.data.claims.sub,
+  });
+  if (current.error) return failure(503);
+  const withProbe = SessionResponseSchema.safeParse({
+    ...result.data, currentProbe: current.data,
+  });
+  if (!withProbe.success) return failure(503);
+  return session.commit(reply(200, withProbe.data));
 }

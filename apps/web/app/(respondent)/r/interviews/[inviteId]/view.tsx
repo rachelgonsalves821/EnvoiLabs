@@ -7,6 +7,8 @@ import { interviewRequest } from "../../interview-request";
 import { formatReward } from "../../reward";
 import { interviewCopy as copy } from "./copy";
 import { AnswerComposer } from "./answer-composer";
+import { ProbeTextAnswer } from "./probe-text-answer";
+import { currentPrompt } from "./current-prompt";
 
 type InterviewState = { kind: "opening" | "submitted" } | { kind: "open"; session: SessionResponse }
   | { kind: "unavailable" | "closed" | "sessionExpired" };
@@ -39,6 +41,30 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     if (state.kind === "open" || state.kind === "submitted") prompt.current?.focus();
   }, [state]);
 
+  useEffect(() => {
+    if (state.kind !== "open" || !state.session.currentProbe) return;
+    const probe = state.session.currentProbe;
+    const sessionId = state.session.sessionId;
+    let active = true;
+    let paintedFrame = 0;
+    const frame = requestAnimationFrame(() => {
+      paintedFrame = requestAnimationFrame(() => {
+        if (!active) return;
+        void interviewRequest("/api/respondent/probes/shown", {
+          sessionId, turnId: probe.turnId, probeId: probe.probeId,
+          browserRenderedAtMs: performance.now(),
+        }).then((result) => {
+          if (active && result.status !== 200) retry();
+        });
+      });
+    });
+    return () => {
+      active = false;
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(paintedFrame);
+    };
+  }, [state]);
+
   function retry() {
     setState({ kind: "opening" });
     setAttempt((value) => value + 1);
@@ -57,6 +83,8 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     else setSubmitError(response.status === 401 ? copy.sessionExpired : copy.submitFailed);
   }
 
+  const displayed = state.kind === "open" ? currentPrompt(state.session) : null;
+
   return (
     <Card className="respondent-welcome">
       {state.kind === "open" ? (
@@ -65,8 +93,12 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
             <ProgressTrack current={state.session.progress.currentQuestion} total={state.session.progress.coreQuestionCount} />
             <EarningsChip amount={formatReward(state.session.progress.rewardCents)} />
           </div>
-          <h1 ref={prompt} tabIndex={-1}>{state.session.nextQuestion?.text ?? copy.complete}</h1>
-          {state.session.nextQuestion
+          <h1 ref={prompt} tabIndex={-1}>{displayed && "text" in displayed ? displayed.text : copy.complete}</h1>
+          {state.session.currentProbe
+            ? <ProbeTextAnswer key={state.session.currentProbe.probeId}
+                sessionId={state.session.sessionId} turnId={state.session.currentProbe.turnId}
+                probeId={state.session.currentProbe.probeId} onSaved={retry} />
+            : state.session.nextQuestion
             ? <AnswerComposer key={state.session.nextQuestion.id} canRecord={canRecord} sessionId={state.session.sessionId}
               questionId={state.session.nextQuestion.id} onSaved={retry} />
             : <Button variant="pulse" aria-disabled={pendingSubmit} onClick={() => void submit(state.session.sessionId)}>

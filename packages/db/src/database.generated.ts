@@ -1343,8 +1343,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      begin_gate3_probe_turn: {
+        Args: {
+          supplied_answer_id: string
+          supplied_auth_user_id: string
+          supplied_browser_upload_ms: number
+        }
+        Returns: string
+      }
       claim_gate1_answer_job: {
         Args: { supplied_answer_id?: string }
+        Returns: Json
+      }
+      commit_gate3_probe_decision: {
+        Args: {
+          supplied_answer_id: string
+          supplied_auth_user_id: string
+          supplied_decision: Json
+          supplied_question_id: string
+          supplied_session_id: string
+          supplied_source_version: string
+          supplied_transcript_revision: string
+          supplied_turn_id: string
+        }
         Returns: Json
       }
       complete_gate1_answer_job: {
@@ -1403,6 +1424,16 @@ export type Database = {
         Returns: Json
       }
       list_gate1_home_invites: { Args: never; Returns: Json }
+      mark_gate3_probe_shown: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_browser_rendered_ms: number
+          supplied_probe_id: string
+          supplied_session_id: string
+          supplied_turn_id: string
+        }
+        Returns: string
+      }
       provision_email_respondent: {
         Args: { supplied_user_id: string }
         Returns: string
@@ -1432,6 +1463,26 @@ export type Database = {
           student: boolean
         }[]
       }
+      read_gate3_committed_probe: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_session_id: string
+          supplied_turn_id: string
+        }
+        Returns: Json
+      }
+      read_gate3_ready_probe_turn: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_session_id: string
+          supplied_turn_id: string
+        }
+        Returns: Json
+      }
+      read_gate3_respondent_probe: {
+        Args: { supplied_auth_user_id: string; supplied_session_id: string }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -1439,6 +1490,17 @@ export type Database = {
           supplied_replace_answer_id?: string
           supplied_session_id: string
           supplied_text: string
+        }
+        Returns: Json
+      }
+      record_gate3_probe_text_answer: {
+        Args: {
+          supplied_answer_id: string
+          supplied_auth_user_id: string
+          supplied_probe_id: string
+          supplied_session_id: string
+          supplied_text: string
+          supplied_turn_id: string
         }
         Returns: Json
       }
