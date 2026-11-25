@@ -43,7 +43,8 @@ export function createGate2CheckoutDatabase(
   return {
     async readApprovedScope(studyId) {
       const study = await allowedStudy(studyId);
-      if (!study || !["brief_ready", "awaiting_payment"].includes(study.state)) return null;
+      if (!study || !["brief_ready", "awaiting_payment"].includes(study.state) ||
+        !study.deadline_at || Date.parse(study.deadline_at) <= Date.now()) return null;
       const brief = readData(await client.from("brief_versions")
         .select("*").eq("study_id", studyId)
         .order("version", { ascending: false }).limit(1).maybeSingle()) as BriefRow | null;

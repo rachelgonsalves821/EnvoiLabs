@@ -22,6 +22,26 @@ select '90600000-0000-4000-8000-000000000001', position,
     'Marketplace question ' || position from generate_series(1, 5) as position;
 
 set local role service_role;
+select throws_ok($$select public.freeze_gate2_marketplace_quote(
+    '90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where version = 101), 101,
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
+    10000, 500, '90200000-0000-4000-8000-000000000001')$$,
+    '23514', null, 'missing fieldwork deadline blocks marketplace quote before checkout');
+reset role;
+update public.studies set deadline_at = clock_timestamp() - interval '1 minute'
+where id = '90600000-0000-4000-8000-000000000001';
+set local role service_role;
+select throws_ok($$select public.freeze_gate2_marketplace_quote(
+    '90600000-0000-4000-8000-000000000001', 1,
+    (select id from public.pricing_configs where version = 101), 101,
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
+    10000, 500, '90200000-0000-4000-8000-000000000001')$$,
+    '23514', null, 'elapsed fieldwork deadline blocks a new marketplace quote');
+reset role;
+update public.studies set deadline_at = clock_timestamp() + interval '3 days'
+where id = '90600000-0000-4000-8000-000000000001';
+set local role service_role;
 select throws_ok($$select public.freeze_gate2_quote(
     '90600000-0000-4000-8000-000000000001', 1,
     (select id from public.pricing_configs where version = 101), 101,
@@ -48,6 +68,19 @@ select is((select feasibility_json ->> 'basis' from public.gate2_quote_snapshots
 select is((select feasibility_json -> 'fillHours' from public.gate2_quote_snapshots
     where study_id = '90600000-0000-4000-8000-000000000001'),
     'null'::jsonb, 'quote cannot freeze an invented fill time');
+reset role;
+update public.studies set deadline_at = clock_timestamp() - interval '1 minute'
+where id = '90600000-0000-4000-8000-000000000001';
+set local role service_role;
+select throws_ok($$select public.claim_gate2_checkout_intent(
+    '90600000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = '90600000-0000-4000-8000-000000000001'))$$,
+    '23514', null, 'elapsed quote cannot claim a fresh provider Checkout');
+reset role;
+update public.studies set deadline_at = clock_timestamp() + interval '3 days'
+where id = '90600000-0000-4000-8000-000000000001';
+set local role service_role;
 select throws_ok($$select public.freeze_gate2_marketplace_quote(
     '90600000-0000-4000-8000-000000000001', 1,
     (select id from public.pricing_configs where version = 101), 101,
