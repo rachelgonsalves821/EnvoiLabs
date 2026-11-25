@@ -1742,6 +1742,13 @@ export type Database = {
         Args: { supplied_quote_id: string; supplied_study_id: string }
         Returns: Json
       }
+      claim_gate2_refund_intent: {
+        Args: {
+          requested_reservation_id: string
+          supplied_auth_user_id: string
+        }
+        Returns: Json
+      }
       commit_gate2_screening_decision: {
         Args: {
           requested_action: string
@@ -1921,6 +1928,16 @@ export type Database = {
           requested_observed_at: string
           requested_order_id: string
           requested_payout_id: string
+        }
+        Returns: boolean
+      }
+      record_gate2_refund_observation: {
+        Args: {
+          requested_amount_cents: number
+          requested_kind: string
+          requested_observed_at: string
+          requested_refund_id: string
+          requested_reservation_id: string
         }
         Returns: boolean
       }
