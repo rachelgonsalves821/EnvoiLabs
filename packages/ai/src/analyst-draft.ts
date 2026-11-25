@@ -30,7 +30,10 @@ export interface AnalystDraftResult {
   readonly promptVersion: string;
   readonly promptDigest: string;
   readonly studyId: string;
-  readonly sources: readonly { readonly transcriptId: string; readonly sourceVersion: string }[];
+  readonly decisionQuestionDigest: string;
+  readonly sources: readonly { readonly transcriptId: string; readonly sourceVersion: string;
+    readonly redactedDigest: string; readonly policyDigest: string;
+    readonly qualificationDigest: string }[];
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly latencyMs: number;
@@ -41,6 +44,11 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const digest = /^[0-9a-f]{64}$/i;
 const nonblank = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
+
+export async function analystTextDigest(value: string): Promise<string> {
+  const hashed = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(hashed), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 function valid(snapshot: AnalystSourceSnapshot | null, studyId: string): snapshot is AnalystSourceSnapshot {
   if (!snapshot || snapshot.studyId !== studyId || !nonblank(snapshot.decisionQuestion)
@@ -75,10 +83,7 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
     || !nonblank(input.promptVersion) || !nonblank(input.systemPrompt)) return null;
   try {
     const snapshot = await port.readCurrent(input.studyId);
-    const hashed = await crypto.subtle.digest("SHA-256",
-      new TextEncoder().encode(input.systemPrompt));
-    const promptDigest = Array.from(new Uint8Array(hashed), (byte) =>
-      byte.toString(16).padStart(2, "0")).join("");
+    const promptDigest = await analystTextDigest(input.systemPrompt);
     if (!valid(snapshot, input.studyId)
       || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
         promptVersion: input.promptVersion, promptDigest, snapshot })) return null;
@@ -96,14 +101,19 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
     if (result.model !== input.providerModel
       || ![result.inputTokens, result.outputTokens, result.latencyMs, result.costMicros]
         .every((value) => Number.isSafeInteger(value) && value >= 0)) return null;
+    const sources = await Promise.all(snapshot.sources.map(async (source) => ({
+      transcriptId: source.transcriptId, sourceVersion: source.sourceVersion,
+      redactedDigest: await analystTextDigest(source.redactedText),
+      policyDigest: source.policyDigest, qualificationDigest: source.qualificationDigest,
+    })));
+    const decisionQuestionDigest = await analystTextDigest(snapshot.decisionQuestion);
     const afterDispatch = await port.readCurrent(input.studyId);
     if (!valid(afterDispatch, input.studyId) || !same(snapshot, afterDispatch)
       || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
         promptVersion: input.promptVersion, promptDigest, snapshot: afterDispatch })) return null;
     return { output: result.output, model: result.model, promptVersion: input.promptVersion,
       promptDigest,
-      studyId: snapshot.studyId, sources: snapshot.sources.map(({ transcriptId, sourceVersion }) =>
-        ({ transcriptId, sourceVersion })),
+      studyId: snapshot.studyId, decisionQuestionDigest, sources,
       inputTokens: result.inputTokens, outputTokens: result.outputTokens,
       latencyMs: result.latencyMs, costMicros: result.costMicros };
   } catch {

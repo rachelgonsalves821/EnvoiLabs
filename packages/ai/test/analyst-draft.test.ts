@@ -26,12 +26,21 @@ function setup() {
 describe("private analyst draft dispatch", () => {
   it("uses only current qualified redacted sources under ai_analysis authorization", async () => {
     const { port, provider, readCurrent, authorize, generate } = setup();
-    expect(await runAnalystDraft(port, provider, input)).toMatchObject({
+    const draft = await runAnalystDraft(port, provider, input);
+    expect(draft).toMatchObject({
       output: response.output, model: "fictional-model", studyId: id(1),
       sources: [{ transcriptId: id(2), sourceVersion: id(3) }],
       inputTokens: 10, outputTokens: 20, costMicros: 0,
     });
     expect(readCurrent).toHaveBeenCalledTimes(3);
+    expect(draft?.sources[0]).toMatchObject({
+      redactedDigest: createHash("sha256").update(snapshot.sources[0]!.redactedText).digest("hex"),
+      policyDigest: snapshot.sources[0]!.policyDigest,
+      qualificationDigest: snapshot.sources[0]!.qualificationDigest,
+    });
+    expect(draft?.decisionQuestionDigest).toBe(
+      createHash("sha256").update(snapshot.decisionQuestion).digest("hex"));
+    expect(JSON.stringify(draft?.sources)).not.toContain(snapshot.sources[0]!.redactedText);
     expect(authorize).toHaveBeenCalledTimes(3);
     expect(authorize).toHaveBeenCalledWith({ purpose: "ai_analysis",
       providerModel: "fictional-model", promptVersion: "analyst-v2",

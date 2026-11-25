@@ -46,6 +46,7 @@ export * from "./report-ui.js";
 export * from "./current-report-port.js";
 export * from "./report-browser-port.js";
 export * from "./analyst-draft.js";
+export * from "./analyst-evidence-screen.js";
 export * from "./marketplace-feasibility-view.js";
 export * from "./marketplace-feasibility-browser.js";
 export * from "./probe-metrics.js";
