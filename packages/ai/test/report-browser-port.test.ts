@@ -8,8 +8,8 @@ const report = { reportId: "a9700000-0000-4000-8000-000000000002", studyId,
   summary: { version: 2, executiveAnswer: "A fictional answer", themes: [], hypotheses: [] } };
 
 it("uses a fresh same-origin report request for display and export", async () => {
-  const fetcher = vi.fn().mockResolvedValue({ ok: true, status: 200,
-    json: async () => report });
+  const fetcher = vi.fn().mockImplementation(async () => new Response(JSON.stringify(report),
+    { status: 200, headers: { "cache-control": "private, no-store" } }));
   const controller = new ReportUiController(reportBrowserPort(fetcher), studyId);
   expect((await controller.refresh()).kind).toBe("ready");
   expect(await controller.requestExport()).toContain('"report_label"');
@@ -20,14 +20,29 @@ it("uses a fresh same-origin report request for display and export", async () =>
 });
 
 it("withholds a previously visible report when a fresh request returns 404 or fails", async () => {
-  const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, status: 200,
-    json: async () => report }).mockResolvedValueOnce({ ok: false, status: 404 });
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(report),
+    { status: 200, headers: { "cache-control": "private, no-store" } }))
+    .mockResolvedValueOnce(new Response(null, { status: 404 }));
   const controller = new ReportUiController(reportBrowserPort(fetcher), studyId);
   await controller.refresh();
   expect(await controller.requestExport()).toBeNull();
   expect(controller.getState()).toEqual({ kind: "withheld", canExport: false });
   fetcher.mockRejectedValue(new Error("network"));
   expect(await controller.refresh()).toEqual({ kind: "withheld", canExport: false });
+});
+
+it("withholds a 200 report without a private no-store response policy", async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(report),
+    { status: 200, headers: { "cache-control": "no-store" } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify(report),
+      { status: 200, headers: { "cache-control": "private, no-store" } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify(report), { status: 200 }));
+  const controller = new ReportUiController(reportBrowserPort(fetcher), studyId);
+  expect(await controller.refresh()).toEqual({ kind: "withheld", canExport: false });
+  expect((await controller.refresh()).kind).toBe("ready");
+  expect(await controller.requestExport()).toBeNull();
+  expect(controller.getState()).toEqual({ kind: "withheld", canExport: false });
+  expect(fetcher).toHaveBeenCalledTimes(3);
 });
 
 it("denies export when the synthetic qualified endpoint withholds the newest report", async () => {
@@ -39,7 +54,7 @@ it("denies export when the synthetic qualified endpoint withholds the newest rep
     const current = await currentQualifiedReportPort(db, loader).readCurrent(studyId);
     return current
       ? new Response(JSON.stringify(current), { status: 200,
-        headers: { "cache-control": "no-store", "content-type": "application/json" } })
+        headers: { "cache-control": "private, no-store", "content-type": "application/json" } })
       : new Response(null, { status: 404, headers: { "cache-control": "no-store" } });
   });
   const controller = new ReportUiController(reportBrowserPort(endpoint as typeof fetch), studyId);

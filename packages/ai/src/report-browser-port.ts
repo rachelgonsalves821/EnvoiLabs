@@ -10,6 +10,10 @@ export function reportBrowserPort(fetcher: typeof fetch = fetch): QualifiedRepor
       });
       if (response.status === 403 || response.status === 404) return null;
       if (!response.ok) throw new Error("Current report unavailable");
+      const cacheControl = response.headers.get("cache-control")?.toLowerCase().split(",")
+        .map((directive) => directive.trim()) ?? [];
+      if (!cacheControl.includes("private") || !cacheControl.includes("no-store"))
+        throw new Error("Current report cache policy unavailable");
       return response.json() as Promise<unknown>;
     },
   };
