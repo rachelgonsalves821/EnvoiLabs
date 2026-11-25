@@ -44,3 +44,23 @@ export function selectDueNudge(candidate: NudgeCandidate,
     body: kind === "halfway" ? "Continue your study where you stopped."
       : "Finish your study before its offer expires." };
 }
+
+export type NudgeQueue = {
+  readCandidates(): Promise<NudgeCandidate[]>;
+  // A transaction must recheck current state and uniquely claim idempotencyKey.
+  enqueue(nudge: DueNudge): Promise<boolean>;
+};
+
+export async function queueDueNudges(queue: NudgeQueue, now: () => Date = () => new Date()) {
+  const candidates = await queue.readCandidates();
+  let queued = 0;
+  let unavailable = 0;
+  for (const candidate of candidates) {
+    const due = selectDueNudge(candidate, now);
+    if (!due) continue;
+    try {
+      if (await queue.enqueue(due)) queued += 1;
+    } catch { unavailable += 1; }
+  }
+  return { considered: candidates.length, queued, unavailable };
+}

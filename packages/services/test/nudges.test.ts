@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TestClock } from "../../testing/src/clock";
-import { selectDueNudge, type NudgeCandidate } from "../src/nudges";
+import { queueDueNudges, selectDueNudge, type NudgeCandidate } from "../src/nudges";
 
 const candidate: NudgeCandidate = {
   inviteId: "offer-1", sessionId: "session-1", state: "in_progress",
@@ -45,5 +45,19 @@ describe("IT-2.6 push nudge timing", () => {
     expect(selectDueNudge({ ...candidate,
       lastActivityAt: "2026-11-24T14:30:00.000Z" }, clock.now)).toBeNull();
     expect(selectDueNudge({ ...candidate, expiresAt: "bad" }, clock.now)).toBeNull();
+  });
+
+  it("queues each due reminder once across three job replays", async () => {
+    const clock = new TestClock("2026-11-24T15:00:00.000Z");
+    const claimed = new Set<string>();
+    const queue = { readCandidates: async () => [candidate],
+      enqueue: async (nudge: { idempotencyKey: string }) => {
+        if (claimed.has(nudge.idempotencyKey)) return false;
+        claimed.add(nudge.idempotencyKey); return true;
+      } };
+    expect(await queueDueNudges(queue, clock.now)).toEqual({ considered: 1, queued: 1, unavailable: 0 });
+    expect(await queueDueNudges(queue, clock.now)).toEqual({ considered: 1, queued: 0, unavailable: 0 });
+    expect(await queueDueNudges(queue, clock.now)).toEqual({ considered: 1, queued: 0, unavailable: 0 });
+    expect([...claimed]).toEqual(["gate2-nudge:offer-1:halfway"]);
   });
 });
