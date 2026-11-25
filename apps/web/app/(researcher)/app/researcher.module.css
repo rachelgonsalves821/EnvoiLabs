@@ -126,6 +126,19 @@
 
 .error { color: var(--critical); margin: 0; }
 
+.feasibility {
+  max-width: 690px;
+  margin-block-start: var(--space-6);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.feasibility h2 { margin: 0; font: var(--text-h2); }
+.feasibility p { overflow-wrap: anywhere; }
+.feasibilityAsOf { color: var(--ink-muted); font: var(--text-body-s); }
+
 .skip:focus-visible,
 .rail a:focus-visible,
 .criterion select:focus-visible {
