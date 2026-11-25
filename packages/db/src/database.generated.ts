@@ -1742,6 +1742,10 @@ export type Database = {
         Args: { supplied_quote_id: string; supplied_study_id: string }
         Returns: Json
       }
+      claim_gate2_nudge_delivery: {
+        Args: { supplied_claim_id: string; supplied_delivery_id: string }
+        Returns: Json
+      }
       claim_gate2_refund_intent: {
         Args: {
           requested_reservation_id: string
@@ -1903,6 +1907,19 @@ export type Database = {
       }
       list_gate1_home_invites: { Args: never; Returns: Json }
       list_gate2_nudge_candidates: { Args: never; Returns: Json }
+      list_gate2_nudge_dispatchable: { Args: never; Returns: Json }
+      observe_gate2_nudge_delivery: {
+        Args: {
+          supplied_claim_id: string
+          supplied_delivery_id: string
+          supplied_state: string
+        }
+        Returns: boolean
+      }
+      prepare_gate2_nudge_deliveries: {
+        Args: { supplied_outbox_id: string }
+        Returns: Json
+      }
       provision_email_respondent: {
         Args: { supplied_user_id: string }
         Returns: string
