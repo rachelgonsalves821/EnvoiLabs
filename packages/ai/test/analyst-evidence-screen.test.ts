@@ -106,3 +106,18 @@ it("withholds if source version or analysis grant changes after authorization", 
   expect(await screenAnalystV2Evidence(grantPort, draft)).toBeNull();
   expect(grantPort.authorize).toHaveBeenCalledTimes(2);
 });
+
+it("screens the original candidate when its model output mutates during authorization", async () => {
+  const candidate = { ...output, themes: [{ ...output.themes[0]!,
+    supportingQuotes: [{ ...quote, exactText: "fabricated" }] }] };
+  const { draft } = await draftWith(candidate);
+  const port = { readCurrent: vi.fn().mockResolvedValue(snapshot),
+    authorize: vi.fn(async () => {
+      candidate.themes[0]!.supportingQuotes[0]!.exactText = "fictional";
+      return true;
+    }) };
+  expect(await screenAnalystV2Evidence(port, draft)).toMatchObject({
+    themes: [], decisions: [{ action: "drop", reason: "quote differs from redacted source" }],
+  });
+  expect(candidate.themes[0]!.supportingQuotes[0]!.exactText).toBe("fictional");
+});

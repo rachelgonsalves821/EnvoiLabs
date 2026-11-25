@@ -88,27 +88,28 @@ function privateV2(value: unknown): value is { themes: readonly {
 export async function screenAnalystV2Evidence(port: AnalystDraftPort,
   draft: AnalystDraftResult): Promise<ScreenedAnalystEvidence | null> {
   try {
-    if (!uuid.test(draft.studyId) || !digest.test(draft.promptDigest)
-      || !digest.test(draft.decisionQuestionDigest) || !nonblank(draft.model)
-      || !nonblank(draft.promptVersion) || !Array.isArray(draft.sources)
-      || draft.sources.length === 0 || !privateV2(draft.output)) return null;
-    const current = await matchingCurrent(await port.readCurrent(draft.studyId), draft);
+    const candidate = structuredClone(draft) as AnalystDraftResult;
+    if (!uuid.test(candidate.studyId) || !digest.test(candidate.promptDigest)
+      || !digest.test(candidate.decisionQuestionDigest) || !nonblank(candidate.model)
+      || !nonblank(candidate.promptVersion) || !Array.isArray(candidate.sources)
+      || candidate.sources.length === 0 || !privateV2(candidate.output)) return null;
+    const current = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate);
     if (!current) return null;
-    if (!await port.authorize({ purpose: "ai_analysis", providerModel: draft.model,
-      promptVersion: draft.promptVersion, promptDigest: draft.promptDigest,
+    if (!await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
+      promptVersion: candidate.promptVersion, promptDigest: candidate.promptDigest,
       snapshot: current })) return null;
-    const after = await matchingCurrent(await port.readCurrent(draft.studyId), draft);
-    if (!after || !await port.authorize({ purpose: "ai_analysis", providerModel: draft.model,
-      promptVersion: draft.promptVersion, promptDigest: draft.promptDigest,
+    const after = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate);
+    if (!after || !await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
+      promptVersion: candidate.promptVersion, promptDigest: candidate.promptDigest,
       snapshot: after })) return null;
     const sources = after.sources.map((source) => ({ ...source,
       published: true, withdrawn: false }));
     const decisions: ScreenedAnalystEvidence["decisions"][number][] = [];
     const themes: ScreenedAnalystEvidence["themes"][number][] = [];
-    for (const [index, theme] of draft.output.themes.entries()) {
+    for (const [index, theme] of candidate.output.themes.entries()) {
       const position = index + 1;
       const screen = (side: "supporting" | "contradicting",
-        candidates: readonly ProposedEvidence[]) => verifyEvidence(draft.studyId, candidates, sources)
+        candidates: readonly ProposedEvidence[]) => verifyEvidence(candidate.studyId, candidates, sources)
         .flatMap((decision, candidateIndex) => {
           decisions.push({ themePosition: position, side, candidateIndex,
             action: decision.action, ...(decision.action === "drop" ? { reason: decision.reason } : {}) });
