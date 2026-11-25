@@ -40,6 +40,8 @@ from (values
     ('public.pricing_configs'), ('public.push_subscriptions'), ('public.quality_scores'),
     ('public.removals'), ('public.gate2_payment_events'), ('public.gate2_payout_events'),
     ('public.gate2_refund_reservations'),
+    ('public.gate2_referral_profile_verifications'),
+    ('public.gate2_referral_vestings'),
     ('public.gate2_screening_rules'), ('public.gate2_screening_events'),
     ('pii.gate2_screener_answers')
 ) as service_only(relation);
