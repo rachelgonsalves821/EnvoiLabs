@@ -2093,6 +2093,10 @@ export type Database = {
         }
         Returns: Json
       }
+      record_gate3_probe_timeout: {
+        Args: { supplied_answer_id: string; supplied_auth_user_id: string }
+        Returns: Json
+      }
       register_gate2_push_subscription: {
         Args: {
           supplied_auth: string

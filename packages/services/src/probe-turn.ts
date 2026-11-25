@@ -142,5 +142,19 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
       if (error) return "unavailable";
       return data === "recorded" || data === "stale" ? data : "unavailable";
     },
+    async recordTimeout(answerId: string): Promise<
+      { status: "committed"; value: CommittedProbe } |
+      { status: "not_due" | "stale" | "unavailable" }> {
+      if (!uuid(answerId)) return { status: "stale" };
+      const { data, error } = await call("record_gate3_probe_timeout", {
+        supplied_answer_id: answerId, supplied_auth_user_id: authUserId });
+      if (error) return { status: "unavailable" };
+      const result = record(data);
+      if (result?.status === "stale" || result?.status === "not_due")
+        return { status: result.status };
+      const saved = committed(result?.value);
+      return result?.status === "committed" && saved?.answerId === answerId
+        ? { status: "committed", value: saved } : { status: "unavailable" };
+    },
   };
 }

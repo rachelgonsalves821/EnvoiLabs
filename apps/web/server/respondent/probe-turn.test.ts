@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createProbeDecisionPort, type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
 const ids = { sessionId: "session", questionId: "question", answerId: "answer",
@@ -63,5 +63,24 @@ describe("probe persistence boundary", () => {
     "respondent", buildRequest);
     await expect(badSource.readCommitted("session", "turn"))
       .rejects.toThrow("invalid committed probe");
+  });
+
+  it("records an authorized timeout and preserves the first decision on retry", async () => {
+    const answerId = "a9720000-0000-4000-8000-000000000005";
+    const saved = { ...committed, answerId, probeId: null,
+      decision: { action: "next", turnId: ids.turnId, outcome: "timeout" } };
+    const call = vi.fn<ProbeRpc>().mockResolvedValue({ data: {
+      status: "committed", value: saved }, error: null });
+    const port = createProbeDecisionPort(call, "verified-respondent", buildRequest);
+    expect(await port.recordTimeout(answerId)).toEqual({ status: "committed", value: saved });
+    expect(call).toHaveBeenCalledWith("record_gate3_probe_timeout", {
+      supplied_answer_id: answerId, supplied_auth_user_id: "verified-respondent" });
+    call.mockResolvedValueOnce({ data: { status: "not_due" }, error: null });
+    expect(await port.recordTimeout(answerId)).toEqual({ status: "not_due" });
+    call.mockResolvedValueOnce({ data: { status: "committed",
+      value: { ...saved, answerId: "another-answer" } }, error: null });
+    expect(await port.recordTimeout(answerId)).toEqual({ status: "unavailable" });
+    expect(await port.recordTimeout("not-a-uuid")).toEqual({ status: "stale" });
+    expect(call).toHaveBeenCalledTimes(3);
   });
 });
