@@ -73,13 +73,14 @@ export SUPABASE_URL SUPABASE_PUBLISHABLE_KEY SUPABASE_SERVICE_ROLE_KEY
 export ENVOI_APP_ORIGIN="http://127.0.0.1:3100"
 export ENVOI_TEST_LOCAL_SUPABASE=1
 export ENVOI_GATE1_TEST_LAUNCH=1
+export ENVOI_GATE2_SCREENING_SHEET_ENABLED=true
 
 if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
   printf '::add-mask::%s\n' "$SUPABASE_PUBLISHABLE_KEY" "$SUPABASE_SERVICE_ROLE_KEY"
 fi
 
 cd -- "$repo_dir"
-pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts
+pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts gate2-screening.spec.ts
 if [[ "${ENVOI_AUTH_TEST_LINK:-custom}" == 'custom' ]]; then
   node --test apps/web/server/respondent/gate1-worker.integration.mjs apps/web/server/respondent/gate1-worker-formats.integration.mjs
 fi
