@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import type { LLMProvider, LLMResponse } from "../src/index.js";
 import { evidenceSupports, type ScreeningEvidenceInput } from "../src/screening-evidence.js";
 
 const criterion = "Has worked as a hospital nurse in the past 12 months";
 const question = "Have you worked as a hospital nurse in the past 12 months?";
+const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const config = { providerModel: "fictional-fixture", promptVersion: "screening-evidence-v1" };
 const input = (answerText: string, result: ScreeningEvidenceInput["result"], excerpt = answerText): ScreeningEvidenceInput => {
   const startChar = Array.from(answerText.slice(0, answerText.indexOf(excerpt))).length;
-  return { criterionText: criterion, question, answerText, result,
+  return { studyId: id(1), answerId: id(2), ruleId: id(3), ruleVersion: 1,
+    criterionText: criterion, question, answerText, result,
     span: { startChar, endChar: startChar + Array.from(excerpt).length } };
 };
 const judgment = (relation: "supported" | "contradicted" | "ambiguous", evidenceText: string,
@@ -16,24 +20,25 @@ const judgment = (relation: "supported" | "contradicted" | "ambiguous", evidence
 });
 const provider = (output: unknown): LLMProvider => ({
   async generate(request): Promise<LLMResponse> {
-    expect(request.purpose).toBe("screening-evidence");
+    expect(request.purpose).toBe("ai_screening");
+    expect(request.promptVersion).toBe(config.promptVersion);
     expect(request.messages[0]?.content).toContain("fullAnswer");
     return { output, model: "fictional-fixture", inputTokens: 0, outputTokens: 0,
       latencyMs: 0, costMicros: 0 };
   },
 });
 const authorizedEvidenceSupports = (model: LLMProvider, candidate: ScreeningEvidenceInput) =>
-  evidenceSupports(model, candidate, { authorize: async () => true });
+  evidenceSupports(model, candidate, config, { authorize: async () => true });
 
 describe("screening evidence boundary", () => {
   it("denies model dispatch without current screening authorization", async () => {
     const candidate = input("I worked as a hospital nurse this year.", "supported");
     const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
       model: "fictional", inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
-    expect(await evidenceSupports({ generate }, candidate)).toBe(false);
-    expect(await evidenceSupports({ generate }, candidate,
+    expect(await evidenceSupports({ generate }, candidate, config)).toBe(false);
+    expect(await evidenceSupports({ generate }, candidate, config,
       { authorize: async () => false })).toBe(false);
-    expect(await evidenceSupports({ generate }, candidate,
+    expect(await evidenceSupports({ generate }, candidate, config,
       { authorize: async () => { throw new Error("consent read failed"); } })).toBe(false);
     expect(generate).not.toHaveBeenCalled();
   });
@@ -43,6 +48,60 @@ describe("screening evidence boundary", () => {
     const no = "I have never worked as a hospital nurse.";
     expect(await authorizedEvidenceSupports(provider(judgment("supported", yes)), input(yes, "supported"))).toBe(true);
     expect(await authorizedEvidenceSupports(provider(judgment("contradicted", no)), input(no, "contradicted"))).toBe(true);
+  });
+
+  it("binds current screening consent to exact source/rule and provider prompt", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const authorize = vi.fn().mockResolvedValue(true);
+    expect(await evidenceSupports(provider(judgment("supported", candidate.answerText)),
+      candidate, config, { authorize })).toBe(true);
+    expect(authorize).toHaveBeenCalledTimes(3);
+    expect(authorize).toHaveBeenCalledWith({ purpose: "ai_screening",
+      providerModel: config.providerModel, promptVersion: config.promptVersion,
+      promptDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      studyId: candidate.studyId, answerId: candidate.answerId,
+      ruleId: candidate.ruleId, ruleVersion: 1,
+      sourceDigest: createHash("sha256").update(JSON.stringify({
+        studyId: candidate.studyId, answerId: candidate.answerId,
+        ruleId: candidate.ruleId, ruleVersion: candidate.ruleVersion,
+        criterionText: candidate.criterionText, question: candidate.question,
+        answerText: candidate.answerText,
+      })).digest("hex") });
+    expect(JSON.stringify(authorize.mock.calls)).not.toContain(candidate.answerText);
+  });
+
+  it("withholds when screening consent or source authority is revoked during inference", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const authorize = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    expect(await evidenceSupports(provider(judgment("supported", candidate.answerText)),
+      candidate, config, { authorize })).toBe(false);
+    const mutable = { ...candidate, span: { ...candidate.span } };
+    const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
+      model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
+    const policy = vi.fn(async () => { mutable.answerText = "A different answer."; return true; });
+    expect(await evidenceSupports({ generate }, mutable, config,
+      { authorize: policy })).toBe(true);
+    expect(generate.mock.calls[0]![0].messages[0].content).toContain(candidate.answerText);
+    expect(JSON.stringify(policy.mock.calls)).not.toContain(candidate.answerText);
+  });
+
+  it("makes no model call when the second current screening check denies dispatch", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
+      model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
+    const authorize = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await evidenceSupports({ generate }, candidate, config, { authorize })).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing source identity and a provider/model mismatch", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    expect(await authorizedEvidenceSupports(provider(judgment("supported", candidate.answerText)),
+      { ...candidate, answerId: "not-an-id" })).toBe(false);
+    expect(await evidenceSupports(provider(judgment("supported", candidate.answerText)),
+      candidate, { ...config, providerModel: "unapproved-model" },
+      { authorize: async () => true })).toBe(false);
   });
 
   it("fails closed for ambiguous, negated, third-party, and wrong-timeframe claims", async () => {
