@@ -3,6 +3,7 @@ import { analystTextDigest, type AnalystDraftPort, type AnalystDraftResult,
   "./analyst-draft.js";
 import { verifyEvidence, type ProposedEvidence, type VerifiedEvidence } from
   "./report-evidence.js";
+import { meetsConfidenceFloor, type FindingConfidence } from "./report-confidence.js";
 
 export interface ScreenedAnalystEvidence {
   /** Evidence only. Model claims, rationale, hypotheses and brief remain private. */
@@ -79,6 +80,8 @@ function privateV2(value: unknown): value is { themes: readonly {
     && Number.isSafeInteger(item.count) && Number(item.count) > 0
     && Number.isSafeInteger(item.total) && Number(item.total) >= Number(item.count)
     && ["high", "medium", "low"].includes(String(item.confidence))
+    && meetsConfidenceFloor(Number(item.count), Number(item.total),
+      item.confidence as FindingConfidence)
     && Array.isArray(item.supportingQuotes) && item.supportingQuotes.length >= 1
     && item.supportingQuotes.length <= 10 && item.supportingQuotes.every(quote)
     && Array.isArray(item.contradictingQuotes) && item.contradictingQuotes.every(quote));

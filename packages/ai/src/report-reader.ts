@@ -1,3 +1,5 @@
+import { meetsConfidenceFloor, type FindingConfidence } from "./report-confidence.js";
+
 /** The port must read through the current qualified report predicate and researcher RLS. */
 export interface QualifiedReportReadPort {
   readCurrent(studyId: string): Promise<unknown | null>;
@@ -66,6 +68,8 @@ function theme(value: unknown, studyId: string): value is PublicReportTheme {
     && Number.isSafeInteger(value.total) && (value.count as number) > 0
     && (value.total as number) >= (value.count as number)
     && ["high", "medium", "low"].includes(String(value.confidence))
+    && meetsConfidenceFloor(Number(value.count), Number(value.total),
+      value.confidence as FindingConfidence)
     && Array.isArray(value.supportingQuotes) && value.supportingQuotes.length >= 1
     && value.supportingQuotes.length <= 10 && value.supportingQuotes.every((item) => quote(item, studyId))
     && Array.isArray(value.contradictingQuotes)

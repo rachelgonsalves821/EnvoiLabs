@@ -77,4 +77,18 @@ describe("qualified report view and export boundary", () => {
     expect((await readReportDisplay({ readCurrent: async () => unicode }, studyId)).kind)
       .toBe("ready");
   });
+
+  it("withholds a public confidence label below the declared respondent-share floor", async () => {
+    for (const [count, total, confidence, accepted] of [
+      [5, 10, "high", false], [6, 10, "high", true],
+      [2, 10, "medium", false], [3, 10, "medium", true],
+      [1, 10, "low", true],
+    ] as const) {
+      const candidate = { ...current, summary: { ...current.summary, themes: [
+        { ...current.summary.themes[0]!, count, total, confidence },
+      ] } };
+      expect((await readReportDisplay({ readCurrent: async () => candidate }, studyId)).kind)
+        .toBe(accepted ? "ready" : "withheld");
+    }
+  });
 });

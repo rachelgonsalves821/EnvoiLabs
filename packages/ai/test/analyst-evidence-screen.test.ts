@@ -60,6 +60,19 @@ it("rejects V1, malformed candidates and missing private V2 structure", async ()
   }
 });
 
+it("rejects a model confidence label below its PRD respondent-share floor", async () => {
+  for (const [count, total, confidence, accepted] of [
+    [5, 10, "high", false], [6, 10, "high", true],
+    [2, 10, "medium", false], [3, 10, "medium", true],
+    [1, 10, "low", true],
+  ] as const) {
+    const candidate = { ...output, themes: [{ ...output.themes[0],
+      count, total, confidence }] };
+    const { draft, port } = await draftWith(candidate);
+    expect((await screenAnalystV2Evidence(port, draft)) !== null).toBe(accepted);
+  }
+});
+
 it("rechecks source, question and analysis grant before screening", async () => {
   const { draft, port, readCurrent, authorize } = await draftWith();
   readCurrent.mockResolvedValueOnce({ ...snapshot, sources: [
