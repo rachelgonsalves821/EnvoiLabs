@@ -63,7 +63,9 @@ function identity(value: unknown): QuoteIdentity | null {
     || !uuid.test(String(row.sourceVersion)) || !Number.isSafeInteger(row.startChar)
     || !Number.isSafeInteger(row.endChar) || (row.startChar as number) < 0
     || (row.endChar as number) <= (row.startChar as number)
-    || typeof row.exactText !== "string" || !row.exactText.trim()) return null;
+    || typeof row.exactText !== "string" || !row.exactText.trim()
+    || Array.from(row.exactText).length !== (row.endChar as number) - (row.startChar as number))
+    return null;
   return Object.fromEntries(quoteKeys.map((key) => [key, row[key]])) as unknown as QuoteIdentity;
 }
 

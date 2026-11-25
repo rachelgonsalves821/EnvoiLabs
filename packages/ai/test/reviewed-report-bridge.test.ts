@@ -66,6 +66,8 @@ describe("PR #138 reviewed report bridge", () => {
         supportingQuotes: [{ ...q1, studyId: id(999) }] }, content.themes[1]!] } },
       { map: quoteMap, result: { ...content, themes: [{ ...content.themes[0]!,
         supportingQuotes: [{ ...q1, rationale: "private" }] }, content.themes[1]!] } },
+      { map: quoteMap, result: { ...content, themes: [{ ...content.themes[0]!,
+        supportingQuotes: [{ ...q1, exactText: "a longer invented quote" }] }, content.themes[1]!] } },
     ];
     for (const item of cases) {
       const ports = setup();
