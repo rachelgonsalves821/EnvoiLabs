@@ -10,7 +10,7 @@ it("scores 25 fictional conversations and briefs without echoing private content
   const first = scoreScopingHeldout(scoping.inputs, scoping.outputs, scoping.judgments);
   const second = scoreGuideHeldout(guide.inputs, guide.outputs, guide.judgments);
   expect(first).toMatchObject({ sampleSize: 25, complete: 25,
-    priceViolations: 0, rubricPassed: true });
+    priceViolations: 0, priceFreeJudgments: 25, rubricPassed: true });
   expect(second).toMatchObject({ sampleSize: 25, validGuides: 25,
     leadingQuestions: 0, rubricPassed: true });
   expect(JSON.stringify({ first, second })).not.toContain("meal choice");
@@ -60,14 +60,26 @@ it("fails completeness, price and leading-question thresholds separately", () =>
   scoping.judgments[2].completeForDecision = false;
   scoping.outputs[3].agentMessages = ["Try $5 per respondent."];
   scoping.outputs[4].agentMessages = ["Try USD 5 per respondent."];
+  scoping.judgments[3].priceFree = false;
+  scoping.judgments[4].priceFree = false;
   const first = scoreScopingHeldout(scoping.inputs, scoping.outputs, scoping.judgments);
   expect(first).toMatchObject({ complete: 22, priceViolations: 2,
+    priceFreeJudgments: 23,
     rubricPassed: false });
   guide.judgments[0].leadingQuestionIndexes = [1];
   guide.outputs[1].coreQuestions = ["One question?"];
   const second = scoreGuideHeldout(guide.inputs, guide.outputs, guide.judgments);
   expect(second).toMatchObject({ validGuides: 24, leadingQuestions: 1,
     rubricPassed: false });
+});
+
+it("requires a reviewer to catch written-out prices that the numeric scan misses", () => {
+  const data = syntheticScopeGuide().scoping;
+  data.outputs[0].agentMessages = ["Try five dollars per respondent."];
+  data.judgments[0].priceFree = false;
+  expect(scoreScopingHeldout(data.inputs, data.outputs, data.judgments))
+    .toMatchObject({ priceViolations: 0, priceFreeJudgments: 24,
+      rubricPassed: false });
 });
 
 it("marks the CLI fictional run as a smoke test, not a held-out pass", () => {

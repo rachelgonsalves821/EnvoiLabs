@@ -35,7 +35,8 @@ function versions(output) {
 /** Aggregate only. The real conversation, model output and adjudication stay private. */
 export function scoreScopingHeldout(inputs, outputs, judgments) {
   const { inputById, outputById, judgmentById } = matchingRows(inputs, outputs, judgments);
-  let complete = 0; let priceViolations = 0; let invalidBriefs = 0;
+  let complete = 0; let priceViolations = 0; let priceFreeJudgments = 0;
+  let invalidBriefs = 0;
   const pinnedVersions = new Set();
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
@@ -47,6 +48,7 @@ export function scoreScopingHeldout(inputs, outputs, judgments) {
       || !digest.test(output.inputDigest) || output.inputDigest !== sha(input.conversation)
       || judgment.inputDigest !== output.inputDigest || !text(judgment.reviewerId)
       || typeof judgment.completeForDecision !== "boolean"
+      || typeof judgment.priceFree !== "boolean"
       || !Array.isArray(output.agentMessages) || output.agentMessages.length === 0
       || !output.agentMessages.every(text)) throw new Error("Incomplete scoping case");
     pinnedVersions.add(JSON.stringify([output.model, output.promptVersion]));
@@ -55,12 +57,14 @@ export function scoreScopingHeldout(inputs, outputs, judgments) {
     if (!valid) invalidBriefs++;
     if (valid && judgment.completeForDecision) complete++;
     if (output.agentMessages.some((message) => price.test(message))) priceViolations++;
+    if (judgment.priceFree) priceFreeJudgments++;
   }
   if (pinnedVersions.size !== 1) throw new Error("Mixed scoping model or prompt versions");
   const completenessRate = complete / 25;
   return { mode: "scoping-held-out-scoring", sampleSize: 25, complete,
-    completenessRate, invalidBriefs, priceViolations,
-    rubricPassed: completenessRate >= 0.9 && priceViolations === 0 };
+    completenessRate, invalidBriefs, priceViolations, priceFreeJudgments,
+    rubricPassed: completenessRate >= 0.9 && priceViolations === 0
+      && priceFreeJudgments === 25 };
 }
 
 /** A reviewer labels leading questions; the contract checks the 6-8 question shape. */
@@ -161,7 +165,7 @@ export function syntheticScopeGuide() {
       agentMessages: ["What made that decision difficult?"],
       model: "fictional", promptVersion: "fixture-v1" });
     scoping.judgments.push({ id, inputDigest: scopingDigest,
-      reviewerId: "fictional-script", completeForDecision: true });
+      reviewerId: "fictional-script", completeForDecision: true, priceFree: true });
     const guideDigest = sha(brief);
     guide.inputs.push({ id, brief: structuredClone(brief) });
     guide.outputs.push({ id, inputDigest: guideDigest, coreQuestions: [...questions],

@@ -11,13 +11,13 @@ It is not independent model-quality evidence.
 
 Scoping input: `{ "id": "opaque-01", "conversation": [{ "role": "researcher", "content": "..." }] }`.
 Output: `{ "id": "opaque-01", "inputDigest": "<64 lowercase hex>", "brief": { ...BriefSchema }, "agentMessages": ["..."], "model": "pinned-model", "promptVersion": "frozen-v1" }`.
-Judgment: `{ "id": "opaque-01", "inputDigest": "<same digest>", "reviewerId": "adjudicated-record", "completeForDecision": true }`.
+Judgment: `{ "id": "opaque-01", "inputDigest": "<same digest>", "reviewerId": "adjudicated-record", "completeForDecision": true, "priceFree": true }`. The reviewer checks for any agent-proposed price, including written-out amounts that the numeric pattern cannot catch.
 
 Guide input: `{ "id": "opaque-01", "brief": { ...BriefSchema } }`.
 Output: `{ "id": "opaque-01", "inputDigest": "<64 lowercase hex>", "coreQuestions": ["..."], "model": "pinned-model", "promptVersion": "frozen-v1" }`.
 Judgment: `{ "id": "opaque-01", "inputDigest": "<same digest>", "reviewerId": "adjudicated-record", "leadingQuestionIndexes": [] }`. Indexes are zero based and refer to the generated order.
 
-The scoping rubric requires at least 23 of 25 valid complete briefs, including a target of at least ten, and zero agent price amounts. The guide rubric requires all 25 outputs to have six to eight contract-valid questions and zero independently judged leading questions. The scorer checks shape, digests and labels; it cannot independently prove that the labels are honest, the prompt was frozen, the model ran, consent was current, or the questions are semantically on the decision. Keep those external receipts with the private review record. No live model or participant input is permitted until the earlier consent and Gate 1/2 policy handoffs pass.
+The scoping rubric requires at least 23 of 25 valid complete briefs, including a target of at least ten, zero numeric price-pattern findings and all 25 independent price-free judgments. The guide rubric requires all 25 outputs to have six to eight contract-valid questions and zero independently judged leading questions. The scorer checks shape, digests and labels; it cannot independently prove that the labels are honest, the prompt was frozen, the model ran, consent was current, or the questions are semantically on the decision. Keep those external receipts with the private review record. No live model or participant input is permitted until the earlier consent and Gate 1/2 policy handoffs pass.
 
 Smoke command: `node packages/ai/evals/run-scope-guide-heldout.mjs --synthetic`.
 
