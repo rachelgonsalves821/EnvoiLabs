@@ -127,6 +127,13 @@ describe("fictional researcher scoping boundary", () => {
     expect(generate).toHaveBeenCalledTimes(1);
   });
 
+  it("does not draft a guide for a brief below the ten-complete minimum", async () => {
+    const { port, provider, generate } = setup(guide);
+    expect(await runGuideDraft(port, provider, { ...base,
+      brief: { ...completeBrief, targetCompletes: 9 } })).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("rejects a malformed or priced guide", async () => {
     const short = setup({ coreQuestions: guide.coreQuestions.slice(0, 5) });
     expect(await runGuideDraft(short.port, short.provider, { ...base,

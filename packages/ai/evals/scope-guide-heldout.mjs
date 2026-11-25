@@ -70,7 +70,8 @@ export function scoreGuideHeldout(inputs, outputs, judgments) {
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
     const judgment = judgmentById.get(id);
-    if (!BriefSchema.safeParse(input.brief).success || !output || !judgment
+    if (!BriefSchema.safeParse(input.brief).success || input.brief.targetCompletes < 10
+      || !output || !judgment
       || !versions(output) || !digest.test(output.inputDigest)
       || output.inputDigest !== sha(input.brief)
       || judgment.inputDigest !== output.inputDigest || !text(judgment.reviewerId)

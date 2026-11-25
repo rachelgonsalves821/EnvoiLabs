@@ -112,6 +112,7 @@ export interface GuideInput extends Omit<ScopingInput, "brief" | "stage"> {
 export async function runGuideDraft(port: ScopingPort, provider: LLMProvider,
   input: GuideInput): Promise<GuideDraft | null> {
   if (!BriefSchema.safeParse(input.brief).success
+    || input.brief.targetCompletes < 10
     || !validInput({ ...input, stage: "deadlineAt" })) return null;
   try {
     const brief = structuredClone(input.brief);
@@ -160,6 +161,7 @@ const leading = /\b(?:don't you agree|wouldn't you|how much do you love|would yo
 function validGuideSnapshot(value: CurrentGuideSnapshot | null,
   revision: string, index: number): value is CurrentGuideSnapshot {
   return !!value && value.revision === revision && BriefSchema.safeParse(value.brief).success
+    && value.brief.targetCompletes >= 10
     && Array.isArray(value.questions) && value.questions.length >= 4
     && value.questions.length <= 10 && index >= 0 && index < value.questions.length
     && value.questions.every((question) => typeof question === "string" && nonblank(question));

@@ -48,6 +48,14 @@ describe("private versioned guide rewrite", () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it("withholds a guide rewrite when the current brief falls below ten completes", async () => {
+    const { port, provider, readCurrent, generate } = setup();
+    readCurrent.mockResolvedValue({ ...current, brief: { ...current.brief,
+      targetCompletes: 9 } });
+    expect(await runGuideRewrite(port, provider, input)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("rejects a reused mutable port object changed during authorization", async () => {
     const reused = { ...current, questions: [...current.questions] };
     const { port, provider, readCurrent, authorize, generate } = setup();
