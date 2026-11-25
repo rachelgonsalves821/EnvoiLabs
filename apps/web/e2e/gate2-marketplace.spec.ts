@@ -322,6 +322,8 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             link.href = "about:blank";
             link.target = "_blank";
             link.rel = "noopener";
+            link.textContent = "Open test tab";
+            link.style.cssText = "position:fixed;right:0;bottom:0;z-index:2147483647;background:white;color:black;padding:12px";
             link.dataset.gate2Background = "true";
             document.body.append(link);
           });
