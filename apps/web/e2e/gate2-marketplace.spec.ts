@@ -105,6 +105,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         id: researcher.data.id, organizationId: org.data.id,
         authUserId: account.data.user.id,
       });
+      const approvedScope = await quoteDb.readApprovedScope(study.data.id);
+      expect(approvedScope).toMatchObject({ studyId: study.data.id,
+        coreQuestionCount: 5, targetRespondents: 10,
+        feasibility: { eligibleProfileCount: 10 } });
+      const selectedPricing = await quoteDb.readSelectedPricing(study.data.id);
+      expect(selectedPricing).toMatchObject({ version: 101,
+        unitPriceCents: 200, incentivePerQuestionCents: 100 });
       let providerSession: CheckoutSession | null = null;
       const provider = {
         async create(key: string, quote: { id: string; studyId: string;
@@ -123,7 +130,9 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         },
       };
       const prepared = await prepareStudyCheckout(quoteDb, provider, study.data.id);
-      expect(prepared.status).toBe("ready");
+      const frozen = await db.from("gate2_quote_snapshots").select("id,line_items_json,feasibility_json")
+        .eq("study_id", study.data.id);
+      expect(prepared.status, JSON.stringify({ frozen: frozen.data, error: frozen.error })).toBe("ready");
       if (prepared.status !== "ready") throw new Error("Synthetic quote was not ready.");
       expect(prepared.quote).toMatchObject({ studyId: study.data.id, pricingConfigVersion: 101,
         totalCents: 10_000, incentiveCentsPerComplete: 500 });
