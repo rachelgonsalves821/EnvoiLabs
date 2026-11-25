@@ -34,7 +34,8 @@ export function StudyFeasibilityLivePanel({ studyId, targetRespondents }: {
       <StudyFeasibilityPanel view={current.view} targetRespondents={targetRespondents} />}
     {current.kind === "loading" && <p role="status">Checking the current matching outlook…</p>}
     {current.kind === "unavailable" && <p role="status">Matching outlook is currently unavailable.</p>}
-    <Button variant="secondary" disabled={current.kind === "loading"} onClick={() => { void load(); }}>
+    <Button variant="secondary" aria-disabled={current.kind === "loading"}
+      onClick={() => { if (current.kind !== "loading") void load(); }}>
       {current.kind === "loading" ? "Checking matching outlook…" : "Check matching outlook again"}
     </Button>
   </div>;

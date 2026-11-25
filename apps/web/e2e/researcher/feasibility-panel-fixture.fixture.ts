@@ -23,13 +23,17 @@ test("clears a prior outlook while rechecking and withholds it on revocation", a
   expect(await page.getByText(/finish time/i).count()).toBe(1);
   const initial = requests;
   pause = true;
-  await page.getByRole("button", { name: "Check matching outlook again" }).click();
+  const retry = page.getByRole("button", { name: "Check matching outlook again" });
+  await retry.focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByRole("status")).toHaveText("Checking the current matching outlook…");
+  await expect(page.getByRole("button", { name: "Checking matching outlook…" })).toBeFocused();
   await expect(page.getByText("about 15 people")).toHaveCount(0);
   await expect.poll(() => requests).toBe(initial + 1);
   available = false;
   release?.();
   await expect(page.getByRole("status")).toHaveText("Matching outlook is currently unavailable.");
+  await expect(retry).toBeFocused();
   await expect(page.getByText("about 15 people")).toHaveCount(0);
 });
 
