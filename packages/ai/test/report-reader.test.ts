@@ -30,6 +30,21 @@ describe("qualified report view and export boundary", () => {
     expect(await exportCurrentReport(port, studyId)).toBeNull();
   });
 
+  it("does not let a mutable port change previously validated claims or evidence", async () => {
+    const mutable = structuredClone(current);
+    const port = { readCurrent: vi.fn().mockResolvedValue(mutable) };
+    const display = await readReportDisplay(port, studyId);
+    expect(display.kind).toBe("ready");
+    if (display.kind !== "ready") return;
+    mutable.summary.executiveAnswer = "Unqualified replacement";
+    mutable.summary.themes[0]!.supportingQuotes[0]!.exactText = "Unqualified quote";
+    Object.assign(mutable.summary, { privateRationale: "private reviewer note" });
+    expect(display.report.summary.executiveAnswer).toBe("One order");
+    expect(display.report.summary.themes[0]!.supportingQuotes[0]!.exactText).toBe("ordered");
+    expect(JSON.stringify(display.report)).not.toContain("private reviewer note");
+    expect(await exportCurrentReport(port, studyId)).toBeNull();
+  });
+
   it("rejects cross-study, unversioned or private researcher output", async () => {
     const bad = [
       { ...current, studyId: id(999) },

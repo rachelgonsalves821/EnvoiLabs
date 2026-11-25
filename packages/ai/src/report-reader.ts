@@ -83,13 +83,33 @@ function snapshot(value: unknown, studyId: string): value is PublicReportSnapsho
       && nonblank(item.hypothesis) && ["supported", "weakened", "untested"].includes(String(item.result)));
 }
 
+/** Do not retain aliases from a mutable service or test adapter after validation. */
+function copySnapshot(source: PublicReportSnapshot): PublicReportSnapshot {
+  const copyQuotes = (quotes: readonly PublicReportQuote[]) => Object.freeze(quotes.map((item) =>
+    Object.freeze({ studyId: item.studyId, transcriptId: item.transcriptId,
+      sourceVersion: item.sourceVersion, startChar: item.startChar, endChar: item.endChar,
+      exactText: item.exactText, confidence: item.confidence })));
+  return Object.freeze({ reportId: source.reportId, studyId: source.studyId,
+    summary: Object.freeze({ version: 2 as const,
+      executiveAnswer: source.summary.executiveAnswer,
+      themes: Object.freeze(source.summary.themes.map((item) => Object.freeze({
+        claim: item.claim, count: item.count, total: item.total, confidence: item.confidence,
+        supportingQuotes: copyQuotes(item.supportingQuotes),
+        contradictingQuotes: copyQuotes(item.contradictingQuotes),
+      }))),
+      hypotheses: Object.freeze(source.summary.hypotheses.map((item) =>
+        Object.freeze({ hypothesis: item.hypothesis, result: item.result }))),
+    }),
+  });
+}
+
 /** Clear an old report on every failed or withheld refresh; never reuse a prior view. */
 export async function readReportDisplay(port: QualifiedReportReadPort, studyId: string): Promise<ReportDisplay> {
   if (!uuid.test(studyId)) return { kind: "withheld", exportAvailable: false };
   try {
     const current = await port.readCurrent(studyId);
     return snapshot(current, studyId)
-      ? { kind: "ready", report: current, exportAvailable: true }
+      ? { kind: "ready", report: copySnapshot(current), exportAvailable: true }
       : { kind: "withheld", exportAvailable: false };
   } catch {
     return { kind: "withheld", exportAvailable: false };
