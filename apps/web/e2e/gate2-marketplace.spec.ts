@@ -243,12 +243,30 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           let answerCalls = 0;
           let sessionId = "";
           let questionId = "";
+          let holdNextRead = false;
+          let signalReadStarted: () => void = () => {};
+          const readStarted = new Promise<void>((resolve) => { signalReadStarted = resolve; });
+          let releaseRead: () => void = () => {};
+          const readGate = new Promise<void>((resolve) => { releaseRead = resolve; });
+          let signalReadFinished: () => void = () => {};
+          const readFinished = new Promise<void>((resolve) => { signalReadFinished = resolve; });
           let releaseReceipt: () => void = () => {};
           const receiptGate = new Promise<void>((resolve) => { releaseReceipt = resolve; });
           let signalShown: () => void = () => {};
           const shownSeen = new Promise<void>((resolve) => { signalShown = resolve; });
           await secondRespondent.route("**/api/respondent/sessions/start", async (route) => {
             const response = await route.fetch();
+            const held = holdNextRead;
+            if (held) {
+              signalReadStarted();
+              await readGate;
+              holdNextRead = false;
+            }
+            if (!response.ok()) {
+              await route.fulfill({ response });
+              if (held) signalReadFinished();
+              return;
+            }
             const current = await response.json() as {
               sessionId: string; nextQuestion: { id: string; text: string } | null;
             };
@@ -257,6 +275,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             await route.fulfill({ response, json: { ...current,
               currentProbe: answerCalls === 0 ? { turnId: probeTurnId, probeId,
                 text: "What shaped your choice?" } : null } });
+            if (held) signalReadFinished();
           });
           await secondRespondent.route("**/api/respondent/probes/shown", async (route) => {
             signalShown();
@@ -288,14 +307,35 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await secondRespondent.getByRole("button", { name: "Save answer" }).click();
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toBeVisible();
           expect(answerCalls).toBe(1);
+          holdNextRead = true;
+          await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+          await readStarted;
+          // Headless Chromium can keep every Playwright page visible. Emulate the
+          // browser visibility signal to exercise the in-flight response race.
+          await secondRespondent.evaluate(() => {
+            Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+            document.dispatchEvent(new Event("visibilitychange"));
+          });
+          await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
+            .toBe("hidden");
+          await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
+          releaseRead();
+          await readFinished;
+          await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           const withdrawn = await db.from("consents").insert({
             respondent_id: second.respondent_id, purpose: "retention", granted: false,
             text_version: "synthetic-marketplace-withdrawal",
           });
           expect(withdrawn.error).toBeNull();
-          await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+          await secondRespondent.evaluate(() => {
+            Reflect.deleteProperty(document, "visibilityState");
+            document.dispatchEvent(new Event("visibilitychange"));
+          });
+          await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
+            .toBe("visible");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
+          await expect(secondRespondent.getByRole("alert")).toBeVisible();
         } finally {
           await secondContext.close();
         }
