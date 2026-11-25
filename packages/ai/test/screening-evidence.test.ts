@@ -39,6 +39,8 @@ describe("screening evidence boundary", () => {
     expect(await evidenceSupports({ generate }, candidate, config,
       { authorize: async () => false })).toBe(false);
     expect(await evidenceSupports({ generate }, candidate, config,
+      { authorize: async () => "false" as unknown as boolean })).toBe(false);
+    expect(await evidenceSupports({ generate }, candidate, config,
       { authorize: async () => { throw new Error("consent read failed"); } })).toBe(false);
     expect(generate).not.toHaveBeenCalled();
   });

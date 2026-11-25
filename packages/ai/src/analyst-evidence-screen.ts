@@ -101,13 +101,13 @@ export async function screenAnalystV2Evidence(port: AnalystDraftPort,
       || candidate.sources.length === 0 || !privateV2(candidate.output)) return null;
     const current = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate);
     if (!current) return null;
-    if (!await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
+    if (await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
       promptVersion: candidate.promptVersion, promptDigest: candidate.promptDigest,
-      snapshot: current })) return null;
+      snapshot: current }) !== true) return null;
     const after = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate);
-    if (!after || !await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
+    if (!after || await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
       promptVersion: candidate.promptVersion, promptDigest: candidate.promptDigest,
-      snapshot: after })) return null;
+      snapshot: after }) !== true) return null;
     const sources = after.sources.map((source) => ({ ...source,
       published: true, withdrawn: false }));
     const decisions: ScreenedAnalystEvidence["decisions"][number][] = [];

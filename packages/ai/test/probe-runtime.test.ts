@@ -22,6 +22,9 @@ describe("probe runtime", () => {
     expect(runtime.authorize).not.toHaveBeenCalled();
     expect(await decideProbe(attempt, { ...runtime, authorize: async () => false }))
       .toMatchObject({ action: "next", outcome: "error" });
+    expect(await decideProbe(attempt, { ...runtime,
+      authorize: async () => "false" as unknown as boolean }))
+      .toMatchObject({ action: "next", outcome: "error" });
     expect(await decideProbe(attempt, { ...runtime, authorize: async () => {
       throw new Error("consent read failed");
     } })).toMatchObject({ action: "next", outcome: "error" });

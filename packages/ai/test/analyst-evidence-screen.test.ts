@@ -95,6 +95,8 @@ it("rechecks source, question and analysis grant before screening", async () => 
   readCurrent.mockResolvedValueOnce(snapshot);
   authorize.mockResolvedValueOnce(false);
   expect(await screenAnalystV2Evidence(port, draft)).toBeNull();
+  authorize.mockResolvedValueOnce("false");
+  expect(await screenAnalystV2Evidence(port, draft)).toBeNull();
 });
 
 it("does not accept a quote added by mutation during the authorization wait", async () => {

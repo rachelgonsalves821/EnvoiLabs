@@ -42,6 +42,9 @@ describe("private versioned guide rewrite", () => {
     authorize.mockResolvedValueOnce(false);
     expect(await runGuideRewrite(port, provider, input)).toBeNull();
     expect(generate).not.toHaveBeenCalled();
+    authorize.mockResolvedValueOnce("false");
+    expect(await runGuideRewrite(port, provider, input)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
     readCurrent.mockResolvedValueOnce(current).mockResolvedValueOnce({ ...current,
       revision: "fictional-guide-5" });
     expect(await runGuideRewrite(port, provider, input)).toBeNull();

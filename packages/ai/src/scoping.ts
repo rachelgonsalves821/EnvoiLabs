@@ -82,7 +82,7 @@ export async function runScopingTurn(port: ScopingPort, provider: LLMProvider,
     const { stage, providerModel, promptVersion, systemPrompt } = input;
     const authorization = { purpose: "researcher_scoping" as const,
       providerModel, promptVersion, promptDigest: await promptDigest(systemPrompt) };
-    if (!await port.authorize(authorization)) return null;
+    if (await port.authorize(authorization) !== true) return null;
     const request: LLMRequest = { purpose: "researcher_scoping", promptVersion,
       system: systemPrompt, messages: [...messages,
         { role: "user", content: JSON.stringify({ currentBrief: brief, currentStage: stage }) }] };
@@ -97,7 +97,7 @@ export async function runScopingTurn(port: ScopingPort, provider: LLMProvider,
       && !/\b(?:cannot|can't|won't|does not)\b/i.test(turn.data.message)) return null;
     const merged = { ...brief, ...turn.data.briefPatch };
     if (!BriefPatchSchema.safeParse(merged).success) return null;
-    if (!await port.authorize(authorization)) return null;
+    if (await port.authorize(authorization) !== true) return null;
     return turn.data;
   } catch {
     return null;
@@ -120,7 +120,7 @@ export async function runGuideDraft(port: ScopingPort, provider: LLMProvider,
     const { providerModel, promptVersion, systemPrompt } = input;
     const authorization = { purpose: "researcher_scoping" as const,
       providerModel, promptVersion, promptDigest: await promptDigest(systemPrompt) };
-    if (!await port.authorize(authorization)) return null;
+    if (await port.authorize(authorization) !== true) return null;
     const generated = await provider.generate({ purpose: "researcher_scoping",
       promptVersion, system: systemPrompt,
       messages: [...messages, { role: "user", content: JSON.stringify({
@@ -130,7 +130,7 @@ export async function runGuideDraft(port: ScopingPort, provider: LLMProvider,
     const guide = GuideDraftSchema.safeParse(generated.output);
     if (!guide.success || guide.data.coreQuestions.some((question) => price.test(question)
       || !question.includes("?"))) return null;
-    if (!await port.authorize(authorization)) return null;
+    if (await port.authorize(authorization) !== true) return null;
     return guide.data;
   } catch {
     return null;
@@ -188,7 +188,7 @@ export async function runGuideRewrite(port: GuideRewritePort, provider: LLMProvi
     const { revision, index, providerModel, promptVersion, systemPrompt } = input;
     const authorization = { purpose: "researcher_scoping" as const,
       providerModel, promptVersion, promptDigest: await promptDigest(systemPrompt) };
-    if (!await port.authorize(authorization)) return null;
+    if (await port.authorize(authorization) !== true) return null;
     const before = await port.readCurrent(revision);
     if (!validGuideSnapshot(before, revision, index)
       || JSON.stringify(copyGuide(before)) !== JSON.stringify(guide)) return null;
@@ -207,7 +207,7 @@ export async function runGuideRewrite(port: GuideRewritePort, provider: LLMProvi
     const after = await port.readCurrent(revision);
     if (!validGuideSnapshot(after, revision, index)
       || JSON.stringify(copyGuide(after)) !== JSON.stringify(guide)
-      || !await port.authorize(authorization)) return null;
+      || await port.authorize(authorization) !== true) return null;
     return { revision, index, question: output.question.trim() };
   } catch {
     return null;

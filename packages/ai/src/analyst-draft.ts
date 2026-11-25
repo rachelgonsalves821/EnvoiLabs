@@ -97,14 +97,14 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
     if (!valid(first, input.studyId)) return null;
     const snapshot = frozen(first);
     const promptDigest = await analystTextDigest(input.systemPrompt);
-    if (!await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
-        promptVersion: input.promptVersion, promptDigest, snapshot })) return null;
+    if (await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
+        promptVersion: input.promptVersion, promptDigest, snapshot }) !== true) return null;
     const beforeRaw = await port.readCurrent(input.studyId);
     if (!valid(beforeRaw, input.studyId)) return null;
     const beforeDispatch = frozen(beforeRaw);
     if (!same(snapshot, beforeDispatch)
-      || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
-        promptVersion: input.promptVersion, promptDigest, snapshot: beforeDispatch })) return null;
+      || await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
+        promptVersion: input.promptVersion, promptDigest, snapshot: beforeDispatch }) !== true) return null;
     const request: LLMRequest = { purpose: "ai_analysis", promptVersion: input.promptVersion,
       system: input.systemPrompt, messages: [{ role: "user", content: JSON.stringify({
         studyId: snapshot.studyId, decisionQuestion: snapshot.decisionQuestion,
@@ -125,8 +125,8 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
     if (!valid(afterRaw, input.studyId)) return null;
     const afterDispatch = frozen(afterRaw);
     if (!same(snapshot, afterDispatch)
-      || !await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
-        promptVersion: input.promptVersion, promptDigest, snapshot: afterDispatch })) return null;
+      || await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
+        promptVersion: input.promptVersion, promptDigest, snapshot: afterDispatch }) !== true) return null;
     return { output: result.output, model: result.model, promptVersion: input.promptVersion,
       promptDigest,
       studyId: snapshot.studyId, decisionQuestionDigest, sources,

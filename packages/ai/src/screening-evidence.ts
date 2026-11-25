@@ -90,8 +90,8 @@ export async function evidenceSupports(provider: LLMProvider, input: ScreeningEv
     const attempt = Object.freeze({ purpose: "ai_screening" as const,
       providerModel, promptVersion, promptDigest, studyId, answerId, ruleId,
       ruleVersion, sourceDigest });
-    if (!modelUse || !await modelUse.authorize(attempt)
-      || !await modelUse.authorize(attempt)) return false;
+    if (!modelUse || await modelUse.authorize(attempt) !== true
+      || await modelUse.authorize(attempt) !== true) return false;
     const generated = await provider.generate({
       purpose: "ai_screening",
       promptVersion,
@@ -107,7 +107,7 @@ export async function evidenceSupports(provider: LLMProvider, input: ScreeningEv
     const supported = isJudgment(parsed) && parsed.relation === result && parsed.evidenceText === excerpt
       && parsed.respondentOwnExperience && parsed.criterionAndTimeframeMatch
       && parsed.explicitNotInferred;
-    return supported && await modelUse.authorize(attempt);
+    return supported && await modelUse.authorize(attempt) === true;
   } catch {
     return false;
   }

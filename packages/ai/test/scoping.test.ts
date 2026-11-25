@@ -43,6 +43,9 @@ describe("fictional researcher scoping boundary", () => {
     authorize.mockResolvedValueOnce(false);
     expect(await runScopingTurn(port, provider, base)).toBeNull();
     expect(generate).not.toHaveBeenCalled();
+    authorize.mockResolvedValueOnce("false");
+    expect(await runScopingTurn(port, provider, base)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
     authorize.mockReset().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     expect(await runScopingTurn(port, provider, base)).toBeNull();
     expect(generate).toHaveBeenCalledTimes(1);
@@ -131,6 +134,13 @@ describe("fictional researcher scoping boundary", () => {
     const { port, provider, generate } = setup(guide);
     expect(await runGuideDraft(port, provider, { ...base,
       brief: { ...completeBrief, targetCompletes: 9 } })).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("does not send a complete brief after a malformed truthy scoping grant", async () => {
+    const { port, provider, authorize, generate } = setup(guide);
+    authorize.mockResolvedValueOnce("false");
+    expect(await runGuideDraft(port, provider, { ...base, brief: completeBrief })).toBeNull();
     expect(generate).not.toHaveBeenCalled();
   });
 

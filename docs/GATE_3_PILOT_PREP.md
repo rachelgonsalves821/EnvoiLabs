@@ -127,6 +127,8 @@ A development-only fictional probe-paint fixture now invokes `presentCommittedPr
 
 The AI decision helper now starts its timeout before the current `ai_followup` authorization recheck and shares that one deadline with provider inference. A stalled grant/source read returns a static-next timeout without dispatching the model, and a late authorization response cannot start inference. The enclosing Platform ready-turn and commit reads still require bounded service behavior and a durable timeout outcome; this local safeguard is not an end-to-end six-second proof.
 
+All AI-owned provider boundaries now require the literal boolean `true` from their current purpose authorization callback. A truthy malformed value such as the string `"false"` is denied before sending screening answers, interview text, analyst redacted sources or researcher scoping/guide text to a model. Fictional regressions cover each dispatch family, while the same strict check also applies to post-generation rechecks. Platform still must supply real current grants and qualified receipts; this does not authorize live inference.
+
 | Check | Synthetic evidence possible now | Required integrated evidence |
 | --- | --- | --- |
 | IT-3.1 full journey | Fixture replay of one answer, first-writer probe decision, timeout/static-next and report reader states | Paid matched offer → current screening rule and purpose grant → qualified or screened-out transition → accept → 4–10-question recording/typed session → persisted probe → two-frame paint receipt → answer/reload → qualified report. Revoke/regrant consent after the offer and prove the old card cannot reactivate; no live provider until approved |

@@ -60,6 +60,13 @@ describe("private analyst draft dispatch", () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it("does not treat a truthy malformed analysis grant as approval", async () => {
+    const { port, provider, authorize, generate } = setup();
+    authorize.mockResolvedValueOnce("false");
+    expect(await runAnalystDraft(port, provider, input)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("cannot reuse an approved prompt version with different prompt text", async () => {
     const { port, provider, authorize, generate } = setup();
     const approvedDigest = createHash("sha256").update(input.systemPrompt).digest("hex");
