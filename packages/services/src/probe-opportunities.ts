@@ -21,6 +21,8 @@ export interface ProbeOpportunity {
   readonly currentQualified: boolean;
   readonly currentTurn: boolean;
   readonly outcome: ProbeOpportunityOutcome;
+  readonly renderOutcome: "shown" | "timeout" | "superseded" | null;
+  readonly renderResolvedAt: string | null;
   readonly probeId: string | null;
   readonly browserUploadConfirmedMs: number | null;
   readonly browserRenderedMs: number | null;
@@ -60,10 +62,15 @@ function parseItem(value: unknown): ProbeOpportunity {
     !nullableUuid(value.turnSourceVersion) || !nullableUuid(value.turnId) ||
     typeof value.currentQualified !== "boolean" ||
     typeof value.currentTurn !== "boolean" || !outcomes.has(String(value.outcome)) ||
+    !(value.renderOutcome === null || value.renderOutcome === "shown" ||
+      value.renderOutcome === "timeout" || value.renderOutcome === "superseded") ||
+    !nullableTime(value.renderResolvedAt) ||
+    ((value.renderOutcome === null) !== (value.renderResolvedAt === null)) ||
     !nullableUuid(value.probeId) || !nullableClock(value.browserUploadConfirmedMs) ||
     !nullableClock(value.browserRenderedMs) ||
     (value.outcome === "rendered" && (value.shownAt === null ||
-      value.browserUploadConfirmedMs === null || value.browserRenderedMs === null)) ||
+      value.browserUploadConfirmedMs === null || value.browserRenderedMs === null ||
+      value.renderOutcome !== "shown")) ||
     (!value.currentQualified && value.outcome !== "withheld"))
     throw new Error("invalid private probe opportunity");
   return value as unknown as ProbeOpportunity;

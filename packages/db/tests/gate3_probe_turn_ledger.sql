@@ -158,6 +158,10 @@ select is((select public.mark_gate3_probe_shown(
     (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
     '90300000-0000-4000-8000-000000000001', 1200)
     from probe_ids), 'recorded', 'shown retry is idempotent');
+select is((select public.record_gate3_probe_render_terminal(turn_id,
+    '90300000-0000-4000-8000-000000000001') ->> 'outcome'
+    from probe_ids), 'shown',
+    'a later terminal worker preserves the first shown receipt');
 select is((select public.read_gate3_respondent_probe(
     'a9700000-0000-4000-8000-000000000003',
     '90300000-0000-4000-8000-000000000001') ->> 'text'),

@@ -85,6 +85,23 @@ describe("probe persistence boundary", () => {
     expect(call).toHaveBeenCalledTimes(3);
   });
 
+  it("reports only a stored terminal render result for the verified respondent", async () => {
+    const turnId = "a9720000-0000-4000-8000-000000000007";
+    const call = vi.fn<ProbeRpc>().mockResolvedValue({ error: null,
+      data: { status: "resolved", outcome: "timeout", turnId } });
+    const port = createProbeDecisionPort(call, "verified-respondent", buildRequest);
+    expect(await port.recordRenderTerminal(turnId))
+      .toEqual({ status: "resolved", outcome: "timeout" });
+    expect(call).toHaveBeenCalledWith("record_gate3_probe_render_terminal", {
+      supplied_turn_id: turnId, supplied_auth_user_id: "verified-respondent" });
+    call.mockResolvedValueOnce({ error: null, data: { status: "not_due" } });
+    expect(await port.recordRenderTerminal(turnId)).toEqual({ status: "not_due" });
+    call.mockResolvedValueOnce({ error: null, data: {
+      status: "resolved", outcome: "shown", turnId: "another-turn" } });
+    expect(await port.recordRenderTerminal(turnId)).toEqual({ status: "unavailable" });
+    expect(await port.recordRenderTerminal("bad-id")).toEqual({ status: "stale" });
+  });
+
   it("sweeps only database-selected overdue answers with no model request", async () => {
     const answerId = "a9720000-0000-4000-8000-000000000005";
     const authUserId = "90300000-0000-4000-8000-000000000001";

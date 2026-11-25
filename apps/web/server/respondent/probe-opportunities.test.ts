@@ -16,6 +16,7 @@ const item = {
   turnSourceVersion: "a9720000-0000-4000-8000-000000000006",
   turnId: "a9720000-0000-4000-8000-000000000007",
   currentQualified: true, currentTurn: true, outcome: "timeout",
+  renderOutcome: null, renderResolvedAt: null,
   probeId: null, browserUploadConfirmedMs: null,
   browserRenderedMs: null,
 };
