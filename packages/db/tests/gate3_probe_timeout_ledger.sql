@@ -52,6 +52,9 @@ values ('a9720000-0000-4000-8000-000000000005',
 select ok(not has_function_privilege('authenticated',
     'public.record_gate3_probe_timeout(uuid,uuid)', 'EXECUTE'),
     'only the trusted worker can record a timeout');
+select ok(not has_function_privilege('authenticated',
+    'public.list_gate3_probe_due(integer)', 'EXECUTE'),
+    'respondents cannot enumerate private overdue answers');
 set local role service_role;
 select is(public.begin_gate3_probe_turn(
     'a9720000-0000-4000-8000-000000000005',
@@ -61,6 +64,10 @@ select is(public.record_gate3_probe_timeout(
     'a9720000-0000-4000-8000-000000000005',
     '90300000-0000-4000-8000-000000000002') ->> 'status', 'stale',
     'another respondent cannot record the timeout');
+select is((select count(*) from jsonb_array_elements(
+    public.list_gate3_probe_due(10)) as due
+    where due ->> 'answerId' = 'a9720000-0000-4000-8000-000000000005'),
+    1::bigint, 'late qualified transcription is in the private due sweep');
 create temporary table missed_transcript (result jsonb not null);
 grant select, insert on missed_transcript to service_role;
 insert into missed_transcript select public.record_gate3_probe_timeout(
@@ -128,6 +135,10 @@ select is((select public.read_gate3_ready_probe_turn(
     'a9720000-0000-4000-8000-000000000004', turn_id,
     '90300000-0000-4000-8000-000000000001') from provider_turn),
     null::jsonb, 'expired turn cannot start another model call');
+select is((select count(*) from jsonb_array_elements(
+    public.list_gate3_probe_due(10)) as due
+    where due ->> 'answerId' = 'a9720000-0000-4000-8000-000000000007'),
+    1::bigint, 'expired provider turn is in the private due sweep');
 create temporary table missed_provider (result jsonb not null);
 grant select, insert on missed_provider to service_role;
 insert into missed_provider select public.record_gate3_probe_timeout(
@@ -209,6 +220,10 @@ insert into first_writer_probe select public.commit_gate3_probe_decision(
 from first_writer_turn;
 select is((select result ->> 'status' from first_writer_probe), 'committed',
     'probe is the first committed decision');
+select is((select count(*) from jsonb_array_elements(
+    public.list_gate3_probe_due(10)) as due
+    where due ->> 'answerId' = 'a9720000-0000-4000-8000-000000000009'),
+    0::bigint, 'a committed probe is absent from the timeout sweep');
 reset role;
 alter table internal.gate3_probe_turns disable trigger gate3_keep_probe_turn_identity;
 update internal.gate3_probe_turns set

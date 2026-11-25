@@ -1953,6 +1953,7 @@ export type Database = {
       list_gate1_home_invites: { Args: never; Returns: Json }
       list_gate2_nudge_candidates: { Args: never; Returns: Json }
       list_gate2_nudge_dispatchable: { Args: never; Returns: Json }
+      list_gate3_probe_due: { Args: { supplied_limit: number }; Returns: Json }
       mark_gate3_probe_shown: {
         Args: {
           supplied_auth_user_id: string

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProbeDecisionPort, type ProbeRpc } from "@envoi-labs/services/probe-turn";
+import { createProbeDecisionPort, sweepDueProbeTimeouts,
+  type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
 const ids = { sessionId: "session", questionId: "question", answerId: "answer",
   turnId: "turn", transcriptRevision: "a".repeat(64),
@@ -82,5 +83,35 @@ describe("probe persistence boundary", () => {
     expect(await port.recordTimeout(answerId)).toEqual({ status: "unavailable" });
     expect(await port.recordTimeout("not-a-uuid")).toEqual({ status: "stale" });
     expect(call).toHaveBeenCalledTimes(3);
+  });
+
+  it("sweeps only database-selected overdue answers with no model request", async () => {
+    const answerId = "a9720000-0000-4000-8000-000000000005";
+    const authUserId = "90300000-0000-4000-8000-000000000001";
+    const call = vi.fn<ProbeRpc>().mockImplementation(async (name) => ({ error: null,
+      data: name === "list_gate3_probe_due"
+        ? [{ answerId, authUserId }]
+        : { status: "committed", value: { ...committed, answerId } } }));
+    expect(await sweepDueProbeTimeouts(call, 1)).toEqual({
+      scanned: 1, timedOut: 0, alreadyDecided: 1,
+      notDue: 0, stale: 0, unavailable: 0 });
+    expect(call).toHaveBeenNthCalledWith(1, "list_gate3_probe_due", { supplied_limit: 1 });
+    expect(call).toHaveBeenNthCalledWith(2, "record_gate3_probe_timeout", {
+      supplied_answer_id: answerId, supplied_auth_user_id: authUserId });
+    expect(call).toHaveBeenCalledTimes(2);
+    const timeout = { ...committed, answerId, probeId: null,
+      decision: { action: "next", turnId: ids.turnId, outcome: "timeout" } };
+    call.mockImplementation(async (name) => ({ error: null,
+      data: name === "list_gate3_probe_due"
+        ? [{ answerId, authUserId }]
+        : { status: "committed", value: timeout } }));
+    expect(await sweepDueProbeTimeouts(call, 1)).toEqual({
+      scanned: 1, timedOut: 1, alreadyDecided: 0,
+      notDue: 0, stale: 0, unavailable: 0 });
+    await expect(sweepDueProbeTimeouts(async () => ({ error: null,
+      data: [{ answerId, authUserId: "browser-supplied" }] })))
+      .rejects.toThrow("invalid private timeout candidate");
+    await expect(sweepDueProbeTimeouts(call, 101))
+      .rejects.toThrow("timeout sweep limit");
   });
 });
