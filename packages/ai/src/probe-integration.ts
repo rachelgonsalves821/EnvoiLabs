@@ -79,6 +79,21 @@ function validCommitted(value: CommittedProbe, sessionId: string, turnId: string
         && ["no_probe", "error", "timeout", "superseded"].includes(value.decision.outcome));
 }
 
+function committedSnapshot(value: CommittedProbe, sessionId: string,
+  turnId: string): CommittedProbe | null {
+  const copy = structuredClone(value) as CommittedProbe;
+  if (!validCommitted(copy, sessionId, turnId)) return null;
+  const decision: ProbeDecision = copy.decision.action === "probe"
+    ? Object.freeze({ action: "probe", turnId: copy.decision.turnId,
+      text: copy.decision.text, uploadConfirmedAtMs: copy.decision.uploadConfirmedAtMs })
+    : Object.freeze({ action: "next", turnId: copy.decision.turnId,
+      outcome: copy.decision.outcome });
+  return Object.freeze({ sessionId: copy.sessionId, questionId: copy.questionId,
+    answerId: copy.answerId, turnId: copy.turnId,
+    transcriptRevision: copy.transcriptRevision, sourceVersion: copy.sourceVersion,
+    probeId: copy.probeId, decision });
+}
+
 function sameCommittedTurn(ready: ReadyProbeTurn, value: CommittedProbe): boolean {
   return value.sessionId === ready.turn.sessionId
     && value.questionId === ready.turn.questionId
@@ -93,8 +108,10 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
   sessionId: string, turnId: string, timeoutMs: number, now: () => number): Promise<ProbeIntegrationResult> {
   try {
     const previous = await port.readCommitted(sessionId, turnId);
-    if (previous) return validCommitted(previous, sessionId, turnId)
-      ? { status: "committed", value: previous } : { status: "unavailable" };
+    if (previous) {
+      const saved = committedSnapshot(previous, sessionId, turnId);
+      return saved ? { status: "committed", value: saved } : { status: "unavailable" };
+    }
     const rawReady = await port.readReadyTurn(sessionId, turnId);
     // A service adapter may reuse an object across reads. Keep the exact
     // authorized request and source receipt fixed through the model wait.
@@ -137,9 +154,9 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
     const current = await port.readReadyTurn(sessionId, turnId);
     if (!current || !sameReady(ready, current)) {
       const committed = await port.readCommitted(sessionId, turnId);
-      return committed && validCommitted(committed, sessionId, turnId)
-        && sameCommittedTurn(ready, committed)
-        ? { status: "committed", value: committed } : { status: "stale" };
+      const saved = committed ? committedSnapshot(committed, sessionId, turnId) : null;
+      return saved && sameCommittedTurn(ready, saved)
+        ? { status: "committed", value: saved } : { status: "stale" };
     }
     const result = await port.commitDecision({ sessionId, questionId: ready.turn.questionId,
       answerId: ready.turn.answerId, turnId, transcriptRevision: ready.transcriptRevision,
@@ -147,13 +164,13 @@ export async function runProbeDecision(port: ProbeDecisionPort, provider: LLMPro
     if (result.status !== "committed") {
       if (result.status === "stale") return { status: "stale" };
       const winner = await port.readCommitted(sessionId, turnId);
-      if (winner && validCommitted(winner, sessionId, turnId))
-        return sameCommittedTurn(ready, winner)
-          ? { status: "committed", value: winner } : { status: "stale" };
+      const saved = winner ? committedSnapshot(winner, sessionId, turnId) : null;
+      if (saved) return sameCommittedTurn(ready, saved)
+        ? { status: "committed", value: saved } : { status: "stale" };
       return { status: "unavailable" };
     }
-    const saved = result.value;
-    if (!validCommitted(saved, sessionId, turnId)
+    const saved = committedSnapshot(result.value, sessionId, turnId);
+    if (!saved
       || !sameCommittedTurn(ready, saved)) return { status: "stale" };
     return { status: "committed", value: saved };
   } catch {
@@ -167,12 +184,16 @@ export async function presentCommittedProbe(port: ProbeDecisionPort, committed: 
   frame: (callback: () => void) => void, now: () => number,
   retract: () => void = () => undefined): Promise<ProbeOutcome> {
   const clear = () => { try { retract(); } catch { /* Keep the failed render unmeasured. */ } };
-  if (committed.decision.action === "next") return { outcome: committed.decision.outcome };
-  if (!committed.probeId) return { outcome: "error" };
+  let value: CommittedProbe | null;
+  try { value = committedSnapshot(committed, committed.sessionId, committed.turnId); }
+  catch { return { outcome: "error" }; }
+  if (!value) return { outcome: "error" };
+  if (value.decision.action === "next") return { outcome: value.decision.outcome };
+  if (!value.probeId) return { outcome: "error" };
   let mounted = false;
   let outcome: ProbeOutcome;
   try {
-    outcome = await presentProbeIfCurrent(committed.decision, currentTurnId,
+    outcome = await presentProbeIfCurrent(value.decision, currentTurnId,
       (text) => { mounted = true; mount(text); }, frame, now);
   } catch {
     if (mounted) clear();
@@ -182,15 +203,15 @@ export async function presentCommittedProbe(port: ProbeDecisionPort, committed: 
     if (mounted) clear();
     return outcome;
   }
-  if (currentTurnId() !== committed.turnId) {
+  if (currentTurnId() !== value.turnId) {
     clear();
     return { outcome: "superseded" };
   }
   try {
-    const stored = await port.markShown({ sessionId: committed.sessionId, turnId: committed.turnId,
-      probeId: committed.probeId, browserRenderedAtMs: outcome.renderedAtMs });
+    const stored = await port.markShown({ sessionId: value.sessionId, turnId: value.turnId,
+      probeId: value.probeId, browserRenderedAtMs: outcome.renderedAtMs });
     if (stored === "recorded") {
-      if (currentTurnId() === committed.turnId) return outcome;
+      if (currentTurnId() === value.turnId) return outcome;
       clear();
       return { outcome: "superseded" };
     }

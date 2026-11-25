@@ -269,6 +269,57 @@ describe("probe decision and render ports", () => {
     expect(port.commitDecision).toHaveBeenCalledTimes(1);
   });
 
+  it("returns a fixed copy of a reused persisted decision", async () => {
+    const { port, setCommitted } = setup();
+    const persisted = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
+      turnId: "turn-1", transcriptRevision: "source-1", sourceVersion, probeId: "probe-1",
+      decision: { action: "probe" as const, turnId: "turn-1", text: "What changed?",
+        uploadConfirmedAtMs: 50 } };
+    setCommitted(persisted);
+    const generate = vi.fn(async () => response({ action: "probe", text: "Different?" }));
+    const result = await runProbeDecision(port, provider(generate), "session-1", "turn-1",
+      500, () => 300);
+    persisted.decision.text = "Mutated after read?";
+    persisted.probeId = "probe-2";
+    expect(result).toMatchObject({ status: "committed", value: { probeId: "probe-1",
+      decision: { text: "What changed?" } } });
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("does not carry private adapter fields into a returned decision", async () => {
+    const { port, setCommitted } = setup();
+    const persisted = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
+      turnId: "turn-1", transcriptRevision: "source-1", sourceVersion, probeId: "probe-1",
+      privateTranscript: "fictional private answer",
+      decision: { action: "probe" as const, turnId: "turn-1", text: "What changed?",
+        uploadConfirmedAtMs: 50, privateRationale: "fictional private reasoning" } };
+    setCommitted(persisted);
+    const result = await runProbeDecision(port, provider(vi.fn()), "session-1", "turn-1",
+      500, () => 300);
+    expect(result).toMatchObject({ status: "committed", value: { probeId: "probe-1",
+      decision: { text: "What changed?" } } });
+    expect(JSON.stringify(result)).not.toContain("private");
+    expect(JSON.stringify(result)).not.toContain("fictional private");
+  });
+
+  it("uses the original persisted probe identity after its presentation starts", async () => {
+    const { port } = setup();
+    const persisted = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
+      turnId: "turn-1", transcriptRevision: "source-1", sourceVersion, probeId: "probe-1",
+      decision: { action: "probe" as const, turnId: "turn-1", text: "What changed?",
+        uploadConfirmedAtMs: 50 } };
+    const mounted: string[] = [];
+    expect(await presentCommittedProbe(port, persisted, () => "turn-1", (text) => {
+      mounted.push(text);
+      persisted.probeId = "probe-2";
+      persisted.decision.text = "Different text?";
+    }, (callback) => callback(), () => 500)).toEqual({ outcome: "rendered",
+      uploadConfirmedAtMs: 50, renderedAtMs: 500 });
+    expect(mounted).toEqual(["What changed?"]);
+    expect(port.markShown).toHaveBeenCalledWith({ sessionId: "session-1", turnId: "turn-1",
+      probeId: "probe-1", browserRenderedAtMs: 500 });
+  });
+
   it("returns the first writer's decision if another worker commits during the provider call", async () => {
     const { port, setCurrent, setCommitted } = setup();
     const prior = { sessionId: "session-1", questionId: "question-1", answerId: "answer-1",
