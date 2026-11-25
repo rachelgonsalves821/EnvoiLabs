@@ -2,16 +2,16 @@ import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../app/api/webhooks/stripe-test/route";
 
-const { verify, lookup, reconcileLaunch, reconcileObservation,
+const { verify, lookup, wave, reconcileLaunch, reconcileObservation,
   makeDb, makeProvider } = vi.hoisted(() => ({
-  verify: vi.fn(), lookup: vi.fn(), reconcileLaunch: vi.fn(),
+  verify: vi.fn(), lookup: vi.fn(), wave: vi.fn(), reconcileLaunch: vi.fn(),
   reconcileObservation: vi.fn(), makeDb: vi.fn(), makeProvider: vi.fn(),
 }));
 vi.mock("./platform/gate2-stripe-webhook", () =>
   ({ verifyStripeTestCheckoutHint: verify }));
 vi.mock("./auth/supabase", async (original) => ({
   ...await original<typeof import("./auth/supabase")>(),
-  trustedClient: () => ({ from: () => {
+  trustedClient: () => ({ rpc: wave, from: () => {
     const query = { select: () => query, eq: () => query, maybeSingle: lookup };
     return query;
   } }),
@@ -41,6 +41,7 @@ function enabled() {
   lookup.mockResolvedValue({ data: { study_id: studyId, quote_id: quoteId },
     error: null });
   makeDb.mockReturnValue({}); makeProvider.mockReturnValue({});
+  wave.mockResolvedValue({ data: { created: 0, remaining: 0 }, error: null });
 }
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
 
@@ -68,10 +69,21 @@ describe("signed test Checkout webhook route", () => {
     for (let n = 0; n < 3; n++) {
       const response = await POST(request());
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ status: "launched" });
+      expect(await response.json()).toEqual({ status: "launched", offersCreated: 0 });
     }
     expect(reconcileLaunch).toHaveBeenCalledTimes(3);
     expect(reconcileLaunch).toHaveBeenCalledWith({}, {}, studyId, quoteId);
+    expect(wave).toHaveBeenCalledWith("create_gate2_paid_launch_wave", {
+      supplied_study_id: studyId, supplied_quote_id: quoteId });
+  });
+  it("retries the offer wave after a post-launch database outage", async () => {
+    enabled();
+    reconcileLaunch.mockResolvedValue("launched");
+    wave.mockResolvedValueOnce({ data: null, error: { code: "08000" } })
+      .mockResolvedValueOnce({ data: { created: 2, remaining: 8 }, error: null });
+    expect((await POST(request())).status).toBe(503);
+    expect(await (await POST(request())).json()).toEqual({
+      status: "launched", offersCreated: 2 });
   });
   it("observes failure without launch and retries provider uncertainty", async () => {
     enabled();
