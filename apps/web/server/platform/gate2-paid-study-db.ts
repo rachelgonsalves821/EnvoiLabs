@@ -63,7 +63,7 @@ export function createGate2PaidStudyDatabase(client: SupabaseClient<Database>): 
       }
     },
     async launchPaidStudy(studyId, quoteId, providerEventId) {
-      const result = readData(await client.rpc("launch_gate2_paid_study", {
+      const result = readData(await client.rpc("launch_gate2_paid_study_checked", {
         supplied_study_id: studyId, supplied_quote_id: quoteId,
         supplied_provider_event_id: providerEventId,
       }));

@@ -1880,6 +1880,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      launch_gate2_paid_study_checked: {
+        Args: {
+          supplied_provider_event_id: string
+          supplied_quote_id: string
+          supplied_study_id: string
+        }
+        Returns: boolean
+      }
       list_gate1_home_invites: { Args: never; Returns: Json }
       provision_email_respondent: {
         Args: { supplied_user_id: string }

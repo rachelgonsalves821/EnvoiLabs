@@ -37,8 +37,26 @@ select id, study_id, 'cs_test_matching', 'paid:matching',
     'paid', total_cents, 'usd', clock_timestamp()
 from public.gate2_quote_snapshots
 where study_id = 'a9840000-0000-4000-8000-000000000001';
+update public.studies set deadline_at = clock_timestamp() - interval '1 minute'
+where id = 'a9840000-0000-4000-8000-000000000001';
 set local role service_role;
-select ok(public.launch_gate2_paid_study(
+select is(public.launch_gate2_paid_study_checked(
+    'a9840000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9840000-0000-4000-8000-000000000001'),
+    'paid:matching'), false,
+    'paid checkout after deadline cannot launch a marketplace study');
+select throws_ok($$select public.launch_gate2_paid_study(
+    'a9840000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9840000-0000-4000-8000-000000000001'),
+    'paid:matching')$$, '23514', null,
+    'legacy privileged launch cannot bypass the table deadline guard');
+reset role;
+update public.studies set deadline_at = clock_timestamp() + interval '3 days'
+where id = 'a9840000-0000-4000-8000-000000000001';
+set local role service_role;
+select ok(public.launch_gate2_paid_study_checked(
     'a9840000-0000-4000-8000-000000000001',
     (select id from public.gate2_quote_snapshots
         where study_id = 'a9840000-0000-4000-8000-000000000001'),

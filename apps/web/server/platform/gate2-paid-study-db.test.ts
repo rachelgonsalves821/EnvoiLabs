@@ -54,7 +54,7 @@ describe("Gate 2 paid study database adapter", () => {
     await db.recordObservation({ ...observation, observedAt: "2026-11-24T10:00:00.000Z" });
     expect(rows.gate2_payment_events).toHaveLength(2);
     expect(await db.launchPaidStudy(studyId, quoteId, observation.eventId)).toBe(true);
-    expect(rpc).toHaveBeenCalledWith("launch_gate2_paid_study", {
+    expect(rpc).toHaveBeenCalledWith("launch_gate2_paid_study_checked", {
       supplied_study_id: studyId, supplied_quote_id: quoteId,
       supplied_provider_event_id: observation.eventId });
   });

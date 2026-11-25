@@ -21,7 +21,8 @@ function fixture({ otherOrganization = false, existingCheckout = false } = {}) {
     researchers: [{ id: researcher.id, organization_id: organizationId,
       auth_user_id: researcher.authUserId }],
     studies: [{ id: studyId, organization_id: otherOrganization ? "other" : organizationId,
-      state: "brief_ready", target_completes: 10 }],
+      state: "brief_ready", target_completes: 10,
+      deadline_at: "2999-11-24T20:00:00.000Z" }],
     brief_versions: [{ study_id: studyId, version: 1 }],
     guide_questions: Array.from({ length: 5 }, (_, index) => ({ study_id: studyId, position: index + 1 })),
     organizations: [{ id: organizationId, pricing_override_id: null }],
@@ -94,6 +95,14 @@ describe("Gate 2 checkout database scope", () => {
       "2026-11-23T20:00:00Z")).rejects.toThrow("scope");
     expect(rpc).not.toHaveBeenCalled();
     expect(rows.gate2_payment_events).toHaveLength(0);
+  });
+
+  it("does not prepare marketplace checkout without a future fieldwork deadline", async () => {
+    const { db, rows } = fixture();
+    rows.studies![0]!.deadline_at = null;
+    expect(await db.readApprovedScope(studyId)).toBeNull();
+    rows.studies![0]!.deadline_at = "2000-01-01T00:00:00.000Z";
+    expect(await db.readApprovedScope(studyId)).toBeNull();
   });
 
   it("accepts an exact checkout replay and refuses a conflicting identity", async () => {

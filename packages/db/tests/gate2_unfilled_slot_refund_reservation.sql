@@ -4,10 +4,11 @@ set local search_path = public, extensions;
 select no_plan();
 
 insert into public.studies (id, organization_id, title, state,
-    target_completes, length_minutes)
+    target_completes, length_minutes, deadline_at)
 values ('a9820000-0000-4000-8000-000000000001',
     '90100000-0000-4000-8000-000000000001',
-    'Unfilled-slot refund fixture', 'awaiting_payment', 12, 10);
+    'Unfilled-slot refund fixture', 'awaiting_payment', 12, 10,
+    clock_timestamp() + interval '3 days');
 insert into public.brief_versions (study_id, version, brief_json, created_by)
 values ('a9820000-0000-4000-8000-000000000001', 1, '{}',
     '90400000-0000-4000-8000-000000000001');
