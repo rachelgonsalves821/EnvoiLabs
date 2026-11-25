@@ -38,4 +38,4 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm build
       - name: Exercise production auth against disposable Supabase
-        run: bash packages/db/scripts/test-local-auth.sh
+        run: xvfb-run -a bash packages/db/scripts/test-local-auth.sh

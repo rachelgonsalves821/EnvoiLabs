@@ -21,6 +21,8 @@ const profile = [
 ] as const;
 
 test.describe("Gate 2 marketplace fixture replay", () => {
+  // The background-tab regression needs the real browser window visibility signal.
+  test.use({ headless: false });
   test.skip(process.env.ENVOI_TEST_LOCAL_SUPABASE !== "1", "Requires disposable local Auth and database.");
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
@@ -310,12 +312,9 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           holdNextRead = true;
           await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
           await readStarted;
-          // Headless Chromium can keep every Playwright page visible. Emulate the
-          // browser visibility signal to exercise the in-flight response race.
-          await secondRespondent.evaluate(() => {
-            Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
-            document.dispatchEvent(new Event("visibilitychange"));
-          });
+          const background = await secondContext.newPage();
+          await background.goto("about:blank");
+          await background.bringToFront();
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("hidden");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
@@ -327,15 +326,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             text_version: "synthetic-marketplace-withdrawal",
           });
           expect(withdrawn.error).toBeNull();
-          await secondRespondent.evaluate(() => {
-            Reflect.deleteProperty(document, "visibilityState");
-            document.dispatchEvent(new Event("visibilitychange"));
-          });
+          await secondRespondent.bringToFront();
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("visible");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
           await expect(secondRespondent.getByRole("alert")).toBeVisible();
+          await background.close();
         } finally {
           await secondContext.close();
         }
