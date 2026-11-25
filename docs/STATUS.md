@@ -7,7 +7,7 @@ Append-only. Newest entries at the bottom. Use the template in `docs/BUILD_PLAN.
 | Gate | Target | State | Evidence |
 | --- | --- | --- | --- |
 | Gate 0 Foundations | End of week 1 | Passed. Delegated sign-off recorded | [Build and browsers](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555314), [database](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555269), [local auth](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/44952555268), [both hosted sign-ins on the same deployment](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7071655542) |
-| Gate 1 Vertical slice | End of week 3 | Hosted study, scheduling and live speech passed. The latest independent redaction qualification failed. Researcher publication remains disabled. | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [live speech](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136), [latest qualification result](https://github.com/rachelgonsalves821/EnvoiLabs/pull/112) |
+| Gate 1 Vertical slice | End of week 3 | Open. The hosted seeded study, scheduling and live speech passed. The latest independent redaction result is below threshold. Signed-in researcher publication on the protected preview is pending. | [Browser study and private worker](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45030028488), [live speech](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136), [latest qualification result](https://github.com/rachelgonsalves821/EnvoiLabs/pull/112), [integration evidence](#2026-11-24-gate-1-integration-evidence) |
 | Gate 2 Money loop and scoping | End of week 5 | Not started | |
 | Gate 3 Probing, reports, pilot | End of week 7 | Not started | |
 | Gate 4 Launch hardening | End of week 8 | Not started | |
@@ -880,3 +880,25 @@ Needs from others. None for this preview check.
 Contract or schema changes. None.
 
 Risks. The deployment and protection checks cover the new build. Researcher transcript publication still needs a qualified redactor and a signed-in rehearsal.
+
+### 2026-11-24 Gate 1 integration evidence
+
+The hosted seeded study verified researcher launch and tracking, eligible respondent access, private voice and typed answers, saved progress, and quality hold. The credentialed synthetic speech check passed separately. [Hosted study](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7079809063) · [Live speech](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45280585136)
+
+| Integration test | Verified evidence |
+| --- | --- |
+| IT-1.1 | The disposable production-build browser test covers a desktop researcher and a phone-sized respondent. Home shows the eligible invite, hides another account’s invite, and restores the same account after fresh sign-in. [Browser test and review](https://github.com/rachelgonsalves821/EnvoiLabs/pull/149) |
+| IT-1.2 | Five stored synthetic fixtures exercise primary transcription, timeout and fallback, provider metadata, consent checks, typed bypass and redaction-gated visibility. Hosted researcher visibility with a qualified redactor is pending. [Fixture worker checks](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45035427938) |
+| IT-1.3 | The browser closes mid-interview, signs in again, and resumes at question three. [Browser test and review](https://github.com/rachelgonsalves821/EnvoiLabs/pull/149) |
+| IT-1.4 | The disposable database test verifies the 24-hour expiry boundary, repeat behavior, audit entries, and protection of completed and unrelated interviews. [Expiry test](../packages/db/tests/gate1_interview_expiry.sql) |
+| IT-1.5 | Concurrent launch, invite acceptance and answer confirmation converge on one durable result. A separate test recovers an answer committed before dispatch failed and verifies idempotent retry. Pending and failed redaction stay private in the fixture worker checks. [Concurrent browser requests](https://github.com/rachelgonsalves821/EnvoiLabs/pull/149) · [Dispatch failure and retry](https://github.com/rachelgonsalves821/EnvoiLabs/pull/73) · [Fixture worker checks](https://github.com/rachelgonsalves821/EnvoiLabs/actions/runs/45035427938) |
+
+Desktop Chromium and iPhone 13-emulated WebKit passed all four production-build accessibility checks at source tree `89081578fb57fd596e0cb8532525a823a110f48d`. These checks cover keyboard focus through request, error and retry, responsive layouts, touch targets and reduced motion. Sign-in responses were synthetic. [Integration and accessibility evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7149577921)
+
+Next. Pass independent redaction qualification and use the matching policy and report to verify a signed-in researcher sees only redacted results on the protected preview. The abandoned-audio cleanup also awaits the shared database migration and integrated rehearsal. [Qualification result](https://github.com/rachelgonsalves821/EnvoiLabs/pull/112) · [Cleanup draft](https://github.com/rachelgonsalves821/EnvoiLabs/pull/148)
+
+Needs from others. Platform owns the shared cleanup migration. No account-holder action is needed for the current qualification work.
+
+Contract or schema changes. None in this status update.
+
+Risks. The accessibility and fixture worker results use synthetic cases. The researcher publication gate remains closed.
