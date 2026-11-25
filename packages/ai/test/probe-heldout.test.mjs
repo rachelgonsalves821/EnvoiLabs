@@ -9,6 +9,24 @@ it("scores all 60 fictional cases without echoing answer text into the report", 
   expect(report).toMatchObject({ sampleSize: 60, probes: 60, acceptable: 60,
     qualityRate: 1, offTopicAnswers: 0, rubricPassed: true });
   expect(JSON.stringify(report)).not.toContain("I hesitated at the last step");
+  expect(report).not.toHaveProperty("results");
+});
+
+it("never prints case, answer or reviewer identifiers even when supplied incorrectly", () => {
+  const data = syntheticProbeHeldout();
+  const privateId = "fictional.person@example.invalid";
+  const privateAnswerId = "fictional.answer@example.invalid";
+  data.inputs[0].id = privateId;
+  data.outputs[0].id = privateId;
+  data.judgments[0].id = privateId;
+  data.judgments[0].reviewerId = "fictional.reviewer@example.invalid";
+  data.judgments[0].followUpAnswerId = privateAnswerId;
+  data.answerReceipts[0].id = privateAnswerId;
+  data.answerReceipts[0].caseId = privateId;
+  const report = scoreProbeHeldout(data.inputs, data.outputs, data.judgments,
+    data.answerReceipts);
+  expect(report.rubricPassed).toBe(true);
+  expect(JSON.stringify(report)).not.toContain("example.invalid");
 });
 
 it("labels the CLI fixture replay without a pilot rubric pass", () => {

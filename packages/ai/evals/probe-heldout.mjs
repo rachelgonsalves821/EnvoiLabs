@@ -33,7 +33,6 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   let probes = 0; let acceptable = 0; let offTopicAnswers = 0;
   let noProbes = 0; let errors = 0; let timeouts = 0;
   const followUpAnswerIds = new Set();
-  const results = [];
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
     const judgment = judgmentById.get(id);
@@ -62,8 +61,6 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
       if (output.action === "error") errors++;
       if (output.action === "timeout") timeouts++;
     }
-    results.push({ id, action: output.action, acceptable: output.action === "probe"
-      ? judgment.decisionAppropriate && judgment.nonLeading && judgment.onGoal : null });
   }
   if (outputById.size !== inputById.size || judgmentById.size !== inputById.size
     || [...outputById.keys(), ...judgmentById.keys()].some((id) => !inputById.has(id)))
@@ -74,8 +71,7 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   const qualityRate = probes === 0 ? null : acceptable / probes;
   return { mode: "held-out-scoring", sampleSize: 60, probes, acceptable, qualityRate,
     offTopicAnswers, noProbes, errors, timeouts,
-    rubricPassed: probes > 0 && qualityRate >= 0.9 && offTopicAnswers === 0,
-    results };
+    rubricPassed: probes > 0 && qualityRate >= 0.9 && offTopicAnswers === 0 };
 }
 
 /** Repeated fictional examples exercise the pipeline only; they are not independent labels. */
