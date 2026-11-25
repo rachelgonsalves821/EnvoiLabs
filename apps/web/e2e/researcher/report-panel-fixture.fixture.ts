@@ -95,3 +95,44 @@ test("has no serious or critical axe findings through fictional report states", 
   await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
   expect(await seriousAxeViolations(panel)).toEqual([]);
 });
+
+test("rechecks fictional private no-store endpoint on display, export and retry", async ({ page }) => {
+  const studyId = "a9700000-0000-4000-8000-000000000001";
+  const report = { reportId: "a9700000-0000-4000-8000-000000000002", studyId,
+    summary: { version: 2, executiveAnswer: "A fictional current answer",
+      themes: [{ claim: "Receipts help", count: 1, total: 1, confidence: "high",
+        supportingQuotes: [{ studyId, transcriptId: "a9700000-0000-4000-8000-000000000003",
+          sourceVersion: "a9700000-0000-4000-8000-000000000004", startChar: 0,
+          endChar: 16, exactText: "A receipt helps.", confidence: 0.9 }],
+        contradictingQuotes: [] }], hypotheses: [] } };
+  let responseKind: "ready" | "missing" | "uncached" = "ready";
+  let requests = 0;
+  const downloads: string[] = [];
+  page.on("download", (item) => downloads.push(item.suggestedFilename()));
+  await page.route("**/api/researcher/studies/*/report", async (route) => {
+    requests++;
+    const kind = responseKind;
+    await route.fulfill({ status: kind === "missing" ? 404 : 200,
+      headers: kind === "ready" ? { "cache-control": "private, no-store" } : {},
+      ...(kind === "missing" ? {} : { json: report }),
+    });
+  });
+  await page.goto("/gate3-report-fixture?endpoint=1");
+  const panel = page.getByRole("region", { name: "Research report" });
+  await expect(panel.getByText("A receipt helps.")).toBeVisible();
+  const initialRequests = requests;
+  responseKind = "missing";
+  await panel.getByRole("button", { name: "Download themes and quotes CSV" }).click();
+  await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
+  await expect(panel.getByText("A receipt helps.")).toHaveCount(0);
+  expect(downloads).toEqual([]);
+  expect(requests).toBe(initialRequests + 1);
+  responseKind = "uncached";
+  await panel.getByRole("button", { name: "Check again" }).click();
+  await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
+  await expect.poll(() => requests).toBe(initialRequests + 2);
+  responseKind = "ready";
+  await panel.getByRole("button", { name: "Check again" }).click();
+  await expect(panel.getByText("A receipt helps.")).toBeVisible();
+  expect(requests).toBe(initialRequests + 3);
+});

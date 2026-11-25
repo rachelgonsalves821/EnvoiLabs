@@ -1,6 +1,6 @@
 "use client";
 
-import { ReportUiController } from "@envoi-labs/ai";
+import { reportBrowserPort, ReportUiController } from "@envoi-labs/ai";
 import { useState } from "react";
 import { StudyReportPanel } from "../(researcher)/app/studies/[studyId]/study-report-panel";
 
@@ -47,5 +47,14 @@ export function ReportFixture() {
     <button data-fixture-replace type="button" onClick={fixture.replace}>Replace fictional report</button>
     <button data-fixture-pause type="button" onClick={fixture.pause}>Pause fictional read</button>
     <button data-fixture-resume type="button" onClick={fixture.resume}>Resume fictional read</button>
+  </main>;
+}
+
+/** Exercises the browser fetch port with Playwright-intercepted fictional responses. */
+export function EndpointReportFixture() {
+  const [controller] = useState(() => new ReportUiController(reportBrowserPort(), studyId));
+  return <main style={{ maxWidth: 760, marginInline: "auto", padding: 16 }}>
+    <h1>Fictional report endpoint fixture</h1>
+    <StudyReportPanel controller={controller} />
   </main>;
 }
