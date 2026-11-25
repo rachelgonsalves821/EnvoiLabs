@@ -130,9 +130,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         },
       };
       const prepared = await prepareStudyCheckout(quoteDb, provider, study.data.id);
-      const frozen = await db.from("gate2_quote_snapshots").select("id,line_items_json,feasibility_json")
-        .eq("study_id", study.data.id);
-      expect(prepared.status, JSON.stringify({ frozen: frozen.data, error: frozen.error })).toBe("ready");
+      expect(prepared.status).toBe("ready");
       if (prepared.status !== "ready") throw new Error("Synthetic quote was not ready.");
       expect(prepared.quote).toMatchObject({ studyId: study.data.id, pricingConfigVersion: 101,
         totalCents: 10_000, incentiveCentsPerComplete: 500 });

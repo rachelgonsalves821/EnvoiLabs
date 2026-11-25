@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../packages/db/src/database.generated";
-import { createGate2CheckoutDatabase } from "./gate2-checkout-db";
+import { QuoteV4Schema } from "@envoi-labs/contracts";
+import { createGate2CheckoutDatabase, mapGate2Quote } from "./gate2-checkout-db";
 
 const studyId = "90600000-0000-4000-8000-000000000001";
 const quoteId = "a9900000-0000-4000-8000-000000000001";
@@ -68,6 +69,15 @@ function fixture({ otherOrganization = false, existingCheckout = false } = {}) {
 }
 
 describe("Gate 2 checkout database scope", () => {
+  it("normalizes PostgreSQL timestamp offsets for the frozen quote contract", () => {
+    const { rows } = fixture();
+    const quoteRow = rows.gate2_quote_snapshots![0]!;
+    quoteRow.created_at = "2026-11-23T20:00:00+00:00";
+    const parsed = QuoteV4Schema.safeParse(mapGate2Quote(
+      quoteRow as unknown as Database["public"]["Tables"]["gate2_quote_snapshots"]["Row"]));
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.createdAt).toBe("2026-11-23T20:00:00.000Z");
+  });
   it("reads the approved scope and selected version, then freezes exact economics", async () => {
     const { db, rpc } = fixture();
     expect(await db.readApprovedScope(studyId)).toEqual({ studyId, briefVersion: 1,
