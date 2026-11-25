@@ -38,5 +38,16 @@ export async function POST(request: NextRequest) {
     ? await reconcilePaidStudyLaunch(db, provider, checkout.study_id, checkout.quote_id)
     : await reconcileCheckoutObservation(db, provider, checkout.study_id, checkout.quote_id);
   if (result === "unavailable") return failure(503);
-  return reply(200, { status: result === "launched" ? "launched" : "observed" });
+  if (result === "launched") {
+    const { data: wave, error: waveError } = await trusted.rpc(
+      "create_gate2_paid_launch_wave", {
+        supplied_study_id: checkout.study_id,
+        supplied_quote_id: checkout.quote_id,
+      });
+    if (waveError || !wave || typeof wave !== "object" ||
+      Array.isArray(wave) || !Number.isSafeInteger(wave.created) ||
+      (wave.created as number) < 0) return failure(503);
+    return reply(200, { status: "launched", offersCreated: wave.created });
+  }
+  return reply(200, { status: "observed" });
 }

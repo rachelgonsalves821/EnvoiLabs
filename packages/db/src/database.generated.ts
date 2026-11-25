@@ -1810,6 +1810,10 @@ export type Database = {
         }
         Returns: Json
       }
+      create_gate2_paid_launch_wave: {
+        Args: { supplied_quote_id: string; supplied_study_id: string }
+        Returns: Json
+      }
       expire_gate1_interviews: {
         Args: { supplied_cutoff: string }
         Returns: Json

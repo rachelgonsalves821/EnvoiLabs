@@ -81,6 +81,9 @@ where respondent_id = '90500000-0000-4000-8000-000000000033';
 select ok(not has_function_privilege('authenticated',
     'public.create_gate2_marketplace_offers(uuid,uuid,uuid,integer)', 'EXECUTE'),
     'no respondent or researcher can directly send offers');
+select ok(not has_function_privilege('authenticated',
+    'public.create_gate2_paid_launch_wave(uuid,uuid)', 'EXECUTE'),
+    'clients cannot trigger a paid launch wave');
 set local role service_role;
 select throws_ok($$select public.create_gate2_marketplace_offers(
     'a9840000-0000-4000-8000-000000000001',
@@ -88,11 +91,10 @@ select throws_ok($$select public.create_gate2_marketplace_offers(
         where study_id = 'a9840000-0000-4000-8000-000000000001'),
     '90300000-0000-4000-8000-000000000021', 20)$$,
     '23514', null, 'respondent cannot match a researcher study');
-select is((public.create_gate2_marketplace_offers(
+select is((public.create_gate2_paid_launch_wave(
     'a9840000-0000-4000-8000-000000000001',
     (select id from public.gate2_quote_snapshots
-        where study_id = 'a9840000-0000-4000-8000-000000000001'),
-    '90200000-0000-4000-8000-000000000001', 20) ->> 'created')::integer,
+        where study_id = 'a9840000-0000-4000-8000-000000000001')) ->> 'created')::integer,
     10, 'paid cap excludes revoked, conflicting and ongoing profiles');
 select is((public.create_gate2_marketplace_offers(
     'a9840000-0000-4000-8000-000000000001',
