@@ -20,6 +20,9 @@ const profile = [
   ["food_orders_per_week", 2], ["interests", ["Food and drink"]],
 ] as const;
 
+// The background-tab regression needs the real browser window visibility signal.
+test.use({ headless: false });
+
 test.describe("Gate 2 marketplace fixture replay", () => {
   test.skip(process.env.ENVOI_TEST_LOCAL_SUPABASE !== "1", "Requires disposable local Auth and database.");
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
@@ -310,12 +313,25 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           holdNextRead = true;
           await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
           await readStarted;
-          // Headless Chromium can keep every Playwright page visible. Emulate the
-          // browser visibility signal to exercise the in-flight response race.
+          // Playwright emulates focus on every page; remove that override so
+          // Chromium can report the real tab-strip visibility transition.
+          const focusSession = await secondContext.newCDPSession(secondRespondent);
+          await focusSession.send("Emulation.setFocusEmulationEnabled", { enabled: false });
           await secondRespondent.evaluate(() => {
-            Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
-            document.dispatchEvent(new Event("visibilitychange"));
+            const link = document.createElement("a");
+            link.href = "about:blank";
+            link.target = "_blank";
+            link.rel = "noopener";
+            link.textContent = "Open test tab";
+            link.style.cssText = "position:fixed;right:0;bottom:0;z-index:2147483647;background:white;color:black;padding:12px";
+            link.dataset.gate2Background = "true";
+            document.body.append(link);
           });
+          const [background] = await Promise.all([
+            secondContext.waitForEvent("page", { timeout: 10_000 }),
+            secondRespondent.locator("[data-gate2-background]").click({ timeout: 10_000 }),
+          ]);
+          await background.bringToFront();
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("hidden");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
@@ -327,15 +343,14 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             text_version: "synthetic-marketplace-withdrawal",
           });
           expect(withdrawn.error).toBeNull();
-          await secondRespondent.evaluate(() => {
-            Reflect.deleteProperty(document, "visibilityState");
-            document.dispatchEvent(new Event("visibilitychange"));
-          });
+          await secondRespondent.bringToFront();
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("visible");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
           await expect(secondRespondent.getByRole("alert")).toBeVisible();
+          await background.close();
+          await focusSession.detach();
         } finally {
           await secondContext.close();
         }
