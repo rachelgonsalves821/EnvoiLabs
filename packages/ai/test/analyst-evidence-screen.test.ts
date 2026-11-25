@@ -78,3 +78,20 @@ it("rechecks source, question and analysis grant before screening", async () => 
   authorize.mockResolvedValueOnce(false);
   expect(await screenAnalystV2Evidence(port, draft)).toBeNull();
 });
+
+it("does not accept a quote added by mutation during the authorization wait", async () => {
+  const forged = { ...quote, startChar: 0, endChar: 10, exactText: "fabricated" };
+  const { draft } = await draftWith({ ...output, themes: [{ ...output.themes[0],
+    supportingQuotes: [forged] }] });
+  const source = { ...snapshot.sources[0]! };
+  const current = { ...snapshot, sources: [source] };
+  const port = { readCurrent: vi.fn().mockResolvedValue(current),
+    authorize: vi.fn(async () => {
+      source.redactedText = "fabricated";
+      return true;
+    }) };
+  expect(await screenAnalystV2Evidence(port, draft)).toMatchObject({
+    themes: [], decisions: [{ action: "drop", reason: "quote differs from redacted source" }],
+  });
+  expect(source.redactedText).toBe("fabricated");
+});

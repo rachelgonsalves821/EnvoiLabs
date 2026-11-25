@@ -1,4 +1,5 @@
-import { analystTextDigest, type AnalystDraftPort, type AnalystDraftResult } from
+import { analystTextDigest, type AnalystDraftPort, type AnalystDraftResult,
+  type AnalystSourceSnapshot } from
   "./analyst-draft.js";
 import { verifyEvidence, type ProposedEvidence, type VerifiedEvidence } from
   "./report-evidence.js";
@@ -21,6 +22,16 @@ const exact = (value: Record<string, unknown>, keys: readonly string[]) =>
   Object.keys(value).sort().join(",") === [...keys].sort().join(",");
 const nonblank = (value: unknown): value is string =>
   typeof value === "string" && !!value.trim();
+
+function frozenCurrent(source: AnalystSourceSnapshot): AnalystSourceSnapshot {
+  return Object.freeze({ studyId: source.studyId, decisionQuestion: source.decisionQuestion,
+    sources: Object.freeze(source.sources.map((item) => Object.freeze({
+      studyId: item.studyId, transcriptId: item.transcriptId,
+      sourceVersion: item.sourceVersion, redactedText: item.redactedText,
+      policyDigest: item.policyDigest, qualificationDigest: item.qualificationDigest,
+    }))),
+  });
+}
 
 function quote(value: unknown): value is ProposedEvidence {
   return record(value) && exact(value, ["studyId", "transcriptId", "sourceVersion",
@@ -59,11 +70,12 @@ export async function screenAnalystV2Evidence(port: AnalystDraftPort,
       || !digest.test(draft.decisionQuestionDigest) || !nonblank(draft.model)
       || !nonblank(draft.promptVersion) || !Array.isArray(draft.sources)
       || draft.sources.length === 0 || !privateV2(draft.output)) return null;
-    const current = await port.readCurrent(draft.studyId);
-    if (!current || current.studyId !== draft.studyId
-      || !nonblank(current.decisionQuestion) || !Array.isArray(current.sources)
-      || current.sources.length !== draft.sources.length
-      || await analystTextDigest(current.decisionQuestion) !== draft.decisionQuestionDigest) return null;
+    const currentRaw = await port.readCurrent(draft.studyId);
+    if (!currentRaw || currentRaw.studyId !== draft.studyId
+      || !nonblank(currentRaw.decisionQuestion) || !Array.isArray(currentRaw.sources)
+      || currentRaw.sources.length !== draft.sources.length) return null;
+    const current = frozenCurrent(currentRaw);
+    if (await analystTextDigest(current.decisionQuestion) !== draft.decisionQuestionDigest) return null;
     const matched = new Set<string>();
     for (const source of current.sources) {
       if (!source || source.studyId !== draft.studyId || !uuid.test(source.transcriptId)
