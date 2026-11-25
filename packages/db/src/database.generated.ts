@@ -1985,9 +1985,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      register_gate2_push_subscription: {
+        Args: {
+          supplied_auth: string
+          supplied_endpoint: string
+          supplied_p256dh: string
+        }
+        Returns: boolean
+      }
       register_gate2_referral: {
         Args: { supplied_referral_code: string }
         Returns: string
+      }
+      remove_gate2_push_subscription: {
+        Args: { supplied_endpoint: string }
+        Returns: boolean
       }
       requeue_gate1_answer_job: {
         Args: { supplied_answer_id: string }
