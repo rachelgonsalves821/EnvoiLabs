@@ -45,14 +45,17 @@ export function createStripeTestPaymentObserver(config: {
       let status: CheckoutObservation["status"] = "pending";
       let refundedCents = 0;
       if (session.status === "expired") status = "failed";
-      else if (session.status === "complete" && session.payment_status === "paid") {
+      else if (session.status === "complete") {
         const paymentId = testId(session.payment_intent, "pi_");
         const payment = await read(`https://api.stripe.com/v1/payment_intents/${paymentId}`);
         if (payment.id !== paymentId || payment.object !== "payment_intent" ||
           payment.livemode !== false || payment.currency !== "usd" ||
-          payment.amount !== amount || payment.amount_received !== amount)
+          payment.amount !== amount || !Number.isSafeInteger(payment.amount_received) ||
+          (payment.amount_received as number) < 0 ||
+          (payment.amount_received as number) > amount)
           throw new Error("Stripe PaymentIntent does not match Checkout");
-        if (payment.status === "succeeded") {
+        if (payment.status === "succeeded" && session.payment_status === "paid" &&
+          payment.amount_received === amount) {
           const refunds = await read(`https://api.stripe.com/v1/refunds?payment_intent=${paymentId}&limit=100`);
           if (refunds.object !== "list" || refunds.has_more !== false ||
             !Array.isArray(refunds.data)) throw new Error("Incomplete refund reconciliation");
