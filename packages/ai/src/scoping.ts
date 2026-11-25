@@ -20,7 +20,7 @@ export interface ScopingInput {
 
 const nonblank = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
-const price = /(?:[$€£]\s*\d+(?:\.\d+)?|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|cad|cents?)\b)/i;
+const price = /(?:[$€£]\s*\d+(?:\.\d+)?|\b(?:usd|cad)\s*\d+(?:\.\d+)?\b|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|cad|cents?)\b)/i;
 const patchFields: Record<ScopingInput["stage"], readonly (keyof BriefPatch)[]> = {
   decision: ["title", "decision"], hypotheses: ["hypotheses"],
   eligibility: ["criteria"], exclusions: ["criteria"],

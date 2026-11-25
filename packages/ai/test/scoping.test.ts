@@ -53,6 +53,7 @@ describe("fictional researcher scoping boundary", () => {
     [{ ...turn, message: "Which decision? And when?" }, "two questions"],
     [{ ...turn, message: `${"word ".repeat(79)}?` }, "long message"],
     [{ ...turn, message: "Would $5 work?" }, "model price"],
+    [{ ...turn, message: "Would USD 5 work?" }, "currency-prefix price"],
     [{ ...turn, briefPatch: { targetCompletes: 0 } }, "invalid patch"],
     [{ ...turn, briefPatch: { targetCompletes: 10 } }, "out of order patch"],
     [{ ...turn, extra: "private text" }, "unexpected contract field"],
@@ -88,6 +89,11 @@ describe("fictional researcher scoping boundary", () => {
     authorize.mockImplementation(async (attempt) => attempt.promptDigest === "0".repeat(64));
     expect(await runScopingTurn(port, provider, base)).toBeNull();
     expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invented currency-prefix amount in a brief patch", async () => {
+    const priced = setup({ ...turn, briefPatch: { decision: "Test a USD 5 fee" } });
+    expect(await runScopingTurn(priced.port, priced.provider, base)).toBeNull();
   });
 
   it("preserves earlier eligibility while asking exclusions", async () => {

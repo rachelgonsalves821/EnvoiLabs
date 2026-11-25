@@ -55,6 +55,8 @@ Gate 2 draft PR #138 now exposes `loadCurrentQualifiedReport(db, studyId)` with 
 
 The 60-answer held-out probe workflow and a synthetic-only pipeline smoke command are documented in `packages/ai/evals/PROBE_HELDOUT.md`. The synthetic score must never be reported as independent model quality.
 
+The 25-conversation scoping and 25-brief guide held-out scorer and private review protocol are in `packages/ai/evals/SCOPE_GUIDE_HELDOUT.md`. Its fictional smoke run marks both rubric results unproved. Actual provider/prompt receipts, independent adjudication and current purpose authorization remain required before claiming the BUILD_PLAN section 7 thresholds.
+
 ## Draft voice and AI disclosure handoff
 
 Rachel's `envoi-terms-draft-v0.1.md` is counsel-pending source material, not consent approval or a published policy. Its long notice names AI follow-ups and analysis, but its consent screen writes only `recording`, `transcription_vendor`, `retention`, `researcher_access` and optional `voice_clip_sharing`. Gate 2's draft probe ledger checks a separate `ai_followup` purpose and returns qualified `transcript.redacted_text` plus the guide question to a server-only request builder; the current onboarding has no `ai_followup` grant path. The Gate 3 runtime now refuses a request whose purpose is not `ai_followup`, but that string check is not proof of consent. The Platform read/commit must enforce the current grant and immutable source receipt before any provider dispatch. Live probes remain disabled.
