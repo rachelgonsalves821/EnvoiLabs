@@ -1794,6 +1794,15 @@ export type Database = {
         }
         Returns: Json
       }
+      create_gate2_marketplace_offers: {
+        Args: {
+          requested_count: number
+          supplied_auth_user_id: string
+          supplied_quote_id: string
+          supplied_study_id: string
+        }
+        Returns: Json
+      }
       expire_gate1_interviews: {
         Args: { supplied_cutoff: string }
         Returns: Json
