@@ -29,8 +29,9 @@ export function ScreeningSheetView({ inviteId }: { inviteId: string }) {
       const value = response.ok ? parseScreeningSheet(await response.json()) : null;
       if (controller.signal.aborted || number !== readNumber.current ||
         currentInvite.current !== inviteId) return;
-      setLoaded(value ? { inviteId, sheet: value } : null);
-      setError(!value);
+      const currentSheet = value?.inviteId === inviteId ? value : null;
+      setLoaded(currentSheet ? { inviteId, sheet: currentSheet } : null);
+      setError(!currentSheet);
     } catch {
       if (!controller.signal.aborted && number === readNumber.current &&
         currentInvite.current === inviteId) {

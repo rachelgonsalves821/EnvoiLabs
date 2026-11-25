@@ -77,9 +77,21 @@ test.describe("Gate 2 private screening sheet", () => {
       });
       expect(consent.error).toBeNull();
 
+      const sheetPath = `**/api/respondent/screening/${offer.data.id}`;
+      await page.route(sheetPath, async (route) => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        const sheet = await response.json() as Record<string, unknown>;
+        await route.fulfill({ response, json: { ...sheet, inviteId: randomUUID() } });
+      });
       await page.goto("/r");
       await page.getByRole("link", { name: "Answer screening questions" }).click();
       await expect(page).toHaveURL(origin + `/r/screening/${offer.data.id}`);
+      await expect(page.getByText(question)).toHaveCount(0);
+      await expect(page.getByLabel("Your answer")).toHaveCount(0);
+      await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
+      await page.unroute(sheetPath);
+      await page.getByRole("button", { name: "Try again" }).click();
       await expect(page.getByText(question)).toBeVisible();
       await page.getByLabel("Your answer").fill(answerText);
       await page.getByRole("button", { name: "Submit answer" }).click();
