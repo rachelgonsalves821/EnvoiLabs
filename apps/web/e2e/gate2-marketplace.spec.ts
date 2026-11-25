@@ -317,8 +317,18 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           // Chromium can report the real tab-strip visibility transition.
           const focusSession = await secondContext.newCDPSession(secondRespondent);
           await focusSession.send("Emulation.setFocusEmulationEnabled", { enabled: false });
-          const background = await secondContext.newPage();
-          await background.goto("about:blank");
+          await secondRespondent.evaluate(() => {
+            const link = document.createElement("a");
+            link.href = "about:blank";
+            link.target = "_blank";
+            link.rel = "noopener";
+            link.dataset.gate2Background = "true";
+            document.body.append(link);
+          });
+          const [background] = await Promise.all([
+            secondContext.waitForEvent("page"),
+            secondRespondent.locator("[data-gate2-background]").click(),
+          ]);
           await background.bringToFront();
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("hidden");
