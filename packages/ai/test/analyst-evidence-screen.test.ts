@@ -17,7 +17,9 @@ const output = { version: 2, executiveAnswer: "Private draft: Ada paused.",
   themes: [{ claim: "Ada had a reason", count: 1, total: 1, confidence: "low",
     supportingQuotes: [quote], contradictingQuotes: [] }],
   hypotheses: [{ hypothesis: "Ada might return", result: "untested" }],
-  followUpBrief: { title: "Private draft" } };
+  followUpBrief: { title: "Private next study", decision: "Which receipt is clearest?",
+    hypotheses: ["A short receipt helps."], criteria: [], targetCompletes: 10,
+    stimulus: null, deadlineAt: "2026-12-01T00:00:00.000Z" } };
 const input = { studyId: id(1), providerModel: "fictional-model",
   promptVersion: "analyst-v2", systemPrompt: "Use exact redacted spans." };
 
@@ -54,7 +56,10 @@ it("drops a finding with no current supporting quote", async () => {
 it("rejects V1, malformed candidates and missing private V2 structure", async () => {
   for (const value of [{ ...output, version: 1 },
     { ...output, themes: [{ ...output.themes[0], supportingQuotes: [null] }] },
-    { ...output, followUpBrief: undefined }]) {
+    { ...output, followUpBrief: undefined },
+    { ...output, followUpBrief: { title: "Incomplete" } },
+    { ...output, followUpBrief: { ...output.followUpBrief, targetCompletes: 9 } },
+    { ...output, followUpBrief: { ...output.followUpBrief, priceCents: 100 } }]) {
     const { draft, port } = await draftWith(value);
     expect(await screenAnalystV2Evidence(port, draft)).toBeNull();
   }

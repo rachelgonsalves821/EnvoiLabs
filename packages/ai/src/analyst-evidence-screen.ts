@@ -4,6 +4,7 @@ import { analystTextDigest, type AnalystDraftPort, type AnalystDraftResult,
 import { verifyEvidence, type ProposedEvidence, type VerifiedEvidence } from
   "./report-evidence.js";
 import { meetsConfidenceFloor, type FindingConfidence } from "./report-confidence.js";
+import { BriefSchema } from "@envoi-labs/contracts";
 
 export interface ScreenedAnalystEvidence {
   /** Evidence only. Model claims, rationale, hypotheses and brief remain private. */
@@ -70,7 +71,9 @@ function privateV2(value: unknown): value is { themes: readonly {
   if (!record(value) || !exact(value, ["version", "executiveAnswer", "themes",
     "hypotheses", "followUpBrief"]) || value.version !== 2
     || !nonblank(value.executiveAnswer) || !Array.isArray(value.themes)
-    || !Array.isArray(value.hypotheses) || !record(value.followUpBrief)) return false;
+    || !Array.isArray(value.hypotheses)) return false;
+  const brief = BriefSchema.safeParse(value.followUpBrief);
+  if (!brief.success || brief.data.targetCompletes < 10) return false;
   if (!value.hypotheses.every((item: unknown) => record(item)
     && exact(item, ["hypothesis", "result"]) && nonblank(item.hypothesis)
     && ["supported", "weakened", "untested"].includes(String(item.result)))) return false;
