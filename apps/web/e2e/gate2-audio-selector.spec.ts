@@ -26,12 +26,15 @@ test.describe("Gate 1 audio selector after Gate 2 marketplace migrations", () =>
     const livePath = `${ids.sessionId}/${ids.liveId}`;
     const expiredPath = `${ids.sessionId}/${ids.expiredId}`;
 
-    const upload = async (path: string) => {
+    const sign = async (path: string) => {
       const signed = await db.storage.from(bucket).createSignedUploadUrl(path, { upsert: false });
       expect(signed.error).toBeNull();
       if (!signed.data?.token) throw new Error("The private signed upload token is missing.");
+      return signed.data.token;
+    };
+    const upload = async (path: string, token: string) => {
       const put = await db.storage.from(bucket).uploadToSignedUrl(
-        path, signed.data.token, new Blob([bytes], { type: "audio/webm" }),
+        path, token, new Blob([bytes], { type: "audio/webm" }),
         { contentType: "audio/webm" },
       );
       expect(put.error).toBeNull();
@@ -42,8 +45,10 @@ test.describe("Gate 1 audio selector after Gate 2 marketplace migrations", () =>
       return (result.data as { storage_path: string }[]).map(({ storage_path }) => storage_path);
     };
 
-    // The live reservation is uploaded and confirmed before its deadline.
-    await upload(livePath);
+    // Both signed tokens are issued while their reservations are live.
+    const liveToken = await sign(livePath);
+    const lateToken = await sign(expiredPath);
+    await upload(livePath, liveToken);
     const confirmation = await db.rpc("confirm_gate1_voice_answer", {
       supplied_owner_id: ids.ownerId, supplied_session_id: ids.sessionId,
       supplied_question_id: ids.questionId, supplied_audio_id: ids.liveId,
@@ -51,11 +56,15 @@ test.describe("Gate 1 audio selector after Gate 2 marketplace migrations", () =>
       supplied_sha256: "\\x" + createHash("sha256").update(bytes).digest("hex"),
     });
     expect(confirmation.error).toBeNull();
+    for (const audioId of [ids.liveId, ids.expiredId]) {
+      const expired = await db.rpc("test_gate2_audio_history_expire", { supplied_audio_id: audioId });
+      expect(expired.error).toBeNull();
+    }
     expect(await selected()).toEqual([]);
 
     // A valid signed PUT can complete after the reservation has expired and
     // after the first cleanup sweep found no object.
-    await upload(expiredPath);
+    await upload(expiredPath, lateToken);
     expect(await selected()).toEqual([expiredPath]);
     const lateConfirmation = await db.rpc("confirm_gate1_voice_answer", {
       supplied_owner_id: ids.ownerId, supplied_session_id: ids.sessionId,

@@ -27,8 +27,13 @@ cp -- "$db_dir/migrations/20261124013900_gate1_expired_audio_selection.sql" \
 cp -- "$db_dir/seed.sql" "$test_dir/supabase/seed.sql"
 supabase db start --workdir "$test_dir" >/dev/null
 
-project_id="$(basename -- "$test_dir" | tr '[:upper:]' '[:lower:]')"
-db_container="supabase_db_$project_id"
+mapfile -t db_containers < <(docker ps --filter 'name=supabase_db_' --format '{{.Names}}')
+if (( ${#db_containers[@]} != 1 )); then
+  printf 'Expected one disposable Supabase database container; found %s.\n' \
+    "${#db_containers[@]}" >&2
+  exit 1
+fi
+db_container="${db_containers[0]}"
 selector_count="$(docker exec "$db_container" psql -U postgres -d postgres \
   -v ON_ERROR_STOP=1 -Atqc "select count(*) from supabase_migrations.schema_migrations
     where version = '20261124013900'")"

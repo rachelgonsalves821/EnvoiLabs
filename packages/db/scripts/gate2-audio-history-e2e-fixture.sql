@@ -41,7 +41,7 @@ begin
     values (live_id, session_id, question_id, 4, 'audio/webm',
         clock_timestamp() + interval '1 hour'),
         (expired_id, session_id, question_id, 4, 'audio/webm',
-        clock_timestamp() - interval '1 minute');
+        clock_timestamp() + interval '1 hour');
     return jsonb_build_object('ownerId', owner_id, 'sessionId', session_id,
         'questionId', question_id, 'liveId', live_id,
         'expiredId', expired_id);
@@ -50,5 +50,26 @@ $$;
 revoke all on function public.test_gate2_audio_history_fixture(uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.test_gate2_audio_history_fixture(uuid)
+    to service_role;
+
+create function public.test_gate2_audio_history_expire(supplied_audio_id uuid)
+returns boolean language plpgsql security definer set search_path = '' as $$
+begin
+    update internal.gate1_audio_uploads as reservation
+    set expires_at = clock_timestamp() - interval '1 minute'
+    from public.sessions as session
+    join public.invites as offer on offer.id = session.invite_id
+    join public.respondents as owner on owner.id = offer.respondent_id
+    join auth.users as account on account.id = owner.auth_user_id
+    where reservation.id = supplied_audio_id
+        and reservation.session_id = session.id
+        and account.email like 'gate2-audio-history-%@example.test';
+    if not found then raise insufficient_privilege; end if;
+    return true;
+end;
+$$;
+revoke all on function public.test_gate2_audio_history_expire(uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function public.test_gate2_audio_history_expire(uuid)
     to service_role;
 notify pgrst, 'reload schema';
