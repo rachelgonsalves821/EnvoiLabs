@@ -37,4 +37,3 @@ create trigger immutable_gate3_proposal before update or delete on pii.gate3_evi
     for each row execute function internal.reject_gate2_ledger_mutation();
 create trigger immutable_gate3_decision before update or delete on pii.gate3_evidence_decisions
     for each row execute function internal.reject_gate2_ledger_mutation();
-

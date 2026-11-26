@@ -68,4 +68,3 @@ select throws_ok($$select private_note from pii.gate3_evidence_decisions$$,
     '42501', null, 'MFA researcher cannot read private decision notes');
 select * from finish();
 rollback;
-
