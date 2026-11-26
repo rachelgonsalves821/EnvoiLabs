@@ -11,7 +11,8 @@ const snapshot: AnalystSourceSnapshot = { studyId: id(1),
       policyDigest: "a".repeat(64), qualificationDigest: "b".repeat(64) },
   ] };
 const input = { studyId: id(1), providerModel: "fictional-model",
-  promptVersion: "analyst-v2", systemPrompt: "Use exact redacted spans only." };
+  promptVersion: "analyst-v2", systemPrompt: "Use exact redacted spans only.",
+  timeoutMs: 10_000 };
 const response = { output: { version: 2, themes: [] }, model: "fictional-model",
   inputTokens: 10, outputTokens: 20, costMicros: 0, latencyMs: 1 };
 
@@ -65,6 +66,24 @@ describe("private analyst draft dispatch", () => {
     authorize.mockResolvedValueOnce("false");
     expect(await runAnalystDraft(port, provider, input)).toBeNull();
     expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("times out a stalled authorization before dispatch", async () => {
+    const { port, provider, authorize, generate } = setup();
+    authorize.mockImplementation(() => new Promise(() => undefined));
+    expect(await runAnalystDraft(port, provider, { ...input, timeoutMs: 1_000 })).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("does not use a provider result that arrives after the draft deadline", async () => {
+    const { port, provider, generate } = setup();
+    let release: (value: typeof response) => void = () => undefined;
+    generate.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+    const pending = runAnalystDraft(port, provider, { ...input, timeoutMs: 1_000 });
+    expect(await pending).toBeNull();
+    release(response);
+    await Promise.resolve();
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
   it("cannot reuse an approved prompt version with different prompt text", async () => {

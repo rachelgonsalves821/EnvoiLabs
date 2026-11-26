@@ -21,7 +21,8 @@ const output = { version: 2, executiveAnswer: "Private draft: Ada paused.",
     hypotheses: ["A short receipt helps."], criteria: [], targetCompletes: 10,
     stimulus: null, deadlineAt: "2026-12-01T00:00:00.000Z" } };
 const input = { studyId: id(1), providerModel: "fictional-model",
-  promptVersion: "analyst-v2", systemPrompt: "Use exact redacted spans." };
+  promptVersion: "analyst-v2", systemPrompt: "Use exact redacted spans.",
+  timeoutMs: 10_000 };
 
 async function draftWith(value: unknown = output) {
   const readCurrent = vi.fn().mockResolvedValue(snapshot);

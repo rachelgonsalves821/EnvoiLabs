@@ -1,4 +1,5 @@
 import type { LLMProvider, LLMRequest } from "./index.js";
+import { analystDeadline } from "./analyst-deadline.js";
 
 export interface QualifiedAnalystSource {
   readonly studyId: string;
@@ -89,29 +90,33 @@ function same(left: AnalystSourceSnapshot, right: AnalystSourceSnapshot): boolea
 /** Private draft only; the reviewed qualified publisher remains the final public gate. */
 export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvider,
   input: { readonly studyId: string; readonly providerModel: string;
-    readonly promptVersion: string; readonly systemPrompt: string }): Promise<AnalystDraftResult | null> {
+    readonly promptVersion: string; readonly systemPrompt: string;
+    readonly timeoutMs: number }): Promise<AnalystDraftResult | null> {
+  const deadline = analystDeadline(input.timeoutMs);
   if (!uuid.test(input.studyId) || !nonblank(input.providerModel)
-    || !nonblank(input.promptVersion) || !nonblank(input.systemPrompt)) return null;
+    || !nonblank(input.promptVersion) || !nonblank(input.systemPrompt) || !deadline) return null;
   try {
-    const first = await port.readCurrent(input.studyId);
+    const first = await deadline.run(() => port.readCurrent(input.studyId));
     if (!valid(first, input.studyId)) return null;
     const snapshot = frozen(first);
     const promptDigest = await analystTextDigest(input.systemPrompt);
-    if (await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
-        promptVersion: input.promptVersion, promptDigest, snapshot }) !== true) return null;
-    const beforeRaw = await port.readCurrent(input.studyId);
+    if (await deadline.run(() => port.authorize({ purpose: "ai_analysis",
+        providerModel: input.providerModel, promptVersion: input.promptVersion,
+        promptDigest, snapshot })) !== true) return null;
+    const beforeRaw = await deadline.run(() => port.readCurrent(input.studyId));
     if (!valid(beforeRaw, input.studyId)) return null;
     const beforeDispatch = frozen(beforeRaw);
     if (!same(snapshot, beforeDispatch)
-      || await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
-        promptVersion: input.promptVersion, promptDigest, snapshot: beforeDispatch }) !== true) return null;
+      || await deadline.run(() => port.authorize({ purpose: "ai_analysis",
+        providerModel: input.providerModel, promptVersion: input.promptVersion,
+        promptDigest, snapshot: beforeDispatch })) !== true) return null;
     const request: LLMRequest = { purpose: "ai_analysis", promptVersion: input.promptVersion,
       system: input.systemPrompt, messages: [{ role: "user", content: JSON.stringify({
         studyId: snapshot.studyId, decisionQuestion: snapshot.decisionQuestion,
         sources: snapshot.sources.map(({ transcriptId, sourceVersion, redactedText }) =>
           ({ transcriptId, sourceVersion, redactedText })),
       }) }] };
-    const result = await provider.generate(request);
+    const result = await deadline.run(() => provider.generate(request));
     if (result.model !== input.providerModel
       || ![result.inputTokens, result.outputTokens, result.latencyMs, result.costMicros]
         .every((value) => Number.isSafeInteger(value) && value >= 0)) return null;
@@ -121,12 +126,13 @@ export async function runAnalystDraft(port: AnalystDraftPort, provider: LLMProvi
       policyDigest: source.policyDigest, qualificationDigest: source.qualificationDigest,
     })));
     const decisionQuestionDigest = await analystTextDigest(snapshot.decisionQuestion);
-    const afterRaw = await port.readCurrent(input.studyId);
+    const afterRaw = await deadline.run(() => port.readCurrent(input.studyId));
     if (!valid(afterRaw, input.studyId)) return null;
     const afterDispatch = frozen(afterRaw);
     if (!same(snapshot, afterDispatch)
-      || await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
-        promptVersion: input.promptVersion, promptDigest, snapshot: afterDispatch }) !== true) return null;
+      || await deadline.run(() => port.authorize({ purpose: "ai_analysis",
+        providerModel: input.providerModel, promptVersion: input.promptVersion,
+        promptDigest, snapshot: afterDispatch })) !== true || deadline.expired()) return null;
     return { output: result.output, model: result.model, promptVersion: input.promptVersion,
       promptDigest,
       studyId: snapshot.studyId, decisionQuestionDigest, sources,

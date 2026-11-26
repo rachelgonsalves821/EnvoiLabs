@@ -16,6 +16,7 @@ const snapshot: AnalystMapReduceSnapshot = { studyId: id(1),
     source(2, "The 🥣 soup was late."), source(3, "The receipt helped."),
   ] };
 const input: AnalystMapReduceInput = { studyId: id(1), providerModel: "fictional-model",
+  timeoutMs: 10_000,
   mapPromptVersion: "analyst-map-v1", mapSystemPrompt: "Map fictional spans.",
   reducePromptVersion: "analyst-reduce-v3", reduceSystemPrompt: "Reduce fictional codes." };
 const map = (n: number, exactText: string, startChar: number) => ({ version: 1,
@@ -76,6 +77,27 @@ describe("private analyst map and reduce", () => {
     authorize.mockResolvedValueOnce("false");
     expect(await runAnalystMapReduceDraft(port, provider, input)).toBeNull();
     expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("bounds a stalled current-purpose check before any model dispatch", async () => {
+    const { port, provider, authorize, generate } = setup();
+    authorize.mockImplementation(() => new Promise(() => undefined));
+    expect(await runAnalystMapReduceDraft(port, provider, { ...input, timeoutMs: 1_000 }))
+      .toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("ignores a model result arriving after the overall draft deadline", async () => {
+    const { port, provider, generate } = setup();
+    let release: (result: ReturnType<typeof reply>) => void = () => undefined;
+    generate.mockReset().mockImplementationOnce(() => new Promise((resolve) => {
+      release = resolve;
+    }));
+    const pending = runAnalystMapReduceDraft(port, provider, { ...input, timeoutMs: 1_000 });
+    expect(await pending).toBeNull();
+    release(reply(map(2, "🥣 soup", 4)));
+    await Promise.resolve();
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
   it("stops before the next map when qualification changes", async () => {

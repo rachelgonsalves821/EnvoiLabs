@@ -1,4 +1,5 @@
 import type { LLMProvider, LLMRequest, LLMResponse } from "./index.js";
+import { analystDeadline } from "./analyst-deadline.js";
 import { analystTextDigest, type AnalystDraftPort, type AnalystDraftResult,
   type AnalystSourceSnapshot } from "./analyst-draft.js";
 import { screenAnalystV2Evidence, type ScreenedAnalystEvidence } from
@@ -12,6 +13,8 @@ type MapOutput = { readonly version: 1; readonly transcriptId: string;
 export interface AnalystMapReduceInput {
   readonly studyId: string;
   readonly providerModel: string;
+  /** Overall private draft deadline, including source and purpose rechecks. */
+  readonly timeoutMs: number;
   readonly mapPromptVersion: string;
   readonly mapSystemPrompt: string;
   readonly reducePromptVersion: string;
@@ -125,22 +128,24 @@ function validResponse(response: LLMResponse, model: string): boolean {
  * and report publication transaction. This function never publishes model text. */
 export async function runAnalystMapReduceDraft(port: AnalystMapReducePort, provider: LLMProvider,
   input: AnalystMapReduceInput): Promise<AnalystMapReduceDraft | null> {
-  if (!uuid.test(input.studyId) || !nonblank(input.providerModel)
+  const deadline = analystDeadline(input.timeoutMs);
+  if (!uuid.test(input.studyId) || !nonblank(input.providerModel) || !deadline
     || !nonblank(input.mapPromptVersion) || !nonblank(input.mapSystemPrompt)
     || !nonblank(input.reducePromptVersion) || !nonblank(input.reduceSystemPrompt)) return null;
+  const bounded = deadline.run;
   try {
-    const initial = await port.readCurrent(input.studyId);
+    const initial = await bounded(() => port.readCurrent(input.studyId));
     if (!validSnapshot(initial, input.studyId)) return null;
     const snapshot = freezeSnapshot(initial);
     const mapPromptDigest = await analystTextDigest(input.mapSystemPrompt);
     const promptDigest = await analystTextDigest(input.reduceSystemPrompt);
     const current = async (promptVersion: string, digestValue: string) => {
-      const raw = await port.readCurrent(input.studyId);
+      const raw = await bounded(() => port.readCurrent(input.studyId));
       if (!validSnapshot(raw, input.studyId)) return false;
       const fresh = freezeSnapshot(raw);
       return sameSnapshot(snapshot, fresh)
-        && await port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
-          promptVersion, promptDigest: digestValue, snapshot: fresh }) === true;
+        && await bounded(() => port.authorize({ purpose: "ai_analysis", providerModel: input.providerModel,
+          promptVersion, promptDigest: digestValue, snapshot: fresh })) === true;
     };
     const maps: MapOutput[] = [];
     const telemetry: LLMResponse[] = [];
@@ -155,7 +160,7 @@ export async function runAnalystMapReduceDraft(port: AnalystMapReducePort, provi
           transcriptId: source.transcriptId, sourceVersion: source.sourceVersion,
           redactedText: source.redactedText,
         }) }] };
-      const result = await provider.generate(request);
+      const result = await bounded(() => provider.generate(request));
       if (!validResponse(result, input.providerModel)
         || !validMap(result.output, source.transcriptId, source.sourceVersion, source.questionId,
           source.redactedText, snapshot.hypotheses)
@@ -165,11 +170,11 @@ export async function runAnalystMapReduceDraft(port: AnalystMapReducePort, provi
     }
     if (!await current(input.reducePromptVersion, promptDigest)
       || !await current(input.reducePromptVersion, promptDigest)) return null;
-    const reduced = await provider.generate({ purpose: "ai_analysis",
+    const reduced = await bounded(() => provider.generate({ purpose: "ai_analysis",
       promptVersion: input.reducePromptVersion, system: input.reduceSystemPrompt,
       messages: [{ role: "user", content: JSON.stringify({ studyId: snapshot.studyId,
         decisionQuestion: snapshot.decisionQuestion, hypotheses: snapshot.hypotheses,
-        guideQuestions: snapshot.guideQuestions, maps }) }] });
+        guideQuestions: snapshot.guideQuestions, maps }) }] }));
     if (!validResponse(reduced, input.providerModel)
       || !await current(input.reducePromptVersion, promptDigest)) return null;
     telemetry.push(reduced);
@@ -188,6 +193,7 @@ export async function runAnalystMapReduceDraft(port: AnalystMapReducePort, provi
       Object.freeze({ transcriptId: mapped.transcriptId, sourceVersion: mapped.sourceVersion,
         questionId: mapped.questionId, startChar: code.startChar, endChar: code.endChar,
         exactText: code.exactText }))));
+    if (deadline.expired()) return null;
     return { output: reduced.output, model: reduced.model,
       promptVersion: input.reducePromptVersion, promptDigest,
       mapPromptVersion: input.mapPromptVersion, mapPromptDigest, mapCount: maps.length,
