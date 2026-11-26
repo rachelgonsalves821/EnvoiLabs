@@ -3,6 +3,9 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
+update auth.users set email_confirmed_at = now()
+where id = '90300000-0000-4000-8000-000000000001';
+
 update public.studies set state = 'fielding'
 where id = '90600000-0000-4000-8000-000000000001';
 insert into public.criteria (id, study_id, kind, attribute_key, operator,
@@ -97,6 +100,94 @@ select is(public.read_gate2_screening_sheet(
     'withdrawn model purpose hides a stale screen-out result');
 reset role;
 rollback to savepoint screened_out_result;
+savepoint current_clarification;
+set local role service_role;
+select is(public.commit_gate2_qualified_screening_decision(
+    'a9f30000-0000-4000-8000-000000000004',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'unclear', null, null, 'clarify', null,
+    (public.current_gate2_screening_model_source(
+        '90600000-0000-4000-8000-000000000001',
+        'a9f30000-0000-4000-8000-000000000004',
+        'a9f30000-0000-4000-8000-000000000003', 1,
+        'synthetic-model', 'screening-v1', repeat('a', 64))
+        ->> 'redactedSourceVersion')::uuid,
+    repeat('c', 64), 'synthetic-model', 'screening-v1', repeat('a', 64))
+    ->> 'action', 'clarify', 'unclear source yields a saved clarification');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002') -> 'questions' -> 0 ->> 'status',
+    'clarify', 'owner sees a current request for detail');
+reset role;
+savepoint withdrawn_clarification;
+insert into public.consents (respondent_id, study_id, purpose, granted,
+    text_version) values ('90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_screening', false,
+    'synthetic-ai-screening-v1');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002') -> 'questions' -> 0 ->> 'status',
+    'pending_review', 'withdrawn purpose does not show a stale clarification');
+select throws_ok($$select public.submit_gate2_screening_text(
+    'a9f30000-0000-4000-8000-000000000002',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'I worked hospital shifts this month.',
+    'gate2-screen:22222222-2222-4222-8222-222222222222')$$,
+    '23514', 'check_violation',
+    'a stale clarification cannot authorize another answer');
+reset role;
+rollback to savepoint withdrawn_clarification;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.submit_gate2_screening_text(
+    'a9f30000-0000-4000-8000-000000000002',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'I worked hospital shifts this month.',
+    'gate2-screen:22222222-2222-4222-8222-222222222222') ->> 'status',
+    'pending_review', 'current clarification permits one revised answer');
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002') -> 'questions' -> 0 ->> 'status',
+    'pending_review', 'the revised answer becomes current before review');
+reset role;
+select is((select count(*)::integer from pii.gate2_screener_answers
+    where invite_id = 'a9f30000-0000-4000-8000-000000000002'), 2,
+    'revision adds one private answer without replacing its audit source');
+select is((select idempotency_key from pii.gate2_screener_answers
+    where invite_id = 'a9f30000-0000-4000-8000-000000000002'
+    order by created_at desc, recorded_sequence desc limit 1),
+    'gate2-screen:22222222-2222-4222-8222-222222222222',
+    'same-transaction revision wins over UUID ordering');
+insert into internal.gate2_screening_redacted_sources (answer_id,
+    raw_answer_digest, redacted_text, redaction_policy_digest,
+    qualification_digest, qualified)
+select id, encode(pg_catalog.sha256(convert_to(answer_text, 'UTF8')), 'hex'),
+    answer_text, repeat('c', 64), repeat('d', 64), true
+from pii.gate2_screener_answers
+where idempotency_key = 'gate2-screen:22222222-2222-4222-8222-222222222222';
+set local role service_role;
+select is(public.commit_gate2_qualified_screening_decision(
+    (select id from pii.gate2_screener_answers where idempotency_key =
+        'gate2-screen:22222222-2222-4222-8222-222222222222'),
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'supported', 0, char_length('I worked hospital shifts this month.'),
+    'qualify', true,
+    (public.current_gate2_screening_model_source(
+        '90600000-0000-4000-8000-000000000001',
+        (select id from pii.gate2_screener_answers where idempotency_key =
+            'gate2-screen:22222222-2222-4222-8222-222222222222'),
+        'a9f30000-0000-4000-8000-000000000003', 1,
+        'synthetic-model', 'screening-v1', repeat('a', 64))
+        ->> 'redactedSourceVersion')::uuid,
+    repeat('c', 64), 'synthetic-model', 'screening-v1', repeat('a', 64))
+    ->> 'action', 'qualify', 'revised qualified source advances the offer');
+reset role;
+select is((select state from public.invites where id =
+    'a9f30000-0000-4000-8000-000000000002'), 'invited',
+    'clarification loop ends in an invited offer');
+rollback to savepoint current_clarification;
 set local role service_role;
 select is(public.commit_gate2_qualified_screening_decision(
     'a9f30000-0000-4000-8000-000000000004',
