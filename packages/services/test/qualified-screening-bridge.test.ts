@@ -17,7 +17,9 @@ const source = { studyId: request.studyId, answerId: request.answerId,
 
 describe("qualified screening bridge", () => {
   it("sends only the qualified redacted source to both model ports", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: source, error: null });
+    const rpc = vi.fn().mockImplementation(async (name: string) => ({
+      data: name === "get_gate2_screening_decision" ? null : source,
+      error: null }));
     const model = { interpret: vi.fn().mockResolvedValue({ result: "supported",
       span: { startChar: 0, endChar: 21 } }),
     evidenceSupports: vi.fn().mockResolvedValue(true) };
@@ -33,14 +35,17 @@ describe("qualified screening bridge", () => {
   });
 
   it("blocks a changed source, revoked consent, or stale span before evidence", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: source, error: null });
+    let current: typeof source | null = source;
+    const rpc = vi.fn().mockImplementation(async (name: string) => ({
+      data: name === "get_gate2_screening_decision" ? null : current,
+      error: null }));
     const model = { interpret: vi.fn(), evidenceSupports: vi.fn() };
     const bridge = createQualifiedScreeningBridge({ rpc }, model);
-    rpc.mockResolvedValueOnce({ data: null, error: null });
+    current = null;
     expect(await bridge.interpret(request)).toBeNull();
     expect(model.interpret).not.toHaveBeenCalled();
-    rpc.mockResolvedValueOnce({ data: { ...source,
-      redactedSourceVersion: "a9f20000-0000-4000-8000-000000000098" }, error: null });
+    current = { ...source,
+      redactedSourceVersion: "a9f20000-0000-4000-8000-000000000098" };
     expect(await bridge.evidenceSupports(request, source, "supported",
       { startChar: 0, endChar: 21 })).toBe(false);
     expect(await bridge.evidenceSupports(request, source, "supported",

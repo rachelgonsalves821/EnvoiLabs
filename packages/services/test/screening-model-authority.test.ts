@@ -25,12 +25,14 @@ async function attempt(): Promise<ScreeningAuthorizationAttempt> {
 
 describe("current Gate 2 screening model authorization", () => {
   it("re-reads the exact policy-bound source for every authorization attempt", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: source, error: null })
-      .mockResolvedValueOnce({ data: null, error: null });
+    let sourceReads = 0;
+    const rpc = vi.fn().mockImplementation(async (name: string) => ({
+      data: name === "get_gate2_screening_decision" ? null
+        : ++sourceReads === 1 ? source : null, error: null }));
     const port = createGate2ScreeningModelUsePort({ rpc });
     expect(await port.authorize(await attempt())).toBe(true);
     expect(await port.authorize(await attempt())).toBe(false);
-    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenCalledTimes(4);
     expect(rpc).toHaveBeenCalledWith("current_gate2_screening_model_source", {
       requested_study_id: source.studyId, requested_answer_id: source.answerId,
       requested_rule_id: source.ruleId, requested_rule_version: 1,
@@ -41,18 +43,25 @@ describe("current Gate 2 screening model authorization", () => {
   });
 
   it("rejects stale answer or wording even when the database returns an authorized row", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: {
-      ...source, answerText: "My sister worked as a hospital nurse." }, error: null });
+    let current = { ...source, answerText: "My sister worked as a hospital nurse." };
+    const rpc = vi.fn().mockImplementation(async (name: string) => ({
+      data: name === "get_gate2_screening_decision" ? null : current, error: null }));
     const port = createGate2ScreeningModelUsePort({ rpc });
     expect(await port.authorize(await attempt())).toBe(false);
-    rpc.mockResolvedValue({ data: { ...source, criterionText: "Nurse last year" }, error: null });
+    current = { ...source, criterionText: "Nurse last year" };
     expect(await port.authorize(await attempt())).toBe(false);
-    rpc.mockResolvedValue({ data: { ...source,
-      redactedSourceVersion: "a9f20000-0000-4000-8000-000000000098" }, error: null });
+    current = { ...source,
+      redactedSourceVersion: "a9f20000-0000-4000-8000-000000000098" };
     expect(await port.authorize(await attempt())).toBe(false);
-    rpc.mockResolvedValue({ data: { ...source,
-      redactionPolicyDigest: "d".repeat(64) }, error: null });
+    current = { ...source, redactionPolicyDigest: "d".repeat(64) };
     expect(await port.authorize(await attempt())).toBe(false);
+  });
+
+  it("does not authorize a second model call after the first decision", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { action: "qualify" }, error: null });
+    expect(await createGate2ScreeningModelUsePort({ rpc }).authorize(await attempt()))
+      .toBe(false);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed for an invalid purpose, malformed receipt and database outage", async () => {

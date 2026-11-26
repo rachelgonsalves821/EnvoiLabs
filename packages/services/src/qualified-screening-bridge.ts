@@ -16,6 +16,11 @@ export function createQualifiedScreeningBridge(db: Database, model: Model) {
   return {
     async interpret(request: Request): Promise<{
       source: QualifiedScreeningSource; interpretation: unknown } | null> {
+      try {
+        const prior = await db.rpc("get_gate2_screening_decision", {
+          requested_answer_id: request.answerId });
+        if (prior.error || prior.data !== null) return null;
+      } catch { return null; }
       const source = await readGate2QualifiedScreeningSource(db, request);
       if (!source) return null;
       try { return { source, interpretation: await model.interpret(source) }; }

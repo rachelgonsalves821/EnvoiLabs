@@ -698,6 +698,11 @@ export type Database = {
           end_char: number | null
           id: string
           interpretation: string | null
+          prompt_digest: string | null
+          prompt_version: string | null
+          provider_model: string | null
+          redacted_source_version: string | null
+          redaction_policy_digest: string | null
           rule_id: string
           rule_version: number
           start_char: number | null
@@ -710,6 +715,11 @@ export type Database = {
           end_char?: number | null
           id?: string
           interpretation?: string | null
+          prompt_digest?: string | null
+          prompt_version?: string | null
+          provider_model?: string | null
+          redacted_source_version?: string | null
+          redaction_policy_digest?: string | null
           rule_id: string
           rule_version: number
           start_char?: number | null
@@ -722,6 +732,11 @@ export type Database = {
           end_char?: number | null
           id?: string
           interpretation?: string | null
+          prompt_digest?: string | null
+          prompt_version?: string | null
+          provider_model?: string | null
+          redacted_source_version?: string | null
+          redaction_policy_digest?: string | null
           rule_id?: string
           rule_version?: number
           start_char?: number | null
@@ -1776,6 +1791,24 @@ export type Database = {
         Args: {
           requested_reservation_id: string
           supplied_auth_user_id: string
+        }
+        Returns: Json
+      }
+      commit_gate2_qualified_screening_decision: {
+        Args: {
+          requested_action: string
+          requested_answer_id: string
+          requested_confirmed: boolean
+          requested_end: number
+          requested_interpretation: string
+          requested_prompt_digest: string
+          requested_prompt_version: string
+          requested_provider_model: string
+          requested_redaction_policy_digest: string
+          requested_rule_id: string
+          requested_source_version: string
+          requested_start: number
+          requested_version: number
         }
         Returns: Json
       }
