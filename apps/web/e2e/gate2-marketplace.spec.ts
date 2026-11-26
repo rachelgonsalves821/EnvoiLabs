@@ -281,6 +281,124 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           .eq("study_id", study.data.id).eq("state", "approved");
         expect(firstStudyApprovals.error).toBeNull();
         expect(firstStudyApprovals.count).toBe(3);
+        // IT-2.4: a reviewed removal frees one purchased slot and creates a
+        // new offer for a newly eligible profile under the original quote.
+        const standbyEmail = `gate2-market-standby-${randomUUID()}@example.test`;
+        const standbyUser = await db.auth.admin.createUser({
+          email: standbyEmail, email_confirm: true,
+        });
+        if (standbyUser.error || !standbyUser.data.user)
+          throw new Error("Synthetic standby account is missing.");
+        const standby = await db.rpc("provision_email_respondent", {
+          supplied_user_id: standbyUser.data.user.id,
+        });
+        if (standby.error || !standby.data)
+          throw new Error("Synthetic standby profile is missing.");
+        const standbyFacts = await db.from("profile_attributes").insert(
+          profile.map(([key, value_json]) => ({ respondent_id: standby.data,
+            key, value_json, source: "signup" })));
+        expect(standbyFacts.error).toBeNull();
+        const standbyConsents = await db.from("consents").insert(
+          ["retention", "researcher_access"].map((purpose) => ({
+            respondent_id: standby.data, purpose, granted: true,
+            text_version: "synthetic-marketplace-fixture",
+          })));
+        expect(standbyConsents.error).toBeNull();
+
+        const submitOffer = async (email: string, offerId: string) => {
+          const context = await browser.newContext({ baseURL: origin });
+          try {
+            const page = await context.newPage();
+            await page.goto("/r/signup");
+            await page.getByLabel("Email address").fill(email);
+            await page.getByRole("checkbox", { name: /18 or older/ }).check();
+            await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+            const link = await deliveredEmail(page, email, origin,
+              "/api/respondent/auth/callback");
+            await page.goto(link.href);
+            await page.goto("/r");
+            await page.getByRole("button", { name: "Start answering" }).click();
+            await expect(page).toHaveURL(origin + `/r/interviews/${offerId}`);
+            for (const [index, question] of core.entries()) {
+              await expect(page.getByRole("heading", { name: question })).toBeVisible();
+              await page.getByRole("textbox", { name: "Type your answer" })
+                .fill(`Synthetic replacement answer ${index + 1}`);
+              await page.getByRole("button", { name: "Save answer" }).click();
+            }
+            await page.getByRole("button", { name: "Submit interview" }).click();
+            await expect(page.getByText("Pending quality check")).toBeVisible();
+            const submitted = await db.from("sessions").select("id,state")
+              .eq("invite_id", offerId).single();
+            if (submitted.error || !submitted.data || submitted.data.state !== "quality_hold")
+              throw new Error("Synthetic replacement journey did not reach quality hold.");
+            return { context, page, sessionId: submitted.data.id };
+          } catch (error) {
+            await context.close();
+            throw error;
+          }
+        };
+        const removable = offers.data?.[4];
+        if (!removable) throw new Error("The removable synthetic offer is missing.");
+        const removableEmail = respondentEmails[
+          respondentIds.indexOf(removable.respondent_id)];
+        if (!removableEmail) throw new Error("The removable account email is missing.");
+        const removedJourney = await submitOffer(removableEmail, removable.id);
+        try {
+          const removalArgs = {
+            supplied_study_id: study.data.id, supplied_quote_id: prepared.quote.id,
+            supplied_session_id: removedJourney.sessionId,
+            supplied_actor_auth_id: account.data.user.id,
+            supplied_decision: "remove", supplied_score: 0,
+            supplied_components: { synthetic: true },
+            supplied_reason: "Synthetic reviewed removal",
+          };
+          const removal = await db.rpc("decide_gate2_marketplace_quality", removalArgs);
+          expect(removal.error).toBeNull();
+          expect(removal.data).toMatchObject({ decision: "remove",
+            replacement: { created: 1, remaining: 0 } });
+          const replayRemoval = await db.rpc("decide_gate2_marketplace_quality", removalArgs);
+          expect(replayRemoval.error).toBeNull();
+          expect(replayRemoval.data).toMatchObject({ replacement: { created: 0 } });
+          await removedJourney.page.goto("/r/earnings");
+          await expect(removedJourney.page.getByText("No approved study rewards yet."))
+            .toBeVisible();
+        } finally {
+          await removedJourney.context.close();
+        }
+        const replacementOffer = await db.from("invites")
+          .select("id,state,reward_cents").eq("study_id", study.data.id)
+          .eq("respondent_id", standby.data).single();
+        if (replacementOffer.error || !replacementOffer.data)
+          throw new Error("The purchased slot did not produce a standby offer.");
+        expect(replacementOffer.data).toMatchObject({ state: "invited", reward_cents: 500 });
+        const replacementJourney = await submitOffer(standbyEmail, replacementOffer.data.id);
+        try {
+          const approval = await db.rpc("decide_gate2_marketplace_quality", {
+            supplied_study_id: study.data.id, supplied_quote_id: prepared.quote.id,
+            supplied_session_id: replacementJourney.sessionId,
+            supplied_actor_auth_id: account.data.user.id,
+            supplied_decision: "approve", supplied_score: 100,
+            supplied_components: { synthetic: true }, supplied_reason: null,
+          });
+          expect(approval.error).toBeNull();
+          await replacementJourney.page.goto("/r/earnings");
+          await expect(replacementJourney.page.getByRole("heading", { name: "Earned" })
+            .locator("..").getByText("$5.00")).toBeVisible();
+        } finally {
+          await replacementJourney.context.close();
+        }
+        const afterReplacement = await db.from("sessions")
+          .select("id,state").eq("study_id", study.data.id)
+          .in("state", ["approved", "removed"]);
+        expect(afterReplacement.error).toBeNull();
+        expect(afterReplacement.data?.filter(({ state }) => state === "approved")).toHaveLength(4);
+        expect(afterReplacement.data?.filter(({ state }) => state === "removed")).toHaveLength(1);
+        const offerCount = await db.from("invites")
+          .select("id", { count: "exact", head: true }).eq("study_id", study.data.id);
+        expect(offerCount.count).toBe(11);
+        const frozenQuotes = await db.from("gate2_quote_snapshots")
+          .select("id,total_cents").eq("study_id", study.data.id);
+        expect(frozenQuotes.data).toEqual([{ id: prepared.quote.id, total_cents: 10_000 }]);
         // Two more paid studies earn the same respondent enough for one
         // denomination-qualified synthetic Visa batch. They remain separate
         // quotes and approved session receipts.
