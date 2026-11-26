@@ -41,6 +41,18 @@ describe("IT-3.2 report evidence integrity", () => {
     expect(verifyEvidence("44444444-4444-4444-8444-444444444444", [quote], [source])[0]?.action).toBe("drop");
   });
 
+  it("rejects duplicate logical source UUIDs even when their letter case differs", () => {
+    const lower = { ...source, transcriptId: "a2222222-2222-4222-8222-222222222222" };
+    const upper = { ...lower, transcriptId: lower.transcriptId.toUpperCase() };
+    const proposed = { ...quote, transcriptId: lower.transcriptId };
+    expect(verifyEvidence(source.studyId, [proposed], [lower])[0]?.action).toBe("accept");
+    expect(verifyEvidence(source.studyId,
+      [{ ...proposed, transcriptId: upper.transcriptId }], [lower])[0])
+      .toMatchObject({ action: "accept", evidence: { transcriptId: lower.transcriptId } });
+    expect(verifyEvidence(source.studyId, [proposed], [lower, upper])[0])
+      .toMatchObject({ action: "drop", reason: "study or source mismatch" });
+  });
+
   it("fails closed when an old unversioned quote reference reaches the gate", () => {
     const oldReference = { transcriptId: quote.transcriptId, startChar: quote.startChar, endChar: quote.endChar };
     expect(verifyEvidence(source.studyId, [oldReference as ProposedEvidence], [source])[0]?.action).toBe("drop");

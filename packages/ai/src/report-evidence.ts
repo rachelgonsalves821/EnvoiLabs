@@ -37,13 +37,17 @@ export function verifyEvidence(
   const byId = new Map<string, RedactedSource>();
   const duplicates = new Set<string>();
   for (const source of sources.filter((item) => item.studyId === studyId)) {
-    if (byId.has(source.transcriptId)) duplicates.add(source.transcriptId);
-    byId.set(source.transcriptId, source);
+    if (typeof source.transcriptId !== "string") continue;
+    const key = source.transcriptId.toLowerCase();
+    if (byId.has(key)) duplicates.add(key);
+    byId.set(key, source);
   }
   return proposed.map((evidence): EvidenceDecision => {
     let reason: string | null = null;
-    const source = byId.get(evidence.transcriptId);
-    if (evidence.studyId !== studyId || !source || duplicates.has(evidence.transcriptId))
+    const key = typeof evidence.transcriptId === "string"
+      ? evidence.transcriptId.toLowerCase() : "";
+    const source = byId.get(key);
+    if (evidence.studyId !== studyId || !source || duplicates.has(key))
       reason = "study or source mismatch";
     else if (!source.published || source.withdrawn || !source.redactedText) reason = "source unavailable";
     else if (!uuid.test(source.sourceVersion) || source.sourceVersion !== evidence.sourceVersion)
@@ -56,10 +60,11 @@ export function verifyEvidence(
       reason = "quote differs from redacted source";
     else if (typeof evidence.rationale !== "string" || !evidence.rationale.trim() || !Number.isFinite(evidence.confidence)
       || evidence.confidence < 0 || evidence.confidence > 1) reason = "invalid provenance";
-    if (reason) return { action: "drop", transcriptId: evidence.transcriptId, reason };
+    if (reason || !source) return { action: "drop", transcriptId: evidence.transcriptId,
+      reason: reason ?? "study or source mismatch" };
     const verified: VerifiedEvidence = {
-      studyId: evidence.studyId, transcriptId: evidence.transcriptId,
-      sourceVersion: evidence.sourceVersion, startChar: evidence.startChar,
+      studyId, transcriptId: source.transcriptId,
+      sourceVersion: source.sourceVersion, startChar: evidence.startChar,
       endChar: evidence.endChar, exactText: evidence.exactText, confidence: evidence.confidence,
     };
     return { action: "accept", evidence: verified };
