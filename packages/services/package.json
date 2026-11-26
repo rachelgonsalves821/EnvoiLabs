@@ -10,6 +10,7 @@
     "./screening-adapter": "./src/screening-adapter.ts",
     "./screening-model-authority": "./src/screening-model-authority.ts",
     "./qualified-screening-source": "./src/qualified-screening-source.ts",
+    "./qualified-screening-bridge": "./src/qualified-screening-bridge.ts",
     "./study-draft": "./src/study-draft.ts",
     "./study-draft-criteria": "./src/study-draft-criteria.ts",
     "./study-tracking": "./src/study-tracking.ts",
