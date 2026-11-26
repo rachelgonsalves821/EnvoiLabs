@@ -5,6 +5,8 @@ import {
 import type { NextRequest } from "next/server";
 import { failure, input, reply } from "../auth/http";
 import { requestSession, trustedClient } from "../auth/supabase";
+import { gate4RouteCheck, type Gate4RouteCheck } from "../gate4/route-check";
+import { rateLimitRejection } from "../gate4/rate-limit-http";
 
 export const audioBucket = "gate1-interview-audio";
 export const maxAudioBytes = 20 * 1024 * 1024;
@@ -34,7 +36,7 @@ function audioFailure(error: { code: string } | null) {
   return failure(503);
 }
 
-export async function startAudioUpload(request: NextRequest) {
+export async function startAudioUpload(request: NextRequest, check: Gate4RouteCheck = gate4RouteCheck) {
   const parsed = await input(request);
   if (parsed.error !== undefined) return failure(parsed.error);
   const audio = StartAudioUploadRequestSchema.safeParse(parsed.body);
@@ -47,6 +49,8 @@ export async function startAudioUpload(request: NextRequest) {
   if (!session.client || !service) return failure(503);
   const identity = await session.client.auth.getClaims();
   if (identity.error || !identity.data?.claims.sub) return failure(401);
+  const rejection = rateLimitRejection(await check(request, "audio-upload", identity.data.claims.sub));
+  if (rejection) return rejection;
   const { data, error } = await session.client.rpc("reserve_gate1_audio", {
     supplied_session_id: audio.data.sessionId, supplied_question_id: audio.data.guideQuestionId,
     supplied_bytes: audio.data.bytes, supplied_mime: mime,

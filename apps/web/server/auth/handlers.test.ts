@@ -57,6 +57,21 @@ describe("auth handlers", () => {
     expect(calls.signIn).not.toHaveBeenCalled();
   });
 
+  it("rejects both email start paths before OTP when the shared limiter denies or is unavailable", async () => {
+    const limited = vi.fn(async () => ({ kind: "limited" as const, retryAfterSeconds: 17 }));
+    const unavailable = vi.fn(async () => ({ kind: "unavailable" as const }));
+    const respondent = await respondentStart(post({ email, ageAttested: true }), limited);
+    const researcher = await researcherStart(post({ email }), unavailable);
+    expect(respondent.status).toBe(429);
+    expect(respondent.headers.get("Retry-After")).toBe("17");
+    expect(researcher.status).toBe(503);
+    expect(limited).toHaveBeenCalledWith(expect.any(NextRequest), "email-start", email);
+    expect(unavailable).toHaveBeenCalledWith(expect.any(NextRequest), "email-start", email);
+    expect(calls.signIn).not.toHaveBeenCalled();
+    expect(calls.commit).not.toHaveBeenCalled();
+    expect(respondent.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
   it("requests a sign-in link and provisions only after same-browser email verification", async () => {
     const started = await respondentStart(post({ email: " Respondent@Example.Test ", ageAttested: true }));
     expect(started.status).toBe(200);
