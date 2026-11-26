@@ -1787,6 +1787,10 @@ export type Database = {
         Args: { supplied_claim_id: string; supplied_delivery_id: string }
         Returns: Json
       }
+      claim_gate2_offer_push_delivery: {
+        Args: { supplied_claim_id: string; supplied_delivery_id: string }
+        Returns: Json
+      }
       claim_gate2_refund_intent: {
         Args: {
           requested_reservation_id: string
@@ -2015,6 +2019,8 @@ export type Database = {
       list_gate1_home_invites: { Args: never; Returns: Json }
       list_gate2_nudge_candidates: { Args: never; Returns: Json }
       list_gate2_nudge_dispatchable: { Args: never; Returns: Json }
+      list_gate2_offer_push_candidates: { Args: never; Returns: Json }
+      list_gate2_offer_push_dispatchable: { Args: never; Returns: Json }
       list_gate3_probe_due: { Args: { supplied_limit: number }; Returns: Json }
       list_gate3_probe_render_due: {
         Args: { supplied_limit: number }
@@ -2038,7 +2044,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      observe_gate2_offer_push_delivery: {
+        Args: {
+          supplied_claim_id: string
+          supplied_delivery_id: string
+          supplied_state: string
+        }
+        Returns: boolean
+      }
       prepare_gate2_nudge_deliveries: {
+        Args: { supplied_outbox_id: string }
+        Returns: Json
+      }
+      prepare_gate2_offer_push_deliveries: {
         Args: { supplied_outbox_id: string }
         Returns: Json
       }
@@ -2061,6 +2079,10 @@ export type Database = {
           supplied_kind: string
           supplied_session_id: string
         }
+        Returns: boolean
+      }
+      queue_gate2_offer_push: {
+        Args: { supplied_invite_id: string }
         Returns: boolean
       }
       read_gate1_audio_reservation: {
