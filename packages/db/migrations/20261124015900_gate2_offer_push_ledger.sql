@@ -28,6 +28,9 @@ alter table internal.gate2_offer_push_deliveries enable row level security;
 revoke all on internal.gate2_offer_push_outbox,
     internal.gate2_offer_push_deliveries
     from public, anon, authenticated, service_role;
+create trigger immutable_gate2_offer_push_outbox before update or delete
+    on internal.gate2_offer_push_outbox for each row
+    execute function internal.reject_gate2_ledger_mutation();
 
 create function internal.gate2_offer_push_consent_receipt(
     target_respondent uuid, target_study uuid)

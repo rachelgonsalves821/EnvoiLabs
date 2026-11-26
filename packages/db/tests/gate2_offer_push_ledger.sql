@@ -76,6 +76,9 @@ select is(jsonb_array_length(public.prepare_gate2_offer_push_deliveries(
 reset role;
 select is((select count(*) from internal.gate2_offer_push_outbox),
     1::bigint, 'exact queue replay created one outbox entry');
+select throws_ok($$update internal.gate2_offer_push_outbox
+    set consent_receipt = sha256(convert_to('tampered', 'UTF8'))$$,
+    '23514', null, 'queued consent identity is immutable');
 select is((select count(*) from internal.gate2_offer_push_deliveries),
     1::bigint, 'one endpoint hash is claimable');
 update internal.gate2_offer_push_deliveries
