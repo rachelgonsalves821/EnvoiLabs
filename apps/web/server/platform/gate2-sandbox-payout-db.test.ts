@@ -1,0 +1,67 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "../../../../packages/db/src/database.generated";
+import { createGate2SandboxPayoutDatabase,
+  readGate2SandboxPayoutRecipient } from "./gate2-sandbox-payout-db";
+
+const id = "11111111-1111-4111-8111-111111111111";
+const sessionId = "22222222-2222-4222-8222-222222222222";
+const saved = { id, sessionId, respondentId: "33333333-3333-4333-8333-333333333333",
+  recipientId: id, productId: "sandbox_visa", amountCents: 300,
+  state: "pending", providerOrderId: null };
+const client = (rpc: ReturnType<typeof vi.fn>) =>
+  ({ rpc } as unknown as SupabaseClient<Database>);
+
+describe("frozen sandbox Visa database adapter", () => {
+  it("reserves by the exact stable session key and observes the frozen route", async () => {
+    const rpc = vi.fn().mockResolvedValueOnce({ data: saved, error: null })
+      .mockResolvedValueOnce({ data: true, error: null });
+    const db = createGate2SandboxPayoutDatabase(client(rpc), 200000);
+    expect(await db.reserveSessionPayout(sessionId, `payout:${sessionId}`)).toEqual(saved);
+    expect(rpc).toHaveBeenNthCalledWith(1, "reserve_gate2_sandbox_visa_intent",
+      { requested_session_id: sessionId, annual_cap_cents: 200000 });
+    await db.recordOrder(id, { id: "ORDER-1", eventId: "evt_ordered",
+      recipientId: id, productId: "sandbox_visa", amountCents: 300,
+      status: "ordered", observedAt: "2026-11-25T02:00:00Z" });
+    expect(rpc).toHaveBeenNthCalledWith(2,
+      "record_gate2_sandbox_visa_observation", expect.objectContaining({
+        requested_payout_id: id, requested_recipient_id: id,
+        requested_product_id: "sandbox_visa", requested_amount_cents: 300 }));
+  });
+
+  it("keeps policy denial separate from a transient database failure", async () => {
+    const rpc = vi.fn().mockResolvedValueOnce({ data: null,
+      error: { code: "23514", message: "below Visa minimum" } })
+      .mockResolvedValueOnce({ data: null,
+        error: { code: "PGRST500", message: "database unavailable" } });
+    const db = createGate2SandboxPayoutDatabase(client(rpc), 200000);
+    await expect(db.reserveSessionPayout(sessionId, `payout:${sessionId}`))
+      .rejects.toThrow("Payout reservation denied");
+    await expect(db.reserveSessionPayout(sessionId, `payout:${sessionId}`))
+      .rejects.toMatchObject({ code: "PGRST500" });
+    await expect(db.reserveSessionPayout(sessionId, "different-key"))
+      .rejects.toThrow("Payout reservation denied");
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a cross-recipient observation before the database call", async () => {
+    const rpc = vi.fn();
+    const db = createGate2SandboxPayoutDatabase(client(rpc), 200000);
+    await expect(db.recordOrder(id, { id: "ORDER-1", eventId: "event",
+      recipientId: sessionId, productId: "sandbox_visa", amountCents: 300,
+      status: "ordered", observedAt: "2026-11-25T02:00:00Z" }))
+      .rejects.toThrow("Invalid sandbox payout observation");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("reads a recipient only through the restricted frozen-intent RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { name: "Synthetic Person",
+      email: "synthetic@example.test", country: "US" }, error: null });
+    expect(await readGate2SandboxPayoutRecipient(client(rpc), id)).toEqual({
+      name: "Synthetic Person", email: "synthetic@example.test", country: "US" });
+    expect(rpc).toHaveBeenCalledWith("read_gate2_sandbox_visa_recipient",
+      { requested_payout_id: id });
+    expect(await readGate2SandboxPayoutRecipient(client(rpc), "bad-id")).toBeNull();
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+});

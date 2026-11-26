@@ -2032,6 +2032,10 @@ export type Database = {
         Args: { requested_reservation_id: string }
         Returns: Json
       }
+      read_gate2_sandbox_visa_recipient: {
+        Args: { requested_payout_id: string }
+        Returns: Json
+      }
       read_gate2_screening_sheet: {
         Args: { supplied_invite_id: string }
         Returns: Json
@@ -2091,6 +2095,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      record_gate2_sandbox_visa_observation: {
+        Args: {
+          requested_amount_cents: number
+          requested_event_id: string
+          requested_kind: string
+          requested_observed_at: string
+          requested_order_id: string
+          requested_payout_id: string
+          requested_product_id: string
+          requested_recipient_id: string
+        }
+        Returns: boolean
+      }
       record_gate3_probe_render_terminal: {
         Args: { supplied_auth_user_id: string; supplied_turn_id: string }
         Returns: Json
@@ -2137,6 +2154,10 @@ export type Database = {
           supplied_question_id: string
           supplied_session_id: string
         }
+        Returns: Json
+      }
+      reserve_gate2_sandbox_visa_intent: {
+        Args: { annual_cap_cents: number; requested_session_id: string }
         Returns: Json
       }
       reserve_gate2_session_payout: {
