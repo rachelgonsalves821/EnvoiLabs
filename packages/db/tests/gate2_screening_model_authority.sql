@@ -132,6 +132,13 @@ create temporary table gate2_first_screening_version as
     select source_version from internal.gate2_screening_redacted_sources
     where answer_id = 'a9f20000-0000-4000-8000-000000000004'
     order by sequence desc limit 1;
+select throws_ok($$update internal.gate2_screening_redacted_sources
+    set source_version = gen_random_uuid()
+    where answer_id = 'a9f20000-0000-4000-8000-000000000004'$$,
+    '23514', null, 'qualified source identity cannot be rewritten');
+select throws_ok($$delete from internal.gate2_screening_redacted_sources
+    where answer_id = 'a9f20000-0000-4000-8000-000000000004'$$,
+    '23514', null, 'qualified source history cannot be deleted');
 set local role service_role;
 select is(public.current_gate2_screening_model_source(
     '90600000-0000-4000-8000-000000000001',

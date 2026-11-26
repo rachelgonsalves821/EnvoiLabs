@@ -51,6 +51,9 @@ create index gate2_screening_redacted_sources_latest
 alter table internal.gate2_screening_redacted_sources enable row level security;
 revoke all on internal.gate2_screening_redacted_sources
     from public, anon, authenticated, service_role;
+create trigger immutable_gate2_screening_redacted_source
+    before update or delete on internal.gate2_screening_redacted_sources
+    for each row execute function internal.reject_gate2_ledger_mutation();
 
 create function public.current_gate2_screening_model_source(
     requested_study_id uuid, requested_answer_id uuid, requested_rule_id uuid,
