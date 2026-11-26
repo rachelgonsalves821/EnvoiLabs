@@ -121,6 +121,25 @@ select is(public.claim_gate2_screening_audio(
     (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture)),
     null::jsonb, 'completed audio cannot be leased again');
 reset role;
+create temp table duplicate_screening_audio (payload jsonb);
+grant select, insert on duplicate_screening_audio to authenticated, service_role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+insert into duplicate_screening_audio select public.reserve_gate2_screening_audio(
+    'a9d10000-0000-4000-8000-000000000003',
+    'a9d10000-0000-4000-8000-000000000002', 1, 4096, 'audio/webm');
+reset role;
+set local role service_role;
+select is(public.confirm_gate2_screening_audio(
+    '90500000-0000-4000-8000-000000000001',
+    'a9d10000-0000-4000-8000-000000000003',
+    (select (payload ->> 'audioObjectId')::uuid from duplicate_screening_audio),
+    5000, repeat('b',64)) ->> 'status', 'queued',
+    'a second tab can confirm another object while an answer is pending');
+select is(public.claim_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from duplicate_screening_audio)),
+    null::jsonb, 'worker does not transcribe a second pending answer for the same rule');
+reset role;
 update internal.gate2_screening_audio_uploads
 set expires_at = now() - interval '1 second'
 where id = (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture);

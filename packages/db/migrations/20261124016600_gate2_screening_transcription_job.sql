@@ -84,6 +84,12 @@ begin
         or job.lease_expires_at > clock_timestamp() then return null; end if;
     select * into source from internal.gate2_screening_audio_source(target_id);
     if not found then return null; end if;
+    if exists (select 1 from pii.gate2_screener_answers as previous
+        where previous.invite_id = job.invite_id and previous.rule_id = job.rule_id
+            and previous.rule_version = job.rule_version
+            and not exists (select 1 from public.gate2_screening_events as decision
+                where decision.answer_id = previous.id and decision.action = 'clarify'))
+    then return null; end if;
     update internal.gate2_screening_audio_uploads
     set lease_id = gen_random_uuid(), lease_expires_at = clock_timestamp() + interval '2 minutes',
         attempts = attempts + 1, recording_consent_id = source.recording_id,
@@ -158,6 +164,12 @@ begin
         or nullif(btrim(supplied_provider), '') is null
         or nullif(btrim(supplied_model), '') is null
     then raise invalid_parameter_value; end if;
+    if exists (select 1 from pii.gate2_screener_answers as previous
+        where previous.invite_id = job.invite_id and previous.rule_id = job.rule_id
+            and previous.rule_version = job.rule_version
+            and not exists (select 1 from public.gate2_screening_events as decision
+                where decision.answer_id = previous.id and decision.action = 'clarify'))
+    then return jsonb_build_object('status', 'stale'); end if;
     insert into pii.gate2_screening_transcription_receipts
         (invite_id, study_id, respondent_id, rule_id, rule_version,
         audio_object_id, audio_storage_path, audio_bytes, audio_mime,
