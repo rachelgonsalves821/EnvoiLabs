@@ -205,6 +205,16 @@ test.describe("Gate 2 consented voice screener fixture", () => {
       expect(staleSource.data).toBeNull();
       expect(await decideQualifiedScreeningAnswer(db, model, request)).toBeNull();
       expect(modelCalls).toBe(1);
+      const staleAccept = await page.request.post("/api/respondent/invites/accept", {
+        data: { inviteId: offer.data.id, action: "accept" },
+      });
+      expect(staleAccept.status()).toBe(409);
+      const noInterview = await db.from("sessions").select("id")
+        .eq("invite_id", offer.data.id);
+      expect(noInterview.error).toBeNull();
+      expect(noInterview.data).toEqual([]);
+      await page.goto("/r");
+      await expect(page.getByRole("button", { name: "Start answering" })).toHaveCount(0);
       await page.goto(`/r/screening/${offer.data.id}`);
       await page.reload();
       await expect(page.getByText("Your answer is awaiting review.")).toHaveCount(0);

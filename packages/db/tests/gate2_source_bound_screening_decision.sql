@@ -88,6 +88,10 @@ reset role;
 select is((select state from public.invites
     where id = 'a9f30000-0000-4000-8000-000000000002'),
     'invited', 'one qualified decision advances the offer');
+select ok(internal.gate2_screening_offer_current(
+    'a9f30000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001'),
+    'the current qualified source permits offer acceptance');
 select is((select count(*)::integer from public.gate2_screening_events
     where answer_id = 'a9f30000-0000-4000-8000-000000000004'), 1,
     'replay does not duplicate the private event');
@@ -104,7 +108,14 @@ insert into public.consents (respondent_id, study_id, purpose, granted,
     text_version) values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'ai_screening', false,
     'synthetic-ai-screening-v1');
+select ok(not internal.gate2_screening_offer_current(
+    'a9f30000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001'),
+    'withdrawn model purpose removes current offer eligibility');
 set local role service_role;
+select throws_ok($$update public.invites set state = 'accepted'
+    where id = 'a9f30000-0000-4000-8000-000000000002'$$,
+    '23514', null, 'service-role accept cannot bypass withdrawn screening');
 select throws_ok($$select public.commit_gate2_qualified_screening_decision(
     'a9f30000-0000-4000-8000-000000000004',
     'a9f30000-0000-4000-8000-000000000003', 1,
@@ -156,5 +167,9 @@ select is(public.get_gate2_current_qualified_screening_decision(
     'synthetic-model', 'screening-v1', repeat('a', 64)), null,
     'retry reader does not fall back after a withheld source');
 reset role;
+select ok(not internal.gate2_screening_offer_current(
+    'a9f30000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001'),
+    'withheld re-redaction removes offer eligibility');
 select * from finish();
 rollback;
