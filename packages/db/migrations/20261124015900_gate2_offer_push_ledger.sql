@@ -57,19 +57,19 @@ revoke all on function internal.gate2_offer_push_consent_receipt(uuid, uuid)
 
 create function internal.gate2_offer_push_current(target public.invites)
 returns boolean language sql stable security definer set search_path = '' as $$
-    select target.state = 'invited' and target.expires_at > clock_timestamp()
+    select (target).state = 'invited' and (target).expires_at > clock_timestamp()
         and exists (select 1 from public.studies as study
-            where study.id = target.study_id and study.state = 'fielding')
+            where study.id = (target).study_id and study.state = 'fielding')
         and exists (select 1 from public.respondents as respondent
-            where respondent.id = target.respondent_id and respondent.status = 'active'
+            where respondent.id = (target).respondent_id and respondent.status = 'active'
                 and internal.gate2_offer_push_consent_receipt(
-                    respondent.id, target.study_id) is not null
+                    respondent.id, (target).study_id) is not null
                 and exists (select 1 from public.push_subscriptions as subscription
                     where subscription.respondent_id = respondent.id))
         and exists (select 1 from public.gate2_quote_snapshots as quote
             join public.gate2_payment_events as paid
                 on paid.quote_id = quote.id and paid.event_kind = 'paid'
-            where quote.study_id = target.study_id
+            where quote.study_id = (target).study_id
                 and quote.pricing_config_version >= 101);
 $$;
 revoke all on function internal.gate2_offer_push_current(public.invites)
