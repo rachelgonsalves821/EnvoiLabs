@@ -25,6 +25,22 @@ const exact = (value: Record<string, unknown>, keys: readonly string[]) =>
 const nonblank = (value: unknown): value is string =>
   typeof value === "string" && !!value.trim();
 
+type MappedProvenance = { readonly mapPromptVersion: string;
+  readonly mapPromptDigest: string; readonly briefDigest: string;
+  readonly mapCount: number };
+
+function mappedProvenance(draft: AnalystDraftResult): MappedProvenance | null | false {
+  const value = draft as unknown as Record<string, unknown>;
+  const names = ["mapPromptVersion", "mapPromptDigest", "briefDigest", "mapCount"];
+  if (!names.some((name) => name in value)) return null;
+  if (!nonblank(value.mapPromptVersion) || !digest.test(String(value.mapPromptDigest))
+    || !digest.test(String(value.briefDigest)) || !Number.isSafeInteger(value.mapCount)
+    || Number(value.mapCount) < 1 || value.mapCount !== draft.sources?.length) return false;
+  return { mapPromptVersion: value.mapPromptVersion,
+    mapPromptDigest: String(value.mapPromptDigest), briefDigest: String(value.briefDigest),
+    mapCount: Number(value.mapCount) };
+}
+
 function frozenCurrent(source: AnalystSourceSnapshot): AnalystSourceSnapshot {
   return Object.freeze({ studyId: source.studyId, decisionQuestion: source.decisionQuestion,
     sources: Object.freeze(source.sources.map((item) => Object.freeze({
@@ -36,9 +52,30 @@ function frozenCurrent(source: AnalystSourceSnapshot): AnalystSourceSnapshot {
 }
 
 async function matchingCurrent(raw: AnalystSourceSnapshot | null,
-  draft: AnalystDraftResult): Promise<AnalystSourceSnapshot | null> {
+  draft: AnalystDraftResult, mapped: MappedProvenance | null): Promise<AnalystSourceSnapshot | null> {
   if (!raw || raw.studyId !== draft.studyId || !nonblank(raw.decisionQuestion)
     || !Array.isArray(raw.sources) || raw.sources.length !== draft.sources.length) return null;
+  if (mapped) {
+    const value = raw as unknown as Record<string, unknown>;
+    if (!Array.isArray(value.hypotheses) || value.hypotheses.length === 0
+      || !value.hypotheses.every(nonblank)
+      || !Array.isArray(value.guideQuestions) || value.guideQuestions.length < 4
+      || value.guideQuestions.length > 10 || !value.guideQuestions.every((question: unknown) =>
+        record(question) && uuid.test(String(question.id)) && nonblank(question.text))) return null;
+    const ids = value.guideQuestions.map((question: { id: string }) => question.id.toLowerCase());
+    if (new Set(ids).size !== ids.length) return null;
+    const hypotheses = value.hypotheses as string[];
+    const briefDigest = await analystTextDigest(JSON.stringify({
+      decisionQuestion: raw.decisionQuestion, hypotheses,
+      guideQuestions: value.guideQuestions }));
+    if (briefDigest !== mapped.briefDigest || mapped.mapCount !== raw.sources.length) return null;
+    const scored = record(draft.output) && Array.isArray(draft.output.hypotheses)
+      ? draft.output.hypotheses.map((item: unknown) =>
+        record(item) ? item.hypothesis : null) : [];
+    if (scored.length !== hypotheses.length
+      || new Set(scored).size !== scored.length
+      || scored.some((item) => typeof item !== "string" || !hypotheses.includes(item))) return null;
+  }
   const current = frozenCurrent(raw);
   if (await analystTextDigest(current.decisionQuestion) !== draft.decisionQuestionDigest) return null;
   const matched = new Set<string>();
@@ -49,7 +86,13 @@ async function matchingCurrent(raw: AnalystSourceSnapshot | null,
       || matched.has(source.transcriptId.toLowerCase())) return null;
     matched.add(source.transcriptId.toLowerCase());
     const original = draft.sources.find((item) => item.transcriptId === source.transcriptId);
+    const sourceRow = raw.sources.find((item) => item.transcriptId === source.transcriptId);
+    const questionId = (sourceRow as unknown as Record<string, unknown> | undefined)?.questionId;
+    const proposedQuestionId = (original as unknown as Record<string, unknown> | undefined)?.questionId;
     if (!original || original.sourceVersion !== source.sourceVersion
+      || (mapped && (!uuid.test(String(questionId)) || questionId !== proposedQuestionId
+        || !(raw as unknown as { guideQuestions: { id: string }[] }).guideQuestions
+          .some((question) => question.id === questionId)))
       || original.policyDigest !== source.policyDigest
       || original.qualificationDigest !== source.qualificationDigest
       || await analystTextDigest(source.redactedText) !== original.redactedDigest) return null;
@@ -95,16 +138,24 @@ export async function screenAnalystV2Evidence(port: AnalystDraftPort,
   draft: AnalystDraftResult): Promise<ScreenedAnalystEvidence | null> {
   try {
     const candidate = structuredClone(draft) as AnalystDraftResult;
+    const mapped = mappedProvenance(candidate);
     if (!uuid.test(candidate.studyId) || !digest.test(candidate.promptDigest)
       || !digest.test(candidate.decisionQuestionDigest) || !nonblank(candidate.model)
       || !nonblank(candidate.promptVersion) || !Array.isArray(candidate.sources)
-      || candidate.sources.length === 0 || !privateV2(candidate.output)) return null;
-    const current = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate);
+      || candidate.sources.length === 0 || mapped === false
+      || !privateV2(candidate.output)) return null;
+    const current = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate, mapped);
     if (!current) return null;
+    if (mapped && await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
+      promptVersion: mapped.mapPromptVersion, promptDigest: mapped.mapPromptDigest,
+      snapshot: current }) !== true) return null;
     if (await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
       promptVersion: candidate.promptVersion, promptDigest: candidate.promptDigest,
       snapshot: current }) !== true) return null;
-    const after = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate);
+    const after = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate, mapped);
+    if (mapped && after && await port.authorize({ purpose: "ai_analysis",
+      providerModel: candidate.model, promptVersion: mapped.mapPromptVersion,
+      promptDigest: mapped.mapPromptDigest, snapshot: after }) !== true) return null;
     if (!after || await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
       promptVersion: candidate.promptVersion, promptDigest: candidate.promptDigest,
       snapshot: after }) !== true) return null;

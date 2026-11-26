@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { runAnalystMapReduceDraft, type AnalystMapReduceInput } from
+import { runAnalystMapReduceDraft, screenAnalystMapReduceV2Evidence,
+  type AnalystMapReduceInput } from
   "../src/analyst-map-reduce.js";
+import { screenAnalystV2Evidence } from "../src/analyst-evidence-screen.js";
 import type { AnalystMapReduceSnapshot } from "../src/analyst-map-reduce.js";
 
 const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -25,6 +27,16 @@ const reply = (output: unknown) => ({ output, model: "fictional-model",
   inputTokens: 10, outputTokens: 5, latencyMs: 2, costMicros: 1 });
 const reduce = { version: 2, executiveAnswer: "Fictional answer", themes: [],
   hypotheses: [], followUpBrief: {} };
+const reviewedCandidate = { version: 2, executiveAnswer: "The fictional soup was late.",
+  themes: [{ claim: "A buyer described a delivery delay", count: 1, total: 1,
+    confidence: "high", supportingQuotes: [{ studyId: id(1), transcriptId: id(2),
+      sourceVersion: id(12), startChar: 4, endChar: 10, exactText: "🥣 soup",
+      rationale: "Private fictional explanation", confidence: 0.9 }],
+    contradictingQuotes: [] }],
+  hypotheses: [{ hypothesis: "A receipt helps buyers decide.", result: "untested" }],
+  followUpBrief: { title: "Private next study", decision: "Which receipt is clearest?",
+    hypotheses: ["A short receipt helps."], criteria: [], targetCompletes: 10,
+    stimulus: null, deadlineAt: "2026-12-01T00:00:00.000Z" } };
 
 function setup() {
   const readCurrent = vi.fn().mockResolvedValue(snapshot);
@@ -123,5 +135,60 @@ describe("private analyst map and reduce", () => {
       });
     expect(await runAnalystMapReduceDraft(port, provider, input)).toBeNull();
     expect(generate).toHaveBeenCalledTimes(3);
+  });
+
+  it("screens a private mapped draft only under its current frozen brief", async () => {
+    const { port, provider, readCurrent, generate } = setup();
+    generate.mockReset().mockResolvedValueOnce(reply(map(2, "🥣 soup", 4)))
+      .mockResolvedValueOnce(reply(map(3, "receipt", 4)))
+      .mockResolvedValueOnce(reply(reviewedCandidate));
+    const draft = await runAnalystMapReduceDraft(port, provider, input);
+    expect(draft).not.toBeNull();
+    const screened = await screenAnalystMapReduceV2Evidence(port, draft!);
+    expect(screened?.themes).toMatchObject([{ position: 1,
+      supportingQuotes: [{ exactText: "🥣 soup", sourceVersion: id(12) }] }]);
+    expect(JSON.stringify(screened)).not.toContain("Private fictional explanation");
+    expect(JSON.stringify(screened)).not.toContain("The fictional soup was late.");
+    expect((await screenAnalystV2Evidence(port, draft!))?.themes).toHaveLength(1);
+    const invented = { ...draft!, output: { ...reviewedCandidate,
+      hypotheses: [{ hypothesis: "Invented hypothesis", result: "supported" }] } };
+    expect(await screenAnalystV2Evidence(port, invented)).toBeNull();
+    readCurrent.mockResolvedValue({ ...snapshot, guideQuestions: snapshot.guideQuestions.map(
+      (question, index) => index === 0 ? { ...question, text: "Edited question?" } : question) });
+    expect(await screenAnalystMapReduceV2Evidence(port, draft!)).toBeNull();
+    expect(await screenAnalystV2Evidence(port, draft!)).toBeNull();
+  });
+
+  it("withholds mapped evidence after question rebind or map grant withdrawal", async () => {
+    const { port, provider, readCurrent, authorize, generate } = setup();
+    generate.mockReset().mockResolvedValueOnce(reply(map(2, "🥣 soup", 4)))
+      .mockResolvedValueOnce(reply(map(3, "receipt", 4)))
+      .mockResolvedValueOnce(reply(reviewedCandidate));
+    const draft = await runAnalystMapReduceDraft(port, provider, input);
+    expect(draft).not.toBeNull();
+    readCurrent.mockResolvedValue({ ...snapshot, sources: [
+      { ...snapshot.sources[0]!, questionId: id(7) }, snapshot.sources[1]!] });
+    expect(await screenAnalystMapReduceV2Evidence(port, draft!)).toBeNull();
+    readCurrent.mockResolvedValue(snapshot);
+    authorize.mockResolvedValue(false);
+    expect(await screenAnalystMapReduceV2Evidence(port, draft!)).toBeNull();
+    expect(await screenAnalystV2Evidence(port, draft!)).toBeNull();
+  });
+
+  it("withholds a screened quote when the source changes after the inner evidence check", async () => {
+    const { port, provider, readCurrent, authorize, generate } = setup();
+    generate.mockReset().mockResolvedValueOnce(reply(map(2, "🥣 soup", 4)))
+      .mockResolvedValueOnce(reply(map(3, "receipt", 4)))
+      .mockResolvedValueOnce(reply(reviewedCandidate));
+    const draft = await runAnalystMapReduceDraft(port, provider, input);
+    expect(draft).not.toBeNull();
+    let calls = 0;
+    authorize.mockImplementation(async () => {
+      if (++calls === 5) readCurrent.mockResolvedValue({ ...snapshot,
+        sources: [{ ...snapshot.sources[0]!, redactedText: "Different qualified text." },
+          snapshot.sources[1]!] });
+      return true;
+    });
+    expect(await screenAnalystMapReduceV2Evidence(port, draft!)).toBeNull();
   });
 });

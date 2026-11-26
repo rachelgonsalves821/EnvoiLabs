@@ -1,6 +1,8 @@
 import type { LLMProvider, LLMRequest, LLMResponse } from "./index.js";
-import { analystTextDigest, type AnalystDraftResult,
+import { analystTextDigest, type AnalystDraftPort, type AnalystDraftResult,
   type AnalystSourceSnapshot } from "./analyst-draft.js";
+import { screenAnalystV2Evidence, type ScreenedAnalystEvidence } from
+  "./analyst-evidence-screen.js";
 
 type Code = { readonly label: string; readonly hypothesis: string | null;
   readonly startChar: number; readonly endChar: number; readonly exactText: string };
@@ -24,11 +26,8 @@ export interface AnalystMapReduceSnapshot extends AnalystSourceSnapshot {
     readonly questionId: string })[];
 }
 
-export interface AnalystMapReducePort {
+export interface AnalystMapReducePort extends AnalystDraftPort {
   readCurrent(studyId: string): Promise<AnalystMapReduceSnapshot | null>;
-  authorize(input: { readonly purpose: "ai_analysis"; readonly providerModel: string;
-    readonly promptVersion: string; readonly promptDigest: string;
-    readonly snapshot: AnalystMapReduceSnapshot }): Promise<boolean>;
 }
 
 export interface AnalystMapReduceDraft extends AnalystDraftResult {
@@ -36,6 +35,8 @@ export interface AnalystMapReduceDraft extends AnalystDraftResult {
   readonly mapPromptDigest: string;
   readonly mapCount: number;
   readonly briefDigest: string;
+  readonly sources: readonly (AnalystDraftResult["sources"][number] & {
+    readonly questionId: string })[];
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -170,6 +171,7 @@ export async function runAnalystMapReduceDraft(port: AnalystMapReducePort, provi
     telemetry.push(reduced);
     const sources = await Promise.all(snapshot.sources.map(async (source) => ({
       transcriptId: source.transcriptId, sourceVersion: source.sourceVersion,
+      questionId: source.questionId,
       redactedDigest: await analystTextDigest(source.redactedText),
       policyDigest: source.policyDigest, qualificationDigest: source.qualificationDigest,
     })));
@@ -188,5 +190,48 @@ export async function runAnalystMapReduceDraft(port: AnalystMapReducePort, provi
       decisionQuestionDigest: await analystTextDigest(snapshot.decisionQuestion), sources,
       inputTokens: sum("inputTokens"), outputTokens: sum("outputTokens"),
       latencyMs: sum("latencyMs"), costMicros: sum("costMicros") };
+  } catch { return null; }
+}
+
+/** Screen a map/reduce draft only while the frozen brief and question bindings
+ * still match. The reviewed Platform publisher remains the final authority. */
+export async function screenAnalystMapReduceV2Evidence(port: AnalystMapReducePort,
+  draft: AnalystMapReduceDraft): Promise<ScreenedAnalystEvidence | null> {
+  try {
+    const candidate = structuredClone(draft) as AnalystMapReduceDraft;
+    if (!digest.test(candidate.mapPromptDigest) || !digest.test(candidate.briefDigest)
+      || !nonblank(candidate.mapPromptVersion)
+      || !Number.isSafeInteger(candidate.mapCount) || candidate.mapCount < 1
+      || candidate.mapCount !== candidate.sources?.length) return null;
+    const current = async () => {
+      const raw = await port.readCurrent(candidate.studyId);
+      if (!validSnapshot(raw, candidate.studyId) || raw.sources.length !== candidate.mapCount)
+        return null;
+      const snapshot = freezeSnapshot(raw);
+      const briefDigest = await analystTextDigest(JSON.stringify({
+        decisionQuestion: snapshot.decisionQuestion, hypotheses: snapshot.hypotheses,
+        guideQuestions: snapshot.guideQuestions }));
+      if (briefDigest !== candidate.briefDigest) return null;
+      for (const source of snapshot.sources) {
+        const original = candidate.sources.find((item) => item.transcriptId === source.transcriptId);
+        if (!original || original.sourceVersion !== source.sourceVersion
+          || original.questionId !== source.questionId
+          || original.policyDigest !== source.policyDigest
+          || original.qualificationDigest !== source.qualificationDigest
+          || original.redactedDigest !== await analystTextDigest(source.redactedText)) return null;
+      }
+      return snapshot;
+    };
+    const before = await current();
+    if (!before || await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
+      promptVersion: candidate.mapPromptVersion, promptDigest: candidate.mapPromptDigest,
+      snapshot: before }) !== true) return null;
+    const screened = await screenAnalystV2Evidence(port, candidate);
+    if (!screened) return null;
+    const after = await current();
+    if (!after || await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,
+      promptVersion: candidate.mapPromptVersion, promptDigest: candidate.mapPromptDigest,
+      snapshot: after }) !== true) return null;
+    return screened;
   } catch { return null; }
 }
