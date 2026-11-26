@@ -13,7 +13,7 @@ test.describe("Gate 2 private screening sheet", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
   test("a signed-in respondent submits text, reloads pending, and cannot trigger eligibility", async ({ browser, baseURL }) => {
-    test.setTimeout(210_000);
+    test.setTimeout(270_000);
     const origin = loopbackOrigin(baseURL);
     const db = localService();
     const email = `gate2-screen-${randomUUID()}@example.test`;
@@ -286,6 +286,63 @@ test.describe("Gate 2 private screening sheet", () => {
           .eq("id", qualifiedOffer.data.id).single();
         expect(approvedOffer.error).toBeNull();
         expect(approvedOffer.data?.state).toBe("invited");
+        const oldKey = submittedKey;
+        const withdrawnPurpose = await db.from("consents").insert({
+          respondent_id: qualifiedProfile.data.id, study_id: study.data.id,
+          purpose: "ai_screening", granted: false,
+          text_version: "synthetic-ai-screening-v1",
+        });
+        expect(withdrawnPurpose.error).toBeNull();
+        await qualifiedPage.goto("/r");
+        await expect(qualifiedPage.getByRole("button", { name: "Start answering" })).toHaveCount(0);
+        const renewedPurpose = await db.from("consents").insert({
+          respondent_id: qualifiedProfile.data.id, study_id: study.data.id,
+          purpose: "ai_screening", granted: true,
+          text_version: "synthetic-ai-screening-v1",
+        }).select("id").single();
+        if (renewedPurpose.error || !renewedPurpose.data)
+          throw new Error("Synthetic renewed purpose missing");
+        const renewedReceipt = await db.rpc("test_gate2_screening_purpose_receipt" as never,
+          { supplied_consent_id: renewedPurpose.data.id } as never);
+        expect(renewedReceipt.error).toBeNull();
+        expect(renewedReceipt.data).toBe(true);
+        const reopened = await db.from("invites").select("state")
+          .eq("id", qualifiedOffer.data.id).single();
+        expect(reopened.error).toBeNull();
+        expect(reopened.data?.state).toBe("screening");
+        await qualifiedPage.goto(`/r/screening/${qualifiedOffer.data.id}`);
+        await expect(qualifiedPage.getByText(
+          "Your previous answer needs a fresh review. Please answer again.")).toBeVisible();
+        await expect(qualifiedPage.getByText(answerText)).toHaveCount(0);
+        await qualifiedPage.getByLabel("Your answer").fill(answerText);
+        await qualifiedPage.getByRole("button", { name: "Submit answer" }).click();
+        expect(submittedKey).not.toBe(oldKey);
+        const renewedAnswer = await db.rpc("store_gate2_screening_answer", {
+          requested_invite_id: qualifiedOffer.data.id,
+          requested_respondent_id: qualifiedProfile.data.id,
+          requested_study_id: study.data.id,
+          requested_rule_id: rule.data.id, requested_version: 1,
+          requested_kind: "text", requested_text: answerText,
+          requested_consent_version: null, requested_key: submittedKey,
+        });
+        const renewedSaved = renewedAnswer.data as { id?: string } | null;
+        if (renewedAnswer.error || !renewedSaved?.id)
+          throw new Error("Synthetic renewed answer missing");
+        const renewedSource = await publishGate2ScreeningRedaction(db,
+          { policyDigest: "a".repeat(64), qualificationDigest: "b".repeat(64),
+            redact: async () => answerText }, {
+            answerId: renewedSaved.id, policyDigest: "a".repeat(64),
+            qualificationDigest: "b".repeat(64),
+            idempotencyKey: `gate2-redaction:${randomUUID()}`,
+          });
+        expect(renewedSource?.qualified).toBe(true);
+        const renewedDecision = await decideQualifiedScreeningAnswer(db,
+          syntheticModel, { ...decisionRequest, answerId: renewedSaved.id });
+        expect(renewedDecision?.action).toBe("qualify");
+        const restoredOffer = await db.from("invites").select("state")
+          .eq("id", qualifiedOffer.data.id).single();
+        expect(restoredOffer.error).toBeNull();
+        expect(restoredOffer.data?.state).toBe("invited");
         await qualifiedPage.goto("/r");
         await qualifiedPage.getByRole("button", { name: "Start answering" }).click();
         await expect(qualifiedPage).toHaveURL(
