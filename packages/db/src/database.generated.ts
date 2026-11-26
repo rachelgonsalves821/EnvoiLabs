@@ -1857,6 +1857,18 @@ export type Database = {
         Args: { supplied_quote_id: string; supplied_study_id: string }
         Returns: Json
       }
+      current_gate2_screening_model_source: {
+        Args: {
+          requested_answer_id: string
+          requested_prompt_digest: string
+          requested_prompt_version: string
+          requested_provider_model: string
+          requested_rule_id: string
+          requested_rule_version: number
+          requested_study_id: string
+        }
+        Returns: Json
+      }
       decide_gate2_marketplace_quality: {
         Args: {
           supplied_actor_auth_id: string

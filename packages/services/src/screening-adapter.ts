@@ -4,7 +4,8 @@ import type { ScreeningAnswer, ScreeningOutcome, ScreeningPorts,
 
 type Database = { rpc(name: string, args: Record<string, unknown>):
   PromiseLike<{ data: unknown; error: { code: string } | null }> };
-type EvidenceInput = { criterionText: string; question: string; answerText: string;
+type EvidenceInput = { studyId: string; answerId: string; ruleId: string;
+  ruleVersion: number; criterionText: string; question: string; answerText: string;
   result: "supported" | "contradicted";
   span: { startChar: number; endChar: number } };
 type Agent3 = {
@@ -68,7 +69,9 @@ export function createScreeningAdapter(db: Database, agent3: Agent3): ScreeningP
     },
     interpret: agent3.interpret,
     evidenceSupports(rule, answer, result, span) {
-      return agent3.evidenceSupports({ criterionText: rule.criterionText,
+      return agent3.evidenceSupports({ studyId: rule.studyId, answerId: answer.id,
+        ruleId: rule.id, ruleVersion: rule.version,
+        criterionText: rule.criterionText,
         question: rule.question, answerText: answer.text, result, span });
     },
     async commitDecision(decision) {

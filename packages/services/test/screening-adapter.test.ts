@@ -48,6 +48,8 @@ describe("screening database and Gate 3 adapter", () => {
     const decision = await screenSubmittedAnswer(createScreeningAdapter({ rpc }, agent3), input);
     expect(decision?.action).toBe("review");
     expect(agent3.evidenceSupports).toHaveBeenCalledWith({
+      studyId: rule.studyId, answerId: "a9b10000-0000-4000-8000-000000000004",
+      ruleId: rule.id, ruleVersion: rule.version,
       criterionText: rule.criterionText, question: rule.question,
       answerText: input.text, result: "supported",
       span: { startChar: 0, endChar: 19 },
