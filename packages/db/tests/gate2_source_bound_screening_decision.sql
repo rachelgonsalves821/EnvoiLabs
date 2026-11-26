@@ -3,6 +3,9 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
+update auth.users set email_confirmed_at = now()
+where id = '90300000-0000-4000-8000-000000000001';
+
 update public.studies set state = 'fielding'
 where id = '90600000-0000-4000-8000-000000000001';
 insert into public.criteria (id, study_id, kind, attribute_key, operator,
