@@ -2041,6 +2041,12 @@ export type Database = {
         }[]
       }
       list_gate1_home_invites: { Args: never; Returns: Json }
+      list_gate2_expired_screening_audio: {
+        Args: { supplied_limit: number }
+        Returns: {
+          storage_path: string
+        }[]
+      }
       list_gate2_nudge_candidates: { Args: never; Returns: Json }
       list_gate2_nudge_dispatchable: { Args: never; Returns: Json }
       list_gate2_offer_push_candidates: { Args: never; Returns: Json }
