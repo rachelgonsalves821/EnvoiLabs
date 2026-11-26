@@ -42,12 +42,25 @@ select 'a9820000-0000-4000-8000-000000000001',
     format('90500000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
     'accepted', 500, clock_timestamp() + interval '1 day'
 from generate_series(1, 12) as n;
-insert into public.sessions (invite_id, study_id, state)
-select offer.id, offer.study_id,
-    case when offer.respondent_id = '90500000-0000-4000-8000-000000000012'
-        then 'quality_hold' else 'approved' end
+insert into public.sessions (invite_id, study_id, state, started_at,
+    submitted_at)
+select offer.id, offer.study_id, 'quality_hold',
+    clock_timestamp() - interval '2 minutes', clock_timestamp()
 from public.invites as offer
 where offer.study_id = 'a9820000-0000-4000-8000-000000000001';
+insert into public.quality_scores (session_id, score, components_json,
+    decision, decided_by)
+select interview.id, 80, '{}'::jsonb, 'approve',
+    '90400000-0000-4000-8000-000000000001'
+from public.sessions as interview
+join public.invites as offer on offer.id = interview.invite_id
+where interview.study_id = 'a9820000-0000-4000-8000-000000000001'
+    and offer.respondent_id <> '90500000-0000-4000-8000-000000000012';
+update public.sessions set state = 'approved'
+where study_id = 'a9820000-0000-4000-8000-000000000001'
+    and id in (select interview.id from public.sessions as interview
+        join public.invites as offer on offer.id = interview.invite_id
+        where offer.respondent_id <> '90500000-0000-4000-8000-000000000012');
 update public.studies set state = 'closed'
 where id = 'a9820000-0000-4000-8000-000000000001';
 select ok(not has_table_privilege('service_role',
@@ -56,7 +69,49 @@ select ok(not has_table_privilege('service_role',
 select ok(not has_function_privilege('authenticated',
     'public.reserve_gate2_unfilled_slot_refund(uuid,uuid,uuid)', 'EXECUTE'),
     'client cannot reserve a refund directly');
+select ok(not has_function_privilege('authenticated',
+    'public.read_gate2_approved_complete_snapshot(uuid,uuid,uuid)', 'EXECUTE'),
+    'client cannot read the private approved-complete session set');
 set local role service_role;
+select is((public.read_gate2_approved_complete_snapshot(
+    'a9820000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9820000-0000-4000-8000-000000000001'),
+    '90200000-0000-4000-8000-000000000001')
+    ->> 'approvedCompleteCount')::integer, 11,
+    'eleven reviewed approved completes count before refund');
+select is(jsonb_array_length(public.read_gate2_approved_complete_snapshot(
+    'a9820000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9820000-0000-4000-8000-000000000001'),
+    '90200000-0000-4000-8000-000000000001') -> 'sessionIds'), 11,
+    'private provenance returns only the eleven approved session IDs');
+select is(public.read_gate2_approved_complete_snapshot(
+    'a9820000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9820000-0000-4000-8000-000000000001'),
+    '90300000-0000-4000-8000-000000000001'), null,
+    'a respondent identity cannot inspect the researcher sample');
+select is(public.read_gate2_approved_complete_snapshot(
+    'a9820000-0000-4000-8000-000000000001',
+    'a9820000-0000-4000-8000-000000000099',
+    '90200000-0000-4000-8000-000000000001'), null,
+    'a different quote cannot stand in for the paid frozen quote');
+select throws_ok($$insert into public.sessions (invite_id, study_id, state)
+    select id, study_id, 'approved' from public.invites
+    where study_id = 'a9820000-0000-4000-8000-000000000001'
+    order by respondent_id limit 1$$, '23514', null,
+    'service cannot insert an already approved marketplace session');
+select throws_ok($$insert into public.sessions (invite_id, study_id, state)
+    select id, study_id, 'removed' from public.invites
+    where study_id = 'a9820000-0000-4000-8000-000000000001'
+    order by respondent_id limit 1$$, '23514', null,
+    'service cannot insert a removed session without a reviewed decision');
+select throws_ok($$insert into public.sessions (invite_id, study_id, state)
+    select id, study_id, 'paid' from public.invites
+    where study_id = 'a9820000-0000-4000-8000-000000000001'
+    order by respondent_id limit 1$$, '23514', null,
+    'service cannot insert a paid session without approval');
 select throws_ok($$select public.reserve_gate2_unfilled_slot_refund(
     'a9820000-0000-4000-8000-000000000001',
     (select id from public.gate2_quote_snapshots
@@ -98,6 +153,22 @@ reset role;
 select is((select unfilled_slots from public.gate2_refund_reservations
     where study_id = 'a9820000-0000-4000-8000-000000000001'), 1,
     'the reservation records one unfilled slot separately from payout');
+select is((select fulfilled_slots from public.gate2_refund_reservations
+    where study_id = 'a9820000-0000-4000-8000-000000000001'), 11,
+    'frozen financial fulfillment matches the reviewed sample snapshot');
+update public.sessions set state = 'paid'
+where id = (select id from public.sessions
+    where study_id = 'a9820000-0000-4000-8000-000000000001'
+        and state = 'approved' order by id limit 1);
+set local role service_role;
+select is((public.read_gate2_approved_complete_snapshot(
+    'a9820000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9820000-0000-4000-8000-000000000001'),
+    '90200000-0000-4000-8000-000000000001')
+    ->> 'approvedCompleteCount')::integer, 11,
+    'approved-to-paid bookkeeping keeps the same complete population');
+reset role;
 select throws_ok($$update public.sessions set state = 'approved'
     where study_id = 'a9820000-0000-4000-8000-000000000001'
         and state = 'removed'$$, '23514', null,

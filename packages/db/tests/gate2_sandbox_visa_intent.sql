@@ -39,8 +39,14 @@ values ('a9870000-0000-4000-8000-000000000002',
 insert into public.sessions (id, invite_id, study_id, state, started_at, submitted_at)
 values ('a9870000-0000-4000-8000-000000000003',
     'a9870000-0000-4000-8000-000000000002',
-    'a9870000-0000-4000-8000-000000000001', 'approved',
+    'a9870000-0000-4000-8000-000000000001', 'quality_hold',
     now() - interval '2 days 1 hour', now() - interval '2 days');
+insert into public.quality_scores (session_id, score, components_json,
+    decision, decided_by) values (
+    'a9870000-0000-4000-8000-000000000003', 80, '{}'::jsonb,
+    'approve', '90400000-0000-4000-8000-000000000001');
+update public.sessions set state = 'approved'
+where id = 'a9870000-0000-4000-8000-000000000003';
 insert into public.answers (id, session_id, study_id, guide_question_id,
     kind, sequence)
 select format('a9870000-0000-4000-8000-%s', lpad((n + 20)::text, 12, '0'))::uuid,
