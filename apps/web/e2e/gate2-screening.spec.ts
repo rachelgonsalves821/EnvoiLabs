@@ -292,28 +292,63 @@ test.describe("Gate 2 private screening sheet", () => {
           origin + `/r/interviews/${qualifiedOffer.data.id}`);
 
         const notFitText = "I have never worked as a hospital nurse.";
+        const notFitEmail = `gate2-screen-not-fit-${randomUUID()}@example.test`;
+        const notFitContext = await browser.newContext({ baseURL: origin });
+        const notFitPage = await notFitContext.newPage();
+        await notFitPage.goto("/r/signup");
+        await notFitPage.getByLabel("Email address").fill(notFitEmail);
+        await notFitPage.getByRole("checkbox", { name: /18 or older/ }).check();
+        await notFitPage.getByRole("button", { name: "Email me a sign-in link" }).click();
+        const notFitLink = await deliveredEmail(notFitPage, notFitEmail,
+          origin, "/api/respondent/auth/callback");
+        await notFitPage.goto(notFitLink.href);
+        const notFitUsers = await db.auth.admin.listUsers();
+        const notFitUser = notFitUsers.data?.users.find((candidate) =>
+          candidate.email === notFitEmail);
+        if (notFitUsers.error || !notFitUser)
+          throw new Error("Synthetic screened-out user absent");
+        const notFitProfile = await db.from("respondents").select("id")
+          .eq("auth_user_id", notFitUser.id).single();
+        if (notFitProfile.error || !notFitProfile.data)
+          throw new Error("Synthetic screened-out profile absent");
+        const notFitRetention = await db.from("consents").insert({
+          respondent_id: notFitProfile.data.id, purpose: "retention",
+          granted: true, text_version: "synthetic-screening-test",
+        });
+        expect(notFitRetention.error).toBeNull();
+        const notFitPurpose = await db.from("consents").insert({
+          respondent_id: notFitProfile.data.id, study_id: study.data.id,
+          purpose: "ai_screening", granted: true,
+          text_version: "synthetic-ai-screening-v1",
+        }).select("id").single();
+        if (notFitPurpose.error || !notFitPurpose.data)
+          throw new Error("Synthetic screened-out purpose absent");
+        const notFitReceipt = await db.rpc("test_gate2_screening_purpose_receipt" as never,
+          { supplied_consent_id: notFitPurpose.data.id } as never);
+        expect(notFitReceipt.error).toBeNull();
+        expect(notFitReceipt.data).toBe(true);
         const notFitOffer = await db.from("invites").insert({
-          study_id: study.data.id, respondent_id: qualifiedProfile.data.id,
+          study_id: study.data.id, respondent_id: notFitProfile.data.id,
           state: "screening", reward_cents: 100,
           expires_at: new Date(Date.now() + 3_600_000).toISOString(),
         }).select("id").single();
         if (notFitOffer.error || !notFitOffer.data)
           throw new Error("Synthetic screened-out offer absent");
         let notFitKey = "";
-        await qualifiedPage.route(`**/api/respondent/screening/${notFitOffer.data.id}`,
+        await notFitPage.route(`**/api/respondent/screening/${notFitOffer.data.id}`,
           async (route) => {
             if (route.request().method() === "POST")
               notFitKey = (route.request().postDataJSON() as { key: string }).key;
             await route.continue();
           });
-        await qualifiedPage.goto(`/r/screening/${notFitOffer.data.id}`);
-        await qualifiedPage.getByLabel("Your answer").fill(notFitText);
-        await qualifiedPage.getByRole("button", { name: "Submit answer" }).click();
-        await expect(qualifiedPage.getByText("Your answer is awaiting review.")).toBeVisible();
+        await notFitPage.goto(`/r/screening/${notFitOffer.data.id}`);
+        await notFitPage.getByLabel("Your answer").fill(notFitText);
+        await notFitPage.getByRole("button", { name: "Submit answer" }).click();
+        await expect(notFitPage.getByText("Your answer is awaiting review.")).toBeVisible();
         expect(notFitKey).toMatch(/^gate2-screen:[a-f0-9-]{36}$/);
         const notFitStored = await db.rpc("store_gate2_screening_answer", {
           requested_invite_id: notFitOffer.data.id,
-          requested_respondent_id: qualifiedProfile.data.id,
+          requested_respondent_id: notFitProfile.data.id,
           requested_study_id: study.data.id, requested_rule_id: rule.data.id,
           requested_version: 1, requested_kind: "text",
           requested_text: notFitText, requested_consent_version: null,
@@ -336,21 +371,22 @@ test.describe("Gate 2 private screening sheet", () => {
           async evidenceSupports() { return true; },
         }, { ...decisionRequest, answerId: notFitAnswer.id });
         expect(notFitDecision?.action).toBe("screen_out");
-        await qualifiedPage.reload();
-        await expect(qualifiedPage.getByRole("heading", { name: "Study match result" })).toBeVisible();
-        await expect(qualifiedPage.getByText("This study is not a fit this time.",
+        await notFitPage.reload();
+        await expect(notFitPage.getByRole("heading", { name: "Study match result" })).toBeVisible();
+        await expect(notFitPage.getByText("This study is not a fit this time.",
           { exact: false })).toBeVisible();
-        await expect(qualifiedPage.getByText(question)).toHaveCount(0);
-        await expect(qualifiedPage.getByText(notFitText)).toHaveCount(0);
+        await expect(notFitPage.getByText(question)).toHaveCount(0);
+        await expect(notFitPage.getByText(notFitText)).toHaveCount(0);
         const revokePurpose = await db.from("consents").insert({
-          respondent_id: qualifiedProfile.data.id, study_id: study.data.id,
+          respondent_id: notFitProfile.data.id, study_id: study.data.id,
           purpose: "ai_screening", granted: false,
           text_version: "synthetic-ai-screening-v1",
         });
         expect(revokePurpose.error).toBeNull();
-        await qualifiedPage.reload();
-        await expect(qualifiedPage.getByText("This study is not a fit this time.",
+        await notFitPage.reload();
+        await expect(notFitPage.getByText("This study is not a fit this time.",
           { exact: false })).toHaveCount(0);
+        await notFitContext.close();
       } finally {
         await qualifiedContext.close();
       }
