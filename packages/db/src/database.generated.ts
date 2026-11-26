@@ -1953,6 +1953,15 @@ export type Database = {
         Args: { supplied_study_id: string }
         Returns: Json
       }
+      get_gate2_current_qualified_screening_decision: {
+        Args: {
+          requested_answer_id: string
+          requested_prompt_digest: string
+          requested_prompt_version: string
+          requested_provider_model: string
+        }
+        Returns: Json
+      }
       get_gate2_screening_decision: {
         Args: { requested_answer_id: string }
         Returns: Json

@@ -339,3 +339,33 @@ revoke all on function public.commit_gate2_qualified_screening_decision(
 grant execute on function public.commit_gate2_qualified_screening_decision(
     uuid, uuid, integer, text, integer, integer, text, boolean,
     uuid, text, text, text, text) to service_role;
+
+-- Retry readers see only the committed result while its source and purpose
+-- are still current. A withdrawn or re-redacted answer has no prior fallback.
+create function public.get_gate2_current_qualified_screening_decision(
+    requested_answer_id uuid, requested_provider_model text,
+    requested_prompt_version text, requested_prompt_digest text
+) returns jsonb language sql stable security definer set search_path = '' as $$
+    select internal.gate2_screening_event_json(event) || jsonb_build_object(
+        'redactedSourceVersion', event.redacted_source_version,
+        'redactionPolicyDigest', event.redaction_policy_digest)
+    from public.gate2_screening_events as event
+    join pii.gate2_screener_answers as answer on answer.id = event.answer_id
+    cross join lateral (select public.current_gate2_screening_model_source(
+        answer.study_id, answer.id, event.rule_id, event.rule_version,
+        requested_provider_model, requested_prompt_version,
+        requested_prompt_digest) as value) as current_source
+    where event.answer_id = requested_answer_id
+        and event.redacted_source_version is not null
+        and event.provider_model = requested_provider_model
+        and event.prompt_version = requested_prompt_version
+        and event.prompt_digest = requested_prompt_digest
+        and current_source.value ->> 'redactedSourceVersion'
+            = event.redacted_source_version::text
+        and current_source.value ->> 'redactionPolicyDigest'
+            = event.redaction_policy_digest;
+$$;
+revoke all on function public.get_gate2_current_qualified_screening_decision(
+    uuid, text, text, text) from public, anon, authenticated, service_role;
+grant execute on function public.get_gate2_current_qualified_screening_decision(
+    uuid, text, text, text) to service_role;

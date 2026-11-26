@@ -94,6 +94,12 @@ select is((select count(*)::integer from public.gate2_screening_events
 select is((select end_char from public.gate2_screening_events
     where answer_id = 'a9f30000-0000-4000-8000-000000000004'), 36,
     'evidence offset is stored against the redacted source');
+set local role service_role;
+select is(public.get_gate2_current_qualified_screening_decision(
+    'a9f30000-0000-4000-8000-000000000004',
+    'synthetic-model', 'screening-v1', repeat('a', 64)) ->> 'action',
+    'qualify', 'retry reader sees only the current qualified decision');
+reset role;
 insert into public.consents (respondent_id, study_id, purpose, granted,
     text_version) values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'ai_screening', false,
@@ -130,6 +136,10 @@ select throws_ok($$select public.commit_gate2_qualified_screening_decision(
         where answer_id = 'a9f30000-0000-4000-8000-000000000004'),
     repeat('c', 64), 'synthetic-model', 'screening-v1', repeat('a', 64))$$,
     '23514', null, 'withheld re-redaction invalidates a prior decision replay');
+select is(public.get_gate2_current_qualified_screening_decision(
+    'a9f30000-0000-4000-8000-000000000004',
+    'synthetic-model', 'screening-v1', repeat('a', 64)), null,
+    'retry reader does not fall back after a withheld source');
 reset role;
 select * from finish();
 rollback;
