@@ -24,6 +24,9 @@ export function createGate2ScreeningModelUsePort(db: Database) {
         !attempt.promptVersion?.trim() || !hexDigest.test(attempt.promptDigest) ||
         !hexDigest.test(attempt.sourceDigest)) return false;
       try {
+        const prior = await db.rpc("get_gate2_screening_decision", {
+          requested_answer_id: attempt.answerId });
+        if (prior.error || prior.data !== null) return false;
         const row = await readGate2QualifiedScreeningSource(db, {
           studyId: attempt.studyId, answerId: attempt.answerId,
           ruleId: attempt.ruleId, ruleVersion: attempt.ruleVersion,
