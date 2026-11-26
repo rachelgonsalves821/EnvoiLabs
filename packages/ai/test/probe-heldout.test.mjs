@@ -133,6 +133,21 @@ it("refuses incomplete, duplicate or mismatched held-out evidence", () => {
   expect(() => scoreProbeHeldout(data.inputs, data.outputs, data.judgments,
     [{ ...data.answerReceipts[0], sourceVersion: "not-a-uuid" },
       ...data.answerReceipts.slice(1)])).toThrow("Invalid answer receipt");
+  const repeatedCore = data.inputs.map((row, index) => index === 1
+    ? { ...row, sourceVersion: data.inputs[0].sourceVersion.toUpperCase() } : row);
+  const repeatedOutputs = data.outputs.map((row, index) => index === 1
+    ? { ...row, sourceVersion: repeatedCore[1].sourceVersion } : row);
+  const repeatedJudgments = data.judgments.map((row, index) => index === 1
+    ? { ...row, sourceVersion: repeatedCore[1].sourceVersion } : row);
+  expect(() => scoreProbeHeldout(repeatedCore, repeatedOutputs, repeatedJudgments,
+    data.answerReceipts)).toThrow("Repeated held-out answer source version");
+  expect(() => scoreProbeHeldout(data.inputs, data.outputs, data.judgments,
+    [{ ...data.answerReceipts[0], sourceVersion: data.inputs[0].sourceVersion },
+      ...data.answerReceipts.slice(1)])).toThrow("Repeated held-out answer source version");
+  expect(() => scoreProbeHeldout(data.inputs, data.outputs, data.judgments,
+    [data.answerReceipts[0], { ...data.answerReceipts[1],
+      sourceVersion: data.answerReceipts[0].sourceVersion.toUpperCase() },
+    ...data.answerReceipts.slice(2)])).toThrow("Invalid answer receipt");
   expect(() => scoreProbeHeldout(data.inputs, [
     { ...data.outputs[0], sourceVersion: data.inputs[1].sourceVersion },
     ...data.outputs.slice(1)], data.judgments, data.answerReceipts))

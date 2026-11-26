@@ -24,17 +24,21 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   const judgmentById = indexed(judgments, "judgments");
   if (!Array.isArray(answerReceipts)) throw new Error("Answer receipts required");
   const receiptById = new Map();
+  const followUpVersions = new Set();
   for (const receipt of answerReceipts) {
     if (!isObject(receipt) || !nonblank(receipt.id) || !nonblank(receipt.caseId)
       || !uuid.test(receipt.sourceVersion) || !uuid.test(receipt.parentSourceVersion)
       || !digest.test(receipt.answerDigest)
+      || followUpVersions.has(receipt.sourceVersion.toLowerCase())
       || receiptById.has(receipt.id)) throw new Error("Invalid answer receipt");
     receiptById.set(receipt.id, receipt);
+    followUpVersions.add(receipt.sourceVersion.toLowerCase());
   }
   let probes = 0; let acceptable = 0; let offTopicAnswers = 0;
   let noProbes = 0; let errors = 0; let timeouts = 0;
   let appropriateDecisions = 0; let inappropriateNoProbeDecisions = 0;
   const followUpAnswerIds = new Set();
+  const coreVersions = new Set();
   let model; let promptVersion;
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
@@ -51,6 +55,10 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
       || judgment.answerDigest !== answerDigest
       || !nonblank(output.model) || !nonblank(output.promptVersion))
       throw new Error("Held-out source or model provenance differs");
+    if (coreVersions.has(input.sourceVersion.toLowerCase())
+      || followUpVersions.has(input.sourceVersion.toLowerCase()))
+      throw new Error("Repeated held-out answer source version");
+    coreVersions.add(input.sourceVersion.toLowerCase());
     if (model === undefined) { model = output.model; promptVersion = output.promptVersion; }
     else if (output.model !== model || output.promptVersion !== promptVersion)
       throw new Error("Mixed held-out model or prompt versions");
