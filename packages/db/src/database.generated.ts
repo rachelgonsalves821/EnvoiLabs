@@ -1798,6 +1798,10 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_gate2_screening_audio: {
+        Args: { supplied_audio_id?: string }
+        Returns: Json
+      }
       commit_gate2_qualified_screening_decision: {
         Args: {
           requested_action: string
@@ -1855,6 +1859,16 @@ export type Database = {
           supplied_raw_text?: string
           supplied_redacted_text?: string
           supplied_redaction_passed?: boolean
+        }
+        Returns: Json
+      }
+      complete_gate2_screening_audio: {
+        Args: {
+          supplied_audio_id: string
+          supplied_lease_id: string
+          supplied_model: string
+          supplied_provider: string
+          supplied_text: string
         }
         Returns: Json
       }
@@ -2327,6 +2341,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      retry_gate2_screening_audio: {
+        Args: {
+          supplied_audio_id: string
+          supplied_delay_seconds?: number
+          supplied_lease_id: string
+        }
+        Returns: boolean
+      }
       save_gate1_consent: { Args: { decisions: Json }; Returns: boolean }
       save_gate1_profile: { Args: { attributes: Json }; Returns: boolean }
       snooze_gate2_nudge: {
@@ -2375,6 +2397,10 @@ export type Database = {
       }
       validate_gate1_answer_job: {
         Args: { supplied_answer_id: string; supplied_lease_id: string }
+        Returns: boolean
+      }
+      validate_gate2_screening_audio: {
+        Args: { supplied_audio_id: string; supplied_lease_id: string }
         Returns: boolean
       }
       verify_gate2_referred_profile: { Args: never; Returns: Json }
