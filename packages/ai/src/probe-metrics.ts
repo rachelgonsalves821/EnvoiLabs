@@ -109,7 +109,7 @@ export function summarizeCompleteProbeOpportunityLog(
         && (opportunity.browserUploadConfirmedAtMs === null
           || record.result.uploadConfirmedAtMs !== opportunity.browserUploadConfirmedAtMs))
       || (opportunity.browserUploadConfirmedAtMs === null
-        && record.result?.outcome !== "timeout"))
+        && (record.result?.outcome !== "timeout" || record.result.stage !== "decision")))
       throw new Error("Probe outcome does not match current opportunity");
   }
   return summarizeProbeAttemptLog(records);
