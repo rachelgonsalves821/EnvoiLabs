@@ -62,10 +62,11 @@ select is_empty($$select * from public.list_gate2_expired_screening_audio(null)$
 select is_empty($$select * from public.list_gate2_expired_screening_audio(0)$$,
     'zero batch bound selects nothing');
 reset role;
-delete from storage.objects where name =
-    'screening/a9e10000-0000-4000-8000-000000000003/a9e10000-0000-4000-8000-000000000002';
+update internal.gate2_screening_audio_uploads
+set confirmed_at = now(), duration_ms = 5000, sha256 = repeat('a', 64)
+where id = 'a9e10000-0000-4000-8000-000000000002';
 set local role service_role;
 select is_empty($$select * from public.list_gate2_expired_screening_audio(50)$$,
-    'deleted object does not reappear on retry');
+    'a confirmed object never enters the cleanup selection');
 select * from finish();
 rollback;
