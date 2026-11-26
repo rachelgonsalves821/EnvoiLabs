@@ -17,11 +17,20 @@ const ports = createGate2ScreeningWorkerPorts(db, { audioObjectId: audioId,
   transcriber: { async transcribe({ audio, mediaType }) {
     if (audio.length < 4 || mediaType !== "audio/webm")
       throw new Error("Synthetic recording has the wrong container.");
-    return { text: "I worked as a hospital nurse last year.",
+    return { text: "I worked as a hospital nurse three months ago.",
       provider: "synthetic", model: "fixture", latencyMs: 0, costMicros: 0 };
   } },
 });
-if (await runGate2ScreeningAudioJob(ports) !== "completed") {
+let completedAnswerId = null;
+const complete = ports.complete;
+ports.complete = async (...args) => {
+  const result = await complete(...args);
+  if (result?.status === "completed") completedAnswerId = result.answerId;
+  return result;
+};
+if (await runGate2ScreeningAudioJob(ports) !== "completed" ||
+    !uuid.test(completedAnswerId)) {
   throw new Error("Synthetic screening voice job did not complete.");
 }
-process.stdout.write("completed\n");
+process.stdout.write(JSON.stringify({ status: "completed",
+  answerId: completedAnswerId }) + "\n");

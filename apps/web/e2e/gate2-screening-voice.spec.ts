@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "@playwright/test";
+import { publishGate2ScreeningRedaction } from
+  "@envoi-labs/services/screening-redaction-publisher";
+import { decideQualifiedScreeningAnswer } from
+  "@envoi-labs/services/qualified-screening-decision";
 import { installSyntheticMicrophone } from "./respondent/voice-fixture";
 import { deliveredEmail, localService, loopbackOrigin } from "./support/disposable-auth";
 
@@ -11,8 +15,8 @@ test.describe("Gate 2 consented voice screener fixture", () => {
   test.skip(process.env.ENVOI_TEST_LOCAL_SUPABASE !== "1", "Requires disposable local Auth and database.");
   test.skip(({ browserName }) => browserName !== "chromium", "Uses disposable Chromium Auth.");
 
-  test("real private upload reaches a fixture-only worker and never qualifies by itself", async ({ browser, baseURL }) => {
-    test.setTimeout(150_000);
+  test("private voice upload reaches a qualified synthetic decision and withdrawal hides its source", async ({ browser, baseURL }) => {
+    test.setTimeout(200_000);
     const origin = loopbackOrigin(baseURL);
     const db = localService();
     const email = `gate2-voice-${randomUUID()}@example.test`;
@@ -52,6 +56,11 @@ test.describe("Gate 2 consented voice screener fixture", () => {
         length_minutes: 10, deadline_at: new Date(Date.now() + 86_400_000).toISOString(),
       }).select("id").single();
       if (study.error || !study.data) throw new Error("Disposable study is missing.");
+      const guide = await db.from("guide_questions").insert({
+        study_id: study.data.id, position: 1,
+        text: "Describe a recent nursing shift.",
+      });
+      expect(guide.error).toBeNull();
       const criterion = await db.from("criteria").insert({ study_id: study.data.id,
         kind: "must", attribute_key: "nurse", operator: "eq", value_json: true,
         text: "Worked as a hospital nurse in the past 12 months",
@@ -109,10 +118,13 @@ test.describe("Gate 2 consented voice screener fixture", () => {
       const workerPath = resolve(__dirname, "support", "process-gate2-screening-voice.mjs");
       const processed = await runNode(process.execPath, [workerPath, reservation.audioObjectId],
         { timeout: 30_000 });
-      expect(processed.stdout.trim()).toBe("completed");
+      const completion = JSON.parse(processed.stdout.trim()) as {
+        status: string; answerId: string };
+      expect(completion.status).toBe("completed");
+      expect(completion.answerId).toMatch(/^[a-f0-9-]{36}$/);
       await page.reload();
       await expect(page.getByText("Your answer is awaiting review.")).toBeVisible();
-      await expect(page.getByText("I worked as a hospital nurse last year.")).toHaveCount(0);
+      await expect(page.getByText("I worked as a hospital nurse three months ago.")).toHaveCount(0);
       const events = await db.from("gate2_screening_events").select("id").eq("rule_id", rule.data.id);
       expect(events.error).toBeNull();
       expect(events.data).toEqual([]);
@@ -120,13 +132,83 @@ test.describe("Gate 2 consented voice screener fixture", () => {
       expect(unchanged.error).toBeNull();
       expect(unchanged.data?.state).toBe("screening");
 
+      // This purpose and policy are installed only in the disposable Auth job.
+      const purpose = await db.from("consents").insert({
+        respondent_id: profile.data.id, study_id: study.data.id,
+        purpose: "ai_screening", granted: true,
+        text_version: "synthetic-ai-screening-v1",
+      }).select("id").single();
+      if (purpose.error || !purpose.data) throw new Error("Synthetic purpose missing");
+      const receipt = await db.rpc("test_gate2_screening_purpose_receipt" as never,
+        { supplied_consent_id: purpose.data.id } as never);
+      expect(receipt.error).toBeNull();
+      expect(receipt.data).toBe(true);
+      const answerText = "I worked as a hospital nurse three months ago.";
+      const qualified = await publishGate2ScreeningRedaction(db,
+        { policyDigest: "a".repeat(64), qualificationDigest: "b".repeat(64),
+          redact: async (raw) => {
+            expect(raw).toBe(answerText);
+            return answerText;
+          } }, {
+          answerId: completion.answerId, policyDigest: "a".repeat(64),
+          qualificationDigest: "b".repeat(64),
+          idempotencyKey: `gate2-redaction:${randomUUID()}`,
+        });
+      expect(qualified?.qualified).toBe(true);
+      const request = { studyId: study.data.id, answerId: completion.answerId,
+        ruleId: rule.data.id, ruleVersion: 1,
+        providerModel: "synthetic-model", promptVersion: "screening-v1",
+        promptDigest: "c".repeat(64) };
+      let modelCalls = 0;
+      const model = {
+        async interpret(source: { answerText: string; redactedSourceVersion: string }) {
+          modelCalls += 1;
+          expect(source).toMatchObject({ answerText,
+            redactedSourceVersion: qualified?.sourceVersion });
+          return { result: "supported", span: {
+            startChar: 0, endChar: Array.from(answerText).length } };
+        },
+        async evidenceSupports(source: { answerText: string; result: string;
+          criterionText: string; span: { startChar: number; endChar: number } }) {
+          return source.answerText === answerText && source.result === "supported" &&
+            source.criterionText === "Worked as a hospital nurse in the past 12 months" &&
+            Array.from(source.answerText).slice(source.span.startChar,
+              source.span.endChar).join("") === answerText;
+        },
+      };
+      expect((await decideQualifiedScreeningAnswer(db, model, request))?.action)
+        .toBe("qualify");
+      expect((await decideQualifiedScreeningAnswer(db, model, request))?.action)
+        .toBe("qualify");
+      expect(modelCalls).toBe(1);
+      const invited = await db.from("invites").select("state")
+        .eq("id", offer.data.id).single();
+      expect(invited.error).toBeNull();
+      expect(invited.data?.state).toBe("invited");
+      await page.goto("/r");
+      await expect(page.getByRole("button", { name: "Start answering" })).toBeVisible();
+
       const withdrawn = await db.from("consents").insert({ respondent_id: profile.data.id,
         study_id: study.data.id, purpose: "transcription_vendor", granted: false,
         text_version: "synthetic-screening-withdrawal" });
       expect(withdrawn.error).toBeNull();
+      const staleSource = await db.rpc("current_gate2_screening_model_source", {
+        requested_study_id: request.studyId,
+        requested_answer_id: request.answerId,
+        requested_rule_id: request.ruleId,
+        requested_rule_version: request.ruleVersion,
+        requested_provider_model: request.providerModel,
+        requested_prompt_version: request.promptVersion,
+        requested_prompt_digest: request.promptDigest,
+      });
+      expect(staleSource.error).toBeNull();
+      expect(staleSource.data).toBeNull();
+      expect(await decideQualifiedScreeningAnswer(db, model, request)).toBeNull();
+      expect(modelCalls).toBe(1);
+      await page.goto(`/r/screening/${offer.data.id}`);
       await page.reload();
-      await expect(page.getByLabel("Your answer")).toBeVisible();
       await expect(page.getByText("Your answer is awaiting review.")).toHaveCount(0);
+      await expect(page.getByText(answerText)).toHaveCount(0);
     } finally {
       await context.close();
     }
