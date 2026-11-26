@@ -128,8 +128,8 @@ test.describe("Gate 2 private screening sheet", () => {
         await stranger.close();
       }
 
-      // A separate synthetic respondent exercises the reviewed decision port.
-      // This fixture is test-only; the live external screening model remains off.
+      // A separate synthetic respondent verifies the retired raw decision
+      // adapter cannot advance an offer without a qualified source.
       const qualifiedEmail = `gate2-screen-qualified-${randomUUID()}@example.test`;
       const qualifiedContext = await browser.newContext({ baseURL: origin });
       try {
@@ -198,17 +198,16 @@ test.describe("Gate 2 private screening sheet", () => {
                 input.span.endChar).join("") === answerText;
           },
         });
-        expect((await screenSubmittedAnswer(reviewer, submitted))?.action).toBe("qualify");
-        expect((await screenSubmittedAnswer(reviewer, submitted))?.action).toBe("qualify");
+        expect(await screenSubmittedAnswer(reviewer, submitted)).toBeNull();
         expect(interpretations).toBe(1);
         const invited = await db.from("invites").select("state")
           .eq("id", qualifiedOffer.data.id).single();
         expect(invited.error).toBeNull();
-        expect(invited.data?.state).toBe("invited");
-        await qualifiedPage.goto("/r");
-        await qualifiedPage.getByRole("button", { name: "Start answering" }).click();
-        await expect(qualifiedPage).toHaveURL(
-          origin + `/r/interviews/${qualifiedOffer.data.id}`);
+        expect(invited.data?.state).toBe("screening");
+        const decisions = await db.from("gate2_screening_events").select("id")
+          .eq("rule_id", rule.data.id);
+        expect(decisions.error).toBeNull();
+        expect(decisions.data).toEqual([]);
       } finally {
         await qualifiedContext.close();
       }
