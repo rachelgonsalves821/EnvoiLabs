@@ -111,6 +111,11 @@ select is((select value ->> 'amountCents' from reserved_batch), '1200',
     'four three-dollar rewards make one twelve-dollar Visa batch');
 select is((select value ->> 'sourceCount' from reserved_batch), '4',
     'batch freezes four separate session receipts');
+select is((select value ->> 'productId' from reserved_batch), 'sandbox_visa',
+    'batch returns the frozen Visa SKU to the sandbox order adapter');
+select is((select value ->> 'recipientId' from reserved_batch),
+    (select value ->> 'payoutId' from reserved_batch),
+    'batch recipient lookup is bound to the frozen payout ID');
 reset role;
 select is((select count(*) from internal.gate2_visa_reward_batch_items),
     4::bigint, 'each source session is claimed exactly once');

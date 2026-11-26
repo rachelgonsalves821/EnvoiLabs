@@ -56,6 +56,7 @@ declare
     product internal.gate2_sandbox_visa_products%rowtype;
     existing public.payouts%rowtype;
     existing_batch internal.gate2_visa_reward_batches%rowtype;
+    existing_intent internal.gate2_sandbox_visa_intents%rowtype;
     candidate record;
     sessions uuid[] := '{}';
     quotes uuid[] := '{}';
@@ -87,8 +88,15 @@ begin
         if not found or existing.respondent_id is distinct from requested_respondent_id
             or existing.amount_cents is distinct from existing_batch.amount_cents
         then raise check_violation; end if;
+        select * into existing_intent from internal.gate2_sandbox_visa_intents
+        where payout_id = existing.id;
+        if not found or existing_intent.batch_id is distinct from existing_batch.id
+            or existing_intent.amount_cents is distinct from existing.amount_cents
+        then raise check_violation; end if;
         return jsonb_build_object('status', 'reserved', 'payoutId', existing.id,
-            'batchId', existing_batch.id, 'amountCents', existing.amount_cents,
+            'batchId', existing_batch.id, 'respondentId', requested_respondent_id,
+            'recipientId', existing.id, 'productId', existing_intent.product_id,
+            'amountCents', existing.amount_cents,
             'payoutState', existing.state, 'providerOrderId',
             existing.tremendous_order_id);
     end if;
@@ -163,7 +171,9 @@ begin
         route.recipient_name, route.recipient_email, route.country,
         product.product_id, route.verification_receipt, product.catalog_receipt);
     return jsonb_build_object('status', 'reserved', 'payoutId', reserved_payout_id,
-        'batchId', batch_id, 'amountCents', total, 'payoutState', 'pending',
+        'batchId', batch_id, 'respondentId', requested_respondent_id,
+        'recipientId', reserved_payout_id, 'productId', product.product_id,
+        'amountCents', total, 'payoutState', 'pending',
         'providerOrderId', null, 'sourceCount', array_length(sessions, 1));
 end;
 $$;
