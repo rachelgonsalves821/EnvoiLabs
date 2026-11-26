@@ -44,10 +44,17 @@ insert into public.sessions (id, invite_id, study_id, state, started_at, submitt
 select format('a98b0000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
     format('a98a0000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
     format('a9880000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
-    'approved', now() - interval '2 days 1 hour',
+    'quality_hold', now() - interval '2 days 1 hour',
     case when n = 4 then now() - interval '1 hour'
         else now() - interval '2 days' end
 from generate_series(1, 4) as n;
+insert into public.quality_scores (session_id, score, components_json,
+    decision, decided_by)
+select id, 80, '{}'::jsonb, 'approve',
+    '90400000-0000-4000-8000-000000000001'
+from public.sessions where study_id::text like 'a9880000-0000-4000-8000-%';
+update public.sessions set state = 'approved'
+where study_id::text like 'a9880000-0000-4000-8000-%';
 insert into public.answers (id, session_id, study_id, guide_question_id,
     kind, sequence)
 select format('a98c0000-0000-4000-8000-%s',
