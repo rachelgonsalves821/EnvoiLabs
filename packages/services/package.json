@@ -20,6 +20,7 @@
     "./refund-settlement": "./src/refund-settlement.ts",
     "./nudges": "./src/nudges.ts",
     "./nudge-delivery": "./src/nudge-delivery.ts",
+    "./offer-push": "./src/offer-push.ts",
     "./visa-product": "./src/visa-product.ts",
     "./probe-turn": "./src/probe-turn.ts",
     "./probe-opportunities": "./src/probe-opportunities.ts"

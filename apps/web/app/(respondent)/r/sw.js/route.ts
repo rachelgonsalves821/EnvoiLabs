@@ -19,15 +19,36 @@ self.addEventListener('push', (event) => {
     }));
 });
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
   const path = event.notification.data?.path;
   if (!resumePath.test(path)) return;
+  event.notification.close();
   event.waitUntil(self.clients.openWindow(path));
 });
 `;
 
+// Proposed generic copy. The separate offer switch remains off until approved.
+const matchedOffer = String.raw`
+self.addEventListener('push', (event) => {
+  let payload;
+  try { payload = JSON.parse(event.data?.text() ?? ''); } catch { return; }
+  if (!payload || payload.kind !== 'matched_offer' || payload.path !== '/r') return;
+  event.waitUntil(self.registration.showNotification('New study match', {
+    body: 'A study that may fit you is ready to review.',
+    tag: 'gate2-matched-offer', data: { path: '/r' },
+  }));
+});
+self.addEventListener('notificationclick', (event) => {
+  const path = event.notification.data?.path;
+  if (path !== '/r') return;
+  event.notification.close();
+  event.waitUntil(self.clients.openWindow('/r'));
+});
+`;
+
 export function GET() {
-  const script = install + (process.env.ENVOI_GATE2_PUSH_WORKER_ENABLED === "true" ? nudge : "");
+  const script = install + (process.env.ENVOI_GATE2_PUSH_WORKER_ENABLED === "true"
+    ? nudge + (process.env.ENVOI_GATE2_OFFER_PUSH_ENABLED === "true"
+      ? matchedOffer : "") : "");
   return new Response(script, {
     headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" },
   });
