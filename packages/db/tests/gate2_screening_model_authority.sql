@@ -124,10 +124,10 @@ select ok(position('nurse@example.test' in
     'a9f20000-0000-4000-8000-000000000003', 1,
     'synthetic-model', 'screening-v1', repeat('a', 64))::text) = 0,
     'raw contact details are absent from the entire model source');
+reset role;
 select ok(not has_table_privilege('service_role',
     'internal.gate2_screening_redacted_sources', 'INSERT'),
     'service cannot self-qualify a raw screening answer');
-reset role;
 create temporary table gate2_first_screening_version as
     select source_version from internal.gate2_screening_redacted_sources
     where answer_id = 'a9f20000-0000-4000-8000-000000000004'
