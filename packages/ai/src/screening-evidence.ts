@@ -65,11 +65,25 @@ function isJudgment(value: unknown): value is Judgment {
     && typeof data.explicitNotInferred === "boolean";
 }
 
+function sameInput(current: ScreeningEvidenceInput, frozen: ScreeningEvidenceInput): boolean {
+  return current.studyId === frozen.studyId && current.answerId === frozen.answerId
+    && current.ruleId === frozen.ruleId && current.ruleVersion === frozen.ruleVersion
+    && current.criterionText === frozen.criterionText && current.question === frozen.question
+    && current.answerText === frozen.answerText && current.result === frozen.result
+    && current.span?.startChar === frozen.span.startChar
+    && current.span?.endChar === frozen.span.endChar;
+}
+
 /** Advisory Agent 3 port: false forces Platform's review/clarification path. */
 export async function evidenceSupports(provider: LLMProvider, input: ScreeningEvidenceInput,
   config: ScreeningModelConfig, modelUse?: ScreeningModelUsePort): Promise<boolean> {
+  const frozen: ScreeningEvidenceInput = { studyId: input.studyId, answerId: input.answerId,
+    ruleId: input.ruleId, ruleVersion: input.ruleVersion,
+    criterionText: input.criterionText, question: input.question,
+    answerText: input.answerText, result: input.result,
+    span: { startChar: input.span?.startChar, endChar: input.span?.endChar } };
   const { studyId, answerId, ruleId, ruleVersion,
-    criterionText, question, answerText, result, span } = input;
+    criterionText, question, answerText, result, span } = frozen;
   if (!uuid.test(studyId) || !uuid.test(answerId) || !uuid.test(ruleId)
     || !Number.isSafeInteger(ruleVersion) || ruleVersion < 1
     || !criterionText?.trim() || !question?.trim() || !answerText?.trim()
@@ -91,7 +105,9 @@ export async function evidenceSupports(provider: LLMProvider, input: ScreeningEv
       providerModel, promptVersion, promptDigest, studyId, answerId, ruleId,
       ruleVersion, sourceDigest });
     if (!modelUse || await modelUse.authorize(attempt) !== true
-      || await modelUse.authorize(attempt) !== true) return false;
+      || !sameInput(input, frozen)
+      || await modelUse.authorize(attempt) !== true
+      || !sameInput(input, frozen)) return false;
     const generated = await provider.generate({
       purpose: "ai_screening",
       promptVersion,
@@ -107,7 +123,8 @@ export async function evidenceSupports(provider: LLMProvider, input: ScreeningEv
     const supported = isJudgment(parsed) && parsed.relation === result && parsed.evidenceText === excerpt
       && parsed.respondentOwnExperience && parsed.criterionAndTimeframeMatch
       && parsed.explicitNotInferred;
-    return supported && await modelUse.authorize(attempt) === true;
+    return supported && sameInput(input, frozen)
+      && await modelUse.authorize(attempt) === true && sameInput(input, frozen);
   } catch {
     return false;
   }

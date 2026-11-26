@@ -83,8 +83,8 @@ describe("screening evidence boundary", () => {
       model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
     const policy = vi.fn(async () => { mutable.answerText = "A different answer."; return true; });
     expect(await evidenceSupports({ generate }, mutable, config,
-      { authorize: policy })).toBe(true);
-    expect(generate.mock.calls[0]![0].messages[0].content).toContain(candidate.answerText);
+      { authorize: policy })).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
     expect(JSON.stringify(policy.mock.calls)).not.toContain(candidate.answerText);
   });
 
@@ -95,6 +95,25 @@ describe("screening evidence boundary", () => {
     const authorize = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     expect(await evidenceSupports({ generate }, candidate, config, { authorize })).toBe(false);
     expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("withholds if the approved rule changes during authorization or inference", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const mutable = { ...candidate, span: { ...candidate.span } };
+    const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
+      model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
+    expect(await evidenceSupports({ generate }, mutable, config, { authorize: async () => {
+      mutable.ruleVersion = 2;
+      return true;
+    } })).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
+    const later = { ...candidate, span: { ...candidate.span } };
+    expect(await evidenceSupports({ generate: async () => {
+      later.criterionText = "A different criterion";
+      return { output: judgment("supported", candidate.answerText),
+        model: config.providerModel, inputTokens: 0, outputTokens: 0,
+        latencyMs: 0, costMicros: 0 };
+    } }, later, config, { authorize: async () => true })).toBe(false);
   });
 
   it("rejects missing source identity and a provider/model mismatch", async () => {
