@@ -12,6 +12,7 @@
     "./qualified-screening-source": "./src/qualified-screening-source.ts",
     "./qualified-screening-bridge": "./src/qualified-screening-bridge.ts",
     "./qualified-screening-decision": "./src/qualified-screening-decision.ts",
+    "./screening-redaction-publisher": "./src/screening-redaction-publisher.ts",
     "./study-draft": "./src/study-draft.ts",
     "./study-draft-criteria": "./src/study-draft-criteria.ts",
     "./study-tracking": "./src/study-tracking.ts",
