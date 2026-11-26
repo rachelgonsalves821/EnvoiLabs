@@ -916,3 +916,11 @@ Needs from others. The coordinator owns the cleanup integration sequence. No acc
 Contract or schema changes. This documentation change records the draft selector migration. The protected preview cleanup option is still off.
 
 Risks. The open-development redaction comparison is below the qualification thresholds. The separate independent dataset remains sealed, and researcher publication remains gated.
+
+## 2026-11-26 · Gate 1 cleanup upgrade rehearsals
+
+Gate 1 remains open. The standalone cleanup draft and the pinned Gate 2 stack were tested on two disposable local databases. In both, the Gate 1 selector was applied before 45 later-added migrations, including 32 with earlier version numbers. The completed migration history contained all 65 migrations. The upgraded schema passed 1,057 SQL assertions across 39 files once its standard synthetic seed was loaded. Real local Storage checks covered a confirmation holding the reservation lock past expiry, selective cleanup, late upload, and an empty repeat. [Upgrade and race evidence](https://github.com/rachelgonsalves821/EnvoiLabs/pull/198#issuecomment-7183303186)
+
+A second run created confirmed, active, and abandoned audio before upgrading. Active and confirmed audio, the confirmation's checksum, and its pending processing job survived. Cleanup removed the abandoned object. A signed upload issued before the upgrade still worked after it, and cleanup removed that late object from the expired reservation. The repeat sweep was empty. [Pre-existing data evidence](https://github.com/rachelgonsalves821/EnvoiLabs/pull/198#issuecomment-7183361318)
+
+The coordinator owns the integration sequence. The protected preview still needs its own cleanup rehearsal after integration. Independent redaction qualification and hosted researcher publication remain outstanding. No account-holder action is needed for this work.
