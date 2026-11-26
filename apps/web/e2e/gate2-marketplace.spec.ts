@@ -230,9 +230,9 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         // quotes and approved session receipts.
         for (let number = 2; number <= 3; number += 1) {
           // Prior matched offers remain active for the separate probe race
-          // below. Add nine new eligible profiles for this study, keeping its
-          // ten-person quote feasible without changing those offers.
-          const extraProfiles = await Promise.all(Array.from({ length: 9 }, async () => {
+          // below. Add ten new eligible profiles so feasibility does not rely
+          // on the returning respondent being counted at quote time.
+          const extraProfiles = await Promise.all(Array.from({ length: 10 }, async () => {
             const created = await db.auth.admin.createUser({
               email: `gate2-market-extra-${number}-${randomUUID()}@example.test`,
               email_confirm: true,
@@ -247,7 +247,8 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const extraFacts = await db.from("profile_attributes").insert(
             extraProfiles.flatMap((respondent_id) =>
               profile.map(([key, value_json]) => ({ respondent_id, key,
-                value_json, source: "signup" }))));
+                value_json: key === "region_zip" ? "02138" : value_json,
+                source: "signup" }))));
           expect(extraFacts.error).toBeNull();
           const extraConsents = await db.from("consents").insert(
             extraProfiles.flatMap((respondent_id) =>
@@ -263,6 +264,12 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             deadline_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
           }).select("id").single();
           if (extra.error || !extra.data) throw new Error(`Extra study: ${extra.error?.message}`);
+          const preference = await db.from("criteria").insert({
+            study_id: extra.data.id, kind: "nice", attribute_key: "region_zip",
+            operator: "eq", value_json: "02139",
+            text: "Returning synthetic respondent preference",
+          });
+          expect(preference.error).toBeNull();
           const extraBrief = await db.from("brief_versions").insert({
             study_id: extra.data.id, version: 1,
             brief_json: { purpose: "Synthetic paid Visa fixture" },
@@ -277,6 +284,8 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             id: researcher.data.id, organizationId: org.data.id,
             authUserId: account.data.user.id,
           });
+          const extraScope = await extraDb.readApprovedScope(extra.data.id);
+          expect(extraScope?.feasibility.eligibleProfileCount).toBeGreaterThanOrEqual(10);
           let extraSession: CheckoutSession | null = null;
           const checkout = await prepareStudyCheckout(extraDb, {
             async create(_key, quote) {
