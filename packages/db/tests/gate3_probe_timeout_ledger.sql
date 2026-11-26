@@ -234,6 +234,72 @@ select is((select count(*) from jsonb_array_elements(
     public.list_gate3_probe_due(10)) as due
     where due ->> 'answerId' = 'a9720000-0000-4000-8000-000000000009'),
     0::bigint, 'a committed probe is absent from the timeout sweep');
+-- Run the failed-frame branch in a subtransaction, preserving this fixture's
+-- later timeout case. Any failed check aborts the whole test transaction.
+do $$
+declare turn_id uuid;
+declare probe_id uuid;
+declare first_receipt jsonb;
+declare replay jsonb;
+declare item jsonb;
+declare rollback_trial boolean := false;
+begin
+    select first_writer_turn.turn_id into turn_id from first_writer_turn;
+    select (result -> 'value' ->> 'probeId')::uuid into probe_id
+        from first_writer_probe;
+    begin
+        if public.record_gate3_probe_render_error(
+            'a9720000-0000-4000-8000-000000000004', turn_id, probe_id,
+            '90300000-0000-4000-8000-000000000002') ->> 'status' <> 'stale'
+            or public.record_gate3_probe_render_error(
+                'a9720000-0000-4000-8000-000000000004', turn_id,
+                gen_random_uuid(),
+                '90300000-0000-4000-8000-000000000001') ->> 'status' <> 'stale'
+        then raise exception 'wrong actor or probe accepted'; end if;
+        first_receipt := public.record_gate3_probe_render_error(
+            'a9720000-0000-4000-8000-000000000004', turn_id, probe_id,
+            '90300000-0000-4000-8000-000000000001');
+        replay := public.record_gate3_probe_render_error(
+            'a9720000-0000-4000-8000-000000000004', turn_id, probe_id,
+            '90300000-0000-4000-8000-000000000001');
+        select value into item from jsonb_array_elements(
+            public.read_gate3_probe_opportunity_snapshot(
+                '90600000-0000-4000-8000-000000000001') -> 'items')
+            where value ->> 'answerId' = 'a9720000-0000-4000-8000-000000000009';
+        if first_receipt ->> 'outcome' <> 'error'
+            or replay ->> 'outcome' <> 'error'
+            or item ->> 'outcome' <> 'error'
+            or item ->> 'renderResolvedAt' is null
+            or public.mark_gate3_probe_shown(
+                'a9720000-0000-4000-8000-000000000004', turn_id, probe_id,
+                '90300000-0000-4000-8000-000000000001', 3200) <> 'stale'
+            or public.record_gate3_probe_render_terminal(turn_id,
+                '90300000-0000-4000-8000-000000000001') ->> 'outcome' <> 'error'
+            or public.read_gate3_respondent_probe(
+                'a9720000-0000-4000-8000-000000000004',
+                '90300000-0000-4000-8000-000000000001') is not null
+        then raise exception 'failed-frame receipt or replay mismatch'; end if;
+        insert into public.consents (respondent_id, study_id, purpose,
+            granted, text_version)
+        values ('90500000-0000-4000-8000-000000000001',
+            '90600000-0000-4000-8000-000000000001', 'ai_followup',
+            true, 'new-synthetic-consent-receipt');
+        if public.record_gate3_probe_render_error(
+            'a9720000-0000-4000-8000-000000000004', turn_id, probe_id,
+            '90300000-0000-4000-8000-000000000001') ->> 'status' <> 'stale'
+            or public.read_gate3_respondent_probe(
+                'a9720000-0000-4000-8000-000000000004',
+                '90300000-0000-4000-8000-000000000001') is not null
+        then raise exception 'old consent receipt reactivated probe'; end if;
+        rollback_trial := true;
+        raise exception 'rollback failed-frame trial';
+    exception when others then
+        if not rollback_trial or sqlerrm <> 'rollback failed-frame trial'
+        then raise; end if;
+    end;
+end;
+$$;
+select pass('failed frame persists error and wins shown/timeout replay');
 reset role;
 alter table internal.gate3_probe_turns disable trigger gate3_keep_probe_turn_identity;
 update internal.gate3_probe_turns set

@@ -31,6 +31,15 @@ describe("private probe opportunity snapshot", () => {
       supplied_study_id: studyId });
   });
 
+  it("accepts a persisted failed-frame outcome without claiming the probe was shown", async () => {
+    const failed = { ...item, outcome: "error", renderOutcome: "error",
+      renderResolvedAt: "2026-11-25T00:00:10Z" };
+    const call: ProbeRpc = async () => ({ error: null,
+      data: { studyId, recordedCount: 1, items: [failed] } });
+    expect((await loadProbeOpportunitySnapshot(call, studyId)).items[0])
+      .toEqual(failed);
+  });
+
   it("fails closed on truncated, duplicate or falsely rendered results", async () => {
     const call: ProbeRpc = async () => ({ error: null,
       data: { studyId, recordedCount: 2, items: [item] } });
