@@ -170,6 +170,26 @@ select is(public.store_gate2_screening_transcribed_answer(
 reset role;
 insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001', 'recording', false, 'voice-v1');
+set local role service_role;
+select throws_ok($$select public.commit_gate2_screening_decision(
+    (select (payload ->> 'id')::uuid from capped_answer),
+    'a9b10000-0000-4000-8000-000000000003', 1,
+    'supported', 2, 37, 'qualify', true)$$,
+    '23514', null, 'recording withdrawal blocks a pending voice decision');
+reset role;
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001', 'recording', true, 'voice-v1');
+set local role service_role;
+select throws_ok($$select public.commit_gate2_screening_decision(
+    (select (payload ->> 'id')::uuid from capped_answer),
+    'a9b10000-0000-4000-8000-000000000003', 1,
+    'supported', 2, 37, 'qualify', true)$$,
+    '23514', null, 'identical recording regrant cannot revive the old receipt');
+reset role;
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001', 'transcription_vendor', false, 'withdrawn-v2');
 set local role service_role;
 select throws_ok($$select public.store_gate2_screening_answer(

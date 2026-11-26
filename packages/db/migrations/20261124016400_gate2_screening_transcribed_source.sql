@@ -31,6 +31,31 @@ alter table pii.gate2_screening_transcription_receipts enable row level security
 revoke all on pii.gate2_screening_transcription_receipts
     from public, anon, authenticated, service_role;
 grant select on pii.gate2_screening_transcription_receipts to service_role;
+
+-- Recording withdrawal must serialize with the same respondent/study locks
+-- already used for transcription and screening decision commits.
+create or replace function internal.gate2_lock_screening_consent_write() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+    if tg_op = 'DELETE' then
+        if old.purpose in ('ai_screening', 'retention', 'recording', 'transcription_vendor') then
+            perform 1 from public.respondents where id = old.respondent_id for update;
+        end if;
+        return old;
+    end if;
+    if tg_op = 'UPDATE' and old.purpose in
+        ('ai_screening', 'retention', 'recording', 'transcription_vendor') then
+        perform 1 from public.respondents where id = old.respondent_id for update;
+    end if;
+    if new.purpose in ('ai_screening', 'retention', 'recording', 'transcription_vendor') then
+        if new.study_id is not null then
+            perform 1 from public.studies where id = new.study_id for update;
+        end if;
+        perform 1 from public.respondents where id = new.respondent_id for update;
+    end if;
+    return new;
+end;
+$$;
 create trigger immutable_gate2_screening_transcription
     before update or delete on pii.gate2_screening_transcription_receipts
     for each row execute function internal.reject_gate2_ledger_mutation();
