@@ -83,6 +83,43 @@ select throws_ok($$select public.confirm_gate2_screening_audio(
     (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture),
     5000, repeat('b',64))$$, '23505', null,
     'changed bytes cannot replay the reservation');
+create temp table claimed_screening_audio (payload jsonb);
+grant select, insert on claimed_screening_audio to service_role;
+insert into claimed_screening_audio select public.claim_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture));
+select ok((select (payload ->> 'leaseId')::uuid is not null
+    from claimed_screening_audio), 'one worker receives a private lease');
+select ok(public.validate_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture),
+    (select (payload ->> 'leaseId')::uuid from claimed_screening_audio)),
+    'worker rechecks the current recording source before transcription');
+select is(public.claim_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture)),
+    null::jsonb, 'competing worker cannot claim an active lease');
+select is(public.complete_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture),
+    (select (payload ->> 'leaseId')::uuid from claimed_screening_audio),
+    'I worked as a hospital nurse this year.', 'synthetic', 'fixture') ->> 'status',
+    'completed', 'leased completion writes the exact private receipt and answer');
+select is((select count(*)::integer from pii.gate2_screening_transcription_receipts
+    where audio_object_id = (select (payload ->> 'audioObjectId')::uuid
+        from screening_audio_fixture)), 1,
+    'one immutable transcription receipt is bound to the confirmed audio');
+select is((select count(*)::integer from pii.gate2_screener_answers as answer
+    join pii.gate2_screening_transcription_receipts as receipt
+        on receipt.id = answer.transcription_receipt_id
+    where receipt.audio_object_id = (select (payload ->> 'audioObjectId')::uuid
+        from screening_audio_fixture)
+        and answer.kind = 'voice' and answer.answer_text = receipt.transcript_text),
+    1, 'private voice answer copies only the worker receipt transcript');
+select is(public.complete_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture),
+    (select (payload ->> 'leaseId')::uuid from claimed_screening_audio),
+    'I worked as a hospital nurse this year.', 'synthetic', 'fixture') ->> 'status',
+    'alreadyCompleted', 'same completed lease replays without a second answer');
+select is(public.claim_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture)),
+    null::jsonb, 'completed audio cannot be leased again');
 reset role;
 update internal.gate2_screening_audio_uploads
 set expires_at = now() - interval '1 second'
@@ -104,5 +141,10 @@ select throws_ok($$select public.confirm_gate2_screening_audio(
     (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture),
     5000, repeat('a',64))$$, '23514', null,
     'withdrawal blocks even an otherwise identical confirmation replay');
+select is(public.complete_gate2_screening_audio(
+    (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture),
+    (select (payload ->> 'leaseId')::uuid from claimed_screening_audio),
+    'I worked as a hospital nurse this year.', 'synthetic', 'fixture') ->> 'status',
+    'stale', 'withdrawal blocks completion replay from exposing old receipt');
 select * from finish();
 rollback;
