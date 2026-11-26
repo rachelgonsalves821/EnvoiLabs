@@ -1,6 +1,6 @@
--- A completed, approved study frees its respondent for a later marketplace
--- offer even while the old accepted offer's 24-hour URL has not expired.
--- In-progress and unreviewed sessions still occupy the respondent.
+-- A submitted study frees its respondent for a later marketplace offer even
+-- while the old accepted offer's 24-hour URL has not expired. The weekly cap
+-- still counts recent submissions. Match the existing feasibility rule.
 create or replace function internal.gate2_marketplace_candidates(supplied_study_id uuid)
 returns table (respondent_id uuid) language sql volatile security definer
 set search_path = '' as $$
@@ -25,7 +25,7 @@ set search_path = '' as $$
                 (offer.state = 'accepted' and not exists (
                     select 1 from public.sessions as finished
                     where finished.invite_id = offer.id
-                        and finished.state in ('approved', 'paid', 'removed')))))
+                        and finished.state not in ('started', 'in_progress')))))
         and not exists (select 1 from public.criteria as criterion
             where criterion.study_id = target.id and criterion.kind in ('must', 'exclude')
                 and (criterion.kind = 'must') is distinct from exists (
