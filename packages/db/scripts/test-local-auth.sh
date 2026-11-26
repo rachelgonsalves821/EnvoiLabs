@@ -69,6 +69,11 @@ insert into internal.gate1_redaction_policies (policy_digest, qualification_dige
 values (repeat('a', 64), repeat('b', 64));
 SQL
 
+# Local-only payout denomination fixture. The helper exists only in this
+# disposable stack and accepts approved synthetic @example.test accounts.
+docker exec -i "supabase_db_$project_id" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  < "$db_dir/scripts/gate2-visa-e2e-fixture.sql" >/dev/null
+
 export SUPABASE_URL SUPABASE_PUBLISHABLE_KEY SUPABASE_SERVICE_ROLE_KEY
 export ENVOI_APP_ORIGIN="http://127.0.0.1:3100"
 export ENVOI_TEST_LOCAL_SUPABASE=1
