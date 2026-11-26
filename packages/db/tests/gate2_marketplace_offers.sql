@@ -199,6 +199,15 @@ select is((select count(*)::integer from public.invites
 select is((select count(*)::integer from public.removals
     where session_id = 'a9840000-0000-4000-8000-000000000099'), 1,
     'reviewed removal has one private reason record');
+set local role service_role;
+select throws_ok($$update public.sessions set state = 'approved'
+    where id = 'a9840000-0000-4000-8000-000000000099'$$,
+    '23514', null, 'reviewed removal cannot become an approved paid slot');
+reset role;
+select is((select count(*)::integer from public.sessions
+    where id = 'a9840000-0000-4000-8000-000000000099'
+        and state in ('approved', 'paid')), 0,
+    'blocked reversal leaves the removed slot unfulfilled for refund');
 update public.invites set state = 'accepted'
 where id = (select id from public.invites
     where study_id = 'a9840000-0000-4000-8000-000000000001'
@@ -231,6 +240,18 @@ reset role;
 select is((select state from public.sessions
     where id = 'a9840000-0000-4000-8000-000000000098'),
     'approved', 'approved session remains in purchased capacity');
+set local role service_role;
+select throws_ok($$update public.sessions set state = 'removed'
+    where id = 'a9840000-0000-4000-8000-000000000098'$$,
+    '23514', null, 'reviewed approval cannot become an unfilled slot');
+select throws_ok($$update public.sessions set state = 'quality_hold'
+    where id = 'a9840000-0000-4000-8000-000000000098'$$,
+    '23514', null, 'reviewed approval cannot evade payout eligibility');
+reset role;
+select is((select count(*)::integer from public.sessions
+    where id = 'a9840000-0000-4000-8000-000000000098'
+        and state in ('approved', 'paid')), 1,
+    'blocked reversal preserves the approved reward and fulfilled slot');
 insert into public.studies (id, organization_id, title, state,
     target_completes, length_minutes, deadline_at)
 values ('a9840000-0000-4000-8000-000000000002',
@@ -285,5 +306,19 @@ select is((select count(*)::integer from public.sessions
 select is((select count(*)::integer from public.invites
     where study_id = 'a9840000-0000-4000-8000-000000000001'), 11,
     'target attainment creates no further replacement offer');
+set local role service_role;
+update public.sessions set state = 'paid'
+where id = 'a9840000-0000-4000-8000-000000000098';
+select is((select state from public.sessions
+    where id = 'a9840000-0000-4000-8000-000000000098'),
+    'paid', 'reviewed approval may advance to paid without changing the slot');
+select throws_ok($$update public.sessions set state = 'removed'
+    where id = 'a9840000-0000-4000-8000-000000000098'$$,
+    '23514', null, 'paid approval cannot later become a removal');
+reset role;
+select is((select count(*)::integer from public.sessions
+    where study_id = 'a9840000-0000-4000-8000-000000000001'
+        and state in ('approved', 'paid')), 10,
+    'paid bookkeeping preserves all ten fulfilled slots for refund math');
 select * from finish();
 rollback;
