@@ -115,6 +115,18 @@ create trigger gate2_lock_screening_source_write
 create function internal.gate2_lock_screening_consent_write() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
+    if tg_op = 'DELETE' then
+        if old.purpose in ('ai_screening', 'retention', 'transcription_vendor') then
+            perform 1 from public.respondents
+                where id = old.respondent_id for update;
+        end if;
+        return old;
+    end if;
+    if tg_op = 'UPDATE' and old.purpose in
+        ('ai_screening', 'retention', 'transcription_vendor') then
+        perform 1 from public.respondents
+            where id = old.respondent_id for update;
+    end if;
     if new.purpose in ('ai_screening', 'retention', 'transcription_vendor') then
         if new.study_id is not null then
             perform 1 from public.studies where id = new.study_id for update;
@@ -128,7 +140,7 @@ $$;
 revoke all on function internal.gate2_lock_screening_consent_write()
     from public, anon, authenticated, service_role;
 create trigger gate2_lock_screening_consent_write
-    before insert or update on public.consents
+    before insert or update or delete on public.consents
     for each row execute function internal.gate2_lock_screening_consent_write();
 
 create function internal.gate2_lock_screening_rule_write() returns trigger

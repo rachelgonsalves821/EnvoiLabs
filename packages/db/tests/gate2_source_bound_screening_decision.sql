@@ -121,6 +121,21 @@ insert into public.consents (id, respondent_id, study_id, purpose,
     'synthetic-ai-screening-v1');
 insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
 values ('a9f30000-0000-4000-8000-000000000006', repeat('b', 64));
+delete from public.consents
+where id = 'a9f30000-0000-4000-8000-000000000006';
+set local role service_role;
+select is(public.get_gate2_current_qualified_screening_decision(
+    'a9f30000-0000-4000-8000-000000000004',
+    'synthetic-model', 'screening-v1', repeat('a', 64)), null,
+    'deleted purpose grant cannot keep the old model decision current');
+reset role;
+insert into public.consents (id, respondent_id, study_id, purpose,
+    granted, text_version) values ('a9f30000-0000-4000-8000-000000000007',
+    '90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_screening', true,
+    'synthetic-ai-screening-v1');
+insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
+values ('a9f30000-0000-4000-8000-000000000007', repeat('b', 64));
 insert into internal.gate2_screening_redacted_sources (answer_id,
     raw_answer_digest, redacted_text, redaction_policy_digest,
     qualification_digest, qualified) values (
