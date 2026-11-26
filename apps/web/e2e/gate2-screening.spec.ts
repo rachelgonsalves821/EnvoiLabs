@@ -290,6 +290,67 @@ test.describe("Gate 2 private screening sheet", () => {
         await qualifiedPage.getByRole("button", { name: "Start answering" }).click();
         await expect(qualifiedPage).toHaveURL(
           origin + `/r/interviews/${qualifiedOffer.data.id}`);
+
+        const notFitText = "I have never worked as a hospital nurse.";
+        const notFitOffer = await db.from("invites").insert({
+          study_id: study.data.id, respondent_id: qualifiedProfile.data.id,
+          state: "screening", reward_cents: 100,
+          expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+        }).select("id").single();
+        if (notFitOffer.error || !notFitOffer.data)
+          throw new Error("Synthetic screened-out offer absent");
+        let notFitKey = "";
+        await qualifiedPage.route(`**/api/respondent/screening/${notFitOffer.data.id}`,
+          async (route) => {
+            if (route.request().method() === "POST")
+              notFitKey = (route.request().postDataJSON() as { key: string }).key;
+            await route.continue();
+          });
+        await qualifiedPage.goto(`/r/screening/${notFitOffer.data.id}`);
+        await qualifiedPage.getByLabel("Your answer").fill(notFitText);
+        await qualifiedPage.getByRole("button", { name: "Submit answer" }).click();
+        await expect(qualifiedPage.getByText("Your answer is awaiting review.")).toBeVisible();
+        expect(notFitKey).toMatch(/^gate2-screen:[a-f0-9-]{36}$/);
+        const notFitStored = await db.rpc("store_gate2_screening_answer", {
+          requested_invite_id: notFitOffer.data.id,
+          requested_respondent_id: qualifiedProfile.data.id,
+          requested_study_id: study.data.id, requested_rule_id: rule.data.id,
+          requested_version: 1, requested_kind: "text",
+          requested_text: notFitText, requested_consent_version: null,
+          requested_key: notFitKey,
+        });
+        const notFitAnswer = notFitStored.data as { id?: string } | null;
+        if (notFitStored.error || !notFitAnswer?.id)
+          throw new Error("Synthetic screened-out answer absent");
+        const notFitSource = await publishGate2ScreeningRedaction(db,
+          { policyDigest: "a".repeat(64), qualificationDigest: "b".repeat(64),
+            redact: async () => notFitText }, {
+            answerId: notFitAnswer.id, policyDigest: "a".repeat(64),
+            qualificationDigest: "b".repeat(64),
+            idempotencyKey: `gate2-redaction:${randomUUID()}`,
+          });
+        expect(notFitSource?.qualified).toBe(true);
+        const notFitDecision = await decideQualifiedScreeningAnswer(db, {
+          async interpret() { return { result: "contradicted" as const,
+            span: { startChar: 0, endChar: Array.from(notFitText).length } }; },
+          async evidenceSupports() { return true; },
+        }, { ...decisionRequest, answerId: notFitAnswer.id });
+        expect(notFitDecision?.action).toBe("screen_out");
+        await qualifiedPage.reload();
+        await expect(qualifiedPage.getByRole("heading", { name: "Study match result" })).toBeVisible();
+        await expect(qualifiedPage.getByText("This study is not a fit this time.",
+          { exact: false })).toBeVisible();
+        await expect(qualifiedPage.getByText(question)).toHaveCount(0);
+        await expect(qualifiedPage.getByText(notFitText)).toHaveCount(0);
+        const revokePurpose = await db.from("consents").insert({
+          respondent_id: qualifiedProfile.data.id, study_id: study.data.id,
+          purpose: "ai_screening", granted: false,
+          text_version: "synthetic-ai-screening-v1",
+        });
+        expect(revokePurpose.error).toBeNull();
+        await qualifiedPage.reload();
+        await expect(qualifiedPage.getByText("This study is not a fit this time.",
+          { exact: false })).toHaveCount(0);
       } finally {
         await qualifiedContext.close();
       }

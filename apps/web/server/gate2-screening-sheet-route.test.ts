@@ -28,7 +28,7 @@ function enabled() {
   vi.stubEnv("ENVOI_GATE2_SCREENING_SHEET_ENABLED", "true");
   vi.stubEnv("ENVOI_APP_ORIGIN", origin);
   getClaims.mockResolvedValue({ data: { claims: { sub: "respondent-user" } }, error: null });
-  rpc.mockResolvedValue({ data: { inviteId, studyId,
+  rpc.mockResolvedValue({ data: { inviteId, studyId, state: "screening",
     expiresAt: "2026-11-25T12:00:00Z", questions: [{ ruleId, ruleVersion: 1,
       question: "Have you worked there?", status: "unanswered" }] }, error: null });
 }
@@ -53,9 +53,22 @@ describe("private typed screening sheet", () => {
       ruleVersion: 1, question: "Have you worked there?", status: "unanswered" });
     rpc.mockResolvedValueOnce({ data: null, error: null });
     expect((await get()).status).toBe(404);
-    rpc.mockResolvedValueOnce({ data: { inviteId, studyId,
+    rpc.mockResolvedValueOnce({ data: { inviteId, studyId, state: "screening",
       expiresAt: "2026-11-25T12:00:00Z", questions: [{ ruleId,
         ruleVersion: 1, question: "Q", status: "unknown" }] }, error: null });
+    expect((await get()).status).toBe(503);
+  });
+  it("returns an owned status-only screened-out result without answer details", async () => {
+    enabled();
+    rpc.mockResolvedValueOnce({ data: { inviteId, studyId, state: "screened_out",
+      expiresAt: "2026-11-25T12:00:00Z", questions: [] }, error: null });
+    const response = await get();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ inviteId, studyId,
+      state: "screened_out", expiresAt: "2026-11-25T12:00:00Z", questions: [] });
+    rpc.mockResolvedValueOnce({ data: { inviteId, studyId, state: "screened_out",
+      expiresAt: "2026-11-25T12:00:00Z", questions: [{ ruleId,
+        ruleVersion: 1, question: "Private question", status: "screen_out" }] }, error: null });
     expect((await get()).status).toBe(503);
   });
   it("stores typed answers as pending review with no model or qualification", async () => {

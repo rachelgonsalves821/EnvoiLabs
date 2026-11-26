@@ -82,12 +82,15 @@ export function ScreeningSheetView({ inviteId, voiceEnabled }: {
   }
   return <main className="respondent-studies">
     <a href="/r">Back to studies</a>
-    <h1>Screening questions</h1>
-    <p>Answer a few questions to check whether this study is a fit. An answer does not confirm a place.</p>
+    <h1>{sheet?.state === "screened_out" ? "Study match result" : "Screening questions"}</h1>
+    {sheet?.state === "screened_out" ?
+      <p role="status">This study is not a fit this time. We’ll keep looking for another match.</p> :
+      <p>Answer a few questions to check whether this study is a fit. An answer does not confirm a place.</p>}
     {!sheet && !error && <p role="status">Loading questions…</p>}
     {error && <><p role="alert">We could not save or load your answer. Please try again.</p>
       <button type="button" className="ev-button" onClick={() => void refresh()}>Try again</button></>}
-    {sheet?.questions.length === 0 && <p role="status">No approved questions are available yet.</p>}
+    {sheet?.state === "screening" && sheet.questions.length === 0 &&
+      <p role="status">No approved questions are available yet.</p>}
     {sheet?.questions.map((question, index) => <section key={question.ruleId}
       className="respondent-invite">
       <h2>Question {index + 1} of {sheet.questions.length}</h2>

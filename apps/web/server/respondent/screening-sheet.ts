@@ -2,7 +2,8 @@ export type ScreeningQuestion = { ruleId: string; ruleVersion: number;
   question: string; status: "unanswered" | "pending_transcription" | "pending_review" | "clarify" |
     "review" | "qualify" | "screen_out" };
 export type ScreeningSheet = { inviteId: string; studyId: string;
-  expiresAt: string; questions: ScreeningQuestion[] };
+  expiresAt: string; state: "screening" | "screened_out";
+  questions: ScreeningQuestion[] };
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const statuses = new Set(["unanswered", "pending_transcription", "pending_review", "clarify", "review",
   "qualify", "screen_out"]);
@@ -12,7 +13,9 @@ export function parseScreeningSheet(input: unknown): ScreeningSheet | null {
   if (typeof row.inviteId !== "string" || !uuid.test(row.inviteId) ||
     typeof row.studyId !== "string" || !uuid.test(row.studyId) ||
     typeof row.expiresAt !== "string" || !Number.isFinite(Date.parse(row.expiresAt)) ||
+    (row.state !== "screening" && row.state !== "screened_out") ||
     !Array.isArray(row.questions) || row.questions.length > 3) return null;
+  if (row.state === "screened_out" && row.questions.length !== 0) return null;
   const questions: ScreeningQuestion[] = [];
   for (const raw of row.questions) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -25,5 +28,5 @@ export function parseScreeningSheet(input: unknown): ScreeningSheet | null {
       question: item.question, status: item.status as ScreeningQuestion["status"] });
   }
   return { inviteId: row.inviteId, studyId: row.studyId,
-    expiresAt: row.expiresAt, questions };
+    expiresAt: row.expiresAt, state: row.state, questions };
 }
