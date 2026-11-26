@@ -95,8 +95,10 @@ export function ScreeningSheetView({ inviteId, voiceEnabled }: {
       className="respondent-invite">
       <h2>Question {index + 1} of {sheet.questions.length}</h2>
       <p>{question.question}</p>
-      {(question.status === "unanswered" || question.status === "clarify") ? <>
+      {(question.status === "unanswered" || question.status === "clarify" ||
+        question.status === "reanswer") ? <>
         {question.status === "clarify" && <p role="status">Please add detail so we can review your answer.</p>}
+        {question.status === "reanswer" && <p role="status">Your previous answer needs a fresh review. Please answer again.</p>}
         <label htmlFor={`screen-${question.ruleId}`}>Your answer</label>
         <textarea id={`screen-${question.ruleId}`} maxLength={2000}
           value={text[question.ruleId] ?? ""}

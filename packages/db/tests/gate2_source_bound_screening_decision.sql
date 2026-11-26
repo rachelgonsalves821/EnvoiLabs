@@ -251,6 +251,16 @@ select throws_ok($$update public.sessions set state = 'in_progress'
     where invite_id = 'a9f30000-0000-4000-8000-000000000002'$$,
     '23514', null, 'withdrawn screening cannot start an accepted session');
 reset role;
+insert into public.consents (id, respondent_id, study_id, purpose,
+    granted, text_version) values ('a9f30000-0000-4000-8000-000000000009',
+    '90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_screening', true,
+    'synthetic-ai-screening-v1');
+insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
+values ('a9f30000-0000-4000-8000-000000000009', repeat('b', 64));
+select is((select state from public.invites
+    where id = 'a9f30000-0000-4000-8000-000000000002'),
+    'accepted', 'regrant never reopens an already accepted session');
 rollback to savepoint accepted_before_withdrawal;
 insert into public.consents (respondent_id, study_id, purpose, granted,
     text_version) values ('90500000-0000-4000-8000-000000000001',
@@ -274,12 +284,94 @@ select throws_ok($$select public.commit_gate2_qualified_screening_decision(
     '23514', null, 'withdrawn screening purpose invalidates decision replay');
 reset role;
 insert into public.consents (id, respondent_id, study_id, purpose,
+    granted, text_version) values ('a9f30000-0000-4000-8000-000000000008',
+    '90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_screening', true,
+    'synthetic-ai-screening-v1');
+insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
+values ('a9f30000-0000-4000-8000-000000000008', repeat('e', 64));
+select is((select state from public.invites
+    where id = 'a9f30000-0000-4000-8000-000000000002'),
+    'invited', 'unapproved consent receipt does not reopen an offer');
+insert into public.consents (id, respondent_id, study_id, purpose,
     granted, text_version) values ('a9f30000-0000-4000-8000-000000000006',
     '90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'ai_screening', true,
     'synthetic-ai-screening-v1');
 insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
 values ('a9f30000-0000-4000-8000-000000000006', repeat('b', 64));
+select is((select state from public.invites
+    where id = 'a9f30000-0000-4000-8000-000000000002'),
+    'screening', 'approved regrant reopens only the unaccepted offer');
+select is((select count(*)::integer from public.invites
+    where study_id = '90600000-0000-4000-8000-000000000001'
+        and respondent_id = '90500000-0000-4000-8000-000000000001'),
+    1, 'regrant keeps the same offer and capacity reservation');
+select is((select count(*)::integer from public.gate2_screening_events
+    where answer_id = 'a9f30000-0000-4000-8000-000000000004'),
+    1, 'old qualified decision remains immutable');
+savepoint reanswer_after_regrant;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000002","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002'), null,
+    'another respondent cannot read the reopened private sheet');
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002')
+    #>> '{questions,0,status}', 'reanswer',
+    'owner sees a fresh re-answer prompt without the old raw answer');
+select is(public.submit_gate2_screening_text(
+    'a9f30000-0000-4000-8000-000000000002',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'I worked as a hospital nurse last year.',
+    'gate2-screen:a9f30000-0000-4000-8000-000000000009') ->> 'status',
+    'pending_review', 'new text answer is accepted under a fresh key');
+select is(public.submit_gate2_screening_text(
+    'a9f30000-0000-4000-8000-000000000002',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'I worked as a hospital nurse last year.',
+    'gate2-screen:a9f30000-0000-4000-8000-000000000009') ->> 'status',
+    'pending_review', 'same-key re-answer retry is idempotent');
+select throws_ok($$select public.submit_gate2_screening_text(
+    'a9f30000-0000-4000-8000-000000000002',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'Another pending answer',
+    'gate2-screen:a9f30000-0000-4000-8000-000000000010')$$,
+    '23514', null, 'pending re-answer cannot be replaced before review');
+reset role;
+insert into internal.gate2_screening_redacted_sources (answer_id,
+    raw_answer_digest, redacted_text, redaction_policy_digest,
+    qualification_digest, qualified)
+select answer.id,
+    encode(pg_catalog.sha256(convert_to(answer.answer_text, 'UTF8')), 'hex'),
+    'I worked as a hospital nurse last year.', repeat('c', 64),
+    repeat('d', 64), true
+from pii.gate2_screener_answers as answer
+where answer.idempotency_key =
+    'gate2-screen:a9f30000-0000-4000-8000-000000000009';
+select is(public.commit_gate2_qualified_screening_decision(
+    (select id from pii.gate2_screener_answers where idempotency_key =
+        'gate2-screen:a9f30000-0000-4000-8000-000000000009'),
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'supported', 14, 28, 'qualify', true,
+    (public.current_gate2_screening_model_source(
+        '90600000-0000-4000-8000-000000000001',
+        (select id from pii.gate2_screener_answers where idempotency_key =
+            'gate2-screen:a9f30000-0000-4000-8000-000000000009'),
+        'a9f30000-0000-4000-8000-000000000003', 1,
+        'synthetic-model', 'screening-v1', repeat('a', 64))
+        ->> 'redactedSourceVersion')::uuid,
+    repeat('c', 64), 'synthetic-model', 'screening-v1', repeat('a', 64))
+    ->> 'action', 'qualify', 'new grant-bound decision qualifies');
+select is((select state from public.invites
+    where id = 'a9f30000-0000-4000-8000-000000000002'),
+    'invited', 'fresh decision restores the current offer');
+select ok(internal.gate2_screening_offer_current(
+    'a9f30000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001'),
+    'current re-answer decision makes acceptance eligible');
+rollback to savepoint reanswer_after_regrant;
 select ok(not has_table_privilege('service_role',
     'internal.gate2_screening_decision_grants', 'SELECT'),
     'provider service cannot read exact private grant bindings');
