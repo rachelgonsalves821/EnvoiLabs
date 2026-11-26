@@ -17,14 +17,15 @@ insert into public.criteria (id, study_id, kind, attribute_key, operator,
     value_json, text)
 values ('a9e10000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'must', 'nurse', 'eq', 'true',
-    'Worked as a hospital nurse');
+    'Worked as a hospital nurse in the past year');
 insert into public.gate2_screening_rules (id, study_id, criterion_id,
     version, criterion_kind, criterion_text, timeframe_text,
     question, approved_by, approved_at)
 values ('a9e10000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001',
     'a9e10000-0000-4000-8000-000000000001', 1, 'must',
-    'Worked as a hospital nurse', 'past year', 'Have you worked as a nurse?',
+    'Worked as a hospital nurse in the past year', 'past year',
+    'Have you worked as a nurse in the past year?',
     '90400000-0000-4000-8000-000000000001', now());
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 values ('a9e10000-0000-4000-8000-000000000003',
