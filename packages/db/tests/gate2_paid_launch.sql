@@ -156,6 +156,9 @@ select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
     'a9900000-0000-4000-8000-000000000001', 'evt_paid'), true,
     'exact launch retry returns prior outcome');
 select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
+    'a9900000-0000-4000-8000-000000000001', 'evt_paid'), true,
+    'third delivery returns the same paid launch outcome');
+select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
     'a9900000-0000-4000-8000-000000000001', 'other_event'), false,
     'different event cannot replay fielding transition');
 reset role;
