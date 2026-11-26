@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./qualified-report": "./src/qualified-report.ts",
+    "./reviewed-report-adapter": "./src/reviewed-report-adapter.ts",
     "./checkout": "./src/checkout.ts",
     "./paid-study": "./src/paid-study.ts",
     "./payout": "./src/payout.ts",
