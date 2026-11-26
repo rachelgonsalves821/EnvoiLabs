@@ -134,6 +134,42 @@ select is(public.read_gate2_screening_sheet(
     'a9d10000-0000-4000-8000-000000000003') -> 'questions' -> 0 ->> 'status',
     'pending_review', 'stored voice answer is pending review on reload');
 reset role;
+create temp table screening_voice_answer as
+    select answer.id from pii.gate2_screener_answers as answer
+    where answer.invite_id = 'a9d10000-0000-4000-8000-000000000003'
+        and answer.kind = 'voice';
+grant select on screening_voice_answer to service_role;
+insert into internal.gate1_redaction_policies (policy_digest,
+    qualification_digest) values (repeat('e', 64), repeat('f', 64));
+insert into internal.gate2_screening_model_policies (provider_model,
+    prompt_version, prompt_digest, consent_text_version,
+    consent_text_digest, approved_at) values (
+    'synthetic-voice-model', 'screening-voice-v1', repeat('c', 64),
+    'synthetic-ai-screening-voice-v1', repeat('d', 64), now());
+insert into public.consents (id, respondent_id, study_id, purpose,
+    granted, text_version) values ('a9d10000-0000-4000-8000-000000000024',
+    '90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_screening', true,
+    'synthetic-ai-screening-voice-v1');
+insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
+values ('a9d10000-0000-4000-8000-000000000024', repeat('d', 64));
+set local role service_role;
+select ok((public.publish_gate2_screening_redacted_source(
+    (select id from screening_voice_answer), repeat('e', 64),
+    encode(pg_catalog.sha256(convert_to(
+        'I worked as a hospital nurse this year.', 'UTF8')), 'hex'),
+    'I worked as a hospital nurse this year.', true,
+    'gate2-redaction:a9d10000-0000-4000-8000-000000000025')
+    ->> 'qualified')::boolean,
+    'current transcribed voice answer receives a versioned qualified source');
+select is(public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    (select id from screening_voice_answer),
+    'a9d10000-0000-4000-8000-000000000002', 1,
+    'synthetic-voice-model', 'screening-voice-v1', repeat('c', 64))
+    ->> 'answerText', 'I worked as a hospital nurse this year.',
+    'purpose-bound model reader receives only the qualified voice source');
+reset role;
 create temp table duplicate_screening_audio (payload jsonb);
 grant select, insert on duplicate_screening_audio to authenticated, service_role;
 set local role authenticated;
@@ -173,6 +209,12 @@ select is(public.read_gate2_screening_sheet(
     'unanswered', 'withdrawal hides the old voice source from the sheet');
 reset role;
 set local role service_role;
+select is(public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    (select id from screening_voice_answer),
+    'a9d10000-0000-4000-8000-000000000002', 1,
+    'synthetic-voice-model', 'screening-voice-v1', repeat('c', 64)),
+    null::jsonb, 'transcription withdrawal hides a formerly qualified model source');
 select throws_ok($$select public.confirm_gate2_screening_audio(
     '90500000-0000-4000-8000-000000000001',
     'a9d10000-0000-4000-8000-000000000003',
