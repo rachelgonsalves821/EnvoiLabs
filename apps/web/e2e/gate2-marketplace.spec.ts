@@ -325,7 +325,10 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const extraOffer = await db.from("invites").select("id")
             .eq("study_id", extra.data.id).eq("respondent_id", first.respondent_id).single();
           if (extraOffer.error || !extraOffer.data) throw new Error(`Extra offer: ${extraOffer.error?.message}`);
-          await respondent.goto("/r/interviews/" + extraOffer.data.id);
+          await respondent.goto("/r");
+          await respondent.getByRole("button", { name: "Start answering" }).click();
+          await expect(respondent).toHaveURL(
+            origin + `/r/interviews/${extraOffer.data.id}`);
           for (const [index, question] of core.entries()) {
             await expect(respondent.getByRole("heading", { name: question })).toBeVisible();
             await respondent.getByRole("textbox", { name: "Type your answer" })
