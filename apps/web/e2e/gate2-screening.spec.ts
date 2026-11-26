@@ -13,7 +13,7 @@ test.describe("Gate 2 private screening sheet", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
   test("a signed-in respondent submits text, reloads pending, and cannot trigger eligibility", async ({ browser, baseURL }) => {
-    test.setTimeout(150_000);
+    test.setTimeout(210_000);
     const origin = loopbackOrigin(baseURL);
     const db = localService();
     const email = `gate2-screen-${randomUUID()}@example.test`;
@@ -342,10 +342,43 @@ test.describe("Gate 2 private screening sheet", () => {
             await route.continue();
           });
         await notFitPage.goto(`/r/screening/${notFitOffer.data.id}`);
+        const unclearText = "I worked near a hospital, but I am unsure of the dates.";
+        await notFitPage.getByLabel("Your answer").fill(unclearText);
+        await notFitPage.getByRole("button", { name: "Submit answer" }).click();
+        await expect(notFitPage.getByText("Your answer is awaiting review.")).toBeVisible();
+        const unclearKey = notFitKey;
+        const unclearStored = await db.rpc("store_gate2_screening_answer", {
+          requested_invite_id: notFitOffer.data.id,
+          requested_respondent_id: notFitProfile.data.id,
+          requested_study_id: study.data.id, requested_rule_id: rule.data.id,
+          requested_version: 1, requested_kind: "text",
+          requested_text: unclearText, requested_consent_version: null,
+          requested_key: unclearKey,
+        });
+        const unclearAnswer = unclearStored.data as { id?: string } | null;
+        if (unclearStored.error || !unclearAnswer?.id)
+          throw new Error("Synthetic unclear answer absent");
+        const unclearSource = await publishGate2ScreeningRedaction(db,
+          { policyDigest: "a".repeat(64), qualificationDigest: "b".repeat(64),
+            redact: async () => unclearText }, {
+            answerId: unclearAnswer.id, policyDigest: "a".repeat(64),
+            qualificationDigest: "b".repeat(64),
+            idempotencyKey: `gate2-redaction:${randomUUID()}`,
+          });
+        expect(unclearSource?.qualified).toBe(true);
+        const unclearDecision = await decideQualifiedScreeningAnswer(db, {
+          async interpret() { return { result: "unclear" as const, span: null }; },
+          async evidenceSupports() { throw new Error("Unclear answer has no supporting span"); },
+        }, { ...decisionRequest, answerId: unclearAnswer.id });
+        expect(unclearDecision?.action).toBe("clarify");
+        await notFitPage.reload();
+        await expect(notFitPage.getByText("Please add detail so we can review your answer.")).toBeVisible();
+        await expect(notFitPage.getByText(unclearText)).toHaveCount(0);
         await notFitPage.getByLabel("Your answer").fill(notFitText);
         await notFitPage.getByRole("button", { name: "Submit answer" }).click();
         await expect(notFitPage.getByText("Your answer is awaiting review.")).toBeVisible();
         expect(notFitKey).toMatch(/^gate2-screen:[a-f0-9-]{36}$/);
+        expect(notFitKey).not.toBe(unclearKey);
         const notFitStored = await db.rpc("store_gate2_screening_answer", {
           requested_invite_id: notFitOffer.data.id,
           requested_respondent_id: notFitProfile.data.id,
