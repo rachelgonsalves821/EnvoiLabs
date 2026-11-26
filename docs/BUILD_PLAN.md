@@ -134,7 +134,7 @@ The [PRD user journeys](PRD.md#6-user-journeys) describe the two paths in full. 
 | --- | --- | --- |
 | 0 · Running preview | [Welcome](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) and [email signup and sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/signup) with age attestation and respondent account provisioning. | [Email sign-in](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app/sign-in), authenticator setup after a validated link, and a [protected workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) with placeholder scoping and brief content. |
 | 1 · Seeded study preview | [Respondent Home](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r) opens eligible invites and in-progress studies after sign-in. [Profile and privacy choices](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/r/onboarding) precede the interview, which supports recording, typing, retry, resume and submission. | [Researcher workspace](https://envoilabs-git-preview-gate-0-rachelgonsalves821s-projects.vercel.app/app) opens the four-question study form after email and MFA. Launch a test study to reach live tracking and the redacted transcript panel. |
-| 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt, and Earnings with gift card brand selection, payout status and history. | Scoping chat beside the live brief, review of screening criteria and guide, quote, checkout, and live tracking. |
+| 2 · First real study | Confirming screener sheet with text or approved voice, qualification or clarification, interview follow-ups, receipt, and Earnings with earned, vested, ordered and delivered prepaid Visa status. | Scoping chat beside the live brief, review of screening criteria and guide, frozen marketplace quote, checkout, and live tracking. |
 | 3 · Pilot | Liveness, full Echo states, privacy and withdrawal controls. | Report and findings, verified quotes, hypothesis evidence and next-study proposal. |
 | 4 · Launch | Accessible and resilient interview on mobile. | Export and launch hardening. |
 
@@ -187,6 +187,8 @@ Debt review. Every `Fake` used in the Gate 1 flow is listed in `DEBT.md` with th
 
 ### Gate 2. Money loop and scoping (end of week 5)
 
+**December 5 fictional product-test overlay (2026-11-26).** The open marketplace uses verified profiles, a frozen $2 per core question per purchased respondent quote with at least ten purchased completes, and a $1 earned reward per approved answered core question. A paid but unfilled study uses the proposed proportional unfilled-completes refund, subject to approved terms before a real charge. Five distinct verified referred profiles vest a $5 bonus; vesting is separate from provider delivery. Prepaid Visa through Tremendous is the payout direction. The protected preview and isolated database use fictional users only. Label simulated Checkout and payout explicitly; claim a TEST provider step only with an actual verified provider receipt. No real participant, model input, charge or payout is part of this overlay. Gate 1–4 acceptance criteria below remain open independently.
+
 Exit criteria
 - [ ] Scoping chat produces a complete brief through the real LLM with structured `BriefPatch` outputs, and the researcher approves the screening criteria and guide.
 - [ ] A preliminary match can complete an LLM-assisted confirming screener (R-RESP-05, PRD 8.5). Respondents see the question, progress and a clear result. Platform applies documented qualification rules after Agent 3 validates the model output and evidence. Consent-gated voice answers use the Gate 1 speech-to-text path.
@@ -194,14 +196,14 @@ Exit criteria
 - [ ] Stripe Checkout in test mode, webhook launches the study, refund path for cancelled studies
 - [ ] Web push invites and halfway and 2-hours-left nudges
 - [ ] Quality hold job approves or removes sessions using the v1 quality score, and removed sessions trigger replacement invites
-- [ ] Tremendous sandbox gift card payout after approval, idempotent, with annual cap enforced. Respondent Earnings shows gift card brand choice after the first approved interview, their own payout status and gift card history.
+- [ ] Tremendous TEST prepaid Visa order after approved answered-core reward reservation, idempotent with annual cap and account-verified SKU, denomination, recipient and provider receipt. Earnings distinguishes earned, vested, ordered and delivered; below-minimum aggregation policy remains open.
 - [ ] Points ledger, milestone bonuses and receipt UI
 - [ ] **First real study** run on a dedicated, access-controlled preview with hand-recruited respondents (at least 10 completes) and Rachel as researcher. Complete the pre-study checklist below before enrollment.
 
 Integration tests required
-- `IT-2.1` Playwright `gate2-money.spec.ts`, scoping (LLM in fixture-replay mode) to quote to Stripe test checkout to launch to 3 completes to approval to Tremendous sandbox order. Verify gift card selection, status and history in the respondent account
+- `IT-2.1` Playwright fictional marketplace chain: scoping fixture to frozen $2/$1 quote of at least ten, verified TEST Checkout or labelled simulation, launch, approved core answers and reviewed replacement, private Earnings, then verified TEST Visa order or visibly mocked payout. Record exact provider receipts where claimed.
 - `IT-2.2` webhook idempotency, replay every Stripe and Tremendous webhook 3 times, assert one effect
-- `IT-2.3` pricing tests, price equals core questions × respondents × unit price in integer cents, probes and screeners never billed, 5 questions × 1 respondent = 500 cents, config version stored on every quote
+- `IT-2.3` pricing tests: integer-cent quote equals core questions × purchased respondents × 200, minimum ten; reward equals distinct approved answered core questions × 100. Probes and screeners do not bill or reward. Five questions × ten respondents = 10,000 cents; store config version on each quote.
 - `IT-2.4` quality removal triggers replacement invite, and target completes still reached
 - `IT-2.5` payout cap, a respondent at $1,990 YTD cannot receive a $20 payout and is flagged
 - `IT-2.6` push delivery contract, the nudge job enqueues correct payloads at the right times (injectable clock)
