@@ -13,10 +13,10 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     from (select item.id, item.queued_at
         from internal.gate2_offer_push_outbox as item
         join public.invites as offer on offer.id = item.invite_id
-        where (supplied_after_id is null or (item.queued_at, item.id) >
-            (select row(cursor.queued_at, cursor.id)
-                from internal.gate2_offer_push_outbox as cursor
-                where cursor.id = supplied_after_id))
+        left join internal.gate2_offer_push_outbox as cursor
+            on cursor.id = supplied_after_id
+        where (supplied_after_id is null or (cursor.id is not null
+            and (item.queued_at, item.id) > (cursor.queued_at, cursor.id)))
             and internal.gate2_offer_push_current(offer)
             and item.consent_receipt = internal.gate2_offer_push_consent_receipt(
                 offer.respondent_id, offer.study_id)
