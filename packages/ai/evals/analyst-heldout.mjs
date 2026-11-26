@@ -70,12 +70,14 @@ export function scoreAnalystHeldout(inputs, outputs, judgments) {
   const judgmentById = indexed(judgments, "judgments");
   const versions = new Set();
   const studyIds = new Set();
+  const transcriptIds = new Set();
+  const sourceVersions = new Set();
   let quotes = 0; let verifiedQuotes = 0; let themes = 0;
   let countsWithinOne = 0; let totalsMatched = 0;
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
     const judgment = judgmentById.get(id);
-    if (!uuid.test(input.studyId) || studyIds.has(input.studyId)
+    if (!uuid.test(input.studyId) || studyIds.has(input.studyId.toLowerCase())
       || !text(input.decisionQuestion)
       || !Array.isArray(input.sources) || input.sources.length === 0
       || !input.sources.every((source) => object(source)
@@ -92,7 +94,14 @@ export function scoreAnalystHeldout(inputs, outputs, judgments) {
       || !text(judgment.reviewerId) || !Array.isArray(output.themes)
       || output.themes.length === 0 || !Array.isArray(judgment.labels))
       throw new Error("Incomplete analyst study");
-    studyIds.add(input.studyId);
+    for (const source of input.sources) {
+      if (transcriptIds.has(source.transcriptId.toLowerCase())
+        || sourceVersions.has(source.sourceVersion.toLowerCase()))
+        throw new Error("Repeated analyst source across studies");
+      transcriptIds.add(source.transcriptId.toLowerCase());
+      sourceVersions.add(source.sourceVersion.toLowerCase());
+    }
+    studyIds.add(input.studyId.toLowerCase());
     const mapped = mappedContext(input, output, judgment);
     versions.add(JSON.stringify([output.model, output.promptVersion,
       mapped?.promptVersion ?? null, mapped?.promptDigest ?? null]));

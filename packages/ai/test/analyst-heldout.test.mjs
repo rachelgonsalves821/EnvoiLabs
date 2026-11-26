@@ -84,7 +84,7 @@ it("refuses altered sources, missing labels and mixed model versions", () => {
 
 it("rejects duplicate study and output IDs", () => {
   const data = syntheticAnalystHeldout();
-  data.inputs[1].studyId = data.inputs[0].studyId;
+  data.inputs[1].studyId = data.inputs[0].studyId.toUpperCase();
   expect(() => scoreAnalystHeldout(data.inputs, data.outputs,
     data.judgments)).toThrow("Incomplete analyst study");
   const duplicate = syntheticAnalystHeldout();
@@ -96,6 +96,37 @@ it("rejects duplicate study and output IDs", () => {
     transcriptId: source.inputs[0].sources[0].transcriptId.toUpperCase() });
   expect(() => scoreAnalystHeldout(source.inputs, source.outputs,
     source.judgments)).toThrow("Incomplete analyst study");
+});
+
+it("refuses a repeated qualified transcript or version under another study", () => {
+  const repeatedVersion = syntheticAnalystHeldout();
+  repeatedVersion.inputs[1].sources[0].sourceVersion =
+    repeatedVersion.inputs[0].sources[0].sourceVersion.toUpperCase();
+  const bind = (data) => {
+    const sourceDigest = createHash("sha256")
+      .update(JSON.stringify(data.inputs[1].sources)).digest("hex");
+    data.outputs[1].sourceDigest = sourceDigest;
+    data.judgments[1].sourceDigest = sourceDigest;
+  };
+  bind(repeatedVersion);
+  expect(() => scoreAnalystHeldout(repeatedVersion.inputs, repeatedVersion.outputs,
+    repeatedVersion.judgments)).toThrow("Repeated analyst source across studies");
+  const repeatedTranscript = syntheticAnalystHeldout();
+  repeatedTranscript.inputs[1].sources[0].transcriptId =
+    repeatedTranscript.inputs[0].sources[0].transcriptId.toUpperCase();
+  bind(repeatedTranscript);
+  expect(() => scoreAnalystHeldout(repeatedTranscript.inputs, repeatedTranscript.outputs,
+    repeatedTranscript.judgments)).toThrow("Repeated analyst source across studies");
+  const repeatedWithinStudy = syntheticAnalystHeldout();
+  repeatedWithinStudy.inputs[0].sources.push({ ...repeatedWithinStudy.inputs[0].sources[0],
+    transcriptId: "a9710000-0000-4000-8000-000000000099" });
+  const firstDigest = createHash("sha256")
+    .update(JSON.stringify(repeatedWithinStudy.inputs[0].sources)).digest("hex");
+  repeatedWithinStudy.outputs[0].sourceDigest = firstDigest;
+  repeatedWithinStudy.judgments[0].sourceDigest = firstDigest;
+  expect(() => scoreAnalystHeldout(repeatedWithinStudy.inputs,
+    repeatedWithinStudy.outputs, repeatedWithinStudy.judgments))
+    .toThrow("Repeated analyst source across studies");
 });
 
 it("labels the fictional CLI result as unproved", () => {
