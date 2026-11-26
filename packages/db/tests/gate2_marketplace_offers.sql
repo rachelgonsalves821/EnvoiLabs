@@ -231,6 +231,24 @@ reset role;
 select is((select state from public.sessions
     where id = 'a9840000-0000-4000-8000-000000000098'),
     'approved', 'approved session remains in purchased capacity');
+insert into public.studies (id, organization_id, title, state,
+    target_completes, length_minutes, deadline_at)
+values ('a9840000-0000-4000-8000-000000000002',
+    '90100000-0000-4000-8000-000000000001',
+    'Later synthetic match', 'brief_ready', 10, 10,
+    clock_timestamp() + interval '3 days');
+select ok(exists (
+    select 1 from internal.gate2_marketplace_candidates(
+        'a9840000-0000-4000-8000-000000000002') as eligible
+    join public.invites as prior on prior.respondent_id = eligible.respondent_id
+    where prior.id = (select invite_id from public.sessions
+        where id = 'a9840000-0000-4000-8000-000000000098')
+), 'approved respondent can match a later study before old offer expiry');
+select ok(not exists (
+    select 1 from internal.gate2_marketplace_candidates(
+        'a9840000-0000-4000-8000-000000000002')
+    where respondent_id = '90500000-0000-4000-8000-000000000033'
+), 'in-progress respondent remains unavailable for a later study');
 update public.invites set state = 'accepted'
 where study_id = 'a9840000-0000-4000-8000-000000000001'
     and state = 'invited';
