@@ -1,10 +1,10 @@
 export type ScreeningQuestion = { ruleId: string; ruleVersion: number;
-  question: string; status: "unanswered" | "pending_review" | "clarify" |
+  question: string; status: "unanswered" | "pending_transcription" | "pending_review" | "clarify" |
     "review" | "qualify" | "screen_out" };
 export type ScreeningSheet = { inviteId: string; studyId: string;
   expiresAt: string; questions: ScreeningQuestion[] };
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
-const statuses = new Set(["unanswered", "pending_review", "clarify", "review",
+const statuses = new Set(["unanswered", "pending_transcription", "pending_review", "clarify", "review",
   "qualify", "screen_out"]);
 export function parseScreeningSheet(input: unknown): ScreeningSheet | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;

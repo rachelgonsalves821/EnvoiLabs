@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseScreeningSheet, type ScreeningSheet } from "../../../../../server/respondent/screening-sheet";
+import { ScreeningVoiceAnswer } from "./screening-voice-answer";
 
-export function ScreeningSheetView({ inviteId }: { inviteId: string }) {
+export function ScreeningSheetView({ inviteId, voiceEnabled }: {
+  inviteId: string; voiceEnabled: boolean;
+}) {
   const [loaded, setLoaded] = useState<{ inviteId: string; sheet: ScreeningSheet } | null>(null);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -101,7 +104,12 @@ export function ScreeningSheetView({ inviteId }: { inviteId: string }) {
         onClick={() => void submit(question.ruleId, question.ruleVersion)}>
           {busy === question.ruleId ? "Saving…" : "Submit answer"}
         </button>
-      </> : <p role="status">{question.status === "qualify" ? "This answer qualified." :
+        {voiceEnabled && <ScreeningVoiceAnswer inviteId={inviteId}
+          ruleId={question.ruleId} ruleVersion={question.ruleVersion}
+          onSubmitted={() => void refresh()} />}
+      </> : question.status === "pending_transcription" ? <p role="status">
+        Your recording is being transcribed. Check back shortly.
+      </p> : <p role="status">{question.status === "qualify" ? "This answer qualified." :
         question.status === "screen_out" ? "This study is not a fit." :
           "Your answer is awaiting review."}</p>}
     </section>)}

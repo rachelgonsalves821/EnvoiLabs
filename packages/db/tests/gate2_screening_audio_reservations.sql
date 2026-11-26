@@ -83,6 +83,13 @@ select throws_ok($$select public.confirm_gate2_screening_audio(
     (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture),
     5000, repeat('b',64))$$, '23505', null,
     'changed bytes cannot replay the reservation');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9d10000-0000-4000-8000-000000000003') -> 'questions' -> 0 ->> 'status',
+    'pending_transcription', 'owner sees current audio as pending on reload');
+reset role;
+set local role service_role;
 create temp table claimed_screening_audio (payload jsonb);
 grant select, insert on claimed_screening_audio to service_role;
 insert into claimed_screening_audio select public.claim_gate2_screening_audio(
@@ -121,6 +128,12 @@ select is(public.claim_gate2_screening_audio(
     (select (payload ->> 'audioObjectId')::uuid from screening_audio_fixture)),
     null::jsonb, 'completed audio cannot be leased again');
 reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9d10000-0000-4000-8000-000000000003') -> 'questions' -> 0 ->> 'status',
+    'pending_review', 'stored voice answer is pending review on reload');
+reset role;
 create temp table duplicate_screening_audio (payload jsonb);
 grant select, insert on duplicate_screening_audio to authenticated, service_role;
 set local role authenticated;
@@ -153,6 +166,12 @@ reset role;
 insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'transcription_vendor', false, 'fixture');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9d10000-0000-4000-8000-000000000003') -> 'questions' -> 0 ->> 'status',
+    'unanswered', 'withdrawal hides the old voice source from the sheet');
+reset role;
 set local role service_role;
 select throws_ok($$select public.confirm_gate2_screening_audio(
     '90500000-0000-4000-8000-000000000001',
