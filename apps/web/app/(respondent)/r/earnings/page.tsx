@@ -52,7 +52,10 @@ export default async function RespondentEarningsPage() {
         <h2>Referrals</h2>
         <Card className="respondent-earnings-referral">
           <p>{earnings.referral.verifiedProfiles} verified profiles</p>
-          <ReferralBonus bonus={earnings.referral.vestedBonusCents} />
+          <ReferralBonus bonus={earnings.referral.vestedBonusCents}
+            payoutStatus={earnings.referral.payoutStatus}
+            payoutId={earnings.referral.payoutId}
+            deliveredAt={earnings.referral.deliveredAt} />
           {process.env.ENVOI_GATE2_REFERRAL_ENABLED === "true" &&
             <ReferralEntry initialCode={jar.get("gate2-ref")?.value ?? ""} />}
         </Card>

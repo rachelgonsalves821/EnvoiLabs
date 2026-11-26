@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PayoutReservationDenied,
   type BatchReservation, type PayoutBatchDatabase,
-  type PayoutDatabase, type Reservation } from "@envoi-labs/services/payout";
+  type PayoutDatabase, type PayoutReferralDatabase,
+  type ReferralReservation, type Reservation } from "@envoi-labs/services/payout";
 import type { Database } from "../../../../packages/db/src/database.generated";
 import type { SandboxWebhookClaim } from "./gate2-tremendous-webhook-process";
 
@@ -97,6 +98,42 @@ export function createGate2SandboxBatchPayoutDatabase(client: SupabaseClient<Dat
       const saved = batchReservation(data, respondentId);
       if (!saved) throw new Error("Invalid frozen sandbox batch intent");
       return saved;
+    },
+    recordOrder: single.recordOrder,
+  };
+}
+
+export function createGate2SandboxReferralPayoutDatabase(
+  client: SupabaseClient<Database>, annualCapCents: number,
+): PayoutReferralDatabase {
+  const single = createGate2SandboxPayoutDatabase(client, annualCapCents);
+  return {
+    async reserveReferralPayout(vestingId) {
+      if (!uuid(vestingId)) throw new PayoutReservationDenied();
+      const { data, error } = await client.rpc(
+        "reserve_gate2_sandbox_visa_referral_bonus", {
+          requested_vesting_id: vestingId, annual_cap_cents: annualCapCents });
+      if (error) {
+        if (["23514", "23505", "42501"].includes(error.code))
+          throw new PayoutReservationDenied();
+        throw error;
+      }
+      if (object(data) && data.status === "below_minimum" &&
+        data.bonusCents === 500 && Number.isSafeInteger(data.minimumCents) &&
+        (data.minimumCents as number) > 500)
+        return { status: "below_minimum" };
+      if (!object(data) || data.status !== "reserved" ||
+        !uuid(data.payoutId) || data.vestingId !== vestingId ||
+        !uuid(data.respondentId) || data.recipientId !== data.payoutId ||
+        typeof data.productId !== "string" || !data.productId ||
+        data.amountCents !== 500 ||
+        !["pending", "ordered", "delivered", "failed"].includes(String(data.payoutState)) ||
+        !(data.providerOrderId === null || typeof data.providerOrderId === "string"))
+        throw new Error("Invalid frozen referral payout intent");
+      return { id: data.payoutId, vestingId, respondentId: data.respondentId,
+        recipientId: data.recipientId, productId: data.productId,
+        amountCents: 500, state: data.payoutState,
+        providerOrderId: data.providerOrderId } as ReferralReservation;
     },
     recordOrder: single.recordOrder,
   };

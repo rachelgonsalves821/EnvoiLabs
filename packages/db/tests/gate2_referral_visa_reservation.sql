@@ -90,6 +90,21 @@ select is((select referral_vesting_id::text
     where respondent_id = '90500000-0000-4000-8000-000000000001'),
     'a9f50000-0000-4000-8000-000000000001',
     'provider recipient/SKU intent binds the vesting');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_current_respondent_earnings()
+    -> 'referral' ->> 'payoutStatus', 'pending',
+    'referrer sees pending TEST reservation, not delivered money');
+select is(public.read_gate2_current_respondent_earnings()
+    -> 'referral' ->> 'payoutId',
+    (select id::text from public.payouts
+        where bonus_ref = 'a9f50000-0000-4000-8000-000000000001'),
+    'referral receipt points to the frozen payout');
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000002","role":"authenticated"}';
+select is(public.read_gate2_current_respondent_earnings()
+    -> 'referral' ->> 'payoutStatus', 'not_vested',
+    'another respondent cannot read the referrer payout');
+reset role;
 set local role service_role;
 select is(public.read_gate2_sandbox_visa_webhook_claim(
     (select id from public.payouts

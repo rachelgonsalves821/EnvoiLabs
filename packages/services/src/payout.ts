@@ -34,6 +34,14 @@ export type PayoutBatchDatabase = {
     BatchReservation | { status: "below_minimum" }>;
   recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
 };
+export type ReferralReservation = Omit<Reservation, "sessionId"> & {
+  vestingId: string;
+};
+export type PayoutReferralDatabase = {
+  reserveReferralPayout(vestingId: string): Promise<
+    ReferralReservation | { status: "below_minimum" }>;
+  recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
+};
 export class PayoutReservationDenied extends Error {
   constructor() { super("Payout reservation denied"); }
 }
@@ -77,6 +85,23 @@ export async function issueReservedBatchPayout(db: PayoutBatchDatabase,
       reserved.recipientId !== reserved.id ||
       !Number.isSafeInteger(reserved.amountCents) || reserved.amountCents <= 0 ||
       !reserved.id || !reserved.recipientId || !reserved.productId) return "blocked";
+  return reconcileReservedPayout(db, provider, reserved);
+}
+
+export async function issueReservedReferralPayout(db: PayoutReferralDatabase,
+  provider: PayoutProvider, vestingId: string): Promise<
+  "ordered" | "delivered" | "failed" | "below_minimum" | "blocked" | "unavailable"> {
+  let reserved: ReferralReservation | { status: "below_minimum" };
+  try {
+    reserved = await db.reserveReferralPayout(vestingId);
+  } catch (error) {
+    return error instanceof PayoutReservationDenied ? "blocked" : "unavailable";
+  }
+  if ("status" in reserved)
+    return reserved.status === "below_minimum" ? "below_minimum" : "unavailable";
+  if (reserved.vestingId !== vestingId || reserved.recipientId !== reserved.id ||
+      reserved.amountCents !== 500 || !reserved.id || !reserved.respondentId ||
+      !reserved.productId) return "blocked";
   return reconcileReservedPayout(db, provider, reserved);
 }
 
