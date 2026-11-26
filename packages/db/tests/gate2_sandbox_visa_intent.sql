@@ -122,5 +122,15 @@ select is(public.reserve_gate2_sandbox_visa_intent(
     'a9870000-0000-4000-8000-000000000003', 200000)
     ->> 'providerOrderId', 'ORDER-1',
     'retry returns the frozen order identity');
+reset role;
+update public.respondents set status = 'deleted'
+where id = '90500000-0000-4000-8000-000000000001';
+set local role service_role;
+select is((select public.read_gate2_sandbox_visa_recipient(
+    (value ->> 'id')::uuid) from intent), null::jsonb,
+    'deletion state withholds the frozen recipient before provider lookup');
+select throws_ok($$select public.reserve_gate2_sandbox_visa_intent(
+    'a9870000-0000-4000-8000-000000000003', 200000)$$,
+    '23514', null, 'deleted respondent cannot retry a sandbox order');
 select * from finish();
 rollback;

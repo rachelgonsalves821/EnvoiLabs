@@ -2085,6 +2085,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      record_gate2_refund_observation: {
+        Args: {
+          requested_amount_cents: number
+          requested_kind: string
+          requested_observed_at: string
+          requested_refund_id: string
+          requested_reservation_id: string
+        }
+        Returns: boolean
+      }
       record_gate2_sandbox_visa_observation: {
         Args: {
           requested_amount_cents: number
@@ -2095,16 +2105,6 @@ export type Database = {
           requested_payout_id: string
           requested_product_id: string
           requested_recipient_id: string
-        }
-        Returns: boolean
-      }
-      record_gate2_refund_observation: {
-        Args: {
-          requested_amount_cents: number
-          requested_kind: string
-          requested_observed_at: string
-          requested_refund_id: string
-          requested_reservation_id: string
         }
         Returns: boolean
       }

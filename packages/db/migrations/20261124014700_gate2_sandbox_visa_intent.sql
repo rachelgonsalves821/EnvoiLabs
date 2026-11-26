@@ -122,9 +122,11 @@ grant execute on function public.reserve_gate2_sandbox_visa_intent(uuid, integer
 
 create function public.read_gate2_sandbox_visa_recipient(requested_payout_id uuid)
 returns jsonb language sql stable security definer set search_path = '' as $$
-    select jsonb_build_object('name', recipient_name, 'email', recipient_email,
-        'country', country) from internal.gate2_sandbox_visa_intents
-    where payout_id = requested_payout_id;
+    select jsonb_build_object('name', intent.recipient_name,
+        'email', intent.recipient_email, 'country', intent.country)
+    from internal.gate2_sandbox_visa_intents as intent
+    join public.respondents as respondent on respondent.id = intent.respondent_id
+    where intent.payout_id = requested_payout_id and respondent.status = 'active';
 $$;
 revoke all on function public.read_gate2_sandbox_visa_recipient(uuid)
     from public, anon, authenticated, service_role;
