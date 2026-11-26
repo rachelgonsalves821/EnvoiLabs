@@ -120,6 +120,12 @@ reset role;
 select is((select count(*) from internal.gate2_visa_reward_batch_items),
     4::bigint, 'each source session is claimed exactly once');
 set local role service_role;
+select is(public.read_gate2_sandbox_visa_webhook_claim(
+    (select (value ->> 'payoutId')::uuid from reserved_batch)) ->> 'productId',
+    'sandbox_visa', 'service webhook claim reads the frozen batch SKU');
+select is(public.read_gate2_sandbox_visa_webhook_claim(
+    (select (value ->> 'payoutId')::uuid from reserved_batch)) ->> 'amountCents',
+    '1200', 'service webhook claim reads the frozen batch amount');
 select is(public.reserve_gate2_sandbox_visa_batch(
     '90500000-0000-4000-8000-000000000001',
     'a98d0000-0000-4000-8000-000000000001', 200000)
@@ -140,7 +146,25 @@ select is(public.record_gate2_sandbox_visa_observation(
     'sandbox_visa', 'evt_batch_delivered', 'ORDER-BATCH-1',
     'delivered', 1200, '2026-11-25T02:00:00Z'), true,
     'one verified provider event delivers the batch');
+select is(public.record_gate2_sandbox_visa_observation(
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
+    'sandbox_visa', 'evt_batch_delivered', 'ORDER-BATCH-1',
+    'delivered', 1200, '2026-11-25T02:00:00Z'), true,
+    'first signed notification replay is idempotent');
+select is(public.record_gate2_sandbox_visa_observation(
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
+    'sandbox_visa', 'evt_batch_delivered', 'ORDER-BATCH-1',
+    'delivered', 1200, '2026-11-25T02:00:00Z'), true,
+    'second signed notification replay is idempotent');
+select is((select count(*) from public.gate2_payout_events
+    where payout_id = (select (value ->> 'payoutId')::uuid from reserved_batch)),
+    1::bigint, 'three deliveries leave one immutable payout effect');
 reset role;
+select ok(not has_function_privilege('authenticated',
+    'public.read_gate2_sandbox_visa_webhook_claim(uuid)', 'EXECUTE'),
+    'respondent cannot inspect private webhook claims');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
 select is((public.read_gate2_current_respondent_earnings()

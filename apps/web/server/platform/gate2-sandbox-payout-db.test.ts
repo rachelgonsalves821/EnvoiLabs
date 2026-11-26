@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../packages/db/src/database.generated";
 import { createGate2SandboxBatchPayoutDatabase, createGate2SandboxPayoutDatabase,
-  readGate2SandboxPayoutRecipient } from "./gate2-sandbox-payout-db";
+  readGate2SandboxPayoutRecipient, readGate2SandboxWebhookClaim } from
+  "./gate2-sandbox-payout-db";
 
 const id = "11111111-1111-4111-8111-111111111111";
 const sessionId = "22222222-2222-4222-8222-222222222222";
@@ -13,6 +14,21 @@ const client = (rpc: ReturnType<typeof vi.fn>) =>
   ({ rpc } as unknown as SupabaseClient<Database>);
 
 describe("frozen sandbox Visa database adapter", () => {
+  it("reads only an exact frozen test webhook claim", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {
+      id, recipientId: id, productId: "sandbox_visa", amountCents: 1200,
+      state: "ordered", providerOrderId: "ORDERBATCH1" }, error: null });
+    expect(await readGate2SandboxWebhookClaim(client(rpc), id)).toMatchObject({
+      id, amountCents: 1200, providerOrderId: "ORDERBATCH1" });
+    expect(rpc).toHaveBeenCalledWith("read_gate2_sandbox_visa_webhook_claim",
+      { requested_payout_id: id });
+    expect(await readGate2SandboxWebhookClaim(client(rpc), "bad-id")).toBeNull();
+    rpc.mockResolvedValue({ data: { id, recipientId: "other",
+      productId: "sandbox_visa", amountCents: 1200,
+      state: "ordered", providerOrderId: "ORDERBATCH1" }, error: null });
+    await expect(readGate2SandboxWebhookClaim(client(rpc), id))
+      .rejects.toThrow("Invalid sandbox webhook claim");
+  });
   it("reserves by the exact stable session key and observes the frozen route", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: saved, error: null })
       .mockResolvedValueOnce({ data: true, error: null });
