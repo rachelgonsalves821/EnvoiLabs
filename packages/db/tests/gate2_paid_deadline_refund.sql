@@ -86,6 +86,32 @@ select is((select count(*)::integer from public.audit_log
         and entity_id = 'a9f40000-0000-4000-8000-000000000001'
         and meta ->> 'reason' = 'paid_deadline_expired'), 1,
     'system cancellation records one reason and provider event');
+set local role service_role;
+select is(public.reserve_gate2_unfilled_slot_refund(
+    'a9f40000-0000-4000-8000-000000000001',
+    (select id from public.gate2_quote_snapshots
+        where study_id = 'a9f40000-0000-4000-8000-000000000001'),
+    '90200000-0000-4000-8000-000000000001') ->> 'reservationId',
+    (select id::text from public.gate2_refund_reservations
+        where study_id = 'a9f40000-0000-4000-8000-000000000001'),
+    'researcher refund request reuses the system reservation');
+select is(public.claim_gate2_refund_intent(
+    (select id from public.gate2_refund_reservations
+        where study_id = 'a9f40000-0000-4000-8000-000000000001'),
+    '90200000-0000-4000-8000-000000000001') ->> 'status',
+    'create', 'authorized researcher claims one TEST refund intent');
+select is(public.claim_gate2_refund_intent(
+    (select id from public.gate2_refund_reservations
+        where study_id = 'a9f40000-0000-4000-8000-000000000001'),
+    '90200000-0000-4000-8000-000000000001') ->> 'status',
+    'unavailable', 'immediate uncertain replay cannot create another refund');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9f40000-0000-4000-8000-000000000001') -> 'refund' ->> 'status',
+    'reserved', 'researcher sees reservation before provider settlement');
+reset role;
 insert into public.gate2_payment_events (quote_id, study_id,
     provider_checkout_id, provider_event_id, event_kind, amount_cents,
     currency, provider_observed_at)
