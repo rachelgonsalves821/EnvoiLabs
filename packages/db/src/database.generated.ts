@@ -2036,6 +2036,10 @@ export type Database = {
         Args: { requested_payout_id: string }
         Returns: Json
       }
+      read_gate2_sandbox_visa_webhook_claim: {
+        Args: { requested_payout_id: string }
+        Returns: Json
+      }
       read_gate2_screening_sheet: {
         Args: { supplied_invite_id: string }
         Returns: Json

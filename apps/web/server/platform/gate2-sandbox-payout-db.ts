@@ -3,6 +3,7 @@ import { PayoutReservationDenied,
   type BatchReservation, type PayoutBatchDatabase,
   type PayoutDatabase, type Reservation } from "@envoi-labs/services/payout";
 import type { Database } from "../../../../packages/db/src/database.generated";
+import type { SandboxWebhookClaim } from "./gate2-tremendous-webhook-process";
 
 const uuid = (value: unknown): value is string => typeof value === "string" &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -110,4 +111,22 @@ export async function readGate2SandboxPayoutRecipient(
   if (!object(data) || typeof data.name !== "string" ||
     typeof data.email !== "string" || typeof data.country !== "string") return null;
   return { name: data.name, email: data.email, country: data.country };
+}
+
+export async function readGate2SandboxWebhookClaim(
+  client: SupabaseClient<Database>, payoutId: string,
+): Promise<SandboxWebhookClaim | null> {
+  if (!uuid(payoutId)) return null;
+  const { data, error } = await client.rpc("read_gate2_sandbox_visa_webhook_claim", {
+    requested_payout_id: payoutId,
+  });
+  if (error) throw error;
+  if (!object(data)) return null;
+  if (data.id !== payoutId || data.recipientId !== payoutId ||
+    typeof data.productId !== "string" || !data.productId ||
+    !Number.isSafeInteger(data.amountCents) || (data.amountCents as number) <= 0 ||
+    !["pending", "ordered", "delivered", "failed"].includes(String(data.state)) ||
+    !(data.providerOrderId === null || typeof data.providerOrderId === "string"))
+    throw new Error("Invalid sandbox webhook claim");
+  return data as SandboxWebhookClaim;
 }
