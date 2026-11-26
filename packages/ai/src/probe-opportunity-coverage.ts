@@ -3,7 +3,7 @@ export interface PersistedProbeOpportunity {
   readonly answerId: string;
   readonly currentQualified: boolean;
   readonly currentTurn: boolean;
-  readonly outcome: "rendered" | "no_probe" | "error" | "timeout" |
+  readonly outcome: "rendered" | "rendered_unmeasured" | "no_probe" | "error" | "timeout" |
     "superseded" | "pending_render" | "pending" | "withheld" | "invalidated";
   readonly renderOutcome: "shown" | "timeout" | "superseded" | null;
 }
@@ -21,6 +21,7 @@ export interface ProbeTerminalCoverage {
   readonly pending: number;
   readonly pendingRender: number;
   readonly terminal: number;
+  readonly unmeasuredRendered: number;
   readonly decisionTimeouts: number;
   readonly renderTimeouts: number;
   /** Does not establish a historical denominator, latency or model quality. */
@@ -28,7 +29,7 @@ export interface ProbeTerminalCoverage {
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const terminalOutcomes = new Set(["rendered", "no_probe", "error", "timeout", "superseded"]);
+const terminalOutcomes = new Set(["rendered", "rendered_unmeasured", "no_probe", "error", "timeout", "superseded"]);
 
 /** Audit stored outcomes without treating an unresolved probe as a timeout. */
 export function assessPersistedProbeCoverage(snapshot: PersistedProbeSnapshot): ProbeTerminalCoverage {
@@ -38,7 +39,7 @@ export function assessPersistedProbeCoverage(snapshot: PersistedProbeSnapshot): 
     throw new Error("Incomplete private probe snapshot");
   const seen = new Set<string>();
   const counts = { survivingRecorded: snapshot.recordedCount, withheld: 0,
-    invalidated: 0, pending: 0, pendingRender: 0, terminal: 0,
+    invalidated: 0, pending: 0, pendingRender: 0, terminal: 0, unmeasuredRendered: 0,
     decisionTimeouts: 0, renderTimeouts: 0 };
   for (const item of snapshot.items) {
     if (!item || !uuid.test(item.answerId) || seen.has(item.answerId.toLowerCase())
@@ -50,10 +51,12 @@ export function assessPersistedProbeCoverage(snapshot: PersistedProbeSnapshot): 
       || (item.outcome === "withheld" && item.currentQualified)
       || (item.outcome === "invalidated" && (!item.currentQualified || item.currentTurn))
       || (item.renderOutcome !== null && item.currentQualified && !item.currentTurn)
-      || (["rendered", "no_probe", "error", "timeout", "pending_render"]
+      || (["rendered", "rendered_unmeasured", "no_probe", "error", "timeout", "pending_render"]
         .includes(item.outcome) && !item.currentTurn)
-      || (item.outcome === "rendered" && item.renderOutcome !== "shown")
+      || (["rendered", "rendered_unmeasured"].includes(item.outcome)
+        && item.renderOutcome !== "shown")
       || (item.renderOutcome === "shown" && item.outcome !== "rendered"
+        && item.outcome !== "rendered_unmeasured"
         && item.outcome !== "withheld" && item.outcome !== "invalidated")
       || (item.renderOutcome === "timeout" && item.outcome !== "timeout"
         && item.outcome !== "withheld" && item.outcome !== "invalidated")
@@ -68,6 +71,7 @@ export function assessPersistedProbeCoverage(snapshot: PersistedProbeSnapshot): 
     else if (item.outcome === "pending_render") counts.pendingRender++;
     else {
       counts.terminal++;
+      if (item.outcome === "rendered_unmeasured") counts.unmeasuredRendered++;
       if (item.outcome === "timeout") {
         if (item.renderOutcome === "timeout") counts.renderTimeouts++;
         else counts.decisionTimeouts++;
