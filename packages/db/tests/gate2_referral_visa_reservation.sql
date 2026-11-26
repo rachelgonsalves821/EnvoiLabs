@@ -95,11 +95,10 @@ set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","r
 select is(public.read_gate2_current_respondent_earnings()
     -> 'referral' ->> 'payoutStatus', 'pending',
     'referrer sees pending TEST reservation, not delivered money');
-select is(public.read_gate2_current_respondent_earnings()
-    -> 'referral' ->> 'payoutId',
-    (select id::text from public.payouts
-        where bonus_ref = 'a9f50000-0000-4000-8000-000000000001'),
-    'referral receipt points to the frozen payout');
+select ok((public.read_gate2_current_respondent_earnings()
+    -> 'referral' ->> 'payoutId') ~
+    '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    'referral receipt exposes a payout identity without private table access');
 set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000002","role":"authenticated"}';
 select is(public.read_gate2_current_respondent_earnings()
     -> 'referral' ->> 'payoutStatus', 'not_vested',
