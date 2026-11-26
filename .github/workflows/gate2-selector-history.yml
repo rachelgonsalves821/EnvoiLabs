@@ -1,0 +1,25 @@
+name: Gate 2 selector migration history
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/gate2-selector-history.yml
+      - packages/db/scripts/test-gate2-selector-history.sh
+      - packages/db/migrations/20261124013800_gate2_marketplace_interview_range.sql
+      - packages/db/migrations/20261124013900_gate1_expired_audio_selection.sql
+      - packages/db/tests/gate2_audio_selector_history.sql
+
+permissions:
+  contents: read
+
+jobs:
+  selector-first:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+      - name: Apply standalone selector before the older Gate 2 stack
+        run: bash packages/db/scripts/test-gate2-selector-history.sh
