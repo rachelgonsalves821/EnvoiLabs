@@ -16,7 +16,7 @@ describe("private matched-offer push adapter", () => {
     const rpc = vi.fn().mockImplementation(async (name) => ({ error: null,
       data: name === "list_gate2_offer_push_candidates" ? [inviteId] :
         name === "queue_gate2_offer_push" ? true :
-        name === "list_gate2_offer_push_dispatchable" ? [outboxId] :
+        name === "list_gate2_offer_push_dispatch_page" ? [outboxId] :
         name === "prepare_gate2_offer_push_deliveries" ? [deliveryId] :
         name === "claim_gate2_offer_push_delivery" ? {
           deliveryId, claimId, inviteId, respondentId,
@@ -27,13 +27,15 @@ describe("private matched-offer push adapter", () => {
     const ledger = createGate2OfferPushLedger(client(rpc));
     expect(await ledger.readCandidates()).toEqual([inviteId]);
     expect(await ledger.enqueue(inviteId)).toBe(true);
-    expect(await ledger.listDispatchable()).toEqual([outboxId]);
+    expect(await ledger.listDispatchable(null)).toEqual([outboxId]);
     expect(await ledger.prepare(outboxId)).toEqual([deliveryId]);
     expect(await ledger.claim(deliveryId, claimId)).toMatchObject({
       deliveryId, claimId, inviteId, respondentId });
     expect(await ledger.observe(deliveryId, claimId, "sent")).toBe(true);
     expect(rpc).toHaveBeenCalledWith("queue_gate2_offer_push",
       { supplied_invite_id: inviteId });
+    expect(rpc).toHaveBeenCalledWith("list_gate2_offer_push_dispatch_page",
+      {});
     expect(rpc).toHaveBeenCalledWith("claim_gate2_offer_push_delivery",
       { supplied_delivery_id: deliveryId, supplied_claim_id: claimId });
   });
@@ -46,5 +48,13 @@ describe("private matched-offer push adapter", () => {
     const ledger = createGate2OfferPushLedger(client(rpc));
     await expect(ledger.claim(inviteId, claimId)).rejects.toThrow("Invalid private offer push claim");
     await expect(ledger.enqueue("not-a-uuid")).rejects.toThrow("Invalid offer identity");
+    await expect(ledger.listDispatchable("not-a-uuid"))
+      .rejects.toThrow("Invalid offer push cursor");
+  });
+  it("rejects an oversized page before dispatch", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null,
+      data: Array.from({ length: 101 }, () => outboxId) });
+    await expect(createGate2OfferPushLedger(client(rpc)).listDispatchable(null))
+      .rejects.toThrow("Invalid private offer push IDs");
   });
 });

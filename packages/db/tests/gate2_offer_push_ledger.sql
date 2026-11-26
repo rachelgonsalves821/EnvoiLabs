@@ -2,6 +2,15 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
+set local role service_role;
+select throws_ok($$select public.list_gate2_offer_push_dispatchable()$$,
+    '42501', 'permission denied for function list_gate2_offer_push_dispatchable',
+    'old unbounded dispatch reader is no longer callable');
+reset role;
+-- Keep the historical ledger fixture focused on its original contract.
+-- This grant lasts only for the rollback-only test transaction.
+grant execute on function public.list_gate2_offer_push_dispatchable()
+    to service_role;
 
 insert into public.studies (id, organization_id, title, state,
     target_completes, length_minutes, deadline_at)
@@ -70,6 +79,14 @@ select is(jsonb_array_length(public.list_gate2_offer_push_candidates()), 0,
     'queued offer is no longer a candidate');
 select is(jsonb_array_length(public.list_gate2_offer_push_dispatchable()), 1,
     'one outbox entry is dispatchable');
+select is(jsonb_array_length(public.list_gate2_offer_push_dispatch_page(null)), 1,
+    'bounded first page includes the queued outbox');
+select is(jsonb_array_length(public.list_gate2_offer_push_dispatch_page(
+    (public.list_gate2_offer_push_dispatch_page(null) ->> 0)::uuid)), 0,
+    'keyset cursor excludes the previous page');
+select is(jsonb_array_length(public.list_gate2_offer_push_dispatch_page(
+    'a9870000-0000-4000-8000-000000000099')), 0,
+    'unknown outbox cursor fails closed');
 select is(jsonb_array_length(public.prepare_gate2_offer_push_deliveries(
     (public.list_gate2_offer_push_dispatchable() ->> 0)::uuid)), 1,
     'one subscription receives one prepared delivery');

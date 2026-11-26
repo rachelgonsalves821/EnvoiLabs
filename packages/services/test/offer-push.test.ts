@@ -49,4 +49,19 @@ describe("matched-offer push dispatch", () => {
     expect(transport.send).not.toHaveBeenCalled();
     expect(ledger.observe).toHaveBeenCalledWith("delivery", "claim", "failed");
   });
+  it("advances an immutable outbox cursor across bounded pages", async () => {
+    const ledger = setup();
+    const first = Array.from({ length: 100 }, (_, index) => `outbox-${index}`);
+    ledger.listDispatchable.mockResolvedValueOnce(first)
+      .mockResolvedValueOnce(["outbox-100"]);
+    ledger.claim.mockResolvedValue(null);
+    const transport = { send: vi.fn() };
+    expect(await dispatchMatchedOfferPush({ ledger, transport,
+      newClaimId: () => "claim", now })).toEqual({ queued: 1,
+      sent: 0, failed: 0, unresolved: 0 });
+    expect(ledger.listDispatchable).toHaveBeenNthCalledWith(1, null);
+    expect(ledger.listDispatchable).toHaveBeenNthCalledWith(2, "outbox-99");
+    expect(ledger.prepare).toHaveBeenCalledTimes(101);
+    expect(transport.send).not.toHaveBeenCalled();
+  });
 });

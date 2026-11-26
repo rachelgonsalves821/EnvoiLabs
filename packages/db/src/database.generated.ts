@@ -2050,6 +2050,10 @@ export type Database = {
       list_gate2_nudge_candidates: { Args: never; Returns: Json }
       list_gate2_nudge_dispatchable: { Args: never; Returns: Json }
       list_gate2_offer_push_candidates: { Args: never; Returns: Json }
+      list_gate2_offer_push_dispatch_page: {
+        Args: { supplied_after_id?: string }
+        Returns: Json
+      }
       list_gate2_offer_push_dispatchable: { Args: never; Returns: Json }
       list_gate3_probe_due: { Args: { supplied_limit: number }; Returns: Json }
       list_gate3_probe_render_due: {
