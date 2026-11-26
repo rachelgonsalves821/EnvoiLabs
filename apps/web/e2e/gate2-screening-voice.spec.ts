@@ -56,6 +56,11 @@ test.describe("Gate 2 consented voice screener fixture", () => {
         length_minutes: 10, deadline_at: new Date(Date.now() + 86_400_000).toISOString(),
       }).select("id").single();
       if (study.error || !study.data) throw new Error("Disposable study is missing.");
+      const guide = await db.from("guide_questions").insert({
+        study_id: study.data.id, position: 1,
+        text: "Describe a recent nursing shift.",
+      });
+      expect(guide.error).toBeNull();
       const criterion = await db.from("criteria").insert({ study_id: study.data.id,
         kind: "must", attribute_key: "nurse", operator: "eq", value_json: true,
         text: "Worked as a hospital nurse in the past 12 months",
