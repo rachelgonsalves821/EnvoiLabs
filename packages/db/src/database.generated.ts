@@ -2117,6 +2117,30 @@ export type Database = {
         }
         Returns: Json
       }
+      publish_gate3_qualified_report: {
+        Args: {
+          supplied_claims: Json
+          supplied_policy: string
+          supplied_qualification: string
+          supplied_quotes: Json
+          supplied_report_id: string
+          supplied_summary: Json
+        }
+        Returns: boolean
+      }
+      publish_gate3_reviewed_report: {
+        Args: {
+          supplied_claims: Json
+          supplied_policy: string
+          supplied_positions: Json
+          supplied_qualification: string
+          supplied_quotes: Json
+          supplied_report_id: string
+          supplied_reviews: Json
+          supplied_summary: Json
+        }
+        Returns: boolean
+      }
       queue_gate2_nudge: {
         Args: {
           supplied_invite_id: string
@@ -2197,8 +2221,16 @@ export type Database = {
         }
         Returns: Json
       }
+      read_gate3_current_qualified_report: {
+        Args: { supplied_study_id: string }
+        Returns: Json
+      }
       read_gate3_probe_opportunity_snapshot: {
         Args: { supplied_study_id: string }
+        Returns: Json
+      }
+      read_gate3_qualified_report: {
+        Args: { supplied_report_id: string; supplied_study_id: string }
         Returns: Json
       }
       read_gate3_ready_probe_turn: {
@@ -2284,6 +2316,22 @@ export type Database = {
       record_gate3_probe_timeout: {
         Args: { supplied_answer_id: string; supplied_auth_user_id: string }
         Returns: Json
+      }
+      record_gate3_withheld_proposal: {
+        Args: {
+          supplied_actor: string
+          supplied_candidate: Json
+          supplied_causation_id: string
+          supplied_model_name: string
+          supplied_model_version: string
+          supplied_prompt_version: string
+          supplied_proposal_id: string
+          supplied_rationale: string
+          supplied_reason: string
+          supplied_report_id: string
+          supplied_study_id: string
+        }
+        Returns: boolean
       }
       register_gate2_push_subscription: {
         Args: {
