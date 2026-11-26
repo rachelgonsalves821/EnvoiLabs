@@ -125,6 +125,10 @@ describe("probe decision and render ports", () => {
       "session-1", "turn-1", 1, () => 300);
     expect(timedOut).toMatchObject({ status: "committed", value: { probeId: null,
       decision: { action: "next", outcome: "timeout" } } });
+    if (timedOut.status === "committed")
+      expect(await presentCommittedProbe(port, timedOut.value, () => "turn-1",
+        () => { throw Error("A decision timeout must not mount"); },
+        () => undefined, () => 300)).toEqual({ outcome: "timeout", stage: "decision" });
     setCommitted(null);
     setCurrent({ ...ready, turn: { ...ready.turn, probesUsed: 2 } });
     const unused = vi.fn(async () => response({ action: "probe", text: "Should not run?" }));
@@ -239,7 +243,7 @@ describe("probe decision and render ports", () => {
       const pending = presentCommittedProbe(port, saved.value, () => "turn-1", mount,
         () => undefined, () => 500, retract, { timeoutMs: 1 });
       await vi.advanceTimersByTimeAsync(1);
-      expect(await pending).toEqual({ outcome: "timeout" });
+      expect(await pending).toEqual({ outcome: "timeout", stage: "render" });
       expect(mount).toHaveBeenCalledTimes(1);
       expect(retract).toHaveBeenCalledTimes(1);
       expect(port.markShown).not.toHaveBeenCalled();

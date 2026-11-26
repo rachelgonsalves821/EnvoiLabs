@@ -92,7 +92,8 @@ export async function decideProbe(attempt: ProbeAttempt, runtime: ProbeRuntime):
 /** Call after the probe is mounted and painted; a later question invalidates the result. */
 export function recordProbeRender(decision: ProbeDecision, currentTurnId: string,
   renderedAtMs: number): ProbeOutcome {
-  if (decision.action === "next") return { outcome: decision.outcome };
+  if (decision.action === "next") return decision.outcome === "timeout"
+    ? { outcome: "timeout", stage: "decision" } : { outcome: decision.outcome };
   if (decision.turnId !== currentTurnId) return { outcome: "superseded" };
   if (!Number.isFinite(renderedAtMs) || renderedAtMs < decision.uploadConfirmedAtMs)
     return { outcome: "error" };
@@ -103,10 +104,11 @@ export function recordProbeRender(decision: ProbeDecision, currentTurnId: string
 export async function recordProbeAfterPaint(decision: ProbeDecision, currentTurnId: () => string,
   frame: (callback: () => void) => void, now: () => number,
   wait: ProbePaintWait = {}): Promise<ProbeOutcome> {
-  if (decision.action === "next") return { outcome: decision.outcome };
+  if (decision.action === "next") return recordProbeRender(decision, currentTurnId(), 0);
   const remaining = Math.min(wait.timeoutMs ?? 6000,
     decision.uploadConfirmedAtMs + 6000 - now());
-  if (!Number.isFinite(remaining) || remaining <= 0) return { outcome: "timeout" };
+  if (!Number.isFinite(remaining) || remaining <= 0) return currentTurnId() === decision.turnId
+    ? { outcome: "timeout", stage: "render" } : { outcome: "superseded" };
   const schedule = wait.schedule ?? setTimeout;
   const cancel = wait.cancel ?? clearTimeout;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -123,14 +125,18 @@ export async function recordProbeAfterPaint(decision: ProbeDecision, currentTurn
       timer = schedule(() => resolve("timeout"), remaining);
     });
     if (await Promise.race([painted, limit]) === "timeout")
-      return { outcome: currentTurnId() === decision.turnId ? "timeout" : "superseded" };
+      return currentTurnId() === decision.turnId
+        ? { outcome: "timeout", stage: "render" } : { outcome: "superseded" };
+  } catch {
+    return currentTurnId() === decision.turnId ? { outcome: "error" } : { outcome: "superseded" };
   } finally {
     if (timer !== undefined) cancel(timer);
   }
   const current = currentTurnId();
   if (current !== decision.turnId) return { outcome: "superseded" };
   const renderedAt = now();
-  if (renderedAt > decision.uploadConfirmedAtMs + 6000) return { outcome: "timeout" };
+  if (renderedAt > decision.uploadConfirmedAtMs + 6000)
+    return { outcome: "timeout", stage: "render" };
   return recordProbeRender(decision, current, renderedAt);
 }
 
@@ -138,7 +144,7 @@ export async function recordProbeAfterPaint(decision: ProbeDecision, currentTurn
 export async function presentProbeIfCurrent(decision: ProbeDecision, currentTurnId: () => string,
   mount: (text: string) => void, frame: (callback: () => void) => void,
   now: () => number, wait: ProbePaintWait = {}): Promise<ProbeOutcome> {
-  if (decision.action === "next") return { outcome: decision.outcome };
+  if (decision.action === "next") return recordProbeRender(decision, currentTurnId(), 0);
   if (currentTurnId() !== decision.turnId) return { outcome: "superseded" };
   try {
     mount(decision.text);

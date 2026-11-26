@@ -1,5 +1,5 @@
 import type { LLMProvider, LLMRequest } from "./index.js";
-import { decideProbe, presentProbeIfCurrent, type ProbeDecision,
+import { decideProbe, presentProbeIfCurrent, recordProbeRender, type ProbeDecision,
   type ProbePaintWait } from "./probe-runtime.js";
 import { advanceProbeState, beginProbeTurn, type ProbeTurn } from "./probe-state.js";
 import type { ProbeOutcome } from "./probe-metrics.js";
@@ -189,7 +189,7 @@ export async function presentCommittedProbe(port: ProbeDecisionPort, committed: 
   try { value = committedSnapshot(committed, committed.sessionId, committed.turnId); }
   catch { return { outcome: "error" }; }
   if (!value) return { outcome: "error" };
-  if (value.decision.action === "next") return { outcome: value.decision.outcome };
+  if (value.decision.action === "next") return recordProbeRender(value.decision, value.turnId, 0);
   if (!value.probeId) return { outcome: "error" };
   let mounted = false;
   let outcome: ProbeOutcome;

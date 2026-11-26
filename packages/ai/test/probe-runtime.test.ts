@@ -89,15 +89,30 @@ describe("probe runtime", () => {
       const pending = recordProbeAfterPaint(decision, () => "answer-1",
         () => undefined, () => 200, { timeoutMs: 1 });
       await vi.advanceTimersByTimeAsync(1);
-      expect(await pending).toEqual({ outcome: "timeout" });
+      expect(await pending).toEqual({ outcome: "timeout", stage: "render" });
       expect(await recordProbeAfterPaint(decision, () => "answer-1",
-        () => undefined, () => 6100)).toEqual({ outcome: "timeout" });
+        () => undefined, () => 6100)).toEqual({ outcome: "timeout", stage: "render" });
       expect(await recordProbeAfterPaint(decision, () => "answer-1",
         (frame) => frame(), (() => {
           let calls = 0;
           return () => ++calls === 1 ? 200 : 6101;
-        })())).toEqual({ outcome: "timeout" });
+        })())).toEqual({ outcome: "timeout", stage: "render" });
     } finally { vi.useRealTimers(); }
+  });
+
+  it("classifies decision timeouts and contains browser-frame failures", async () => {
+    const decision = { action: "probe" as const, turnId: "answer-1",
+      text: "What happened?", uploadConfirmedAtMs: 100 };
+    expect(recordProbeRender({ action: "next", turnId: "answer-1", outcome: "timeout" },
+      "answer-1", 200)).toEqual({ outcome: "timeout", stage: "decision" });
+    expect(await recordProbeAfterPaint(decision, () => "answer-1", () => {
+      throw Error("frame unavailable");
+    }, () => 200)).toEqual({ outcome: "error" });
+    let frames = 0;
+    expect(await recordProbeAfterPaint(decision, () => "answer-1", (callback) => {
+      if (++frames === 2) throw Error("second frame unavailable");
+      callback();
+    }, () => 200)).toEqual({ outcome: "error" });
   });
 
   it("advances without a probe on intentional next, provider error, timeout or invalid output", async () => {
