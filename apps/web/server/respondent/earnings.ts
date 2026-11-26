@@ -10,7 +10,9 @@ type Earnings = {
     payoutStatus: "awaiting_reservation" | "pending" | "ordered" | "delivered" | "failed";
     payoutId?: string | null; batchId?: string | null;
     deliveredAt?: string | null }[];
-  referral: { verifiedProfiles: number; vestedBonusCents: number };
+  referral: { verifiedProfiles: number; vestedBonusCents: number;
+    payoutStatus: "not_vested" | "vested" | "pending" | "ordered" | "delivered" | "failed";
+    payoutId: string | null; deliveredAt: string | null };
 };
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -22,7 +24,20 @@ export function parseCurrentEarnings(value: unknown): Earnings | null {
   if (!record(value) || value.currency !== "usd" || !cents(value.earnedCents) ||
     !cents(value.deliveredCents) || (value.deliveredCents as number) > (value.earnedCents as number) ||
     !Array.isArray(value.sessions) || !record(value.referral) ||
-    !cents(value.referral.verifiedProfiles) || !cents(value.referral.vestedBonusCents)) return null;
+    !cents(value.referral.verifiedProfiles) || !cents(value.referral.vestedBonusCents) ||
+    typeof value.referral.payoutStatus !== "string" ||
+    !["not_vested", "vested", "pending", "ordered", "delivered", "failed"]
+      .includes(value.referral.payoutStatus) ||
+    !(value.referral.payoutId === null || uuid(value.referral.payoutId)) ||
+    !(value.referral.deliveredAt === null ||
+      (typeof value.referral.deliveredAt === "string" &&
+        Number.isFinite(Date.parse(value.referral.deliveredAt)))) ||
+    (value.referral.payoutStatus === "delivered" &&
+      (value.referral.payoutId === null || value.referral.deliveredAt === null)) ||
+    (["not_vested", "vested"].includes(value.referral.payoutStatus) &&
+      value.referral.payoutId !== null) ||
+    (value.referral.payoutStatus === "not_vested" &&
+      value.referral.vestedBonusCents !== 0)) return null;
   for (const item of value.sessions) {
     if (!record(item) || typeof item.sessionId !== "string" ||
       typeof item.studyId !== "string" || !cents(item.earnedCents) ||
