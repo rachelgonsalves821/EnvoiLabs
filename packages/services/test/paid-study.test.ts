@@ -15,6 +15,7 @@ function setup() {
     readCheckoutId: vi.fn().mockResolvedValue(paid.id),
     recordObservation: vi.fn().mockResolvedValue(undefined),
     launchPaidStudy: vi.fn().mockResolvedValue(true),
+    expirePaidStudy: vi.fn().mockResolvedValue(false),
   };
   const provider = { getCheckout: vi.fn().mockResolvedValue(paid) };
   return { db, provider };
@@ -57,6 +58,24 @@ describe("paid study launch reconciliation", () => {
     expect(provider.getCheckout).toHaveBeenCalledWith(paid.id);
     expect(db.recordObservation).toHaveBeenCalledWith(paid);
     expect(db.launchPaidStudy).toHaveBeenCalledWith(quote.studyId, quote.id, paid.eventId);
+  });
+
+  it("reserves a full unfielded refund after paid launch misses the deadline", async () => {
+    const { db, provider } = setup();
+    db.readQuote.mockResolvedValue(currentQuote);
+    provider.getCheckout.mockResolvedValue({ ...paid,
+      pricingConfigVersion: currentQuote.pricingConfigVersion,
+      amountCents: currentQuote.totalCents });
+    db.launchPaidStudy.mockResolvedValue(false);
+    db.expirePaidStudy.mockResolvedValue(true);
+    expect(await reconcilePaidStudyLaunch(db, provider,
+      currentQuote.studyId, currentQuote.id)).toBe("refund_reserved");
+    expect(db.recordObservation).toHaveBeenCalledOnce();
+    expect(db.expirePaidStudy).toHaveBeenCalledWith(
+      currentQuote.studyId, currentQuote.id, paid.eventId);
+    db.expirePaidStudy.mockRejectedValue(new Error("reservation unavailable"));
+    expect(await reconcilePaidStudyLaunch(db, provider,
+      currentQuote.studyId, currentQuote.id)).toBe("unavailable");
   });
 
   it.each([

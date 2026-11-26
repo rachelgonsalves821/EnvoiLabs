@@ -85,6 +85,14 @@ describe("signed test Checkout webhook route", () => {
     expect(await (await POST(request())).json()).toEqual({
       status: "launched", offersCreated: 2 });
   });
+  it("acknowledges a paid deadline expiry without creating offers", async () => {
+    enabled();
+    reconcileLaunch.mockResolvedValue("refund_reserved");
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "refund_reserved" });
+    expect(wave).not.toHaveBeenCalled();
+  });
   it("observes failure without launch and retries provider uncertainty", async () => {
     enabled();
     verify.mockReturnValue({ ...hint, type: "checkout.session.expired" });

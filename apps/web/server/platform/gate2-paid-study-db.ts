@@ -69,5 +69,24 @@ export function createGate2PaidStudyDatabase(client: SupabaseClient<Database>): 
       }));
       return result === true;
     },
+    async expirePaidStudy(studyId, quoteId, providerEventId) {
+      const result = readData(await client.rpc("expire_gate2_paid_after_deadline", {
+        supplied_study_id: studyId, supplied_quote_id: quoteId,
+        supplied_provider_event_id: providerEventId,
+      }));
+      if (result === null) return false;
+      if (!result || typeof result !== "object" || Array.isArray(result) ||
+        result.status !== "refund_reserved" || result.studyId !== studyId ||
+        result.quoteId !== quoteId ||
+        typeof result.reservationId !== "string" ||
+        !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+          .test(result.reservationId) ||
+        typeof result.amountCents !== "number" ||
+        !Number.isSafeInteger(result.amountCents) || result.amountCents <= 0 ||
+        typeof result.unfilledSlots !== "number" ||
+        !Number.isSafeInteger(result.unfilledSlots) || result.unfilledSlots < 10)
+        throw new Error("Invalid paid deadline refund reservation");
+      return true;
+    },
   };
 }

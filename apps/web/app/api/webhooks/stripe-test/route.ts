@@ -49,5 +49,7 @@ export async function POST(request: NextRequest) {
       (wave.created as number) < 0) return failure(503);
     return reply(200, { status: "launched", offersCreated: wave.created });
   }
+  if (result === "refund_reserved")
+    return reply(200, { status: "refund_reserved" });
   return reply(200, { status: "observed" });
 }
