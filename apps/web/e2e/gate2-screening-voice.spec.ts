@@ -206,6 +206,7 @@ test.describe("Gate 2 consented voice screener fixture", () => {
       expect(await decideQualifiedScreeningAnswer(db, model, request)).toBeNull();
       expect(modelCalls).toBe(1);
       const staleAccept = await page.request.post("/api/respondent/invites/accept", {
+        headers: { origin: new URL(page.url()).origin },
         data: { inviteId: offer.data.id, action: "accept" },
       });
       expect(staleAccept.status()).toBe(409);
