@@ -19,6 +19,50 @@ function indexed(rows, name) {
   return indexedRows;
 }
 
+function mappedContext(input, output, judgment) {
+  const fields = [input.hypotheses, input.guideQuestions, output.mapPromptVersion,
+    output.mapPromptDigest, output.briefDigest, output.mapCount, output.mapEvidence,
+    judgment.briefDigest];
+  if (fields.every((value) => value === undefined)) return null;
+  if (!Array.isArray(input.hypotheses) || input.hypotheses.length === 0
+    || !input.hypotheses.every(text)
+    || !Array.isArray(input.guideQuestions) || input.guideQuestions.length < 4
+    || input.guideQuestions.length > 10
+    || !input.guideQuestions.every((question) => object(question)
+      && uuid.test(question.id) && text(question.text))
+    || new Set(input.guideQuestions.map((question) => question.id.toLowerCase())).size
+      !== input.guideQuestions.length
+    || !text(output.mapPromptVersion) || !digest.test(output.mapPromptDigest)
+    || !digest.test(output.briefDigest) || output.briefDigest !== judgment.briefDigest
+    || output.briefDigest !== sha({ decisionQuestion: input.decisionQuestion,
+      hypotheses: input.hypotheses, guideQuestions: input.guideQuestions })
+    || output.mapCount !== input.sources.length || !Array.isArray(output.mapEvidence))
+    throw new Error("Incomplete mapped analyst provenance");
+  for (const source of input.sources) {
+    if (!uuid.test(source.questionId)
+      || !input.guideQuestions.some((question) => question.id === source.questionId))
+      throw new Error("Invalid mapped guide binding");
+  }
+  for (const evidence of output.mapEvidence) {
+    const source = input.sources.find((item) => item.transcriptId === evidence?.transcriptId);
+    if (!object(evidence) || !source || evidence.sourceVersion !== source.sourceVersion
+      || evidence.questionId !== source.questionId
+      || !Number.isSafeInteger(evidence.startChar) || !Number.isSafeInteger(evidence.endChar)
+      || evidence.startChar < 0 || evidence.endChar <= evidence.startChar
+      || !text(evidence.exactText)
+      || Array.from(source.redactedText).slice(evidence.startChar, evidence.endChar).join("")
+        !== evidence.exactText) throw new Error("Invalid mapped evidence span");
+  }
+  return { promptVersion: output.mapPromptVersion, promptDigest: output.mapPromptDigest,
+    evidence: output.mapEvidence };
+}
+
+function quoteWasMapped(quote, mapped) {
+  return !mapped || mapped.evidence.some((evidence) => evidence.transcriptId === quote.transcriptId
+    && evidence.sourceVersion === quote.sourceVersion && evidence.startChar === quote.startChar
+    && evidence.endChar === quote.endChar && evidence.exactText === quote.exactText);
+}
+
 /** Exact redacted-span and hand-count scorer; the reviewer/source records remain private. */
 export function scoreAnalystHeldout(inputs, outputs, judgments) {
   const inputById = indexed(inputs, "inputs");
@@ -49,7 +93,9 @@ export function scoreAnalystHeldout(inputs, outputs, judgments) {
       || output.themes.length === 0 || !Array.isArray(judgment.labels))
       throw new Error("Incomplete analyst study");
     studyIds.add(input.studyId);
-    versions.add(JSON.stringify([output.model, output.promptVersion]));
+    const mapped = mappedContext(input, output, judgment);
+    versions.add(JSON.stringify([output.model, output.promptVersion,
+      mapped?.promptVersion ?? null, mapped?.promptDigest ?? null]));
     const labels = new Map();
     for (const label of judgment.labels) {
       if (!object(label) || !text(label.labelId) || labels.has(label.labelId)
@@ -75,7 +121,8 @@ export function scoreAnalystHeldout(inputs, outputs, judgments) {
       if (theme.total === label.handTotal) totalsMatched++;
       for (const quote of [...theme.supportingQuotes, ...theme.contradictingQuotes]) {
         quotes++;
-        if (verifyEvidence(input.studyId, [quote], input.sources)[0]?.action === "accept")
+        if (quoteWasMapped(quote, mapped)
+          && verifyEvidence(input.studyId, [quote], input.sources)[0]?.action === "accept")
           verifiedQuotes++;
       }
     }
