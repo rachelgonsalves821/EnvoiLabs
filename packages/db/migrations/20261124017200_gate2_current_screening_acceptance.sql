@@ -46,6 +46,29 @@ create trigger gate2_guard_screened_offer_acceptance
     before update of state on public.invites for each row
     execute function internal.gate2_guard_screened_offer_acceptance();
 
+-- Acceptance creates a started session. Recheck before that session is first
+-- opened, since consent or source qualification may change in the meantime.
+create function internal.gate2_guard_screened_session_start()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+    offer public.invites%rowtype;
+begin
+    if old.state = 'started' and new.state = 'in_progress' then
+        select * into offer from public.invites where id = new.invite_id;
+        if not found then raise check_violation; end if;
+        perform 1 from public.respondents where id = offer.respondent_id for update;
+        if not internal.gate2_screening_offer_current(offer.id, offer.study_id)
+        then raise check_violation; end if;
+    end if;
+    return new;
+end;
+$$;
+revoke all on function internal.gate2_guard_screened_session_start()
+    from public, anon, authenticated, service_role;
+create trigger gate2_guard_screened_session_start
+    before update of state on public.sessions for each row
+    execute function internal.gate2_guard_screened_session_start();
+
 -- Home must not advertise an offer that its accept command will refuse.
 create or replace function public.list_gate1_home_invites() returns jsonb
 language sql stable security definer set search_path = pg_catalog as $$
@@ -77,7 +100,8 @@ language sql stable security definer set search_path = pg_catalog as $$
             and studies.state = 'fielding'
             and questions.core_question_count > 0
             and invites.expires_at > statement_timestamp()
-            and (invites.state <> 'invited' or
+            and (invites.state not in ('invited', 'accepted')
+                or sessions.state = 'in_progress' or
                 internal.gate2_screening_offer_current(invites.id, invites.study_id))
             and (invites.state in ('invited', 'screening')
                 or (invites.state = 'accepted'

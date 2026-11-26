@@ -104,6 +104,24 @@ select is(public.get_gate2_current_qualified_screening_decision(
     'synthetic-model', 'screening-v1', repeat('a', 64)) ->> 'action',
     'qualify', 'retry reader sees only the current qualified decision');
 reset role;
+savepoint accepted_before_withdrawal;
+set local role service_role;
+update public.invites set state = 'accepted'
+where id = 'a9f30000-0000-4000-8000-000000000002';
+insert into public.sessions (invite_id, study_id) values (
+    'a9f30000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001');
+reset role;
+insert into public.consents (respondent_id, study_id, purpose, granted,
+    text_version) values ('90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_screening', false,
+    'synthetic-ai-screening-v1');
+set local role service_role;
+select throws_ok($$update public.sessions set state = 'in_progress'
+    where invite_id = 'a9f30000-0000-4000-8000-000000000002'$$,
+    '23514', null, 'withdrawn screening cannot start an accepted session');
+reset role;
+rollback to savepoint accepted_before_withdrawal;
 insert into public.consents (respondent_id, study_id, purpose, granted,
     text_version) values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'ai_screening', false,
