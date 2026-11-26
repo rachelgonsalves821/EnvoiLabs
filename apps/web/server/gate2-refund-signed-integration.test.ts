@@ -49,7 +49,7 @@ const checkout = { object: "checkout.session", id: checkoutId,
 const payment = { object: "payment_intent", id: "pi_expired_paid",
   livemode: false, status: "succeeded", currency: "usd",
   amount, amount_received: amount };
-const refund = (status: "pending" | "succeeded") => ({
+const refund = (status: "pending" | "succeeded" | "failed") => ({
   object: "refund", id: refundId, payment_intent: payment.id,
   amount, currency: "usd", status,
   metadata: { reservationId, quoteId, studyId },
@@ -63,10 +63,11 @@ function researcherRequest() {
         "content-type": "application/json" },
     }), { params: Promise.resolve({ studyId }) });
 }
-function signedWebhook() {
+function signedWebhook(type: "refund.created" | "refund.updated" | "refund.failed",
+  status: "succeeded" | "failed" = "succeeded") {
   const body = JSON.stringify({ object: "event", id: "evt_refund_signed",
-    livemode: false, type: "refund.updated",
-    data: { object: refund("succeeded") } });
+    livemode: false, type,
+    data: { object: refund(status) } });
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = createHmac("sha256", secret)
     .update(`${timestamp}.${body}`).digest("hex");
@@ -88,7 +89,7 @@ function setup() {
   study.mockResolvedValue({ data: { id: studyId }, error: null });
   reconciled.mockResolvedValue("refunded");
   let known = false;
-  let providerStatus: "pending" | "succeeded" = "pending";
+  let providerStatus: "pending" | "succeeded" | "failed" = "pending";
   const events = new Set<string>();
   rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
     switch (name) {
@@ -134,12 +135,14 @@ function setup() {
     throw new Error(`Unexpected synthetic Stripe request ${method} ${url}`);
   }));
   return { requests, events,
-    succeed: () => { providerStatus = "succeeded"; } };
+    succeed: () => { providerStatus = "succeeded"; },
+    fail: () => { providerStatus = "failed"; } };
 }
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("expired paid TEST refund through signed provider observation", () => {
-  it("creates once, retrieves on researcher retry, then accepts signed triple replay", async () => {
+  it.each(["refund.created", "refund.updated", "refund.failed"] as const)(
+    "creates once, then accepts signed triple %s replay using current provider success", async (type) => {
     const state = setup();
     expect(await (await researcherRequest()).json()).toEqual({ quoteId,
       refundStatus: "pending", amountCents: amount, refundId });
@@ -151,12 +154,26 @@ describe("expired paid TEST refund through signed provider observation", () => {
     expect(state.requests.filter((item) => item.method === "POST")).toHaveLength(1);
     state.succeed();
     for (let n = 0; n < 3; n++) {
-      const response = await signedWebhook();
+      const response = await signedWebhook(type);
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ status: "succeeded" });
     }
     expect(state.events).toEqual(new Set(["pending", "succeeded"]));
     expect(reconciled).toHaveBeenCalledTimes(3);
+    expect(state.requests.filter((item) => item.method === "POST")).toHaveLength(1);
+  });
+
+  it("records failed provider state once across signed failure replay", async () => {
+    const state = setup();
+    expect((await researcherRequest()).status).toBe(200);
+    state.fail();
+    for (let n = 0; n < 3; n++) {
+      const response = await signedWebhook("refund.failed", "failed");
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ status: "failed" });
+    }
+    expect(state.events).toEqual(new Set(["pending", "failed"]));
+    expect(reconciled).not.toHaveBeenCalled();
     expect(state.requests.filter((item) => item.method === "POST")).toHaveLength(1);
   });
 });
