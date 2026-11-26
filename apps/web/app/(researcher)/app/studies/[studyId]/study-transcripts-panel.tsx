@@ -1,17 +1,16 @@
 "use client";
 
-import {
-  ResearcherTranscriptListSchema, ResearcherTranscriptListV2Schema,
-  type ResearcherTranscriptList, type ResearcherTranscriptListV2,
-} from "@envoi-labs/contracts";
+import { ResearcherTranscriptListV2Schema, type ResearcherTranscriptListV2 } from
+  "@envoi-labs/contracts";
 import { useEffect, useId, useState } from "react";
 import { trackingCopy as copy } from "./copy";
 import styles from "./tracking.module.css";
 
-type Transcripts = ResearcherTranscriptList | ResearcherTranscriptListV2;
-type TranscriptState = { kind: "loading" | "unavailable" } | { kind: "loaded"; data: Transcripts };
+type TranscriptState = { kind: "loading" | "unavailable" } |
+  { kind: "loaded"; data: ResearcherTranscriptListV2 };
 
-function TranscriptList({ items }: { items: ResearcherTranscriptList["transcripts"] }) {
+function TranscriptList({ items }: {
+  items: ResearcherTranscriptListV2["respondents"][number]["transcripts"] }) {
   return (
     <ul className={styles.transcriptList} role="list">
       {items.map(({ id, redactedText }) => <li key={id}>{redactedText}</li>)}
@@ -19,10 +18,9 @@ function TranscriptList({ items }: { items: ResearcherTranscriptList["transcript
   );
 }
 
-function TranscriptContent({ data, headingId }: { data: Transcripts; headingId: string }) {
-  const items = "respondents" in data ? data.respondents : data.transcripts;
-  if (items.length === 0) return <p role="status">{copy.transcriptsEmpty}</p>;
-  if ("transcripts" in data) return <TranscriptList items={data.transcripts} />;
+function TranscriptContent({ data, headingId }: {
+  data: ResearcherTranscriptListV2; headingId: string }) {
+  if (data.respondents.length === 0) return <p role="status">{copy.transcriptsEmpty}</p>;
 
   return (
     <div className={styles.transcriptGroups}>
@@ -38,7 +36,11 @@ function TranscriptContent({ data, headingId }: { data: Transcripts; headingId: 
 }
 
 export function StudyTranscriptsPanel({ studyId }: { studyId: string }) {
-  const [snapshot, setSnapshot] = useState<TranscriptState>({ kind: "loading" });
+  const [stored, setStored] = useState<{ studyId: string; state: TranscriptState }>(
+    () => ({ studyId, state: { kind: "loading" } }),
+  );
+  const snapshot: TranscriptState = stored.studyId === studyId
+    ? stored.state : { kind: "loading" };
   const headingId = useId();
 
   useEffect(() => {
@@ -51,18 +53,23 @@ export function StudyTranscriptsPanel({ studyId }: { studyId: string }) {
       active = request;
       try {
         const response = await fetch(`/api/researcher/studies/${studyId}/transcripts?version=2`, {
-          cache: "no-store", signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]),
+          cache: "no-store", credentials: "same-origin", redirect: "error",
+          signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]),
         });
         if (active !== request) return;
         if (response.status === 403 || response.status === 404) accessEnded = true;
         if (!response.ok) throw new Error("Transcript refresh failed");
+        const cacheControl = response.headers.get("cache-control")?.toLowerCase().split(",")
+          .map((directive) => directive.trim()) ?? [];
+        if (response.redirected || !cacheControl.includes("private")
+          || !cacheControl.includes("no-store"))
+          throw new Error("Transcript response is not private and current");
         const payload: unknown = await response.json();
-        const grouped = ResearcherTranscriptListV2Schema.safeParse(payload);
-        const result = grouped.success ? grouped : ResearcherTranscriptListSchema.safeParse(payload);
+        const result = ResearcherTranscriptListV2Schema.safeParse(payload);
         if (!result.success || result.data.studyId !== studyId) throw new Error("Transcript refresh was invalid");
-        if (active === request) setSnapshot({ kind: "loaded", data: result.data });
+        if (active === request) setStored({ studyId, state: { kind: "loaded", data: result.data } });
       } catch {
-        if (active === request) setSnapshot({ kind: "unavailable" });
+        if (active === request) setStored({ studyId, state: { kind: "unavailable" } });
       } finally {
         if (active === request) active = null;
       }
@@ -76,7 +83,7 @@ export function StudyTranscriptsPanel({ studyId }: { studyId: string }) {
     function checkVisibility() {
       if (document.hidden) {
         abandonRequest();
-        if (!accessEnded) setSnapshot({ kind: "loading" });
+        if (!accessEnded) setStored({ studyId, state: { kind: "loading" } });
       } else {
         void refresh();
       }

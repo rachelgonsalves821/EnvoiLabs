@@ -3,6 +3,7 @@
 import { reportBrowserPort, ReportUiController } from "@envoi-labs/ai";
 import { useState } from "react";
 import { StudyReportPanel } from "../(researcher)/app/studies/[studyId]/study-report-panel";
+import { StudyTranscriptsPanel } from "../(researcher)/app/studies/[studyId]/study-transcripts-panel";
 
 const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const studyId = id(1);
@@ -70,5 +71,15 @@ export function EndpointReportFixture() {
   return <main style={{ maxWidth: 760, marginInline: "auto", padding: 16 }}>
     <h1>Fictional report endpoint fixture</h1>
     <StudyReportPanel controller={controller} />
+  </main>;
+}
+
+/** Reuses the mounted transcript panel across fictional study route changes. */
+export function TranscriptFixture() {
+  const [secondStudy, setSecondStudy] = useState(false);
+  return <main style={{ maxWidth: 760, marginInline: "auto", padding: 16 }}>
+    <h1>Fictional transcript fixture</h1>
+    <StudyTranscriptsPanel studyId={secondStudy ? secondStudyId : studyId} />
+    <button type="button" onClick={() => setSecondStudy(true)}>Switch fictional study</button>
   </main>;
 }
