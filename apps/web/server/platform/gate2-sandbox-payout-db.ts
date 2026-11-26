@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PayoutReservationDenied,
+  type BatchReservation, type PayoutBatchDatabase,
   type PayoutDatabase, type Reservation } from "@envoi-labs/services/payout";
 import type { Database } from "../../../../packages/db/src/database.generated";
 
@@ -56,6 +57,47 @@ export function createGate2SandboxPayoutDatabase(client: SupabaseClient<Database
       if (error) throw error;
       if (data !== true) throw new Error("Sandbox payout observation rejected");
     },
+  };
+}
+
+function batchReservation(value: unknown, respondentId: string): BatchReservation | null {
+  if (!object(value) || value.status !== "reserved" || !uuid(value.payoutId) ||
+    !uuid(value.batchId) || value.respondentId !== respondentId ||
+    value.recipientId !== value.payoutId ||
+    typeof value.productId !== "string" || !value.productId ||
+    !Number.isSafeInteger(value.amountCents) || (value.amountCents as number) <= 0 ||
+    !["pending", "ordered", "delivered", "failed"].includes(String(value.payoutState)) ||
+    !(value.providerOrderId === null || typeof value.providerOrderId === "string"))
+    return null;
+  return { id: value.payoutId, batchId: value.batchId,
+    respondentId, recipientId: value.recipientId,
+    productId: value.productId, amountCents: value.amountCents,
+    state: value.payoutState, providerOrderId: value.providerOrderId } as BatchReservation;
+}
+
+export function createGate2SandboxBatchPayoutDatabase(client: SupabaseClient<Database>,
+  annualCapCents: number): PayoutBatchDatabase {
+  const single = createGate2SandboxPayoutDatabase(client, annualCapCents);
+  return {
+    async reserveBatchPayout(respondentId, requestId) {
+      if (!uuid(respondentId) || !uuid(requestId))
+        throw new PayoutReservationDenied();
+      const { data, error } = await client.rpc("reserve_gate2_sandbox_visa_batch", {
+        requested_respondent_id: respondentId,
+        requested_request_id: requestId, annual_cap_cents: annualCapCents });
+      if (error) {
+        if (["23514", "23505", "42501"].includes(error.code))
+          throw new PayoutReservationDenied();
+        throw error;
+      }
+      if (object(data) && data.status === "below_minimum" &&
+        Number.isSafeInteger(data.minimumCents) && (data.minimumCents as number) > 0)
+        return { status: "below_minimum" };
+      const saved = batchReservation(data, respondentId);
+      if (!saved) throw new Error("Invalid frozen sandbox batch intent");
+      return saved;
+    },
+    recordOrder: single.recordOrder,
   };
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../../../packages/db/src/database.generated";
-import { createGate2SandboxPayoutDatabase,
+import { createGate2SandboxBatchPayoutDatabase, createGate2SandboxPayoutDatabase,
   readGate2SandboxPayoutRecipient } from "./gate2-sandbox-payout-db";
 
 const id = "11111111-1111-4111-8111-111111111111";
@@ -63,5 +63,39 @@ describe("frozen sandbox Visa database adapter", () => {
       { requested_payout_id: id });
     expect(await readGate2SandboxPayoutRecipient(client(rpc), "bad-id")).toBeNull();
     expect(rpc).toHaveBeenCalledOnce();
+  });
+
+  it("maps a frozen four-session batch to one payout and stable request ID", async () => {
+    const respondentId = saved.respondentId;
+    const requestId = "44444444-4444-4444-8444-444444444444";
+    const batchId = "55555555-5555-4555-8555-555555555555";
+    const rpc = vi.fn().mockResolvedValueOnce({ data: {
+      status: "reserved", payoutId: id, batchId, respondentId,
+      recipientId: id, productId: "sandbox_visa", amountCents: 1200,
+      payoutState: "pending", providerOrderId: null }, error: null })
+      .mockResolvedValueOnce({ data: { status: "below_minimum",
+        minimumCents: 1000 }, error: null });
+    const db = createGate2SandboxBatchPayoutDatabase(client(rpc), 200000);
+    expect(await db.reserveBatchPayout(respondentId, requestId)).toEqual({
+      id, batchId, respondentId, recipientId: id, productId: "sandbox_visa",
+      amountCents: 1200, state: "pending", providerOrderId: null });
+    expect(rpc).toHaveBeenNthCalledWith(1, "reserve_gate2_sandbox_visa_batch", {
+      requested_respondent_id: respondentId, requested_request_id: requestId,
+      annual_cap_cents: 200000 });
+    expect(await db.reserveBatchPayout(respondentId, requestId))
+      .toEqual({ status: "below_minimum" });
+  });
+
+  it("fails closed on a batch whose recipient or respondent changes", async () => {
+    const respondentId = saved.respondentId;
+    const requestId = "44444444-4444-4444-8444-444444444444";
+    const rpc = vi.fn().mockResolvedValue({ data: { status: "reserved",
+      payoutId: id, batchId: "55555555-5555-4555-8555-555555555555",
+      respondentId: "other", recipientId: id,
+      productId: "sandbox_visa", amountCents: 1200,
+      payoutState: "pending", providerOrderId: null }, error: null });
+    const db = createGate2SandboxBatchPayoutDatabase(client(rpc), 200000);
+    await expect(db.reserveBatchPayout(respondentId, requestId))
+      .rejects.toThrow("Invalid frozen sandbox batch intent");
   });
 });

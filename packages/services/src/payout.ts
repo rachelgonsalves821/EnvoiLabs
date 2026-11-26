@@ -8,6 +8,9 @@ export type Reservation = {
   state: "pending" | "ordered" | "delivered" | "failed";
   providerOrderId: string | null;
 };
+export type BatchReservation = Omit<Reservation, "sessionId"> & {
+  batchId: string;
+};
 export type ProviderOrder = {
   id: string;
   eventId: string;
@@ -24,6 +27,11 @@ export type PayoutDatabase = {
   reserveSessionPayout(sessionId: string, reservationKey: string): Promise<Reservation>;
   // The writer must deduplicate providerEventId and update payout state under
   // a payout lock. A duplicate exact observation returns the prior result.
+  recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
+};
+export type PayoutBatchDatabase = {
+  reserveBatchPayout(respondentId: string, requestId: string): Promise<
+    BatchReservation | { status: "below_minimum" }>;
   recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
 };
 export class PayoutReservationDenied extends Error {
@@ -51,6 +59,30 @@ export async function issueReservedPayout(
       reserved.amountCents <= 0 || !reserved.id || !reserved.recipientId || !reserved.productId) {
     return "blocked";
   }
+  return reconcileReservedPayout(db, provider, reserved);
+}
+
+export async function issueReservedBatchPayout(db: PayoutBatchDatabase,
+  provider: PayoutProvider, respondentId: string, requestId: string): Promise<
+  "ordered" | "delivered" | "failed" | "below_minimum" | "blocked" | "unavailable"> {
+  let reserved: BatchReservation | { status: "below_minimum" };
+  try {
+    reserved = await db.reserveBatchPayout(respondentId, requestId);
+  } catch (error) {
+    return error instanceof PayoutReservationDenied ? "blocked" : "unavailable";
+  }
+  if ("status" in reserved)
+    return reserved.status === "below_minimum" ? "below_minimum" : "unavailable";
+  if (reserved.respondentId !== respondentId || !reserved.batchId ||
+      reserved.recipientId !== reserved.id ||
+      !Number.isSafeInteger(reserved.amountCents) || reserved.amountCents <= 0 ||
+      !reserved.id || !reserved.recipientId || !reserved.productId) return "blocked";
+  return reconcileReservedPayout(db, provider, reserved);
+}
+
+async function reconcileReservedPayout(db: Pick<PayoutDatabase, "recordOrder">,
+  provider: PayoutProvider, reserved: Omit<Reservation, "sessionId">): Promise<
+  "ordered" | "delivered" | "failed" | "blocked" | "unavailable"> {
   if (reserved.state === "delivered" || reserved.state === "failed") return reserved.state;
   const key = `gate2-payout:${reserved.id}`;
   const expected = { recipientId: reserved.recipientId,
