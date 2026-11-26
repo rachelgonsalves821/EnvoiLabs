@@ -16,7 +16,7 @@ function handlers() {
   }
   const client = new Inngest({ id: "envoi-labs", ...config.client });
   const functions = [
-    ...(config.expiryEnabled ? [gate1ExpiryFunction(client)] : []),
+    ...(config.expiryEnabled ? [gate1ExpiryFunction(client, config.orphanAudioEnabled)] : []),
     ...(config.privateAnswersEnabled ? [gate1PrivateAnswersFunction(client)] : []),
   ];
   return serve({ client, functions });
