@@ -336,9 +336,12 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             await respondent.getByRole("button", { name: "Save answer" }).click();
           }
           await respondent.getByRole("button", { name: "Submit interview" }).click();
-          const extraInterview = await db.from("sessions").select("id")
+          await expect(respondent.getByText("Pending quality check")).toBeVisible();
+          const extraInterview = await db.from("sessions").select("id,state,submitted_at")
             .eq("invite_id", extraOffer.data.id).single();
           if (extraInterview.error || !extraInterview.data) throw new Error("Extra session absent");
+          expect(extraInterview.data.state).toBe("quality_hold");
+          expect(extraInterview.data.submitted_at).not.toBeNull();
           const decision = await db.rpc("decide_gate2_marketplace_quality", {
             supplied_study_id: extra.data.id,
             supplied_quote_id: checkout.quote.id,
