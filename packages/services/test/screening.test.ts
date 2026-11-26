@@ -71,6 +71,12 @@ describe("versioned screener service", () => {
     const voice = setup();
     expect(await screenSubmittedAnswer(voice, { ...submitted, kind: "voice" })).toBeNull();
     expect(voice.storeAnswer).not.toHaveBeenCalled();
+    const transcribed = setup();
+    const receiptId = "a9b10000-0000-4000-8000-000000000020";
+    expect((await screenSubmittedAnswer(transcribed, { ...submitted,
+      kind: "voice", transcriptionConsentVersion: "voice-v1",
+      transcriptionReceiptId: receiptId }))?.action).toBe("qualify");
+    expect(transcribed.storeAnswer).toHaveBeenCalledOnce();
     const stale = setup();
     stale.getApprovedRule.mockResolvedValue({ ...rule, studyId: ruleId });
     expect(await screenSubmittedAnswer(stale, submitted)).toBeNull();

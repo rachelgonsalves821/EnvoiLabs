@@ -3,7 +3,8 @@ import { ScreeningInterpretationV1Schema, ScreeningRuleV1Schema,
 
 export type ScreeningAnswer = { id: string; inviteId: string; studyId: string; ruleId: string;
   ruleVersion: number; text: string; kind: "text" | "voice";
-  transcriptionConsentVersion: string | null; idempotencyKey: string };
+  transcriptionConsentVersion: string | null; transcriptionReceiptId?: string | null;
+  idempotencyKey: string };
 export type ScreeningSubmission = Omit<ScreeningAnswer, "id"> & { respondentId: string };
 export type ScreeningOutcome = ScreeningDecisionV1 & { answerId: string;
   interpretation: "supported" | "contradicted" | "unclear" | null;
@@ -36,7 +37,9 @@ function resultFor(rule: ScreeningRuleV1, answerId: string,
 export async function screenSubmittedAnswer(ports: ScreeningPorts, submitted: ScreeningSubmission):
   Promise<ScreeningOutcome | null> {
   if (!submitted.text.trim() || !submitted.idempotencyKey.trim() ||
-      (submitted.kind === "voice" && !submitted.transcriptionConsentVersion?.trim())) return null;
+      (submitted.kind === "voice" && (!submitted.transcriptionConsentVersion?.trim() ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          .test(submitted.transcriptionReceiptId ?? "")))) return null;
   const rule = ScreeningRuleV1Schema.safeParse(await ports.getApprovedRule(
     submitted.ruleId, submitted.studyId, submitted.ruleVersion));
   if (!rule.success || rule.data.studyId !== submitted.studyId ||
@@ -49,6 +52,8 @@ export async function screenSubmittedAnswer(ports: ScreeningPorts, submitted: Sc
       answer.ruleId !== rule.data.id || answer.ruleVersion !== rule.data.version ||
       answer.text !== submitted.text || answer.kind !== submitted.kind ||
       answer.transcriptionConsentVersion !== submitted.transcriptionConsentVersion ||
+      (submitted.kind === "voice" &&
+        answer.transcriptionReceiptId !== submitted.transcriptionReceiptId) ||
       answer.idempotencyKey !== submitted.idempotencyKey) return null;
   const prior = await ports.getDecision(answer.id);
   if (prior) return prior;

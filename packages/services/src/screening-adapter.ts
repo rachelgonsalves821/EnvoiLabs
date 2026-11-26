@@ -44,7 +44,12 @@ export function createScreeningAdapter(db: Database, agent3: Agent3): ScreeningP
       return { ...record, approvedAt: approvedAt.toISOString() } as ScreeningRuleV1;
     },
     async storeAnswer(answer: ScreeningSubmission) {
-      const { data, error } = await db.rpc("store_gate2_screening_answer", {
+      const { data, error } = answer.kind === "voice"
+        ? await db.rpc("store_gate2_screening_transcribed_answer", {
+          requested_receipt_id: answer.transcriptionReceiptId,
+          requested_key: answer.idempotencyKey,
+        })
+        : await db.rpc("store_gate2_screening_answer", {
         requested_invite_id: answer.inviteId,
         requested_respondent_id: answer.respondentId,
         requested_study_id: answer.studyId,
