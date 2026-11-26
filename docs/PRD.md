@@ -15,7 +15,7 @@
 
 Read this if you started from an earlier copy.
 
-1. **Pricing is decided** at $1 per core question per respondent (sections 5 and 11, R-PLAT-01, R-RSCH-05). Respondent incentive per question is still open (Q-01).
+1. **Pricing was revised 2026-11-24** to $2 per core question per respondent, with a $1 respondent reward per answered core question and at least 10 respondents per study (sections 5 and 11). Probes and screeners remain unbilled. This supersedes the 2026-11-19 price.
 2. **Open-source references.** Evaluate Presidio for the first redaction pass (R-PLAT-07). Report quotes follow OpenVerbatim's grounding approach (R-RSCH-08, section 8.3). The interviewer and analyst build on a review of OpenInterviewer (section 8). Panel, matching, quality scoring, payouts and pricing stay proprietary (section 5).
 3. **New sections.** Detailed user journeys for respondents and researchers built from the original notes (section 6), full design guidelines (section 13) and open-source building blocks (section 14). Sections after 5 were renumbered, so check references.
 4. **The product name is Envoi Labs** (Q-09). Keep the brand name in `packages/ui/src/brand.ts` and the copy files.
@@ -85,13 +85,13 @@ North star metric is **decision-ready studies delivered per week**. A study coun
 | Platform | Mobile-first web app (PWA) for respondents, desktop web app for researchers, one codebase |
 | WhatsApp | Not in v1. Signup waitlist checkbox as a demand test, build in v1.1 if 30%+ opt in |
 | Email | Sign-in links for respondents and researchers, plus receipts and legal notices. Study nudges appear in the respondent app and via web push. |
-| Payouts | Gift cards only, through Tremendous |
+| Payouts | Prepaid Visa in v1, through a sandbox-verified provider path before live use |
 | Gamification | Points with stated cash value (100 points = $1), streaks, quality levels, milestone bonuses. No random prize draws |
 | Privacy default | Researchers see redacted transcripts. Voice clips only on per-study respondent opt-in |
 | Money | Prices and payouts come from deterministic code, never from an LLM |
 | Proprietary core | The panel, matching, quality scoring, payouts and pricing are written in-house. No third-party code in those areas (BUILD_PLAN section 11) |
 | Open-source reuse | MIT, Apache-2.0 or BSD only, with notices kept in `THIRD_PARTY_NOTICES.md`. No AGPL or GPL code |
-| Price | $1 per core question per respondent. A 5-question study with 1 respondent costs $5. Follow-up probes are included, not billed |
+| Price | $2 per core question per respondent, with a minimum of 10 respondents. A 5-question study for 10 respondents costs $100. Follow-up probes are included, not billed |
 | Turnaround | Fieldwork 24 to 48 hours, report within 24 hours of last complete |
 | Naming | "Respondents" and "researchers" everywhere in code and copy |
 
@@ -110,7 +110,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 | Surveys live 24 hours, agents nudge stalls | Kept. Two nudges by web push, resume at the exact question | Matches the notes |
 | Paid within a week, points toward prizes | Gift cards after a 24 to 48 hour quality hold. Points with a cash value and milestone bonuses. No prize draws | Keeps rewards deterministic |
 | Completers can become researchers | Not in v1. Paid respondent referrals instead | Different buyer, conflicts of interest |
-| Researcher price by participants, complexity, screening | $1 per core question per respondent | Decided 2026-11-19 |
+| Researcher price by participants, complexity, screening | $2 per core question per respondent; minimum 10 respondents | Revised by Rachel 2026-11-24 |
 | Follow-up questions as a paid opt-in | Live follow-ups in every study, never billed | Probing is where interview value comes from |
 | Analysis and transcripts within 3 days | Fieldwork 24 to 48 hours, report within 24 hours of the last complete | Faster than the notes, worst case still 3 days |
 | Proposed follow-up survey ("pivot intelligence") | Report scores each hypothesis and proposes one priced next study | Says what to test next, never "pivot to X" |
@@ -122,7 +122,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 
 **Goal.** From link to first paid interview in under 10 minutes. Every later interview takes one tap to start.
 
-The respondent has a persistent account in the Envoi web app. Home shows study invites the respondent can act on, plus any pending screener or in-progress interview. Earnings is where the respondent sees rewards, chooses a gift card brand and checks payout history. A one-time email link signs the respondent into that same account on return. Study activity and reminders live in the app, with web push when enabled.
+The respondent has a persistent account in the Envoi web app. Anyone eligible may sign up and complete a profile through open self-service enrollment; no first-study invite cohort is chosen in advance. Home shows matched study invites, a pending screener or an in-progress interview. Earnings shows approved rewards and prepaid Visa payout status and history. A one-time email link signs the respondent into that same account on return. Study activity and reminders live in the app, with web push when enabled.
 
 | Stage | What Maya sees and does | What the system does | Requirements |
 | --- | --- | --- | --- |
@@ -138,7 +138,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 | 10. Follow-ups | After some answers the Echo pulses while a follow-up is written, then a short probe appears ("What made you pick that app over walking to the store?"). At most 2 per question | Probe shown within 6 seconds at p95. If none arrives in 8 seconds the interview moves on | R-RESP-08, section 8.2 |
 | 11. Stalls | If she stops halfway, she gets a push showing her progress and the agreed reward and another with 2 hours left. Tapping resumes at the exact question | Nudge jobs run on the session's 24-hour clock | R-RESP-09 |
 | 12. Finish | Receipt screen. The Echo flashes lime once, the amount counts up, "Pending quality check, expected by Friday" | Session enters the quality hold. Score combines specificity, relevance, profile consistency, behavior and liveness | R-RESP-10, R-PLAT-04 |
-| 13. Get paid | After her first approved interview she picks a gift card brand in Earnings. Later payouts go automatically. Earnings shows the status and history of her gift cards | Tremendous order with an idempotency key. Annual cap kept under $2,000 | R-RESP-10, R-PLAT-08 |
+| 13. Get paid | Earnings shows approved rewards and prepaid Visa payout status and history | Provider order with an idempotency key. Annual cap kept under $2,000 | R-RESP-10, R-PLAT-08 |
 | 14. Keep coming back | Earnings tab shows total earned, points with cash value (100 points = $1), streak, next milestone bonus (5, 10, 25 completes) and quality level. iPhone users see a 3-step "Add to Home Screen" guide after the first payout so nudges reach them | Points ledger, milestone bonuses, quality levels unlock higher-paying studies | R-RESP-11, R-RESP-09 |
 | 15. Control her data | Settings let her stop invites, withdraw from a study, toggle voice sharing per study, export her data, or delete her account | Deletions honored within 30 days, audio deleted after 60 days | R-RESP-12, R-PLAT-09 |
 
@@ -165,7 +165,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 | 2. Start a study | An empty screen asks "What decision are you trying to make? Start there and I'll draft the study." He types his goal, or pastes questions he already has | Scoping agent starts. The live brief panel appears on the right with every section as a placeholder | R-RSCH-02, R-RSCH-03 |
 | 3. Scoping conversation | The agent asks one question at a time with quick-reply chips. The decision ("Set the fee price"), 2 or 3 hypotheses, who to hear from (must have vs. nice to have, written as behavior such as "ordered food after 10pm in the last 30 days"), exclusions, how many people, any concept or price to show, and the deadline | Each answer updates the brief, and the chat says what changed ("Added 2 criteria to your brief"). If he asks a sizing question ("What percent would pay?"), the agent explains interviews can't size a market and reframes | R-RSCH-02, R-RSCH-03, R-RSCH-04 |
 | 4. Review the guide | The agent drafts 6 to 8 open, non-leading questions about past behavior. He can edit, reorder or ask for rewrites. Pasted questions that are leading get flagged with a suggested rewrite | Guide stored as a versioned brief. Limit of 4 to 10 core questions | R-RSCH-02, section 8.1 |
-| 5. Quote and feasibility | Sees "$140" with line items "7 questions × 20 respondents × $1", that follow-ups are included, and "We expect all 20 within 36 hours" with a status chip | Price from the pricing formula, never from the agent. Feasibility from eligible active respondents and historic accept and completion rates. If feasibility is low, suggests loosening a criterion before he pays | R-RSCH-05, R-PLAT-01, R-PLAT-02 |
+| 5. Quote and feasibility | Sees "$280" with line items "7 questions × 20 respondents × $2", that follow-ups are included, and a qualified fill estimate with its data source | Price from the pricing formula, never from the agent. Feasibility from eligible active marketplace respondents and historic accept and completion rates. If there is too little evidence, show uncertainty rather than a promised fill time | R-RSCH-05, R-PLAT-01, R-PLAT-02 |
 | 6. Pay and launch | Clicks "Approve and pay $140", pays on Stripe Checkout, returns to a "Study launched" screen | Payment webhook launches the study. Invites go out in waves | R-RSCH-06 |
 | 7. Track | Tracking page shows completes against target ("14 of 20"), invited, accepted, completed, removed and replaced, sample composition against his criteria, and the projected finish. Updates live | Removals for quality are listed with "replaced free". If fill is slow, more invites are added automatically and the status turns to warn | R-RSCH-07 |
 | 8. Read transcripts early | Opens redacted transcripts as they arrive, with each respondent described by profile facts, never by name | Redaction runs before anything reaches him | R-RSCH-10, R-PLAT-07 |
@@ -212,11 +212,11 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 | R-RESP-07 | Voice capture and resume | Each answer uploads as soon as it is recorded. A nudge link resumes at the exact unanswered question. Re-record last answer allowed. | Agent 2 | In progress | [Synthetic recording flow](../apps/web/e2e/respondent/voice-fixture.ts) |
 | R-RESP-08 | Live follow-up display | Probe appears within 6 seconds p95 of the answer upload. Echo shows `think` state while waiting. | Agent 2 with Agent 3 | Not started | |
 | R-RESP-09 | Nudges | Web push at the halfway point and with 2 hours left before 24h expiry. Snooze and decline allowed. Install-to-home-screen guide on iPhone after first payout. | Agent 2 | Not started | |
-| R-RESP-10 | Receipt and payout | Instant receipt with amount, "pending quality check", expected date. Gift card brand choice in Earnings after the first approved completion. Payout is sent after quality hold. The respondent can view their own payout status and gift card history in Earnings. | Agent 2 with Agent 1 | Not started | |
+| R-RESP-10 | Receipt and payout | Instant receipt with $1 per answered core question, "pending quality check", and expected date. Prepaid Visa payout is sent after quality hold. The respondent can view their own payout status and prepaid Visa history in Earnings. | Agent 2 with Agent 1 | Not started | |
 | R-RESP-11 | Points and levels | Points ledger with cash value shown. Streaks never claw back money. Milestone bonuses at 5, 10, 25 completes. Quality levels unlock higher-paying studies. | Agent 2 with Agent 1 | Not started | |
 | R-RESP-12 | Privacy controls | Delete account, export data, stop invites, withdraw from a study, per-study voice sharing toggle. | Agent 2 | Not started | |
 | R-RESP-13 | WhatsApp waitlist | Optional checkbox at signup, stored with timestamp. Reported as a demand metric. | Agent 2 | Not started | |
-| R-RESP-14 | Referral loop | Paid respondent-to-respondent referral with unique link, bonus after the referee's first approved complete. | Agent 2 with Agent 1 | Not started | |
+| R-RESP-14 | Referral loop | Unique respondent links; $5 bonus after five distinct referred friends complete verified profiles. Count each eligible verified profile once, reject self-referral and duplicate identities, and vest through an idempotent ledger entry. | Agent 2 with Agent 1 | Not started | |
 
 ### 7.2 Researcher app (desktop-first)
 
@@ -238,14 +238,14 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 
 | ID | Requirement | Acceptance criteria | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| R-PLAT-01 | Pricing formula | Deterministic function `priceStudy(brief, config)` = core questions × target respondents × unit price (default 100 cents). Probes and screeners are not billed. Config in DB, versioned. Every quote stores the config version. | Agent 1 | Not started | |
+| R-PLAT-01 | Pricing formula | Deterministic function `priceStudy(brief, config)` = core questions × target respondents × unit price (default 200 cents), with target respondents at least 10. Probes and screeners are not billed. Config in DB, versioned. Every quote stores the config version. | Agent 1 | In progress | |
 | R-PLAT-02 | Matching | SQL filter on profile attributes plus participation caps and cooldowns. Feasibility estimate from eligible active respondents and historical accept and complete rates. | Agent 1 | In progress (Platform) | [Seeded matching tests](../packages/db/tests/gate1_study_launch.sql) |
 | R-PLAT-03 | Study, invite, session and payout state machines | Explicit states and transitions as in section 10. Illegal transitions throw. Every transition writes an audit row. | Agent 1 | In progress (Platform) | [Pure transition tests](../packages/core/test/state.test.ts) |
 | R-PLAT-04 | Quality scoring | Per-response score 0 to 100 from specificity, relevance, consistency with profile and behavioral signals. Below threshold auto-flags for removal and triggers a replacement invite. | Agent 1 with Agent 3 | Not started | |
-| R-PLAT-05 | Fraud controls | One account per verified email. Device and gift card recipient caps, speed and duplicate audio checks. | Agent 1 | Not started | |
+| R-PLAT-05 | Fraud controls | One account per verified email. Device and prepaid Visa recipient caps, referral identity deduplication, speed and duplicate audio checks. | Agent 1 | Not started | |
 | R-PLAT-06 | Voice liveness (v1 light) | Random spoken phrase before each study, checked by transcript match. Speaker match is a v1.1 stretch. | Agent 1 with Agent 2 | Not started | |
 | R-PLAT-07 | Redaction | Names, emails, phone numbers, addresses and employers removed from transcripts before any researcher view. An evaluated deterministic analyzer followed by approved contextual redaction. Presidio is the first candidate (BUILD_PLAN section 11). Recall 99%+ for phones and emails, 95%+ for names and employers on the redaction eval. Raw text never reaches researcher endpoints. | Agent 3 | In progress (Researcher and AI) | [Presidio evaluation](adr/0003-presidio-transcript-redaction-evaluation.md), [independent synthetic speech evaluation](adr/0004-offline-contextual-redaction.md). Publication stays closed pending qualification. |
-| R-PLAT-08 | Payout service | Tremendous gift card orders with idempotency keys, quality hold of 24 to 48 hours, annual cap per respondent below $2,000. | Agent 1 | Not started | |
+| R-PLAT-08 | Payout service | Prepaid Visa v1 orders through a verified provider catalog, idempotency keys, quality hold of 24 to 48 hours, and annual cap per respondent below $2,000. The $1 reward applies to answered core questions under the approved quality policy. | Agent 1 | In progress | |
 | R-PLAT-09 | Retention | Raw audio deleted 60 days after transcription and quality review. Deletion and export requests honored within 30 days. | Agent 1 | Not started | |
 | R-PLAT-10 | Admin console | Internal page to view studies, override quality decisions, re-send payouts and adjust pricing config. Behind an admin role. | Agent 1 | Not started | |
 | R-PLAT-11 | Analytics events | Event schema in section 12 emitted from server code. | Agent 1 | Not started | |
@@ -314,18 +314,18 @@ All LLM calls go through `packages/ai`. Prompts live in versioned files. Every a
 
 ## 11. Pricing
 
-**Decided 2026-11-19.** Researchers pay **$1 per core question per respondent**. A 5-question study answered by 1 respondent costs $5. A 7-question study with 20 respondents costs $140. Live follow-up probes are included and never billed. Screener questions are not billed.
+**Revised by Rachel 2026-11-24.** Researchers pay **$2 per core question per respondent** and studies target at least **10 respondents**. A 5-question study for 10 respondents costs $100. A 7-question study for 20 respondents costs $280. Respondents earn **$1 per answered core question** under the approved quality and payout rules. Live follow-up probes and screeners are not billed. At the study's fill cutoff, refund each respondent slot that did not complete at its original frozen per-slot quote price. For example, 12 paid slots and 11 completes refunds one slot. This refund ledger is separate from respondent rewards and payouts.
 
 | Parameter | Value | Notes |
 | --- | --- | --- |
-| Unit price | 100 cents per core question per respondent | Decided. Stored in `pricing_configs` so it can change without a deploy |
+| Unit price | 200 cents per core question per respondent | Decided. Stored in versioned `pricing_configs` |
 | Billed questions | Core guide questions only | Probes and screeners free |
 | Question limit | 4 to 10 core questions | Keeps interviews under 15 minutes |
-| Minimum study | Open (Q-01b) | Suggested 5 respondents |
-| Respondent incentive | Open (Q-01). Placeholder 40 cents per core question | See economics below |
+| Minimum study | 10 respondents | Decided 2026-11-24 |
+| Respondent reward | 100 cents per answered core question | Quality/removal and partial answer treatment needs exact policy before live payouts |
 | Design partner pricing | Same unit price, `pricing_override_id` available for credits | |
 
-**Economics warning.** At $1 per question, a 7-question interview earns $7. Recruiting a new respondent costs roughly $25, spread over about 4 completes, so about $6 per complete early on. Paying respondents $0.70 per minute as originally planned loses about $8 per complete. Paying 40 cents per question ($2.80 for a 7-question interview, about $17 an hour) still loses about $3.50 per complete early and earns about 10% margin once the panel is mature and recruiting cost falls near $2 per complete. Track `margin_per_complete_cents` from day one (section 12).
+**Economics warning.** The $1 per answered core question difference between researcher price and respondent reward is before Stripe fees, prepaid Visa/order fees, model and transcription costs, support, fraud losses, refunds and respondent acquisition. It is not a proven net margin. Track actual `margin_per_complete_cents` from day one (section 12).
 
 ## 12. Success metrics and events
 
@@ -513,7 +513,7 @@ The respondent panel, matching, quality scoring, fraud controls, payouts, points
 | --- | --- | --- |
 | Gate 0 | End of week 1 | Foundations ready |
 | Gate 1 | End of week 3 | Vertical slice, one study end to end with seeded data |
-| Gate 2 | End of week 5 | Money loop and scoping, first real study with hand-recruited respondents |
+| Gate 2 | End of week 5 | Money loop and scoping, then a first real study using open self-service signup, approved matching and screened marketplace enrollment |
 | Gate 3 | End of week 7 | Probing, reports, quality, pilot with 30 to 50 respondents and 2 to 3 founders |
 | Gate 4 | End of week 8 | Launch hardening |
 
@@ -523,15 +523,17 @@ See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for acceptance and pre-s
 
 | ID | Question | Raised by | Proposed answer | Decision |
 | --- | --- | --- | --- | --- |
-| Q-01 | Respondent incentive per core question given the $1 price (30 or 40 cents), and whether to add a per-study platform fee or bill probes to reach positive margin | Claude | 40 cents, review after pilot margin data | Open |
-| Q-01b | Minimum respondents per study | Claude | 5 | Open |
+| Q-01 | Researcher unit price and respondent reward per answered core question | Rachel | $2 charged and $1 reward; no probe or screener billing | Decided 2026-11-24 |
+| Q-01b | Minimum respondents per study | Rachel | 10 | Decided 2026-11-24 |
 | Q-02 | How to reach iPhone respondents who never install the PWA | Claude | Use in-app install guidance after the first payout. Revisit optional SMS nudges after v1. | Deferred |
 | Q-03 | Where the first 100 respondents come from beyond MIT and Harvard | Council | Campus ambassadors plus $3k ads test | Open |
 | Q-04 | Can international students on study visas accept paid incentives | Claude | Counsel review before launch | Open |
 | Q-05 | Harvard and MIT rules for recruiting students into paid commercial studies | Claude | Counsel review before launch | Open |
 | Q-06 | Voice consent and retention under BIPA and similar | Council | Counsel review before launch | Open |
-| Q-07 | Add Tremendous prepaid Visa to the catalog | Claude | Yes if fees stay at zero | Open |
-| Q-08 | Refund policy when a study cannot fill | Claude | Pro-rata refund of unfilled completes | Open |
+| Q-07 | V1 respondent payout form | Rachel | Prepaid Visa; verify provider catalog, fees and recipient routing in sandbox | Decided 2026-11-24; provider details pending |
+| Q-08 | Refund policy when a study cannot fill | Rachel | Pro rata refund of respondent slots that did not complete, using the original frozen quote's per-slot core-question price; 12 paid and 11 complete refunds one slot | Decided 2026-11-24; fill cutoff and disputed-complete operations pending |
+| Q-10 | Referral bonus vesting | Rachel | $5 after five distinct referred friends have verified profiles; deduplicate and reject self-referral before vesting | Decided 2026-11-24; fraud review and delivery operations pending |
+| Q-11 | Open marketplace activation | Rachel | Self-service signup and profile, then matching; define location/age coverage, supply estimate, waitlist behavior and first-study availability before live enrollment | Pending operational detail |
 | Q-09 | Final product name | Rachel | Envoi Labs | Decided |
 
 ## 17. Changelog
@@ -547,3 +549,4 @@ See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for acceptance and pre-s
 | 2026-11-21 | Envoi Labs | Added the confirming screener AI specification and mapped both UI journeys, voice transcription and upstream evaluation to gate acceptance. |
 | 2026-11-21 | Rachel via Codex | Clarified the persistent respondent account, eligible studies on Home and gift card management in Earnings. |
 | 2026-11-21 | Rachel via Codex | Switched respondent account sign-in to a one-time email link. Mapped email delivery, verified identity and the 18+ check to Gate 0. |
+| 2026-11-24 | Rachel via Codex | Superseded price and cohort assumptions: $2 researcher charge, $1 respondent reward per answered core question, minimum 10 respondents, open self-service marketplace, $5 referral after five verified profiles, pro-rata refund of uncompleted respondent slots at the frozen quote, prepaid Visa payout. Provider and operational details remain pending. |
