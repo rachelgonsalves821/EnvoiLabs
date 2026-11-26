@@ -6,6 +6,7 @@ import { reconcilePaidStudyLaunch } from "@envoi-labs/services/paid-study";
 import type { Database } from "../../../packages/db/src/database.generated";
 import { createGate2CheckoutDatabase } from "../server/platform/gate2-checkout-db";
 import { createGate2PaidStudyDatabase } from "../server/platform/gate2-paid-study-db";
+import { issueGate2SandboxVisaBatch } from "../server/platform/gate2-visa-batch-issue";
 import { deliveredEmail, localService, loopbackOrigin, totp, useDefaultTemplate } from
   "./support/disposable-auth";
 
@@ -25,7 +26,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
   test("AAL2 feasibility, frozen $2/$1 quote, synthetic paid launch and matched respondent offer", async ({ browser, baseURL }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
     const origin = loopbackOrigin(baseURL);
     const db = localService();
     const typedDb = db as unknown as SupabaseClient<Database>;
@@ -224,6 +225,184 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         await expect(respondent.getByRole("heading", { name: "Delivered" }).locator("..").getByText("$0.00"))
           .toBeVisible();
         await expect(respondent.getByText("Reward approved · payout not scheduled")).toBeVisible();
+        // Two more paid studies earn the same respondent enough for one
+        // denomination-qualified synthetic Visa batch. They remain separate
+        // quotes and approved session receipts.
+        for (let number = 2; number <= 3; number += 1) {
+          // Prior matched offers remain active for the separate probe race
+          // below. Add ten new eligible profiles so feasibility does not rely
+          // on the returning respondent being counted at quote time.
+          const extraProfiles = await Promise.all(Array.from({ length: 10 }, async () => {
+            const created = await db.auth.admin.createUser({
+              email: `gate2-market-extra-${number}-${randomUUID()}@example.test`,
+              email_confirm: true,
+            });
+            if (created.error || !created.data.user) throw new Error("Extra profile account absent");
+            const provisioned = await db.rpc("provision_email_respondent", {
+              supplied_user_id: created.data.user.id,
+            });
+            if (provisioned.error || !provisioned.data) throw new Error("Extra profile absent");
+            return provisioned.data as string;
+          }));
+          const extraFacts = await db.from("profile_attributes").insert(
+            extraProfiles.flatMap((respondent_id) =>
+              profile.map(([key, value_json]) => ({ respondent_id, key,
+                value_json: key === "region_zip" ? "02138" : value_json,
+                source: "signup" }))));
+          expect(extraFacts.error).toBeNull();
+          const extraConsents = await db.from("consents").insert(
+            extraProfiles.flatMap((respondent_id) =>
+              ["retention", "researcher_access"].map((purpose) => ({
+                respondent_id, purpose, granted: true,
+                text_version: "synthetic-marketplace-fixture",
+              }))));
+          expect(extraConsents.error).toBeNull();
+          const extra = await db.from("studies").insert({
+            organization_id: org.data.id,
+            title: `Synthetic meal decisions ${number}`,
+            state: "brief_ready", target_completes: 10, length_minutes: 10,
+            deadline_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
+          }).select("id").single();
+          if (extra.error || !extra.data) throw new Error(`Extra study: ${extra.error?.message}`);
+          const preference = await db.from("criteria").insert({
+            study_id: extra.data.id, kind: "nice", attribute_key: "region_zip",
+            operator: "eq", value_json: "02139",
+            text: "Returning synthetic respondent preference",
+          });
+          expect(preference.error).toBeNull();
+          const extraBrief = await db.from("brief_versions").insert({
+            study_id: extra.data.id, version: 1,
+            brief_json: { purpose: "Synthetic paid Visa fixture" },
+            created_by: researcher.data.id,
+          });
+          expect(extraBrief.error).toBeNull();
+          const extraGuide = await db.from("guide_questions").insert(core.map((text, index) => ({
+            study_id: extra.data.id, position: index + 1, text,
+          })));
+          expect(extraGuide.error).toBeNull();
+          const extraDb = createGate2CheckoutDatabase(typedDb, {
+            id: researcher.data.id, organizationId: org.data.id,
+            authUserId: account.data.user.id,
+          });
+          const extraScope = await extraDb.readApprovedScope(extra.data.id);
+          expect(extraScope?.feasibility.eligibleProfileCount).toBeGreaterThanOrEqual(10);
+          let extraSession: CheckoutSession | null = null;
+          const checkout = await prepareStudyCheckout(extraDb, {
+            async create(_key, quote) {
+              extraSession = { id: `cs_test_fixture_${quote.id.replaceAll("-", "")}`,
+                studyId: quote.studyId, quoteId: quote.id,
+                pricingConfigVersion: quote.pricingConfigVersion,
+                amountCents: quote.totalCents, currency: "usd", status: "open",
+                url: "https://checkout.stripe.com/c/pay/synthetic-fixture" };
+              return extraSession;
+            },
+            async get(id) {
+              if (!extraSession || id !== extraSession.id) throw new Error("Unknown checkout");
+              return extraSession;
+            },
+          }, extra.data.id);
+          expect(checkout.status).toBe("ready");
+          if (checkout.status !== "ready") throw new Error("Extra checkout unavailable");
+          expect(checkout.quote.totalCents).toBe(10_000);
+          const extraAwaiting = await db.from("studies")
+            .update({ state: "awaiting_payment" }).eq("id", extra.data.id);
+          expect(extraAwaiting.error).toBeNull();
+          expect(await reconcilePaidStudyLaunch(createGate2PaidStudyDatabase(typedDb), {
+            async getCheckout(id) {
+              return { id, eventId: `synthetic-paid:${id}`,
+                studyId: extra.data.id, quoteId: checkout.quote.id,
+                pricingConfigVersion: 101, amountCents: 10_000,
+                currency: "usd", status: "paid", refundedCents: 0,
+                observedAt: new Date().toISOString() };
+            },
+          }, extra.data.id, checkout.quote.id)).toBe("launched");
+          const wave = await db.rpc("create_gate2_marketplace_offers", {
+            supplied_study_id: extra.data.id,
+            supplied_quote_id: checkout.quote.id,
+            supplied_auth_user_id: account.data.user.id, requested_count: 10,
+          });
+          expect(wave.error).toBeNull();
+          const extraOffer = await db.from("invites").select("id")
+            .eq("study_id", extra.data.id).eq("respondent_id", first.respondent_id).single();
+          if (extraOffer.error || !extraOffer.data) throw new Error(`Extra offer: ${extraOffer.error?.message}`);
+          await respondent.goto("/r");
+          await respondent.getByRole("button", { name: "Start answering" }).click();
+          await expect(respondent).toHaveURL(
+            origin + `/r/interviews/${extraOffer.data.id}`);
+          for (const [index, question] of core.entries()) {
+            await expect(respondent.getByRole("heading", { name: question })).toBeVisible();
+            await respondent.getByRole("textbox", { name: "Type your answer" })
+              .fill(`Synthetic study ${number}, answer ${index + 1}`);
+            await respondent.getByRole("button", { name: "Save answer" }).click();
+          }
+          await respondent.getByRole("button", { name: "Submit interview" }).click();
+          const extraInterview = await db.from("sessions").select("id")
+            .eq("invite_id", extraOffer.data.id).single();
+          if (extraInterview.error || !extraInterview.data) throw new Error("Extra session absent");
+          const decision = await db.rpc("decide_gate2_marketplace_quality", {
+            supplied_study_id: extra.data.id,
+            supplied_quote_id: checkout.quote.id,
+            supplied_session_id: extraInterview.data.id,
+            supplied_actor_auth_id: account.data.user.id,
+            supplied_decision: "approve", supplied_score: 100,
+            supplied_components: { synthetic: true }, supplied_reason: null,
+          });
+          expect(decision.error).toBeNull();
+        }
+        const seeded = await db.rpc("prepare_gate2_visa_e2e_fixture", {
+          requested_respondent_id: first.respondent_id,
+        });
+        expect(seeded.error).toBeNull();
+        expect(seeded.data).toBe(true);
+        const orderId = `ORDER-BROWSER-${randomUUID()}`;
+        let payoutKey = "";
+        let created = false;
+        let orderPosts = 0;
+        const request: typeof fetch = async (input, init) => {
+          const url = String(input);
+          const json = (body: unknown, status = 200) =>
+            new Response(JSON.stringify(body), { status,
+              headers: { "content-type": "application/json" } });
+          if (url.includes("/products?")) return json({ products: [{
+            id: "sandbox_visa", category: "visa_card", currency_codes: ["USD"],
+            countries: [{ abbr: "US" }],
+            skus: [{ min: 10, max: 500, currency_code: "USD" }],
+          }] });
+          if (init?.method === "POST") {
+            orderPosts += 1;
+            const body = JSON.parse(String(init.body)) as { external_id: string };
+            payoutKey = body.external_id;
+            created = true;
+          }
+          if (url.includes("/orders")) {
+            if (!created) return json({}, 404);
+            const order = { id: orderId, external_id: payoutKey,
+              created_at: new Date().toISOString(), status: "EXECUTED",
+              rewards: [{ products: ["sandbox_visa"],
+                value: { denomination: 15, currency_code: "USD" },
+                recipient: { name: "Synthetic Browser Person", email: respondentEmail },
+                delivery: { method: "EMAIL", status: "SUCCEEDED" } }] };
+            return json({ order });
+          }
+          throw new Error(`Unexpected synthetic provider URL: ${url}`);
+        };
+        const batchRequestId = randomUUID();
+        const batchInput = { client: typedDb, apiKey: "TEST_browser_fixture",
+          respondentId: first.respondent_id, requestId: batchRequestId,
+          annualCapCents: 200_000, request };
+        expect(await issueGate2SandboxVisaBatch(batchInput)).toBe("delivered");
+        expect(await issueGate2SandboxVisaBatch(batchInput)).toBe("delivered");
+        expect(orderPosts).toBe(1);
+        await respondent.goto("/r/earnings");
+        await expect(respondent.getByRole("heading", { name: "Earned" })
+          .locator("..").getByText("$15.00")).toBeVisible();
+        await expect(respondent.getByRole("heading", { name: "Delivered" })
+          .locator("..").getByText("$15.00")).toBeVisible();
+        await expect(respondent.locator(".respondent-earnings-list small"))
+          .toHaveCount(3);
+        const receipts = await respondent.locator(".respondent-earnings-list small")
+          .allTextContents();
+        expect(new Set(receipts)).toHaveProperty("size", 1);
         const second = offers.data?.[1];
         const secondEmail = second && respondentEmails[respondentIds.indexOf(second.respondent_id)];
         const firstQuestion = core[0];
