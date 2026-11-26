@@ -31,6 +31,27 @@ revoke all on internal.gate2_screening_model_policies,
     internal.gate2_screening_consent_receipts
     from public, anon, authenticated, service_role;
 
+-- Gate 1 qualification must publish a new immutable identity for every
+-- screening redaction. The latest row wins, including a withheld row; an
+-- older qualified text can never become current again by fallback.
+create table internal.gate2_screening_redacted_sources (
+    sequence bigint generated always as identity primary key,
+    answer_id uuid not null references pii.gate2_screener_answers (id),
+    source_version uuid not null default gen_random_uuid() unique,
+    raw_answer_digest text not null check (raw_answer_digest ~ '^[a-f0-9]{64}$'),
+    redacted_text text,
+    redaction_policy_digest text not null check (redaction_policy_digest ~ '^[a-f0-9]{64}$'),
+    qualification_digest text not null check (qualification_digest ~ '^[a-f0-9]{64}$'),
+    qualified boolean not null,
+    created_at timestamptz not null default clock_timestamp(),
+    check (not qualified or nullif(btrim(redacted_text), '') is not null)
+);
+create index gate2_screening_redacted_sources_latest
+    on internal.gate2_screening_redacted_sources (answer_id, sequence desc);
+alter table internal.gate2_screening_redacted_sources enable row level security;
+revoke all on internal.gate2_screening_redacted_sources
+    from public, anon, authenticated, service_role;
+
 create function public.current_gate2_screening_model_source(
     requested_study_id uuid, requested_answer_id uuid, requested_rule_id uuid,
     requested_rule_version integer, requested_provider_model text,
@@ -39,7 +60,9 @@ create function public.current_gate2_screening_model_source(
     select jsonb_build_object('studyId', answer.study_id,
         'answerId', answer.id, 'ruleId', rule.id,
         'ruleVersion', rule.version, 'criterionText', rule.criterion_text,
-        'question', rule.question, 'answerText', answer.answer_text)
+        'question', rule.question, 'answerText', source.redacted_text,
+        'redactedSourceVersion', source.source_version,
+        'redactionPolicyDigest', source.redaction_policy_digest)
     from pii.gate2_screener_answers as answer
     join public.invites as offer on offer.id = answer.invite_id
         and offer.study_id = answer.study_id
@@ -47,6 +70,17 @@ create function public.current_gate2_screening_model_source(
     join public.respondents as respondent on respondent.id = offer.respondent_id
     join public.gate2_screening_rules as rule on rule.id = answer.rule_id
         and rule.study_id = answer.study_id and rule.version = answer.rule_version
+    join lateral (
+        select latest.* from internal.gate2_screening_redacted_sources as latest
+        where latest.answer_id = answer.id
+        order by latest.sequence desc limit 1
+    ) as source on source.qualified
+        and source.raw_answer_digest = encode(
+            pg_catalog.sha256(convert_to(answer.answer_text, 'UTF8')), 'hex')
+    join internal.gate1_redaction_policies as redaction_policy
+        on redaction_policy.policy_digest = source.redaction_policy_digest
+        and redaction_policy.qualification_digest = source.qualification_digest
+        and redaction_policy.revoked_at is null
     join lateral (
         select consent.* from public.consents as consent
         where consent.respondent_id = offer.respondent_id

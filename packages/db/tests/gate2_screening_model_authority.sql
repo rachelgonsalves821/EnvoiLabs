@@ -32,7 +32,8 @@ insert into pii.gate2_screener_answers (id, invite_id, study_id, rule_id,
     'a9f20000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001',
     'a9f20000-0000-4000-8000-000000000003', 1, 'text',
-    'I worked as a hospital nurse this year.', 'synthetic:ai-screening');
+    'I worked as a hospital nurse this year. Email me at nurse@example.test.',
+    'synthetic:ai-screening');
 
 select ok(not has_function_privilege('authenticated',
     'public.current_gate2_screening_model_source(uuid,uuid,uuid,integer,text,text,text)',
@@ -87,9 +88,51 @@ select is(public.current_gate2_screening_model_source(
     '90600000-0000-4000-8000-000000000001',
     'a9f20000-0000-4000-8000-000000000004',
     'a9f20000-0000-4000-8000-000000000003', 1,
+    'synthetic-model', 'screening-v1', repeat('a', 64)), null,
+    'consent cannot expose a raw answer without a qualified redacted source');
+reset role;
+insert into internal.gate1_redaction_policies
+    (policy_digest, qualification_digest) values (repeat('c', 64), repeat('d', 64));
+insert into internal.gate2_screening_redacted_sources (answer_id,
+    raw_answer_digest, redacted_text, redaction_policy_digest,
+    qualification_digest, qualified) values (
+    'a9f20000-0000-4000-8000-000000000004',
+    encode(pg_catalog.sha256(convert_to(
+        'I worked as a hospital nurse this year. Email me at nurse@example.test.',
+        'UTF8')), 'hex'),
+    'I worked as a hospital nurse this year. Email me at [redacted].',
+    repeat('c', 64), repeat('d', 64), true);
+set local role service_role;
+select is(public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    'a9f20000-0000-4000-8000-000000000004',
+    'a9f20000-0000-4000-8000-000000000003', 1,
     'synthetic-model', 'screening-v1', repeat('a', 64)) ->> 'answerText',
-    'I worked as a hospital nurse this year.',
-    'current explicit grant exposes only the exact private source to service');
+    'I worked as a hospital nurse this year. Email me at [redacted].',
+    'only qualified redacted text is available to the service');
+select ok(public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    'a9f20000-0000-4000-8000-000000000004',
+    'a9f20000-0000-4000-8000-000000000003', 1,
+    'synthetic-model', 'screening-v1', repeat('a', 64))
+    ->> 'redactedSourceVersion' is not null,
+    'qualified source has an explicit version for evidence offsets');
+select ok(position('nurse@example.test' in
+    public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    'a9f20000-0000-4000-8000-000000000004',
+    'a9f20000-0000-4000-8000-000000000003', 1,
+    'synthetic-model', 'screening-v1', repeat('a', 64))::text) = 0,
+    'raw contact details are absent from the entire model source');
+select ok(not has_table_privilege('service_role',
+    'internal.gate2_screening_redacted_sources', 'INSERT'),
+    'service cannot self-qualify a raw screening answer');
+reset role;
+create temporary table gate2_first_screening_version as
+    select source_version from internal.gate2_screening_redacted_sources
+    where answer_id = 'a9f20000-0000-4000-8000-000000000004'
+    order by sequence desc limit 1;
+set local role service_role;
 select is(public.current_gate2_screening_model_source(
     '90600000-0000-4000-8000-000000000001',
     'a9f20000-0000-4000-8000-000000000004',
@@ -109,6 +152,57 @@ select is(public.current_gate2_screening_model_source(
     'synthetic-model', 'screening-v1', repeat('a', 64)), null,
     'another study cannot reuse the private answer');
 reset role;
+insert into internal.gate2_screening_redacted_sources (answer_id,
+    raw_answer_digest, redacted_text, redaction_policy_digest,
+    qualification_digest, qualified) values (
+    'a9f20000-0000-4000-8000-000000000004',
+    encode(pg_catalog.sha256(convert_to(
+        'I worked as a hospital nurse this year. Email me at nurse@example.test.',
+        'UTF8')), 'hex'), null, repeat('c', 64), repeat('d', 64), false);
+set local role service_role;
+select is(public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    'a9f20000-0000-4000-8000-000000000004',
+    'a9f20000-0000-4000-8000-000000000003', 1,
+    'synthetic-model', 'screening-v1', repeat('a', 64)), null,
+    'latest withheld publication never falls back to an older qualified source');
+reset role;
+insert into internal.gate2_screening_redacted_sources (answer_id,
+    raw_answer_digest, redacted_text, redaction_policy_digest,
+    qualification_digest, qualified) values (
+    'a9f20000-0000-4000-8000-000000000004',
+    encode(pg_catalog.sha256(convert_to(
+        'I worked as a hospital nurse this year. Email me at nurse@example.test.',
+        'UTF8')), 'hex'),
+    'I worked as a hospital nurse this year. Contact withheld.',
+    repeat('c', 64), repeat('d', 64), true);
+set local role service_role;
+select isnt(public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    'a9f20000-0000-4000-8000-000000000004',
+    'a9f20000-0000-4000-8000-000000000003', 1,
+    'synthetic-model', 'screening-v1', repeat('a', 64))
+    ->> 'answerText',
+    'I worked as a hospital nurse this year. Email me at [redacted].',
+    're-redaction replaces the old model source');
+reset role;
+select isnt((select source_version from internal.gate2_screening_redacted_sources
+    where answer_id = 'a9f20000-0000-4000-8000-000000000004'
+    order by sequence desc limit 1),
+    (select source_version from gate2_first_screening_version),
+    're-redaction rotates the immutable screening source version');
+update internal.gate1_redaction_policies set revoked_at = now()
+where policy_digest = repeat('c', 64);
+set local role service_role;
+select is(public.current_gate2_screening_model_source(
+    '90600000-0000-4000-8000-000000000001',
+    'a9f20000-0000-4000-8000-000000000004',
+    'a9f20000-0000-4000-8000-000000000003', 1,
+    'synthetic-model', 'screening-v1', repeat('a', 64)), null,
+    'revoked qualification policy hides the previously qualified source');
+reset role;
+update internal.gate1_redaction_policies set revoked_at = null
+where policy_digest = repeat('c', 64);
 insert into public.consents (respondent_id, study_id, purpose, granted,
     text_version) values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'ai_screening', false,

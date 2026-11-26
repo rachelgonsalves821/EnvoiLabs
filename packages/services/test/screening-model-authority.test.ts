@@ -7,7 +7,9 @@ const source = { studyId: "90600000-0000-4000-8000-000000000001",
   ruleId: "a9f20000-0000-4000-8000-000000000003", ruleVersion: 1,
   criterionText: "Worked as a hospital nurse in the past 12 months",
   question: "Have you worked as a hospital nurse in the past 12 months?",
-  answerText: "I worked as a hospital nurse this year." };
+  redactedSourceVersion: "a9f20000-0000-4000-8000-000000000099",
+  redactionPolicyDigest: "c".repeat(64),
+  answerText: "I worked as a hospital nurse this year. Contact: [redacted]." };
 async function attempt(): Promise<ScreeningAuthorizationAttempt> {
   const bytes = await crypto.subtle.digest("SHA-256",
     new TextEncoder().encode(JSON.stringify(source)));
@@ -16,7 +18,9 @@ async function attempt(): Promise<ScreeningAuthorizationAttempt> {
   return { purpose: "ai_screening", providerModel: "synthetic-model",
     promptVersion: "screening-v1", promptDigest: "a".repeat(64),
     sourceDigest, studyId: source.studyId, answerId: source.answerId,
-    ruleId: source.ruleId, ruleVersion: source.ruleVersion };
+    ruleId: source.ruleId, ruleVersion: source.ruleVersion,
+    redactedSourceVersion: source.redactedSourceVersion,
+    redactionPolicyDigest: source.redactionPolicyDigest };
 }
 
 describe("current Gate 2 screening model authorization", () => {
@@ -42,6 +46,12 @@ describe("current Gate 2 screening model authorization", () => {
     const port = createGate2ScreeningModelUsePort({ rpc });
     expect(await port.authorize(await attempt())).toBe(false);
     rpc.mockResolvedValue({ data: { ...source, criterionText: "Nurse last year" }, error: null });
+    expect(await port.authorize(await attempt())).toBe(false);
+    rpc.mockResolvedValue({ data: { ...source,
+      redactedSourceVersion: "a9f20000-0000-4000-8000-000000000098" }, error: null });
+    expect(await port.authorize(await attempt())).toBe(false);
+    rpc.mockResolvedValue({ data: { ...source,
+      redactionPolicyDigest: "d".repeat(64) }, error: null });
     expect(await port.authorize(await attempt())).toBe(false);
   });
 
