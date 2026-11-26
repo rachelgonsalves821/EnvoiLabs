@@ -35,6 +35,10 @@ export interface AnalystMapReduceDraft extends AnalystDraftResult {
   readonly mapPromptDigest: string;
   readonly mapCount: number;
   readonly briefDigest: string;
+  readonly mapEvidence: readonly { readonly transcriptId: string;
+    readonly sourceVersion: string; readonly questionId: string;
+    readonly startChar: number; readonly endChar: number;
+    readonly exactText: string }[];
   readonly sources: readonly (AnalystDraftResult["sources"][number] & {
     readonly questionId: string })[];
 }
@@ -180,9 +184,14 @@ export async function runAnalystMapReduceDraft(port: AnalystMapReducePort, provi
     if ([sum("inputTokens"), sum("outputTokens"), sum("latencyMs"), sum("costMicros")]
       .some((value) => !Number.isSafeInteger(value))
       || !await current(input.reducePromptVersion, promptDigest)) return null;
+    const mapEvidence = Object.freeze(maps.flatMap((mapped) => mapped.codes.map((code) =>
+      Object.freeze({ transcriptId: mapped.transcriptId, sourceVersion: mapped.sourceVersion,
+        questionId: mapped.questionId, startChar: code.startChar, endChar: code.endChar,
+        exactText: code.exactText }))));
     return { output: reduced.output, model: reduced.model,
       promptVersion: input.reducePromptVersion, promptDigest,
       mapPromptVersion: input.mapPromptVersion, mapPromptDigest, mapCount: maps.length,
+      mapEvidence,
       briefDigest: await analystTextDigest(JSON.stringify({
         decisionQuestion: snapshot.decisionQuestion, hypotheses: snapshot.hypotheses,
         guideQuestions: snapshot.guideQuestions })),

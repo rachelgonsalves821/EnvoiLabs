@@ -27,18 +27,43 @@ const nonblank = (value: unknown): value is string =>
 
 type MappedProvenance = { readonly mapPromptVersion: string;
   readonly mapPromptDigest: string; readonly briefDigest: string;
-  readonly mapCount: number };
+  readonly mapCount: number;
+  readonly mapEvidence: readonly { readonly transcriptId: string;
+    readonly sourceVersion: string; readonly questionId: string;
+    readonly startChar: number; readonly endChar: number;
+    readonly exactText: string }[] };
 
 function mappedProvenance(draft: AnalystDraftResult): MappedProvenance | null | false {
   const value = draft as unknown as Record<string, unknown>;
-  const names = ["mapPromptVersion", "mapPromptDigest", "briefDigest", "mapCount"];
+  const names = ["mapPromptVersion", "mapPromptDigest", "briefDigest", "mapCount",
+    "mapEvidence"];
   if (!names.some((name) => name in value)) return null;
   if (!nonblank(value.mapPromptVersion) || !digest.test(String(value.mapPromptDigest))
     || !digest.test(String(value.briefDigest)) || !Number.isSafeInteger(value.mapCount)
-    || Number(value.mapCount) < 1 || value.mapCount !== draft.sources?.length) return false;
+    || Number(value.mapCount) < 1 || value.mapCount !== draft.sources?.length
+    || !Array.isArray(value.mapEvidence)
+    || !value.mapEvidence.every((item: unknown) => record(item)
+      && exact(item, ["transcriptId", "sourceVersion", "questionId", "startChar",
+        "endChar", "exactText"])
+      && uuid.test(String(item.transcriptId)) && uuid.test(String(item.sourceVersion))
+      && uuid.test(String(item.questionId)) && Number.isSafeInteger(item.startChar)
+      && Number.isSafeInteger(item.endChar) && Number(item.startChar) >= 0
+      && Number(item.endChar) > Number(item.startChar) && nonblank(item.exactText)
+      && Array.from(item.exactText).length === Number(item.endChar) - Number(item.startChar)))
+    return false;
   return { mapPromptVersion: value.mapPromptVersion,
     mapPromptDigest: String(value.mapPromptDigest), briefDigest: String(value.briefDigest),
-    mapCount: Number(value.mapCount) };
+    mapCount: Number(value.mapCount), mapEvidence: value.mapEvidence };
+}
+
+function quotesAreMapped(output: { themes: readonly { supportingQuotes: readonly ProposedEvidence[];
+  contradictingQuotes: readonly ProposedEvidence[] }[] }, mapped: MappedProvenance): boolean {
+  return output.themes.every((theme) =>
+    [...theme.supportingQuotes, ...theme.contradictingQuotes].every((quote) =>
+      mapped.mapEvidence.some((code) => code.transcriptId === quote.transcriptId
+        && code.sourceVersion === quote.sourceVersion
+        && code.startChar === quote.startChar && code.endChar === quote.endChar
+        && code.exactText === quote.exactText)));
 }
 
 function frozenCurrent(source: AnalystSourceSnapshot): AnalystSourceSnapshot {
@@ -97,6 +122,13 @@ async function matchingCurrent(raw: AnalystSourceSnapshot | null,
       || original.qualificationDigest !== source.qualificationDigest
       || await analystTextDigest(source.redactedText) !== original.redactedDigest) return null;
   }
+  if (mapped && mapped.mapEvidence.some((code) => {
+    const source = raw.sources.find((item) => item.transcriptId === code.transcriptId);
+    return !source || source.sourceVersion !== code.sourceVersion
+      || (source as unknown as Record<string, unknown>).questionId !== code.questionId
+      || Array.from(source.redactedText).slice(code.startChar, code.endChar).join("")
+        !== code.exactText;
+  })) return null;
   return current;
 }
 
@@ -144,6 +176,7 @@ export async function screenAnalystV2Evidence(port: AnalystDraftPort,
       || !nonblank(candidate.promptVersion) || !Array.isArray(candidate.sources)
       || candidate.sources.length === 0 || mapped === false
       || !privateV2(candidate.output)) return null;
+    if (mapped && !quotesAreMapped(candidate.output, mapped)) return null;
     const current = await matchingCurrent(await port.readCurrent(candidate.studyId), candidate, mapped);
     if (!current) return null;
     if (mapped && await port.authorize({ purpose: "ai_analysis", providerModel: candidate.model,

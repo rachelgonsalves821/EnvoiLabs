@@ -153,6 +153,12 @@ describe("private analyst map and reduce", () => {
     const invented = { ...draft!, output: { ...reviewedCandidate,
       hypotheses: [{ hypothesis: "Invented hypothesis", result: "supported" }] } };
     expect(await screenAnalystV2Evidence(port, invented)).toBeNull();
+    const uncoded = { ...draft!, output: { ...reviewedCandidate,
+      themes: [{ ...reviewedCandidate.themes[0]!, supportingQuotes: [{
+        ...reviewedCandidate.themes[0]!.supportingQuotes[0]!, startChar: 0,
+        endChar: 3, exactText: "The" }] }] } };
+    expect(await screenAnalystMapReduceV2Evidence(port, uncoded)).toBeNull();
+    expect(await screenAnalystV2Evidence(port, uncoded)).toBeNull();
     readCurrent.mockResolvedValue({ ...snapshot, guideQuestions: snapshot.guideQuestions.map(
       (question, index) => index === 0 ? { ...question, text: "Edited question?" } : question) });
     expect(await screenAnalystMapReduceV2Evidence(port, draft!)).toBeNull();
