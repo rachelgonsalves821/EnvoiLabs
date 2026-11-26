@@ -67,6 +67,32 @@ fi
 docker exec -i "supabase_db_$project_id" psql -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
 values (repeat('a', 64), repeat('b', 64));
+insert into internal.gate2_screening_model_policies (provider_model,
+    prompt_version, prompt_digest, consent_text_version,
+    consent_text_digest, approved_at)
+values ('synthetic-model', 'screening-v1', repeat('c', 64),
+    'synthetic-ai-screening-v1', repeat('d', 64), clock_timestamp());
+-- Disposable Auth fixture only. This helper is never a repository migration.
+create function public.test_gate2_screening_purpose_receipt(supplied_consent_id uuid)
+returns boolean language plpgsql security definer set search_path = '' as $$
+begin
+    if not exists (select 1 from public.consents as consent
+        join public.respondents as respondent on respondent.id = consent.respondent_id
+        join auth.users as account on account.id = respondent.auth_user_id
+        where consent.id = supplied_consent_id and consent.purpose = 'ai_screening'
+            and consent.granted and consent.study_id is not null
+            and consent.text_version = 'synthetic-ai-screening-v1'
+            and account.email like '%@example.test')
+    then raise check_violation; end if;
+    insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
+    values (supplied_consent_id, repeat('d', 64)) on conflict do nothing;
+    return true;
+end;
+$$;
+revoke all on function public.test_gate2_screening_purpose_receipt(uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function public.test_gate2_screening_purpose_receipt(uuid)
+    to service_role;
 SQL
 
 # Local-only payout denomination fixture. The helper exists only in this
