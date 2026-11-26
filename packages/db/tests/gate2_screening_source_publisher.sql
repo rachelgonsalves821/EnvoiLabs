@@ -99,6 +99,34 @@ select is((select qualified from internal.gate2_screening_redacted_sources
     where answer_id = 'a9f90000-0000-4000-8000-000000000004'
     order by sequence desc limit 1), false,
     'latest source is withheld after a failed re-redaction');
+create temporary table screening_original_source as
+    select source_version from internal.gate2_screening_redacted_sources
+    where answer_id = 'a9f90000-0000-4000-8000-000000000004'
+        and qualified order by sequence limit 1;
+set local role service_role;
+select ok((public.publish_gate2_screening_redacted_source(
+    'a9f90000-0000-4000-8000-000000000004', repeat('a', 64),
+    encode(pg_catalog.sha256(convert_to(
+        'I worked as a hospital nurse. Email fictional@example.test.', 'UTF8')),
+        'hex'), 'I worked as a hospital nurse. Email [redacted].', true,
+    'gate2-redaction:a9f90000-0000-4000-8000-000000000009')
+    ->> 'qualified')::boolean,
+    'same text may be requalified under a new publication identity');
+reset role;
+select isnt((select source_version from internal.gate2_screening_redacted_sources
+    where answer_id = 'a9f90000-0000-4000-8000-000000000004'
+    order by sequence desc limit 1),
+    (select source_version from screening_original_source),
+    'identical-text re-publication rotates the immutable source version');
+update internal.gate1_redaction_policies set revoked_at = now()
+    where policy_digest = repeat('a', 64);
+set local role service_role;
+select is(public.read_gate2_screening_redaction_input(
+    'a9f90000-0000-4000-8000-000000000004', repeat('a', 64)), null,
+    'revoked redaction policy cannot read input for a new publication');
+reset role;
+update internal.gate1_redaction_policies set revoked_at = null
+    where policy_digest = repeat('a', 64);
 insert into public.consents (respondent_id, study_id, purpose, granted,
     text_version) values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'retention', false, 'synthetic');
