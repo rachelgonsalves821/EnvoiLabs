@@ -1919,6 +1919,14 @@ export type Database = {
         Args: { supplied_cutoff: string }
         Returns: Json
       }
+      expire_gate2_paid_after_deadline: {
+        Args: {
+          supplied_provider_event_id: string
+          supplied_quote_id: string
+          supplied_study_id: string
+        }
+        Returns: Json
+      }
       freeze_gate2_marketplace_quote: {
         Args: {
           supplied_auth_user_id: string

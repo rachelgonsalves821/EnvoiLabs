@@ -81,4 +81,21 @@ describe("Gate 2 paid study database adapter", () => {
     expect(rows.gate2_payment_events).toHaveLength(2);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it("accepts only a bound paid-deadline reservation receipt", async () => {
+    const { db, rpc } = fixture();
+    const reservationId = "a9f40000-0000-4000-8000-000000000099";
+    rpc.mockResolvedValue({ data: { status: "refund_reserved", studyId,
+      quoteId, reservationId, amountCents: 12000,
+      unfilledSlots: 12 }, error: null });
+    expect(await db.expirePaidStudy?.(studyId, quoteId,
+      observation.eventId)).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("expire_gate2_paid_after_deadline", {
+      supplied_study_id: studyId, supplied_quote_id: quoteId,
+      supplied_provider_event_id: observation.eventId });
+    rpc.mockResolvedValue({ data: { status: "refund_reserved", studyId,
+      quoteId, reservationId, amountCents: 0, unfilledSlots: 12 }, error: null });
+    await expect(db.expirePaidStudy?.(studyId, quoteId, observation.eventId))
+      .rejects.toThrow("Invalid paid deadline refund reservation");
+  });
 });

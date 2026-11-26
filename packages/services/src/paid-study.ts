@@ -20,6 +20,8 @@ export type PaidStudyDatabase = {
   // The database implementation must recheck the current quote and event under
   // one study lock before changing the study state.
   launchPaidStudy(studyId: string, quoteId: string, providerEventId: string): Promise<boolean>;
+  expirePaidStudy?(studyId: string, quoteId: string,
+    providerEventId: string): Promise<boolean>;
 };
 
 export type PaidCheckoutProvider = { getCheckout(checkoutId: string): Promise<CheckoutObservation> };
@@ -65,7 +67,7 @@ export async function reconcileCheckoutObservation(
 
 export async function reconcilePaidStudyLaunch(
   db: PaidStudyDatabase, provider: PaidCheckoutProvider, studyId: string, quoteId: string,
-): Promise<"launched" | "blocked" | "unavailable"> {
+): Promise<"launched" | "refund_reserved" | "blocked" | "unavailable"> {
   let rawQuote: unknown;
   let checkoutId: string | null;
   try {
@@ -94,7 +96,9 @@ export async function reconcilePaidStudyLaunch(
   try {
     await db.recordObservation(checkout);
     if (checkout.status !== "paid" || checkout.refundedCents !== 0) return "blocked";
-    return await db.launchPaidStudy(studyId, quoteId, checkout.eventId) ? "launched" : "blocked";
+    if (await db.launchPaidStudy(studyId, quoteId, checkout.eventId)) return "launched";
+    return db.expirePaidStudy && await db.expirePaidStudy(
+      studyId, quoteId, checkout.eventId) ? "refund_reserved" : "blocked";
   } catch {
     return "unavailable";
   }
