@@ -32,7 +32,8 @@ export interface Transcription {
 }
 
 export interface Transcriber {
-  transcribe(request: TranscriptionRequest): Promise<Transcription>;
+  /** Recheck the current lease and voice grant before every provider dispatch. */
+  transcribe(request: TranscriptionRequest, authorize?: () => Promise<boolean>): Promise<Transcription>;
 }
 
 export * from "./fixtures.js";

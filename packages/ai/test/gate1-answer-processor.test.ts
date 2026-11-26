@@ -30,9 +30,38 @@ describe("Gate 1 answer processor", () => {
     const fallback = { transcribe: vi.fn().mockResolvedValue(transcript) };
     const transcriber = withTranscriptionFallback(primary, fallback);
     await expect(runGate1AnswerJob({ ...ports, transcriber })).resolves.toBe("published");
-    expect(primary.transcribe).toHaveBeenCalledOnce();
+    expect(primary.transcribe).toHaveBeenCalledTimes(2);
     expect(fallback.transcribe).toHaveBeenCalledOnce();
     expect(ports.complete).toHaveBeenCalledWith(lease, { transcription: transcript, redactedText: "A synthetic [redacted] answer" });
+  });
+
+  it("does not retry or change vendors after consent or lease is revoked", async () => {
+    const ports = setup();
+    ports.validate.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false);
+    const primary = { transcribe: vi.fn().mockRejectedValue(new ProviderError("openai", "timeout")) };
+    const fallback = { transcribe: vi.fn().mockResolvedValue(transcript) };
+    await expect(runGate1AnswerJob({ ...ports,
+      transcriber: withTranscriptionFallback(primary, fallback) })).resolves.toBe("stale");
+    expect(primary.transcribe).toHaveBeenCalledOnce();
+    expect(fallback.transcribe).not.toHaveBeenCalled();
+    expect(ports.retry).not.toHaveBeenCalled();
+    expect(ports.complete).not.toHaveBeenCalled();
+  });
+
+  it("does not send audio to the fallback after the second primary failure if consent lapses", async () => {
+    const ports = setup();
+    ports.validate.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+    const primary = { transcribe: vi.fn().mockRejectedValue(new ProviderError("openai", "transport")) };
+    const fallback = { transcribe: vi.fn().mockResolvedValue(transcript) };
+    await expect(runGate1AnswerJob({ ...ports,
+      transcriber: withTranscriptionFallback(primary, fallback) })).resolves.toBe("stale");
+    expect(primary.transcribe).toHaveBeenCalledTimes(2);
+    expect(fallback.transcribe).not.toHaveBeenCalled();
+    expect(ports.retry).not.toHaveBeenCalled();
   });
 
   it("processes typed text through redaction without ASR or recording reads", async () => {

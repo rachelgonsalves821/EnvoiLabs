@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  createAnthropicProvider, createGroqTranscriber, createOpenAITranscriber, withTranscriptionFallback,
+  createAnthropicProvider, createGroqTranscriber, createOpenAITranscriber, ProviderError,
+  withTranscriptionFallback,
 } from "../src/index.js";
 
 const request = {
@@ -107,20 +108,48 @@ describe("transcription adapters", () => {
       createGroqTranscriber({ ...transcriptionOptions, fetch: fetchFallback, costMicros }),
     );
 
-    await expect(provider.transcribe(audio)).resolves.toMatchObject({
+    await expect(provider.transcribe(audio, async () => true)).resolves.toMatchObject({
       provider: "groq", model: "whisper-large-v3-turbo", text: "Fallback transcript.", costMicros: 6,
     });
+    expect(fetchPrimary).toHaveBeenCalledTimes(2);
     const [url, init] = fetchFallback.mock.calls[0] ?? [];
     expect(url).toBe("https://api.groq.com/openai/v1/audio/transcriptions");
     expect((init?.body as FormData).get("response_format")).toBe("verbose_json");
     expect(costMicros).toHaveBeenCalledWith(expect.objectContaining({ provider: "groq", durationSeconds: 2.5 }));
   });
 
+  it("retries one transient primary failure before considering the fallback", async () => {
+    const calls: string[] = [];
+    const primary = { transcribe: vi.fn().mockImplementationOnce(async () => {
+      calls.push("primary-failure");
+      throw new ProviderError("openai", "transport");
+    }).mockImplementationOnce(async () => {
+      calls.push("primary-recovery");
+      return { text: "Recovered transcript", provider: "openai", model: "fixture",
+        latencyMs: 1, costMicros: 1 };
+    }) };
+    const fallback = { transcribe: vi.fn() };
+    const authorize = vi.fn(async () => { calls.push("current"); return true; });
+    await expect(withTranscriptionFallback(primary, fallback).transcribe(audio, authorize))
+      .resolves.toMatchObject({ provider: "openai", text: "Recovered transcript" });
+    expect(calls).toEqual(["current", "primary-failure", "current", "primary-recovery"]);
+    expect(fallback.transcribe).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch either vendor without a current authority callback", async () => {
+    const primary = { transcribe: vi.fn() };
+    const fallback = { transcribe: vi.fn() };
+    await expect(withTranscriptionFallback(primary, fallback).transcribe(audio))
+      .rejects.toMatchObject({ name: "TranscriptionAuthorizationError" });
+    expect(primary.transcribe).not.toHaveBeenCalled();
+    expect(fallback.transcribe).not.toHaveBeenCalled();
+  });
+
   it("rejects unsupported audio before either vendor is called", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>();
     const options = { ...transcriptionOptions, fetch };
     const provider = withTranscriptionFallback(createOpenAITranscriber(options), createGroqTranscriber(options));
-    await expect(provider.transcribe({ ...audio, mediaType: "text/plain" })).rejects.toMatchObject({
+    await expect(provider.transcribe({ ...audio, mediaType: "text/plain" }, async () => true)).rejects.toMatchObject({
       provider: "openai", kind: "invalid-input",
     });
     expect(fetch).not.toHaveBeenCalled();
@@ -133,7 +162,7 @@ describe("transcription adapters", () => {
       createOpenAITranscriber({ ...transcriptionOptions, fetch }),
       createGroqTranscriber({ ...transcriptionOptions, fetch: fallback }),
     );
-    await expect(provider.transcribe(audio)).rejects.toMatchObject({
+    await expect(provider.transcribe(audio, async () => true)).rejects.toMatchObject({
       provider: "openai", kind: "http", status: 400,
     });
     expect(fallback).not.toHaveBeenCalled();
