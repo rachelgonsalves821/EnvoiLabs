@@ -22,6 +22,26 @@ insert into public.sessions (id, invite_id, study_id, state)
 values ('a9700000-0000-4000-8000-000000000003',
     'a9700000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001', 'in_progress');
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+select '90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', purpose, true, 'synthetic-only'
+from unnest(array['retention', 'researcher_access']) as consent(purpose);
+
+select ok(not has_function_privilege('authenticated',
+    'public.read_gate3_ready_probe_turn(uuid,uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('authenticated',
+    'public.commit_gate3_probe_decision(uuid,uuid,uuid,uuid,uuid,uuid,text,jsonb)', 'EXECUTE')
+    and not has_table_privilege('service_role', 'internal.gate3_probe_turns', 'SELECT'),
+    'private ledger and source read are restricted to service RPCs');
+select ok(not exists (select 1 from public.consents
+    where respondent_id = '90500000-0000-4000-8000-000000000001'
+        and study_id = '90600000-0000-4000-8000-000000000001'
+        and purpose = 'ai_followup' and granted),
+    'AI follow-up defaults to denied');
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_followup', true,
+    'synthetic-only');
 insert into public.answers (id, session_id, study_id, guide_question_id, kind, sequence)
 values ('a9700000-0000-4000-8000-000000000004',
     'a9700000-0000-4000-8000-000000000003',
@@ -41,27 +61,6 @@ insert into internal.gate1_answer_jobs (answer_id, source_hash,
 values ('a9700000-0000-4000-8000-000000000004',
     decode(repeat('c', 64), 'hex'), clock_timestamp(), 'published',
     repeat('a', 64), repeat('b', 64));
-insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
-select '90500000-0000-4000-8000-000000000001',
-    '90600000-0000-4000-8000-000000000001', purpose, true, 'synthetic-only'
-from unnest(array['retention', 'researcher_access']) as consent(purpose);
-
-select ok(not has_function_privilege('authenticated',
-    'public.read_gate3_ready_probe_turn(uuid,uuid,uuid)', 'EXECUTE')
-    and not has_function_privilege('authenticated',
-    'public.commit_gate3_probe_decision(uuid,uuid,uuid,uuid,uuid,uuid,text,jsonb)', 'EXECUTE')
-    and not has_table_privilege('service_role', 'internal.gate3_probe_turns', 'SELECT'),
-    'private ledger and source read are restricted to service RPCs');
-set local role service_role;
-select is(public.begin_gate3_probe_turn(
-    'a9700000-0000-4000-8000-000000000004',
-    '90300000-0000-4000-8000-000000000001', 1000), null::uuid,
-    'AI follow-up defaults to denied');
-reset role;
-insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
-values ('90500000-0000-4000-8000-000000000001',
-    '90600000-0000-4000-8000-000000000001', 'ai_followup', true,
-    'synthetic-only');
 create temporary table probe_ids (turn_id uuid not null);
 grant select, insert on probe_ids to service_role;
 set local role service_role;
