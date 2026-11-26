@@ -225,6 +225,62 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         await expect(respondent.getByRole("heading", { name: "Delivered" }).locator("..").getByText("$0.00"))
           .toBeVisible();
         await expect(respondent.getByText("Reward approved · payout not scheduled")).toBeVisible();
+        // IT-2.1 requires three distinct completes in the same paid study.
+        // Keep the second offer untouched for the probe race below.
+        for (const additional of offers.data?.slice(2, 4) ?? []) {
+          const additionalEmail = respondentEmails[
+            respondentIds.indexOf(additional.respondent_id)];
+          if (!additionalEmail) throw new Error("Additional matched email is missing.");
+          const additionalContext = await browser.newContext({ baseURL: origin });
+          try {
+            const additionalPage = await additionalContext.newPage();
+            await additionalPage.goto("/r/signup");
+            await additionalPage.getByLabel("Email address").fill(additionalEmail);
+            await additionalPage.getByRole("checkbox", { name: /18 or older/ }).check();
+            await additionalPage.getByRole("button", { name: "Email me a sign-in link" }).click();
+            const additionalLink = await deliveredEmail(additionalPage,
+              additionalEmail, origin, "/api/respondent/auth/callback");
+            await additionalPage.goto(additionalLink.href);
+            await additionalPage.goto("/r");
+            await additionalPage.getByRole("button", { name: "Start answering" }).click();
+            await expect(additionalPage).toHaveURL(
+              origin + `/r/interviews/${additional.id}`);
+            for (const [index, question] of core.entries()) {
+              await expect(additionalPage.getByRole("heading", { name: question }))
+                .toBeVisible();
+              await additionalPage.getByRole("textbox", { name: "Type your answer" })
+                .fill(`Synthetic same-study answer ${index + 1}`);
+              await additionalPage.getByRole("button", { name: "Save answer" }).click();
+            }
+            await additionalPage.getByRole("button", { name: "Submit interview" }).click();
+            await expect(additionalPage.getByText("Pending quality check")).toBeVisible();
+            const additionalSession = await db.from("sessions")
+              .select("id,state,submitted_at").eq("invite_id", additional.id).single();
+            if (additionalSession.error || !additionalSession.data)
+              throw new Error("Additional submitted session is missing.");
+            expect(additionalSession.data.state).toBe("quality_hold");
+            expect(additionalSession.data.submitted_at).not.toBeNull();
+            const additionalReview = await db.rpc("decide_gate2_marketplace_quality", {
+              supplied_study_id: study.data.id,
+              supplied_quote_id: prepared.quote.id,
+              supplied_session_id: additionalSession.data.id,
+              supplied_actor_auth_id: account.data.user.id,
+              supplied_decision: "approve", supplied_score: 100,
+              supplied_components: { synthetic: true }, supplied_reason: null,
+            });
+            expect(additionalReview.error).toBeNull();
+            await additionalPage.goto("/r/earnings");
+            await expect(additionalPage.getByRole("heading", { name: "Earned" })
+              .locator("..").getByText("$5.00")).toBeVisible();
+          } finally {
+            await additionalContext.close();
+          }
+        }
+        const firstStudyApprovals = await db.from("sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("study_id", study.data.id).eq("state", "approved");
+        expect(firstStudyApprovals.error).toBeNull();
+        expect(firstStudyApprovals.count).toBe(3);
         // Two more paid studies earn the same respondent enough for one
         // denomination-qualified synthetic Visa batch. They remain separate
         // quotes and approved session receipts.
