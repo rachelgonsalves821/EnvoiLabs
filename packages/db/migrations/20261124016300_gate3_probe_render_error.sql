@@ -4,6 +4,18 @@ alter table internal.gate3_probe_turns drop constraint gate3_probe_turns_render_
 alter table internal.gate3_probe_turns add constraint gate3_probe_turns_render_outcome_check
     check (render_outcome in ('shown', 'error', 'timeout', 'superseded'));
 
+create function internal.gate3_probe_receipt_current(supplied_turn_id uuid)
+returns boolean language sql volatile security definer set search_path = '' as $$
+    select exists (select 1 from internal.gate3_probe_turns as turn
+        join internal.gate3_probe_opportunities as opportunity
+            on opportunity.answer_id = turn.answer_id
+        where turn.id = supplied_turn_id
+            and opportunity.consent_receipt = internal.gate3_probe_consent_receipt(
+                opportunity.respondent_id, opportunity.study_id));
+$$;
+revoke all on function internal.gate3_probe_receipt_current(uuid)
+    from public, anon, authenticated, service_role;
+
 create function public.record_gate3_probe_render_error(
     supplied_session_id uuid, supplied_turn_id uuid, supplied_probe_id uuid,
     supplied_auth_user_id uuid
@@ -18,6 +30,7 @@ begin
     if not found or turn.probe_id is distinct from supplied_probe_id
         or turn.decision_json ->> 'action' is distinct from 'probe'
         or not internal.gate3_probe_current(turn.id, supplied_auth_user_id)
+        or not internal.gate3_probe_receipt_current(turn.id)
     then return jsonb_build_object('status', 'stale'); end if;
     if turn.render_outcome is not null then
         return jsonb_build_object('status', 'resolved',
@@ -57,6 +70,7 @@ begin
         or turn.decision_json ->> 'action' is distinct from 'probe'
         or turn.render_outcome in ('error', 'timeout', 'superseded')
         or not internal.gate3_probe_current(turn.id, supplied_auth_user_id)
+        or not internal.gate3_probe_receipt_current(turn.id)
     then return 'stale'; end if;
     if turn.shown_at is not null then return 'recorded'; end if;
     if turn.decided_at + interval '30 seconds' <= clock_timestamp()
@@ -87,6 +101,7 @@ create or replace function public.read_gate3_respondent_probe(
             or turn.shown_at is not null)
         and (turn.render_outcome is null or turn.render_outcome = 'shown')
         and internal.gate3_probe_current(turn.id, supplied_auth_user_id)
+        and internal.gate3_probe_receipt_current(turn.id)
         and not exists (select 1 from public.answers as answer
             where answer.probe_id = probe.id)
     order by probe.decided_at desc, probe.id desc limit 1;

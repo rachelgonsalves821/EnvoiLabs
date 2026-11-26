@@ -279,6 +279,18 @@ begin
                 'a9720000-0000-4000-8000-000000000004',
                 '90300000-0000-4000-8000-000000000001') is not null
         then raise exception 'failed-frame receipt or replay mismatch'; end if;
+        insert into public.consents (respondent_id, study_id, purpose,
+            granted, text_version)
+        values ('90500000-0000-4000-8000-000000000001',
+            '90600000-0000-4000-8000-000000000001', 'ai_followup',
+            true, 'new-synthetic-consent-receipt');
+        if public.record_gate3_probe_render_error(
+            'a9720000-0000-4000-8000-000000000004', turn_id, probe_id,
+            '90300000-0000-4000-8000-000000000001') ->> 'status' <> 'stale'
+            or public.read_gate3_respondent_probe(
+                'a9720000-0000-4000-8000-000000000004',
+                '90300000-0000-4000-8000-000000000001') is not null
+        then raise exception 'old consent receipt reactivated probe'; end if;
         rollback_trial := true;
         raise exception 'rollback failed-frame trial';
     exception when others then
