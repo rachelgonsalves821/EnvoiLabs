@@ -71,8 +71,10 @@ export async function issueReservedBatchPayout(db: PayoutBatchDatabase,
   } catch (error) {
     return error instanceof PayoutReservationDenied ? "blocked" : "unavailable";
   }
-  if ("status" in reserved) return "below_minimum";
+  if ("status" in reserved)
+    return reserved.status === "below_minimum" ? "below_minimum" : "unavailable";
   if (reserved.respondentId !== respondentId || !reserved.batchId ||
+      reserved.recipientId !== reserved.id ||
       !Number.isSafeInteger(reserved.amountCents) || reserved.amountCents <= 0 ||
       !reserved.id || !reserved.recipientId || !reserved.productId) return "blocked";
   return reconcileReservedPayout(db, provider, reserved);

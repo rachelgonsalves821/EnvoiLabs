@@ -119,7 +119,7 @@ describe("payout issue and reconciliation", () => {
 
 describe("aggregated Visa batch issue", () => {
   const batch = { id: reservation.id, batchId: "batch_fixture_1",
-    respondentId: reservation.respondentId, recipientId: reservation.recipientId,
+    respondentId: reservation.respondentId, recipientId: reservation.id,
     productId: reservation.productId, amountCents: reservation.amountCents,
     state: "pending" as const, providerOrderId: null };
   it("does not contact the provider below the account Visa minimum", async () => {
@@ -134,11 +134,12 @@ describe("aggregated Visa batch issue", () => {
   });
 
   it("reconciles an uncertain create and delivered retry with one payout key", async () => {
+    const batchOrder = { ...order, recipientId: batch.id };
     const db = { reserveBatchPayout: vi.fn().mockResolvedValueOnce(batch)
-      .mockResolvedValue({ ...batch, state: "delivered", providerOrderId: order.id }),
+      .mockResolvedValue({ ...batch, state: "delivered", providerOrderId: batchOrder.id }),
       recordOrder: vi.fn().mockResolvedValue(undefined) };
     const provider = { createOrder: vi.fn().mockRejectedValue(new Error("timeout")),
-      getOrderByKey: vi.fn().mockResolvedValueOnce(null).mockResolvedValue(order) };
+      getOrderByKey: vi.fn().mockResolvedValueOnce(null).mockResolvedValue(batchOrder) };
     expect(await issueReservedBatchPayout(db, provider,
       batch.respondentId, "stable-request")).toBe("ordered");
     expect(await issueReservedBatchPayout(db, provider,
@@ -161,5 +162,13 @@ describe("aggregated Visa batch issue", () => {
       batch.respondentId, "stable-request")).toBe("unavailable");
     expect(provider.getOrderByKey).not.toHaveBeenCalled();
     expect(provider.createOrder).not.toHaveBeenCalled();
+  });
+  it("blocks a batch whose recipient is not its frozen payout ID", async () => {
+    const db = { reserveBatchPayout: vi.fn().mockResolvedValue({
+      ...batch, recipientId: "other" }), recordOrder: vi.fn() };
+    const provider = { createOrder: vi.fn(), getOrderByKey: vi.fn() };
+    expect(await issueReservedBatchPayout(db, provider,
+      batch.respondentId, "stable-request")).toBe("blocked");
+    expect(provider.getOrderByKey).not.toHaveBeenCalled();
   });
 });
