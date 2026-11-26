@@ -1871,6 +1871,16 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_gate2_screening_audio: {
+        Args: {
+          supplied_audio_id: string
+          supplied_duration_ms: number
+          supplied_invite_id: string
+          supplied_owner_id: string
+          supplied_sha256: string
+        }
+        Returns: Json
+      }
       create_gate1_study: {
         Args: {
           draft: Json
@@ -2132,6 +2142,10 @@ export type Database = {
         Args: { requested_payout_id: string }
         Returns: Json
       }
+      read_gate2_screening_audio_reservation: {
+        Args: { supplied_audio_id: string; supplied_invite_id: string }
+        Returns: Json
+      }
       read_gate2_screening_sheet: {
         Args: { supplied_invite_id: string }
         Returns: Json
@@ -2275,6 +2289,16 @@ export type Database = {
       }
       reserve_gate2_sandbox_visa_referral_bonus: {
         Args: { annual_cap_cents: number; requested_vesting_id: string }
+        Returns: Json
+      }
+      reserve_gate2_screening_audio: {
+        Args: {
+          supplied_bytes: number
+          supplied_invite_id: string
+          supplied_mime: string
+          supplied_rule_id: string
+          supplied_version: number
+        }
         Returns: Json
       }
       reserve_gate2_session_payout: {
