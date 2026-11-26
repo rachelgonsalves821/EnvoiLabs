@@ -16,16 +16,16 @@ create function internal.gate2_bind_screening_decision_grant()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
     answer pii.gate2_screener_answers%rowtype;
-    respondent_id uuid;
+    target_respondent_id uuid;
     current_grant public.consents%rowtype;
     qualified_source jsonb;
 begin
     if new.redacted_source_version is null then return new; end if;
     select * into answer from pii.gate2_screener_answers where id = new.answer_id;
-    select offer.respondent_id into respondent_id from public.invites as offer
+    select offer.respondent_id into target_respondent_id from public.invites as offer
     where offer.id = answer.invite_id and offer.study_id = answer.study_id;
     select * into current_grant from public.consents as grant_row
-    where grant_row.respondent_id = respondent_id
+    where grant_row.respondent_id = target_respondent_id
         and grant_row.study_id = answer.study_id
         and grant_row.purpose = 'ai_screening'
     order by grant_row.created_at desc, grant_row.recorded_sequence desc limit 1;
