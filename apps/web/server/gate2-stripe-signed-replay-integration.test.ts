@@ -22,9 +22,9 @@ vi.mock("./platform/gate2-stripe-payment-test", () =>
 const quote = QuoteV4Schema.parse((QuoteV4Schema.meta()?.examples as unknown[])[0]);
 const checkoutId = "cs_test_signed_replay";
 const secret = "whsec_signed_replay";
-function signedRequest() {
+function signedRequest(type = "checkout.session.completed") {
   const body = JSON.stringify({ id: "evt_signed_replay", object: "event",
-    livemode: false, type: "checkout.session.completed",
+    livemode: false, type,
     data: { object: { id: checkoutId, object: "checkout.session" } } });
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = createHmac("sha256", secret)
@@ -74,16 +74,28 @@ function setup() {
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
 
 describe("signed Stripe TEST paid replay through reconciliation", () => {
-  it("verifies the signature and binds provider state on three deliveries with one effect", async () => {
-    const { provider, database, counts } = setup();
+  it.each([
+    { type: "checkout.session.completed", providerStatus: "paid", response: "launched" },
+    { type: "checkout.session.async_payment_succeeded", providerStatus: "paid", response: "launched" },
+    { type: "checkout.session.async_payment_failed", providerStatus: "failed", response: "observed" },
+    { type: "checkout.session.expired", providerStatus: "failed", response: "observed" },
+  ] as const)("reconciles three signed $type deliveries to one provider effect", async ({
+    type, providerStatus, response: expectedResponse,
+  }) => {
+    const { provider, database, observed, counts } = setup();
+    provider.getCheckout.mockResolvedValue({ ...observed,
+      eventId: `stripe-checkout-state:${checkoutId}:${providerStatus}:0`,
+      status: providerStatus });
     for (let n = 0; n < 3; n++) {
-      const response = await POST(signedRequest());
+      const response = await POST(signedRequest(type));
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ status: "launched",
-        offersCreated: n === 0 ? 1 : 0 });
+      expect(await response.json()).toEqual(expectedResponse === "launched"
+        ? { status: "launched", offersCreated: n === 0 ? 1 : 0 }
+        : { status: "observed" });
     }
-    expect(counts()).toEqual({ effects: 1, launches: 1,
-      reservations: 0, waves: 3 });
+    expect(counts()).toEqual({ effects: 1,
+      launches: expectedResponse === "launched" ? 1 : 0,
+      reservations: 0, waves: expectedResponse === "launched" ? 3 : 0 });
     expect(provider.getCheckout).toHaveBeenCalledTimes(3);
     expect(database.recordObservation).toHaveBeenCalledTimes(3);
     expect(database.expirePaidStudy).not.toHaveBeenCalled();

@@ -58,18 +58,34 @@ describe("signed Tremendous TEST webhook", () => {
       .toThrow("Sandbox key required");
   });
 
-  it("replays one delivered webhook three times with one frozen payout effect", async () => {
-    const hint = verifyTremendousSandboxHint({ rawBody: bytes(body),
-      signature: sign(body), secret });
-    if (!hint) throw new Error("Signed order hint absent");
+  it.each([
+    { kind: "ORDERS.CREATED", resourceType: "orders", status: "ordered" },
+    { kind: "ORDERS.APPROVED", resourceType: "orders", status: "delivered" },
+    { kind: "ORDERS.CANCELED", resourceType: "orders", status: "failed" },
+    { kind: "ORDERS.FAILED", resourceType: "orders", status: "failed" },
+    { kind: "REWARDS.CANCELED", resourceType: "rewards", status: "failed" },
+    { kind: "REWARDS.DELIVERY.SUCCEEDED", resourceType: "rewards", status: "delivered" },
+    { kind: "REWARDS.DELIVERY.FAILED", resourceType: "rewards", status: "failed" },
+  ] as const)("replays three signed $kind hints with one frozen payout effect", async ({
+    kind, resourceType, status,
+  }) => {
+    const signedBody = JSON.stringify({ event: kind,
+      uuid: "22222222-2222-4222-8222-222222222222",
+      created_utc: "2026-11-25T02:00:00Z",
+      payload: { resource: { id: resourceType === "orders" ? "ORDERBATCH1" : "REWARD1",
+        type: resourceType }, meta: {} } });
+    const hint = verifyTremendousSandboxHint({ rawBody: bytes(signedBody),
+      signature: sign(signedBody), secret });
+    if (!hint) throw new Error("Signed sandbox hint absent");
+    expect(hint).toMatchObject({ kind, resourceType });
     const effects = new Set<string>();
     const claim = { id: payoutId, recipientId: payoutId,
       productId: "sandbox_visa", amountCents: 1500,
       state: "pending" as const, providerOrderId: null };
     const order = { id: "ORDERBATCH1",
-      eventId: "gate2-order:ORDERBATCH1:EXECUTED:SUCCEEDED",
+      eventId: `gate2-order:ORDERBATCH1:${status}`,
       recipientId: payoutId, productId: "sandbox_visa",
-      amountCents: 1500, status: "delivered" as const,
+      amountCents: 1500, status,
       observedAt: "2026-11-25T02:00:00Z" };
     const ports = { resolveOrder: vi.fn().mockResolvedValue({
       id: order.id, externalId: key }),
