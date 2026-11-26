@@ -100,6 +100,8 @@ SQL
 # disposable stack and accepts approved synthetic @example.test accounts.
 docker exec -i "supabase_db_$project_id" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
   < "$db_dir/scripts/gate2-visa-e2e-fixture.sql" >/dev/null
+docker exec -i "supabase_db_$project_id" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  < "$db_dir/scripts/gate2-audio-history-e2e-fixture.sql" >/dev/null
 
 export SUPABASE_URL SUPABASE_PUBLISHABLE_KEY SUPABASE_SERVICE_ROLE_KEY
 export ENVOI_APP_ORIGIN="http://127.0.0.1:3100"
@@ -115,7 +117,7 @@ if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
 fi
 
 cd -- "$repo_dir"
-pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts gate2-screening.spec.ts gate2-screening-voice.spec.ts gate2-marketplace.spec.ts
+pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts gate2-screening.spec.ts gate2-screening-voice.spec.ts gate2-marketplace.spec.ts gate2-audio-selector.spec.ts
 if [[ "${ENVOI_AUTH_TEST_LINK:-custom}" == 'custom' ]]; then
   node --test apps/web/server/respondent/gate1-worker.integration.mjs apps/web/server/respondent/gate1-worker-formats.integration.mjs
 fi
