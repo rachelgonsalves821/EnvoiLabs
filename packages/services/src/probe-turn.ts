@@ -157,7 +157,7 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
         ? { status: "committed", value: saved } : { status: "unavailable" };
     },
     async recordRenderTerminal(turnId: string): Promise<
-      { status: "resolved"; outcome: "shown" | "timeout" | "superseded" } |
+      { status: "resolved"; outcome: "shown" | "error" | "timeout" | "superseded" } |
       { status: "not_due" | "stale" | "unavailable" }> {
       if (!uuid(turnId)) return { status: "stale" };
       const { data, error } = await call("record_gate3_probe_render_terminal", {
@@ -167,7 +167,7 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
       if (result?.status === "not_due" || result?.status === "stale")
         return { status: result.status };
       if (result?.status === "resolved" && result.turnId === turnId &&
-        (result.outcome === "shown" || result.outcome === "timeout" ||
+        (result.outcome === "shown" || result.outcome === "error" || result.outcome === "timeout" ||
           result.outcome === "superseded"))
         return { status: "resolved", outcome: result.outcome };
       return { status: "unavailable" };

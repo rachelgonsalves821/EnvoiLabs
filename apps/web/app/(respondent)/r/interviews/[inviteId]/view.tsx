@@ -60,20 +60,38 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     const probe = state.session.currentProbe;
     const sessionId = state.session.sessionId;
     let active = true;
+    let frame = 0;
     let paintedFrame = 0;
-    const frame = requestAnimationFrame(() => {
-      paintedFrame = requestAnimationFrame(() => {
+    const renderFailed = () => {
+      if (!active) return;
+      void interviewRequest("/api/respondent/probes/render-error", {
+        sessionId, turnId: probe.turnId, probeId: probe.probeId,
+      }).then((result) => {
         if (!active) return;
-        void interviewRequest("/api/respondent/probes/shown", {
-          sessionId, turnId: probe.turnId, probeId: probe.probeId,
-          browserRenderedAtMs: performance.now(),
-        }).then((result) => {
-          if (!active) return;
-          if (result.status === 200) setConfirmedProbeId(probe.probeId);
-          else retry();
-        });
+        if (result.status === 200) retry();
+        else setState({ kind: "unavailable" });
       });
-    });
+    };
+    try {
+      frame = requestAnimationFrame(() => {
+        try {
+          paintedFrame = requestAnimationFrame(() => {
+            if (!active) return;
+            try {
+              const browserRenderedAtMs = performance.now();
+              void interviewRequest("/api/respondent/probes/shown", {
+                sessionId, turnId: probe.turnId, probeId: probe.probeId,
+                browserRenderedAtMs,
+              }).then((result) => {
+                if (!active) return;
+                if (result.status === 200) setConfirmedProbeId(probe.probeId);
+                else retry();
+              });
+            } catch { renderFailed(); }
+          });
+        } catch { renderFailed(); }
+      });
+    } catch { renderFailed(); }
     return () => {
       active = false;
       cancelAnimationFrame(frame);

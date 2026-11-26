@@ -21,7 +21,7 @@ export interface ProbeOpportunity {
   readonly currentQualified: boolean;
   readonly currentTurn: boolean;
   readonly outcome: ProbeOpportunityOutcome;
-  readonly renderOutcome: "shown" | "timeout" | "superseded" | null;
+  readonly renderOutcome: "shown" | "error" | "timeout" | "superseded" | null;
   readonly renderResolvedAt: string | null;
   readonly probeId: string | null;
   readonly browserUploadConfirmedMs: number | null;
@@ -63,6 +63,7 @@ function parseItem(value: unknown): ProbeOpportunity {
     typeof value.currentQualified !== "boolean" ||
     typeof value.currentTurn !== "boolean" || !outcomes.has(String(value.outcome)) ||
     !(value.renderOutcome === null || value.renderOutcome === "shown" ||
+      value.renderOutcome === "error" ||
       value.renderOutcome === "timeout" || value.renderOutcome === "superseded") ||
     !nullableTime(value.renderResolvedAt) ||
     ((value.renderOutcome === null) !== (value.renderResolvedAt === null)) ||

@@ -134,6 +134,10 @@ export const MarkProbeShownRequestSchema = withExample(z.strictObject({
 }), { ...exampleSession, turnId: exampleId, probeId: exampleId,
   browserRenderedAtMs: 1200 });
 
+export const RecordProbeRenderErrorRequestSchema = withExample(z.strictObject({
+  ...sessionId, turnId: id, probeId: id,
+}), { ...exampleSession, turnId: exampleId, probeId: exampleId });
+
 export const SubmitSessionRequestSchema = withExample(z.strictObject(sessionId), exampleSession);
 export const SubmitSessionResponseSchema = withExample(z.strictObject({
   ...sessionId, state: z.literal("submitted"),

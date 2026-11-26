@@ -1,6 +1,6 @@
 import {
   MarkProbeShownRequestSchema, RecordAnswerResponseSchema,
-  RecordProbeTextAnswerRequestSchema,
+  RecordProbeRenderErrorRequestSchema, RecordProbeTextAnswerRequestSchema,
 } from "@envoi-labs/contracts";
 import type { NextRequest } from "next/server";
 import { failure, input, reply } from "../auth/http";
@@ -33,6 +33,29 @@ export async function markProbeShown(request: NextRequest) {
   if (error) return failure(503);
   if (data !== "recorded") return failure(409);
   return actor.session.commit(reply(200, { status: "recorded" }));
+}
+
+export async function recordProbeRenderError(request: NextRequest) {
+  const parsed = await input(request);
+  if (parsed.error !== undefined) return failure(parsed.error);
+  const choice = RecordProbeRenderErrorRequestSchema.safeParse(parsed.body);
+  if (!choice.success) return failure(400);
+  const actor = await respondent(request);
+  if (!actor) return failure(401);
+  const trusted = trustedClient();
+  if (!trusted) return failure(503);
+  const { data, error } = await trusted.rpc("record_gate3_probe_render_error", {
+    supplied_session_id: choice.data.sessionId,
+    supplied_turn_id: choice.data.turnId,
+    supplied_probe_id: choice.data.probeId,
+    supplied_auth_user_id: actor.authUserId,
+  });
+  if (error) return failure(503);
+  if (!data || typeof data !== "object" || data.status !== "resolved"
+    || data.turnId !== choice.data.turnId || ![
+      "shown", "error", "timeout", "superseded",
+    ].includes(data.outcome)) return failure(409);
+  return actor.session.commit(reply(200, { status: "resolved", outcome: data.outcome }));
 }
 
 export async function recordProbeTextAnswer(request: NextRequest) {

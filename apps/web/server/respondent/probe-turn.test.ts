@@ -92,6 +92,10 @@ describe("probe persistence boundary", () => {
     const port = createProbeDecisionPort(call, "verified-respondent", buildRequest);
     expect(await port.recordRenderTerminal(turnId))
       .toEqual({ status: "resolved", outcome: "timeout" });
+    call.mockResolvedValueOnce({ error: null,
+      data: { status: "resolved", outcome: "error", turnId } });
+    expect(await port.recordRenderTerminal(turnId))
+      .toEqual({ status: "resolved", outcome: "error" });
     expect(call).toHaveBeenCalledWith("record_gate3_probe_render_terminal", {
       supplied_turn_id: turnId, supplied_auth_user_id: "verified-respondent" });
     call.mockResolvedValueOnce({ error: null, data: { status: "not_due" } });
