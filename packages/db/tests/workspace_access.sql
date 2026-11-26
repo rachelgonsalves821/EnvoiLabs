@@ -43,7 +43,8 @@ from (values
     ('public.gate2_referral_profile_verifications'),
     ('public.gate2_referral_vestings'),
     ('public.gate2_screening_rules'), ('public.gate2_screening_events'),
-    ('pii.gate2_screener_answers')
+    ('pii.gate2_screener_answers'),
+    ('pii.gate2_screening_transcription_receipts')
 ) as service_only(relation);
 grant select on access_matrix to authenticated, anon;
 

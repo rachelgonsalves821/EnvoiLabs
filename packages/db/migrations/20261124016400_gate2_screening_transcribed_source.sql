@@ -30,6 +30,7 @@ create table pii.gate2_screening_transcription_receipts (
 alter table pii.gate2_screening_transcription_receipts enable row level security;
 revoke all on pii.gate2_screening_transcription_receipts
     from public, anon, authenticated, service_role;
+grant select on pii.gate2_screening_transcription_receipts to service_role;
 create trigger immutable_gate2_screening_transcription
     before update or delete on pii.gate2_screening_transcription_receipts
     for each row execute function internal.reject_gate2_ledger_mutation();
