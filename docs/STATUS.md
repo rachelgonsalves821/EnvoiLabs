@@ -902,3 +902,17 @@ Needs from others. Platform owns the shared cleanup migration. No account-holder
 Contract or schema changes. None in this status update.
 
 Risks. The accessibility and fixture worker results use synthetic cases. The researcher publication gate remains closed.
+
+## 2026-11-25 Gate 1 redaction and cleanup checkpoint
+
+Done. Recorded the bounded development redaction replay across 242 synthetic recordings and checked proposed changes on separate synthetic controls. The composed development candidate fully masked 124/124 phones, 115/125 emails, 54/61 names, 42/58 authored employers, and 53/58 addresses. Redaction altered 28 of 258 annotated research spans. Follow-up experiments found both coverage and evidence-preservation regressions. [Development and transfer evidence](https://github.com/rachelgonsalves821/EnvoiLabs/issues/4#issuecomment-7171430305)
+
+Done. Opened a standalone draft that combines the expired-audio scheduler and the handoff migration. It passed CI, database checks, and both local auth modes on head `d2c4cefe158a7ad4f245de9e8fb9925b6c95f739`. The disposable rehearsal verified Storage removal, preservation of active and confirmed audio, a late upload removed on the next sweep, and an empty repeat. [Cleanup draft and checks](https://github.com/rachelgonsalves821/EnvoiLabs/pull/198#issuecomment-7171990489)
+
+Next. Pass independent redaction qualification before verifying researcher publication on the protected preview. Integrate the cleanup draft in the coordinated order and repeat the synthetic cleanup check on the protected preview.
+
+Needs from others. The coordinator owns the cleanup integration sequence. No account-holder action is needed for the current qualification work.
+
+Contract or schema changes. This documentation change records the draft selector migration. The protected preview cleanup option is still off.
+
+Risks. The open-development redaction comparison is below the qualification thresholds. The separate independent dataset remains sealed, and researcher publication remains gated.
