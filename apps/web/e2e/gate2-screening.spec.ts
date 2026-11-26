@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { createScreeningAdapter } from "@envoi-labs/services/screening-adapter";
+import { screenSubmittedAnswer } from "@envoi-labs/services/screening";
 import { deliveredEmail, localService, loopbackOrigin } from "./support/disposable-auth";
 
 test.describe("Gate 2 private screening sheet", () => {
@@ -7,7 +9,7 @@ test.describe("Gate 2 private screening sheet", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
   test("a signed-in respondent submits text, reloads pending, and cannot trigger eligibility", async ({ browser, baseURL }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(150_000);
     const origin = loopbackOrigin(baseURL);
     const db = localService();
     const email = `gate2-screen-${randomUUID()}@example.test`;
@@ -124,6 +126,91 @@ test.describe("Gate 2 private screening sheet", () => {
         expect(response.status()).toBe(403);
       } finally {
         await stranger.close();
+      }
+
+      // A separate synthetic respondent exercises the reviewed decision port.
+      // This fixture is test-only; the live external screening model remains off.
+      const qualifiedEmail = `gate2-screen-qualified-${randomUUID()}@example.test`;
+      const qualifiedContext = await browser.newContext({ baseURL: origin });
+      try {
+        const qualifiedPage = await qualifiedContext.newPage();
+        await qualifiedPage.goto("/r/signup");
+        await qualifiedPage.getByLabel("Email address").fill(qualifiedEmail);
+        await qualifiedPage.getByRole("checkbox", { name: /18 or older/ }).check();
+        await qualifiedPage.getByRole("button", { name: "Email me a sign-in link" }).click();
+        const qualifiedLink = await deliveredEmail(qualifiedPage, qualifiedEmail,
+          origin, "/api/respondent/auth/callback");
+        await qualifiedPage.goto(qualifiedLink.href);
+        const accounts = await db.auth.admin.listUsers();
+        expect(accounts.error).toBeNull();
+        const qualifiedUser = accounts.data?.users.find((candidate) =>
+          candidate.email === qualifiedEmail);
+        if (!qualifiedUser) throw new Error("Synthetic qualified user absent");
+        const qualifiedProfile = await db.from("respondents").select("id")
+          .eq("auth_user_id", qualifiedUser.id).single();
+        if (qualifiedProfile.error || !qualifiedProfile.data)
+          throw new Error("Synthetic qualified profile absent");
+        const qualifiedConsent = await db.from("consents").insert({
+          respondent_id: qualifiedProfile.data.id, purpose: "retention",
+          granted: true, text_version: "synthetic-screening-test",
+        });
+        expect(qualifiedConsent.error).toBeNull();
+        const qualifiedOffer = await db.from("invites").insert({
+          study_id: study.data.id, respondent_id: qualifiedProfile.data.id,
+          state: "screening", reward_cents: 100,
+          expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+        }).select("id").single();
+        if (qualifiedOffer.error || !qualifiedOffer.data)
+          throw new Error("Synthetic qualified offer absent");
+        let submittedKey = "";
+        await qualifiedPage.route(`**/api/respondent/screening/${qualifiedOffer.data.id}`,
+          async (route) => {
+            if (route.request().method() === "POST") {
+              const posted = route.request().postDataJSON() as { key: string };
+              submittedKey = posted.key;
+            }
+            await route.continue();
+          });
+        await qualifiedPage.goto("/r");
+        await qualifiedPage.getByRole("link", { name: "Answer screening questions" }).click();
+        await qualifiedPage.getByLabel("Your answer").fill(answerText);
+        await qualifiedPage.getByRole("button", { name: "Submit answer" }).click();
+        await expect(qualifiedPage.getByText("Your answer is awaiting review.")).toBeVisible();
+        expect(submittedKey).toMatch(/^gate2-screen:[a-f0-9-]{36}$/);
+        const submitted = { respondentId: qualifiedProfile.data.id,
+          inviteId: qualifiedOffer.data.id, studyId: study.data.id,
+          ruleId: rule.data.id, ruleVersion: 1, kind: "text" as const,
+          text: answerText, transcriptionConsentVersion: null,
+          idempotencyKey: submittedKey };
+        let interpretations = 0;
+        const reviewer = createScreeningAdapter(db as unknown as
+          Parameters<typeof createScreeningAdapter>[0], {
+          async interpret() {
+            interpretations += 1;
+            return { result: "supported", span: {
+              startChar: 0, endChar: Array.from(answerText).length } };
+          },
+          async evidenceSupports(input) {
+            return input.criterionText ===
+              "Worked as a hospital nurse in the past 12 months" &&
+              input.answerText === answerText && input.result === "supported" &&
+              Array.from(input.answerText).slice(input.span.startChar,
+                input.span.endChar).join("") === answerText;
+          },
+        });
+        expect((await screenSubmittedAnswer(reviewer, submitted))?.action).toBe("qualify");
+        expect((await screenSubmittedAnswer(reviewer, submitted))?.action).toBe("qualify");
+        expect(interpretations).toBe(1);
+        const invited = await db.from("invites").select("state")
+          .eq("id", qualifiedOffer.data.id).single();
+        expect(invited.error).toBeNull();
+        expect(invited.data?.state).toBe("invited");
+        await qualifiedPage.goto("/r");
+        await qualifiedPage.getByRole("button", { name: "Start answering" }).click();
+        await expect(qualifiedPage).toHaveURL(
+          origin + `/r/interviews/${qualifiedOffer.data.id}`);
+      } finally {
+        await qualifiedContext.close();
       }
     } finally {
       await context.close();
