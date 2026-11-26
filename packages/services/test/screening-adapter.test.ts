@@ -26,6 +26,14 @@ function setup() {
       transcriptionConsentVersion: args.requested_consent_version,
       idempotencyKey: args.requested_key,
     }, error: null };
+    if (name === "store_gate2_screening_transcribed_answer") return { data: {
+      id: "a9b10000-0000-4000-8000-000000000005",
+      inviteId: input.inviteId, studyId: input.studyId, ruleId: input.ruleId,
+      ruleVersion: input.ruleVersion, kind: "voice", text: input.text,
+      transcriptionConsentVersion: "voice-v1",
+      transcriptionReceiptId: args.requested_receipt_id,
+      idempotencyKey: args.requested_key,
+    }, error: null };
     if (name === "get_gate2_screening_decision") return { data: null, error: null };
     if (name === "commit_gate2_screening_decision") return { data: {
       answerId: args.requested_answer_id, ruleId: args.requested_rule_id,
@@ -43,6 +51,22 @@ function setup() {
 }
 
 describe("screening database and Gate 3 adapter", () => {
+  it("uses a private transcription receipt for voice and never submits caller text as voice", async () => {
+    const { rpc, agent3 } = setup();
+    const transcriptionReceiptId = "a9b10000-0000-4000-8000-000000000020";
+    agent3.evidenceSupports.mockResolvedValue(true);
+    const result = await screenSubmittedAnswer(createScreeningAdapter({ rpc }, agent3), {
+      ...input, kind: "voice", transcriptionConsentVersion: "voice-v1",
+      transcriptionReceiptId,
+    });
+    expect(result?.action).toBe("qualify");
+    expect(rpc).toHaveBeenCalledWith("store_gate2_screening_transcribed_answer", {
+      requested_receipt_id: transcriptionReceiptId, requested_key: input.idempotencyKey,
+    });
+    expect(rpc).not.toHaveBeenCalledWith("store_gate2_screening_answer",
+      expect.objectContaining({ requested_kind: "voice" }));
+  });
+
   it("sends frozen wording and the full negated answer to Gate 3, then records review", async () => {
     const { rpc, agent3 } = setup();
     const decision = await screenSubmittedAnswer(createScreeningAdapter({ rpc }, agent3), input);

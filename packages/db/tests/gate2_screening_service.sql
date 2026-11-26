@@ -123,17 +123,70 @@ values ('90500000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001', 'recording', true, 'voice-v1'),
     ('90500000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001', 'transcription_vendor', true, 'voice-v1');
+insert into pii.gate2_screening_transcription_receipts (id, invite_id, study_id,
+    respondent_id, rule_id, rule_version, audio_object_id, audio_storage_path,
+    audio_bytes, audio_mime, duration_ms, audio_sha256,
+    provider, model, transcript_text, recording_consent_id,
+    transcription_consent_id, transcription_consent_version)
+select 'a9b10000-0000-4000-8000-000000000020',
+    'a9b10000-0000-4000-8000-000000000012',
+    '90600000-0000-4000-8000-000000000001',
+    '90500000-0000-4000-8000-000000000002',
+    'a9b10000-0000-4000-8000-000000000003', 1,
+    'a9b10000-0000-4000-8000-000000000021',
+    'screening/a9b10000-0000-4000-8000-000000000012/a9b10000-0000-4000-8000-000000000021',
+    4096, 'audio/webm', 5000, repeat('a', 64),
+    'synthetic', 'fixture', 'I worked as a hospital nurse this year.',
+    (select id from public.consents where respondent_id =
+        '90500000-0000-4000-8000-000000000002' and purpose = 'recording'
+        order by recorded_sequence desc limit 1),
+    (select id from public.consents where respondent_id =
+        '90500000-0000-4000-8000-000000000002' and purpose = 'transcription_vendor'
+        order by recorded_sequence desc limit 1), 'voice-v1';
+select ok(not has_table_privilege('service_role',
+    'pii.gate2_screening_transcription_receipts', 'INSERT'),
+    'service callers cannot fabricate private transcription receipts');
+select ok(not has_function_privilege('authenticated',
+    'public.store_gate2_screening_transcribed_answer(uuid,text)', 'EXECUTE'),
+    'browser clients cannot store an unreviewed transcribed answer');
 create temp table capped_answer (payload jsonb);
 grant select, insert on capped_answer to service_role;
 set local role service_role;
-insert into capped_answer select public.store_gate2_screening_answer(
+select throws_ok($$select public.store_gate2_screening_answer(
     'a9b10000-0000-4000-8000-000000000012',
     '90500000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001',
     'a9b10000-0000-4000-8000-000000000003', 1, 'voice',
-    'I worked as a hospital nurse this year.', 'voice-v1', 'screening:voice');
+    'I worked as a hospital nurse this year.', 'voice-v1', 'screening:voice-bypass')$$,
+    '23514', null, 'caller text cannot masquerade as transcribed voice');
+insert into capped_answer select public.store_gate2_screening_transcribed_answer(
+    'a9b10000-0000-4000-8000-000000000020', 'screening:voice');
 select ok((select payload ->> 'id' from capped_answer) is not null,
-    'consented voice transcript is stored privately');
+    'consented transcript receipt is stored privately');
+select is(public.store_gate2_screening_transcribed_answer(
+    'a9b10000-0000-4000-8000-000000000020', 'screening:voice') ->> 'id',
+    (select payload ->> 'id' from capped_answer),
+    'transcribed answer retry returns the same private row');
+reset role;
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001', 'recording', false, 'voice-v1');
+set local role service_role;
+select throws_ok($$select public.commit_gate2_screening_decision(
+    (select (payload ->> 'id')::uuid from capped_answer),
+    'a9b10000-0000-4000-8000-000000000003', 1,
+    'supported', 2, 37, 'qualify', true)$$,
+    '23514', null, 'recording withdrawal blocks a pending voice decision');
+reset role;
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001', 'recording', true, 'voice-v1');
+set local role service_role;
+select throws_ok($$select public.commit_gate2_screening_decision(
+    (select (payload ->> 'id')::uuid from capped_answer),
+    'a9b10000-0000-4000-8000-000000000003', 1,
+    'supported', 2, 37, 'qualify', true)$$,
+    '23514', null, 'identical recording regrant cannot revive the old receipt');
 reset role;
 insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000002',
@@ -166,6 +219,40 @@ insert into public.consents (respondent_id, study_id, purpose, granted, text_ver
 values ('90500000-0000-4000-8000-000000000002',
     '90600000-0000-4000-8000-000000000001', 'transcription_vendor', true, 'voice-v1');
 set local role service_role;
+select throws_ok($$select public.commit_gate2_screening_decision(
+    (select (payload ->> 'id')::uuid from capped_answer),
+    'a9b10000-0000-4000-8000-000000000003', 1,
+    'supported', 2, 37, 'qualify', true)$$,
+    '23514', null, 'regranting identical words cannot reactivate old voice source');
+select throws_ok($$select public.store_gate2_screening_transcribed_answer(
+    'a9b10000-0000-4000-8000-000000000020',
+    'screening:stale-voice-source')$$,
+    '23514', null, 'old transcription receipt cannot be reused after regrant');
+reset role;
+insert into pii.gate2_screening_transcription_receipts (id, invite_id, study_id,
+    respondent_id, rule_id, rule_version, audio_object_id, audio_storage_path,
+    audio_bytes, audio_mime, duration_ms, audio_sha256,
+    provider, model, transcript_text, recording_consent_id,
+    transcription_consent_id, transcription_consent_version)
+select 'a9b10000-0000-4000-8000-000000000024',
+    'a9b10000-0000-4000-8000-000000000012',
+    '90600000-0000-4000-8000-000000000001',
+    '90500000-0000-4000-8000-000000000002',
+    'a9b10000-0000-4000-8000-000000000003', 1,
+    'a9b10000-0000-4000-8000-000000000025',
+    'screening/a9b10000-0000-4000-8000-000000000012/a9b10000-0000-4000-8000-000000000025',
+    4096, 'audio/webm', 5000, repeat('b', 64),
+    'synthetic', 'fixture', 'I worked as a hospital nurse this year.',
+    (select id from public.consents where respondent_id =
+        '90500000-0000-4000-8000-000000000002' and purpose = 'recording'
+        order by recorded_sequence desc limit 1),
+    (select id from public.consents where respondent_id =
+        '90500000-0000-4000-8000-000000000002' and purpose = 'transcription_vendor'
+        order by recorded_sequence desc limit 1), 'voice-v1';
+delete from capped_answer;
+set local role service_role;
+insert into capped_answer select public.store_gate2_screening_transcribed_answer(
+    'a9b10000-0000-4000-8000-000000000024', 'screening:voice-regrant');
 select throws_ok($$select public.commit_gate2_screening_decision(
     (select (payload ->> 'id')::uuid from capped_answer),
     'a9b10000-0000-4000-8000-000000000003', 1,

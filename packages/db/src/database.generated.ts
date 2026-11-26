@@ -2327,6 +2327,10 @@ export type Database = {
         }
         Returns: Json
       }
+      store_gate2_screening_transcribed_answer: {
+        Args: { requested_key: string; requested_receipt_id: string }
+        Returns: Json
+      }
       submit_gate1_session: {
         Args: { supplied_session_id: string }
         Returns: Json
