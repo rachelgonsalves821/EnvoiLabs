@@ -1,6 +1,10 @@
 import { expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scoreAnalystHeldout, syntheticAnalystHeldout } from "../evals/analyst-heldout.mjs";
 
@@ -74,4 +78,22 @@ it("labels the fictional CLI result as unproved", () => {
   expect(JSON.parse(run.stdout)).toMatchObject({ sampleSize: 10,
     rubricPassed: null, fixtureRubricPass: true,
     evidence: "synthetic-pipeline-smoke-only" });
+});
+
+it("does not promote fictional rows passed as files into independent evidence", () => {
+  const data = syntheticAnalystHeldout();
+  const files = [data.inputs, data.outputs, data.judgments].map((rows, index) => {
+    const path = join(tmpdir(), `envoi-analyst-${randomUUID()}-${index}.json`);
+    writeFileSync(path, JSON.stringify(rows));
+    return path;
+  });
+  try {
+    const run = spawnSync(process.execPath,
+      [fileURLToPath(new URL("../evals/run-analyst-heldout.mjs", import.meta.url)),
+        ...files], { encoding: "utf8" });
+    expect(run.status).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({ rubricPassed: null,
+      scoredRubricPass: true, gateQualified: false,
+      evidence: "supplied-labels-unverified" });
+  } finally { files.forEach((path) => unlinkSync(path)); }
 });

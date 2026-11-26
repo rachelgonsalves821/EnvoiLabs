@@ -29,7 +29,8 @@ try {
   console.log(JSON.stringify(synthetic
     ? { ...report, rubricPassed: null, fixtureRubricPass: report.rubricPassed,
       evidence: "synthetic-pipeline-smoke-only" }
-    : { ...report, evidence: "reviewer-labels-supplied" }, null, 2));
+    : { ...report, rubricPassed: null, scoredRubricPass: report.rubricPassed,
+      evidence: "supplied-labels-unverified", gateQualified: false }, null, 2));
   if (!report.rubricPassed) process.exitCode = 1;
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Invalid held-out input");

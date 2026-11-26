@@ -1,6 +1,10 @@
 import { expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { scoreProbeHeldout, syntheticProbeHeldout } from "../evals/probe-heldout.mjs";
 
 it("scores all 60 fictional cases without echoing answer text into the report", () => {
@@ -40,6 +44,25 @@ it("labels the CLI fixture replay without a pilot rubric pass", () => {
   const output = JSON.parse(run.stdout);
   expect(output).toMatchObject({ evidence: "synthetic-pipeline-smoke-only",
     rubricPassed: null, fixtureRubricPass: true, sampleSize: 60 });
+});
+
+it("does not promote the fictional 60 rows passed as files into pilot evidence", () => {
+  const data = syntheticProbeHeldout();
+  const files = [data.inputs, data.outputs, data.judgments, data.answerReceipts]
+    .map((rows, index) => {
+      const path = join(tmpdir(), `envoi-probe-${randomUUID()}-${index}.json`);
+      writeFileSync(path, JSON.stringify(rows));
+      return path;
+    });
+  try {
+    const run = spawnSync(process.execPath,
+      [fileURLToPath(new URL("../evals/run-probe-heldout.mjs", import.meta.url)),
+        ...files], { encoding: "utf8" });
+    expect(run.status).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({ rubricPassed: null,
+      scoredRubricPass: true, gateQualified: false,
+      evidence: "supplied-labels-unverified" });
+  } finally { files.forEach((path) => unlinkSync(path)); }
 });
 
 it("fails the quality or off-topic rubric with reviewed negative labels", () => {
