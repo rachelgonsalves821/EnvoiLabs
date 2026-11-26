@@ -280,6 +280,27 @@ insert into public.consents (id, respondent_id, study_id, purpose,
     'synthetic-ai-screening-v1');
 insert into internal.gate2_screening_consent_receipts (consent_id, text_digest)
 values ('a9f30000-0000-4000-8000-000000000006', repeat('b', 64));
+select ok(not has_table_privilege('service_role',
+    'internal.gate2_screening_decision_grants', 'SELECT'),
+    'provider service cannot read exact private grant bindings');
+set local role service_role;
+select is(public.get_gate2_current_qualified_screening_decision(
+    'a9f30000-0000-4000-8000-000000000004',
+    'synthetic-model', 'screening-v1', repeat('a', 64)), null,
+    'same-text regrant cannot revive a decision from the withdrawn grant');
+select throws_ok($$select public.commit_gate2_qualified_screening_decision(
+    'a9f30000-0000-4000-8000-000000000004',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'supported', 0, 36, 'qualify', true,
+    (select redacted_source_version from public.gate2_screening_events
+        where answer_id = 'a9f30000-0000-4000-8000-000000000004'),
+    repeat('c', 64), 'synthetic-model', 'screening-v1', repeat('a', 64))$$,
+    '23514', null, 'privileged retry cannot return the old decision after regrant');
+reset role;
+select ok(not internal.gate2_screening_offer_current(
+    'a9f30000-0000-4000-8000-000000000002',
+    '90600000-0000-4000-8000-000000000001'),
+    'regrant does not restore offer acceptance eligibility');
 delete from public.consents
 where id = 'a9f30000-0000-4000-8000-000000000006';
 set local role service_role;
