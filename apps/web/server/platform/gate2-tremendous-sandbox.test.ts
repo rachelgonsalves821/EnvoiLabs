@@ -12,6 +12,7 @@ const product = { id: "sandbox-visa", category: "visa_card",
   currency_codes: ["USD"], countries: [{ abbr: "US" }],
   skus: [{ min: 10, max: 500, currency_code: "USD" }] };
 const order = { id: "ORDER-1", external_id: key, status: "EXECUTED",
+  created_at: "2026-11-25T02:00:00Z",
   rewards: [{ products: ["sandbox-visa"],
     value: { denomination: 10, currency_code: "USD" },
     recipient: { name: recipient.name, email: recipient.email },
@@ -20,8 +21,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const make = (request: typeof fetch, resolved = recipient) =>
   createTremendousSandboxPayoutProvider({ apiKey: "TEST_fixture",
-    recipient: vi.fn().mockResolvedValue(resolved), request,
-    now: () => new Date("2026-11-25T02:00:00Z") });
+    recipient: vi.fn().mockResolvedValue(resolved), request });
 
 describe("Tremendous sandbox Visa adapter", () => {
   it("requires a sandbox key and exact private recipient before any request", async () => {
@@ -44,6 +44,16 @@ describe("Tremendous sandbox Visa adapter", () => {
     expect(request).toHaveBeenCalledWith(
       `https://testflight.tremendous.com/api/v2/orders/${encodeURIComponent(key)}`,
       expect.objectContaining({ method: "GET" }));
+  });
+
+  it("keeps the same event timestamp when an ordered status is read twice", async () => {
+    const pending = { ...order, status: "OPEN", rewards: [{ ...order.rewards[0],
+      delivery: { method: "EMAIL", status: "PENDING" } }] };
+    const provider = make(vi.fn().mockImplementation(async () => json({ order: pending })));
+    const first = await provider.getOrderByKey(key, expected);
+    const replay = await provider.getOrderByKey(key, expected);
+    expect(first).toEqual(replay);
+    expect(first?.observedAt).toBe("2026-11-25T02:00:00.000Z");
   });
 
   it("treats a verified 404 as absent but all uncertain reads as unavailable", async () => {

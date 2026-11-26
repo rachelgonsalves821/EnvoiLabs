@@ -27,7 +27,7 @@ function orderFrom(value: unknown): Fields {
   return order;
 }
 function verifiedOrder(value: unknown, key: string, expected: Expected,
-  recipient: Recipient, now: () => Date): ProviderOrder {
+  recipient: Recipient): ProviderOrder {
   const order = orderFrom(value);
   const reward = Array.isArray(order.rewards) && order.rewards.length === 1
     ? order.rewards[0] : null;
@@ -43,13 +43,16 @@ function verifiedOrder(value: unknown, key: string, expected: Expected,
     !object(reward.delivery) || reward.delivery.method !== "EMAIL" ||
     !["OPEN", "EXECUTED", "FAILED", "CANCELED", "PENDING APPROVAL",
       "PENDING INTERNAL PAYMENT APPROVAL", "PENDING SETTLEMENT"].includes(String(order.status)) ||
-    !["SCHEDULED", "PENDING", "SUCCEEDED", "FAILED"].includes(String(reward.delivery.status)))
+    !["SCHEDULED", "PENDING", "SUCCEEDED", "FAILED"].includes(String(reward.delivery.status)) ||
+    typeof order.created_at !== "string" ||
+    !Number.isFinite(Date.parse(order.created_at)))
     throw new Error("Sandbox order does not match payout reservation");
   const status = order.status === "FAILED" || order.status === "CANCELED" ||
     reward.delivery.status === "FAILED" ? "failed" :
     order.status === "EXECUTED" && reward.delivery.status === "SUCCEEDED"
       ? "delivered" : "ordered";
-  const observedAt = now().toISOString();
+  // Stable across repeated reads of one status; the event ID includes status.
+  const observedAt = new Date(order.created_at).toISOString();
   return { id: order.id, eventId: `gate2-order:${order.id}:${order.status}:${reward.delivery.status}`,
     recipientId: expected.recipientId, productId: expected.productId,
     amountCents: expected.amountCents, status, observedAt };
@@ -59,11 +62,9 @@ export function createTremendousSandboxPayoutProvider(config: {
   apiKey: string;
   recipient: (id: string) => Promise<Recipient | null>;
   request?: typeof fetch;
-  now?: () => Date;
 }): PayoutProvider {
   if (!config.apiKey.startsWith("TEST_")) throw new Error("Sandbox key required");
   const request = config.request ?? fetch;
-  const now = config.now ?? (() => new Date());
   const root = "https://testflight.tremendous.com/api/v2";
   const headers = { Authorization: `Bearer ${config.apiKey}`,
     Accept: "application/json" };
@@ -80,7 +81,7 @@ export function createTremendousSandboxPayoutProvider(config: {
         { method: "GET", headers });
       if (response.status === 404) return null;
       if (!response.ok) throw new Error("Sandbox order lookup unavailable");
-      return verifiedOrder(await response.json(), key, expected, recipient, now);
+      return verifiedOrder(await response.json(), key, expected, recipient);
     },
     async createOrder(input) {
       if (!validKey(input.idempotencyKey) ||
