@@ -47,6 +47,8 @@ export interface ProbeAttemptLogSummary {
   readonly iosSafari: ProbeMetrics;
   readonly androidChrome: ProbeMetrics;
   readonly bothDeviceLabelsPresent: boolean;
+  /** Each device has at least one rendered probe with a measurable latency. */
+  readonly bothDevicesRendered: boolean;
 }
 
 /** Keep one outcome per persisted turn and keep fixture timing distinct from device timing. */
@@ -73,10 +75,13 @@ export function summarizeProbeAttemptLog(records: readonly ProbeAttemptRecord[])
     .filter((record) => record.device === device).map((record) => record.result);
   const ios = forDevice("ios-safari");
   const android = forDevice("android-chrome");
+  const iosSafari = summarizeProbeOutcomes(ios);
+  const androidChrome = summarizeProbeOutcomes(android);
   return { evidence: evidence.values().next().value ?? "none",
     overall: summarizeProbeOutcomes(records.map((record) => record.result)),
-    iosSafari: summarizeProbeOutcomes(ios), androidChrome: summarizeProbeOutcomes(android),
-    bothDeviceLabelsPresent: ios.length > 0 && android.length > 0 };
+    iosSafari, androidChrome,
+    bothDeviceLabelsPresent: ios.length > 0 && android.length > 0,
+    bothDevicesRendered: iosSafari.rendered > 0 && androidChrome.rendered > 0 };
 }
 
 /** Do not score a selected subset of successful probes or replay an old source version. */

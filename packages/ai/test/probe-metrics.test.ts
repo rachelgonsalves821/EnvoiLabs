@@ -44,13 +44,17 @@ it("summarizes unique fictional turns by device without claiming a physical timi
       result: { outcome: "no_probe" as const } },
   ];
   expect(summarizeProbeAttemptLog(records)).toMatchObject({ evidence: "fixture",
-    bothDeviceLabelsPresent: true,
+    bothDeviceLabelsPresent: true, bothDevicesRendered: false,
     overall: { total: 3, rendered: 1, renderedP95Ms: 5100, noProbe: 1, timeouts: 1 },
     iosSafari: { total: 1, rendered: 1, renderedP95Ms: 5100 },
     androidChrome: { total: 2, rendered: 0, renderedP95Ms: null },
   });
   expect(summarizeProbeAttemptLog([])).toMatchObject({ evidence: "none",
-    bothDeviceLabelsPresent: false, overall: { total: 0, renderedP95Ms: null } });
+    bothDeviceLabelsPresent: false, bothDevicesRendered: false,
+    overall: { total: 0, renderedP95Ms: null } });
+  expect(summarizeProbeAttemptLog([...records, { ...records[0]!, turnId: id(4),
+    device: "android-chrome" as const }])).toMatchObject({ bothDevicesRendered: true,
+    iosSafari: { rendered: 1 }, androidChrome: { rendered: 1 } });
   expect(() => summarizeProbeAttemptLog([...records, records[0]!]))
     .toThrow("Invalid or duplicate probe attempt");
   expect(() => summarizeProbeAttemptLog([...records, { ...records[0]!,
