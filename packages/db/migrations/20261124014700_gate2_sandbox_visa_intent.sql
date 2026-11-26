@@ -46,7 +46,7 @@ declare
     owner_id uuid;
     route internal.gate2_sandbox_visa_routes%rowtype;
     product internal.gate2_sandbox_visa_products%rowtype;
-    payout_id uuid;
+    reserved_payout_id uuid;
     payout public.payouts%rowtype;
     intent internal.gate2_sandbox_visa_intents%rowtype;
     earned integer;
@@ -64,7 +64,7 @@ begin
             or payout.respondent_id is distinct from owner_id
         then raise check_violation; end if;
         select * into intent from internal.gate2_sandbox_visa_intents
-        where payout_id = payout.id;
+        where gate2_sandbox_visa_intents.payout_id = payout.id;
         if found then
             return jsonb_build_object('id', payout.id,
                 'sessionId', requested_session_id,
@@ -84,12 +84,13 @@ begin
     if earned is null or earned < product.minimum_cents
         or earned > product.maximum_cents
     then raise check_violation using message = 'reward outside sandbox Visa denomination'; end if;
-    payout_id := public.reserve_gate2_session_payout(requested_session_id,
+    reserved_payout_id := public.reserve_gate2_session_payout(requested_session_id,
         owner_id, earned, annual_cap_cents,
         'payout:' || requested_session_id::text);
-    select * into payout from public.payouts where id = payout_id for update;
+    select * into payout from public.payouts
+    where id = reserved_payout_id for update;
     select * into intent from internal.gate2_sandbox_visa_intents
-    where payout_id = payout.id;
+    where gate2_sandbox_visa_intents.payout_id = payout.id;
     if not found then
         if payout.state <> 'pending' or payout.tremendous_order_id is not null
         then raise check_violation using message = 'payout was ordered before route freeze'; end if;
