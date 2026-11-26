@@ -142,6 +142,24 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
       if (error) return "unavailable";
       return data === "recorded" || data === "stale" ? data : "unavailable";
     },
+    async recordRenderError(input: { readonly sessionId: string;
+      readonly turnId: string; readonly probeId: string }): Promise<
+      { status: "resolved"; outcome: "shown" | "error" | "timeout" | "superseded" } |
+      { status: "stale" | "unavailable" }> {
+      if (!uuid(input.sessionId) || !uuid(input.turnId) || !uuid(input.probeId))
+        return { status: "stale" };
+      const { data, error } = await call("record_gate3_probe_render_error", {
+        supplied_session_id: input.sessionId, supplied_turn_id: input.turnId,
+        supplied_probe_id: input.probeId, supplied_auth_user_id: authUserId });
+      if (error) return { status: "unavailable" };
+      const result = record(data);
+      if (result?.status === "stale") return { status: "stale" };
+      if (result?.status === "resolved" && result.turnId === input.turnId &&
+        (result.outcome === "shown" || result.outcome === "error" ||
+          result.outcome === "timeout" || result.outcome === "superseded"))
+        return { status: "resolved", outcome: result.outcome };
+      return { status: "unavailable" };
+    },
     async recordTimeout(answerId: string): Promise<
       { status: "committed"; value: CommittedProbe } |
       { status: "not_due" | "stale" | "unavailable" }> {

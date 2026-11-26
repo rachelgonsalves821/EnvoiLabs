@@ -106,6 +106,22 @@ describe("probe persistence boundary", () => {
     expect(await port.recordRenderTerminal("bad-id")).toEqual({ status: "stale" });
   });
 
+  it("records a failed-frame terminal with exact turn identity and no model call", async () => {
+    const input = { sessionId: "a9720000-0000-4000-8000-000000000004",
+      turnId: "a9720000-0000-4000-8000-000000000007",
+      probeId: "a9720000-0000-4000-8000-000000000008" };
+    const call = vi.fn<ProbeRpc>().mockResolvedValue({ error: null,
+      data: { status: "resolved", outcome: "error", turnId: input.turnId } });
+    const port = createProbeDecisionPort(call, "verified-respondent", buildRequest);
+    expect(await port.recordRenderError(input)).toEqual({ status: "resolved", outcome: "error" });
+    expect(call).toHaveBeenCalledWith("record_gate3_probe_render_error", {
+      supplied_session_id: input.sessionId, supplied_turn_id: input.turnId,
+      supplied_probe_id: input.probeId, supplied_auth_user_id: "verified-respondent" });
+    expect(await port.recordRenderError({ ...input, probeId: "wrong" }))
+      .toEqual({ status: "stale" });
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
   it("sweeps only database-selected overdue answers with no model request", async () => {
     const answerId = "a9720000-0000-4000-8000-000000000005";
     const authUserId = "90300000-0000-4000-8000-000000000001";
