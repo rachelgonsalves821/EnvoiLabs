@@ -1,11 +1,13 @@
 export type ProbeOutcome =
   | { readonly outcome: "rendered"; readonly uploadConfirmedAtMs: number; readonly renderedAtMs: number }
+  | { readonly outcome: "rendered_unmeasured"; readonly reason: "clock_origin_changed" }
   | { readonly outcome: "timeout"; readonly stage?: "decision" | "render" }
   | { readonly outcome: "no_probe" | "error" | "superseded" };
 
 export interface ProbeMetrics {
   readonly total: number;
   readonly rendered: number;
+  readonly unmeasuredRendered: number;
   readonly renderedP95Ms: number | null;
   readonly noProbe: number;
   readonly errors: number;
@@ -15,6 +17,7 @@ export interface ProbeMetrics {
   readonly unclassifiedTimeouts: number;
   readonly superseded: number;
   readonly noProbeRate: number;
+  readonly unmeasuredRenderedRate: number;
   readonly errorRate: number;
   readonly timeoutRate: number;
   readonly supersededRate: number;
@@ -64,8 +67,11 @@ export function summarizeProbeAttemptLog(records: readonly ProbeAttemptRecord[])
       || seen.has(record.turnId.toLowerCase())
       || !["ios-safari", "android-chrome"].includes(record.device)
       || !["fixture", "physical-device"].includes(record.evidence)
-      || !record.result || !["rendered", "no_probe", "error", "timeout", "superseded"]
+      || !record.result || !["rendered", "rendered_unmeasured", "no_probe", "error", "timeout", "superseded"]
         .includes(record.result.outcome)
+      || (record.result.outcome === "rendered_unmeasured"
+        && (record.result.reason !== "clock_origin_changed"
+          || Object.keys(record.result).sort().join(",") !== "outcome,reason"))
       || (record.result.outcome === "rendered"
         && (!Number.isFinite(record.result.uploadConfirmedAtMs)
           || !Number.isFinite(record.result.renderedAtMs))))
@@ -113,13 +119,17 @@ export function summarizeCompleteProbeOpportunityLog(
     if (!record || typeof record.turnId !== "string")
       throw new Error("Probe outcome does not match current opportunity");
     const opportunity = expected.get(record.turnId.toLowerCase());
+    const sameClock = opportunity?.browserClockOriginId !== null
+      && uuid.test(String(record.browserClockOriginId))
+      && opportunity?.browserClockOriginId?.toLowerCase()
+        === record.browserClockOriginId?.toLowerCase();
+    const changedClock = opportunity?.browserClockOriginId !== null
+      && uuid.test(String(record.browserClockOriginId)) && !sameClock;
     if (!uuid.test(record.sourceVersion) || !opportunity
       || opportunity.sourceVersion.toLowerCase() !== record.sourceVersion.toLowerCase()
       || (opportunity.browserClockOriginId === null
         ? record.browserClockOriginId !== null
-        : !uuid.test(String(record.browserClockOriginId))
-          || opportunity.browserClockOriginId.toLowerCase()
-            !== record.browserClockOriginId?.toLowerCase())
+        : record.result?.outcome === "rendered_unmeasured" ? !changedClock : !sameClock)
       || opportunity.device !== record.device || opportunity.evidence !== record.evidence
       || (record.result?.outcome === "rendered"
         && (opportunity.browserUploadConfirmedAtMs === null
@@ -136,6 +146,10 @@ export function summarizeProbeOutcomes(outcomes: readonly ProbeOutcome[]): Probe
   if (outcomes.some((item) => item.outcome === "timeout" && item.stage !== undefined
     && item.stage !== "decision" && item.stage !== "render"))
     throw new Error("Invalid probe timeout stage");
+  if (outcomes.some((item) => item.outcome === "rendered_unmeasured"
+    && (item.reason !== "clock_origin_changed"
+      || Object.keys(item).sort().join(",") !== "outcome,reason")))
+    throw new Error("Invalid unmeasured probe outcome");
   const latencies = outcomes.filter((item): item is Extract<ProbeOutcome, { outcome: "rendered" }> =>
     item.outcome === "rendered").map((item) => item.renderedAtMs - item.uploadConfirmedAtMs);
   if (latencies.some((ms) => !Number.isFinite(ms) || ms < 0)) throw new Error("Invalid probe timestamps");
@@ -143,6 +157,7 @@ export function summarizeProbeOutcomes(outcomes: readonly ProbeOutcome[]): Probe
   const count = (outcome: ProbeOutcome["outcome"]) => outcomes.filter((item) => item.outcome === outcome).length;
   const rate = (n: number) => outcomes.length === 0 ? 0 : n / outcomes.length;
   const noProbe = count("no_probe");
+  const unmeasuredRendered = count("rendered_unmeasured");
   const errors = count("error");
   const timeouts = count("timeout");
   const decisionTimeouts = outcomes.filter((item) => item.outcome === "timeout"
@@ -151,11 +166,12 @@ export function summarizeProbeOutcomes(outcomes: readonly ProbeOutcome[]): Probe
     && item.stage === "render").length;
   const superseded = count("superseded");
   return {
-    total: outcomes.length, rendered: latencies.length,
+    total: outcomes.length, rendered: latencies.length, unmeasuredRendered,
     renderedP95Ms: latencies.length === 0 ? null : latencies[Math.ceil(0.95 * latencies.length) - 1] ?? null,
     noProbe, errors, timeouts, decisionTimeouts, renderTimeouts,
     unclassifiedTimeouts: timeouts - decisionTimeouts - renderTimeouts,
-    superseded, noProbeRate: rate(noProbe), errorRate: rate(errors),
+    superseded, noProbeRate: rate(noProbe), unmeasuredRenderedRate: rate(unmeasuredRendered),
+    errorRate: rate(errors),
     timeoutRate: rate(timeouts), supersededRate: rate(superseded),
   };
 }

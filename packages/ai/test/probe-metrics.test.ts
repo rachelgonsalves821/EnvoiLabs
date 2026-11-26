@@ -32,6 +32,34 @@ it("keeps persisted decision and render timeouts separate without guessing unlab
   ])).toThrow("Invalid probe timeout stage");
 });
 
+it("counts shown probes with changed browser clocks without inventing a latency", () => {
+  const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const opportunity = { turnId: id(1), sourceVersion: id(2),
+    browserUploadConfirmedAtMs: 100, browserClockOriginId: id(3),
+    device: "ios-safari" as const, evidence: "fixture" as const };
+  const changed = { ...opportunity, browserClockOriginId: id(4),
+    result: { outcome: "rendered_unmeasured" as const,
+      reason: "clock_origin_changed" as const } };
+  expect(summarizeCompleteProbeOpportunityLog([opportunity], [changed])).toMatchObject({
+    overall: { total: 1, rendered: 0, unmeasuredRendered: 1,
+      renderedP95Ms: null, unmeasuredRenderedRate: 1 },
+  });
+  expect(() => summarizeCompleteProbeOpportunityLog([opportunity], [
+    { ...changed, browserClockOriginId: opportunity.browserClockOriginId },
+  ])).toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeProbeOutcomes([{ outcome: "rendered_unmeasured",
+    reason: "clock_origin_changed", renderedAtMs: 300 } as unknown as
+    Parameters<typeof summarizeProbeOutcomes>[0][number]]))
+    .toThrow("Invalid unmeasured probe outcome");
+  expect(() => summarizeCompleteProbeOpportunityLog([opportunity], [
+    { ...changed, result: { outcome: "rendered" as const,
+      uploadConfirmedAtMs: 100, renderedAtMs: 300 } },
+  ])).toThrow("Probe outcome does not match current opportunity");
+  expect(() => summarizeCompleteProbeOpportunityLog([{
+    ...opportunity, browserUploadConfirmedAtMs: null, browserClockOriginId: null,
+  }], [{ ...changed }])).toThrow("Probe outcome does not match current opportunity");
+});
+
 it("summarizes unique fictional turns by device without claiming a physical timing pass", () => {
   const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
   const records = [
