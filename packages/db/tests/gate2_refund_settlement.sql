@@ -136,6 +136,15 @@ select ok(public.record_gate2_refund_observation(
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
     're_test_refund_1', 'pending', 10000, clock_timestamp()),
     'known pending provider refund is recorded once');
+select ok(public.record_gate2_refund_observation(
+    (select id from public.gate2_refund_reservations
+        where study_id = 'a9850000-0000-4000-8000-000000000001'),
+    're_test_refund_1', 'pending', 10000, clock_timestamp()),
+    'each repeated pending provider observation is accepted without a new event')
+from generate_series(1, 3);
+select is((select count(*) from internal.gate2_refund_events
+    where provider_refund_id = 're_test_refund_1' and event_kind = 'pending'),
+    1::bigint, 'three pending replays leave one immutable refund event');
 reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
@@ -159,6 +168,15 @@ select ok(public.record_gate2_refund_observation(
         where study_id = 'a9850000-0000-4000-8000-000000000001'),
     're_test_refund_1', 'succeeded', 10000, clock_timestamp()),
     'observed provider success settles the reserved amount');
+select ok(public.record_gate2_refund_observation(
+    (select id from public.gate2_refund_reservations
+        where study_id = 'a9850000-0000-4000-8000-000000000001'),
+    're_test_refund_1', 'succeeded', 10000, clock_timestamp()),
+    'each repeated success observation is accepted without a new event')
+from generate_series(1, 3);
+select is((select count(*) from internal.gate2_refund_events
+    where provider_refund_id = 're_test_refund_1' and event_kind = 'succeeded'),
+    1::bigint, 'three success replays leave one immutable refund event');
 reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
