@@ -9,6 +9,9 @@ export interface ScreeningInterpretationInput {
   readonly ruleVersion: number;
   readonly criterionText: string;
   readonly question: string;
+  /** Must identify the current qualified redacted screening source, not raw text. */
+  readonly redactedSourceVersion: string;
+  readonly redactionPolicyDigest: string;
   readonly answerText: string;
 }
 
@@ -32,6 +35,8 @@ function frozen(input: ScreeningInterpretationInput): ScreeningInterpretationInp
   return Object.freeze({ studyId: input.studyId, answerId: input.answerId,
     ruleId: input.ruleId, ruleVersion: input.ruleVersion,
     criterionText: input.criterionText, question: input.question,
+    redactedSourceVersion: input.redactedSourceVersion,
+    redactionPolicyDigest: input.redactionPolicyDigest,
     answerText: input.answerText });
 }
 
@@ -39,6 +44,8 @@ function same(left: ScreeningInterpretationInput, right: ScreeningInterpretation
   return left.studyId === right.studyId && left.answerId === right.answerId
     && left.ruleId === right.ruleId && left.ruleVersion === right.ruleVersion
     && left.criterionText === right.criterionText && left.question === right.question
+    && left.redactedSourceVersion === right.redactedSourceVersion
+    && left.redactionPolicyDigest === right.redactionPolicyDigest
     && left.answerText === right.answerText;
 }
 
@@ -78,6 +85,8 @@ export async function interpretScreeningAnswer(provider: LLMProvider,
     && config.systemPrompt === approvedConfig.systemPrompt
     && config.timeoutMs === approvedConfig.timeoutMs;
   if (!uuid.test(source.studyId) || !uuid.test(source.answerId) || !uuid.test(source.ruleId)
+    || !uuid.test(source.redactedSourceVersion)
+    || !/^[0-9a-f]{64}$/i.test(source.redactionPolicyDigest)
     || !Number.isSafeInteger(source.ruleVersion) || source.ruleVersion < 1
     || !source.criterionText?.trim() || !source.question?.trim() || !source.answerText?.trim()
     || !approvedConfig.providerModel?.trim() || !approvedConfig.promptVersion?.trim()
@@ -89,6 +98,8 @@ export async function interpretScreeningAnswer(provider: LLMProvider,
       providerModel: approvedConfig.providerModel, promptVersion: approvedConfig.promptVersion,
       promptDigest: await digest(approvedConfig.systemPrompt), studyId: source.studyId,
       answerId: source.answerId, ruleId: source.ruleId, ruleVersion: source.ruleVersion,
+      redactedSourceVersion: source.redactedSourceVersion,
+      redactionPolicyDigest: source.redactionPolicyDigest,
       sourceDigest: await digest(JSON.stringify(source)) });
     const timeout = new Promise<null>((resolve) => {
       timer = setTimeout(() => resolve(null), approvedConfig.timeoutMs);
@@ -100,7 +111,7 @@ export async function interpretScreeningAnswer(provider: LLMProvider,
       promptVersion: approvedConfig.promptVersion, system: approvedConfig.systemPrompt,
       messages: [{ role: "user",
         content: JSON.stringify({ approvedCriterion: source.criterionText,
-          question: source.question, fullAnswer: source.answerText }) }] }), timeout]);
+          question: source.question, fullRedactedAnswer: source.answerText }) }] }), timeout]);
     if (!response || response.model !== approvedConfig.providerModel
       || !same(input, source) || !sameConfig()) return null;
     const result = parse(response.output, source.answerText);

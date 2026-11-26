@@ -10,9 +10,10 @@ const input: ScreeningInterpretationInput = { studyId: id(1), answerId: id(2),
   ruleId: id(3), ruleVersion: 1,
   criterionText: "Worked as a hospital nurse in the past 12 months",
   question: "Have you worked as a hospital nurse in the past 12 months?",
+  redactedSourceVersion: id(4), redactionPolicyDigest: "a".repeat(64),
   answerText: "🩺 I worked as a hospital nurse this year." };
-const config = { providerModel: "fictional-screening", promptVersion: "screening-interpret-v1",
-  systemPrompt: readFileSync(new URL("../prompts/screening/interpret-v1.md", import.meta.url),
+const config = { providerModel: "fictional-screening", promptVersion: "screening-interpret-v2",
+  systemPrompt: readFileSync(new URL("../prompts/screening/interpret-v2.md", import.meta.url),
     "utf8"), timeoutMs: 100 };
 const response = (output: unknown) => ({ output, model: config.providerModel,
   inputTokens: 1, outputTokens: 1, latencyMs: 1, costMicros: 0 });
@@ -36,12 +37,14 @@ describe("private screening interpretation dispatch", () => {
     expect(request).toMatchObject({ purpose: "ai_screening",
       promptVersion: config.promptVersion });
     expect(request.messages[0].content).toContain(input.answerText);
+    expect(request.messages[0].content).toContain("fullRedactedAnswer");
     expect(authorize).toHaveBeenCalledTimes(3);
     expect(authorize).toHaveBeenCalledWith({ purpose: "ai_screening",
       providerModel: config.providerModel, promptVersion: config.promptVersion,
       promptDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
       studyId: input.studyId, answerId: input.answerId, ruleId: input.ruleId,
-      ruleVersion: 1,
+      ruleVersion: 1, redactedSourceVersion: input.redactedSourceVersion,
+      redactionPolicyDigest: input.redactionPolicyDigest,
       sourceDigest: createHash("sha256").update(JSON.stringify(input)).digest("hex") });
     expect(JSON.stringify(authorize.mock.calls)).not.toContain(input.answerText);
   });
@@ -54,6 +57,16 @@ describe("private screening interpretation dispatch", () => {
     authorize.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     expect(await interpretScreeningAnswer(provider, input, config, { authorize })).toBeNull();
     expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("denies an answer without an approved redacted-source version and policy receipt", async () => {
+    const { provider, modelUse, generate, authorize } = setup();
+    expect(await interpretScreeningAnswer(provider,
+      { ...input, redactedSourceVersion: "" }, config, modelUse)).toBeNull();
+    expect(await interpretScreeningAnswer(provider,
+      { ...input, redactionPolicyDigest: "unqualified" }, config, modelUse)).toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+    expect(authorize).not.toHaveBeenCalled();
   });
 
   it("cannot substitute an unapproved prompt under the same version", async () => {
@@ -94,6 +107,12 @@ describe("private screening interpretation dispatch", () => {
       { authorize: async () => { mutableConfig.promptVersion = "unapproved-v2"; return true; } }))
       .toBeNull();
     expect(third.generate).not.toHaveBeenCalled();
+    const receipt = { ...input };
+    const fourth = setup();
+    expect(await interpretScreeningAnswer(fourth.provider, receipt, config,
+      { authorize: async () => { receipt.redactedSourceVersion = id(9); return true; } }))
+      .toBeNull();
+    expect(fourth.generate).not.toHaveBeenCalled();
   });
 
   it("returns null for timeout, late result, bad model or invalid spans", async () => {

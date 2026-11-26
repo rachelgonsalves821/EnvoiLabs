@@ -6,12 +6,13 @@ import { evidenceSupports, type ScreeningEvidenceInput } from "../src/screening-
 const criterion = "Has worked as a hospital nurse in the past 12 months";
 const question = "Have you worked as a hospital nurse in the past 12 months?";
 const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-const config = { providerModel: "fictional-fixture", promptVersion: "screening-evidence-v1",
+const config = { providerModel: "fictional-fixture", promptVersion: "screening-evidence-v2",
   timeoutMs: 100 };
 const input = (answerText: string, result: ScreeningEvidenceInput["result"], excerpt = answerText): ScreeningEvidenceInput => {
   const startChar = Array.from(answerText.slice(0, answerText.indexOf(excerpt))).length;
   return { studyId: id(1), answerId: id(2), ruleId: id(3), ruleVersion: 1,
-    criterionText: criterion, question, answerText, result,
+    criterionText: criterion, question, redactedSourceVersion: id(4),
+    redactionPolicyDigest: "a".repeat(64), answerText, result,
     span: { startChar, endChar: startChar + Array.from(excerpt).length } };
 };
 const judgment = (relation: "supported" | "contradicted" | "ambiguous", evidenceText: string,
@@ -23,7 +24,7 @@ const provider = (output: unknown): LLMProvider => ({
   async generate(request): Promise<LLMResponse> {
     expect(request.purpose).toBe("ai_screening");
     expect(request.promptVersion).toBe(config.promptVersion);
-    expect(request.messages[0]?.content).toContain("fullAnswer");
+    expect(request.messages[0]?.content).toContain("fullRedactedAnswer");
     return { output, model: "fictional-fixture", inputTokens: 0, outputTokens: 0,
       latencyMs: 0, costMicros: 0 };
   },
@@ -46,6 +47,20 @@ describe("screening evidence boundary", () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it("denies evidence review without a qualified redacted-source receipt", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
+      model: config.providerModel, inputTokens: 0, outputTokens: 0,
+      latencyMs: 0, costMicros: 0 }));
+    const authorize = vi.fn().mockResolvedValue(true);
+    for (const source of [
+      { ...candidate, redactedSourceVersion: "" },
+      { ...candidate, redactionPolicyDigest: "unqualified" },
+    ]) expect(await evidenceSupports({ generate }, source, config, { authorize })).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
+    expect(authorize).not.toHaveBeenCalled();
+  });
+
   it("accepts explicit supported and contradicted respondent evidence", async () => {
     const yes = "I worked as a hospital nurse this year.";
     const no = "I have never worked as a hospital nurse.";
@@ -64,10 +79,14 @@ describe("screening evidence boundary", () => {
       promptDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
       studyId: candidate.studyId, answerId: candidate.answerId,
       ruleId: candidate.ruleId, ruleVersion: 1,
+      redactedSourceVersion: candidate.redactedSourceVersion,
+      redactionPolicyDigest: candidate.redactionPolicyDigest,
       sourceDigest: createHash("sha256").update(JSON.stringify({
         studyId: candidate.studyId, answerId: candidate.answerId,
         ruleId: candidate.ruleId, ruleVersion: candidate.ruleVersion,
         criterionText: candidate.criterionText, question: candidate.question,
+        redactedSourceVersion: candidate.redactedSourceVersion,
+        redactionPolicyDigest: candidate.redactionPolicyDigest,
         answerText: candidate.answerText,
       })).digest("hex") });
     expect(JSON.stringify(authorize.mock.calls)).not.toContain(candidate.answerText);
@@ -135,6 +154,11 @@ describe("screening evidence boundary", () => {
       model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
     expect(await evidenceSupports({ generate }, candidate, mutable,
       { authorize: async () => { mutable.promptVersion = "unapproved"; return true; } }))
+      .toBe(false);
+    expect(generate).not.toHaveBeenCalled();
+    const receipt = { ...candidate, span: { ...candidate.span } };
+    expect(await evidenceSupports({ generate }, receipt, config,
+      { authorize: async () => { receipt.redactedSourceVersion = id(9); return true; } }))
       .toBe(false);
     expect(generate).not.toHaveBeenCalled();
   });
