@@ -8,6 +8,7 @@ import { formatReward } from "../../reward";
 import { interviewCopy as copy } from "./copy";
 import { AnswerComposer } from "./answer-composer";
 import { ProbeTextAnswer } from "./probe-text-answer";
+import { ProbeRenderBoundary } from "./probe-render-boundary";
 import { currentPrompt } from "./current-prompt";
 
 type InterviewState = { kind: "opening" | "submitted" } | { kind: "open"; session: SessionResponse }
@@ -64,13 +65,7 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     let paintedFrame = 0;
     const renderFailed = () => {
       if (!active) return;
-      void interviewRequest("/api/respondent/probes/render-error", {
-        sessionId, turnId: probe.turnId, probeId: probe.probeId,
-      }).then((result) => {
-        if (!active) return;
-        if (result.status === 200) retry();
-        else setState({ kind: "unavailable" });
-      });
+      recordRenderFailure(sessionId, probe.turnId, probe.probeId, () => active);
     };
     try {
       frame = requestAnimationFrame(() => {
@@ -105,6 +100,18 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     setAttempt((value) => value + 1);
   }
 
+  function recordRenderFailure(sessionId: string, turnId: string, probeId: string,
+    isCurrent = () => true) {
+    void interviewRequest("/api/respondent/probes/render-error", {
+      sessionId, turnId, probeId,
+    }).then((result) => {
+      if (!isCurrent()) return;
+      if (result.status === 200 && result.data && typeof result.data === "object"
+        && "outcome" in result.data && result.data.outcome !== "shown") retry();
+      else setState({ kind: "unavailable" });
+    });
+  }
+
   async function submit(sessionId: string) {
     if (submitting.current) return;
     submitting.current = true;
@@ -130,10 +137,14 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
           </div>
           <h1 ref={prompt} tabIndex={-1}>{displayed && "text" in displayed ? displayed.text : copy.complete}</h1>
           {state.session.currentProbe
-            ? <ProbeTextAnswer key={state.session.currentProbe.probeId}
-                sessionId={state.session.sessionId} turnId={state.session.currentProbe.turnId}
-                probeId={state.session.currentProbe.probeId}
-                shown={confirmedProbeId === state.session.currentProbe.probeId} onSaved={retry} />
+            ? <ProbeRenderBoundary key={state.session.currentProbe.probeId}
+                onError={() => recordRenderFailure(state.session.sessionId,
+                  state.session.currentProbe!.turnId, state.session.currentProbe!.probeId)}>
+                <ProbeTextAnswer sessionId={state.session.sessionId}
+                  turnId={state.session.currentProbe.turnId}
+                  probeId={state.session.currentProbe.probeId}
+                  shown={confirmedProbeId === state.session.currentProbe.probeId} onSaved={retry} />
+              </ProbeRenderBoundary>
             : state.session.nextQuestion
             ? <AnswerComposer key={state.session.nextQuestion.id} canRecord={canRecord} sessionId={state.session.sessionId}
               questionId={state.session.nextQuestion.id} onSaved={retry} />
