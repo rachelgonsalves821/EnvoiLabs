@@ -19,7 +19,7 @@ function authorized(request: NextRequest, secret: string) {
 /** Deliberate one-batch TEST invocation in the isolated fictional preview only. */
 export async function POST(request: NextRequest) {
   if (process.env.ENVOI_GATE5_VISA_TEST_ENABLED !== "true") return failure(404);
-  if (process.env.VERCEL_ENV === "production") return failure(404);
+  if (process.env.VERCEL_ENV !== "preview") return failure(404);
   const secret = process.env.ENVOI_GATE5_VISA_TEST_SECRET;
   const apiKey = process.env.TREMENDOUS_TEST_API_KEY;
   const databaseUrl = process.env.SUPABASE_URL;

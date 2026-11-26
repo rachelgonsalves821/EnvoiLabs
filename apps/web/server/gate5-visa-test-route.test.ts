@@ -35,6 +35,8 @@ describe("default-off TEST Visa invocation", () => {
     enabled();
     vi.stubEnv("VERCEL_ENV", "production");
     expect((await POST(request())).status).toBe(404);
+    vi.stubEnv("VERCEL_ENV", "");
+    expect((await POST(request())).status).toBe(404);
     expect(issue).not.toHaveBeenCalled();
   });
   it("requires TEST key, exact isolated database and bearer before any reservation", async () => {
