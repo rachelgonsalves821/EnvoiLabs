@@ -2234,6 +2234,10 @@ export type Database = {
         Args: { annual_cap_cents: number; requested_session_id: string }
         Returns: Json
       }
+      reserve_gate2_sandbox_visa_referral_bonus: {
+        Args: { annual_cap_cents: number; requested_vesting_id: string }
+        Returns: Json
+      }
       reserve_gate2_session_payout: {
         Args: {
           annual_cap_cents: number
