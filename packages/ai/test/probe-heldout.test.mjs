@@ -7,6 +7,7 @@ it("scores all 60 fictional cases without echoing answer text into the report", 
   const { inputs, outputs, judgments, answerReceipts } = syntheticProbeHeldout();
   const report = scoreProbeHeldout(inputs, outputs, judgments, answerReceipts);
   expect(report).toMatchObject({ sampleSize: 60, probes: 60, acceptable: 60,
+    model: "synthetic-script", promptVersion: "synthetic-v1",
     qualityRate: 1, probeCoverageRate: 1, appropriateDecisions: 60,
     decisionAppropriateRate: 1, inappropriateNoProbeDecisions: 0,
     offTopicAnswers: 0, rubricPassed: true });
@@ -54,7 +55,7 @@ it("fails the quality or off-topic rubric with reviewed negative labels", () => 
 it("reports inappropriate skipped probes separately from emitted-probe quality", () => {
   const data = syntheticProbeHeldout();
   for (const [index, appropriate] of [false, true].entries()) {
-    data.outputs[index] = { id: data.outputs[index].id, action: "next" };
+    data.outputs[index] = { ...data.outputs[index], action: "next", text: undefined };
     data.judgments[index] = { ...data.judgments[index], decisionAppropriate: appropriate,
       nonLeading: null, onGoal: null, offTopicFollowUp: null, followUpAnswerId: null };
   }
@@ -109,4 +110,19 @@ it("refuses incomplete, duplicate or mismatched held-out evidence", () => {
   expect(() => scoreProbeHeldout(data.inputs, data.outputs, data.judgments,
     [{ ...data.answerReceipts[0], sourceVersion: "not-a-uuid" },
       ...data.answerReceipts.slice(1)])).toThrow("Invalid answer receipt");
+  expect(() => scoreProbeHeldout(data.inputs, [
+    { ...data.outputs[0], sourceVersion: data.inputs[1].sourceVersion },
+    ...data.outputs.slice(1)], data.judgments, data.answerReceipts))
+    .toThrow("Held-out source or model provenance differs");
+  expect(() => scoreProbeHeldout(data.inputs, data.outputs, [
+    { ...data.judgments[0], answerDigest: "f".repeat(64) },
+    ...data.judgments.slice(1)], data.answerReceipts))
+    .toThrow("Held-out source or model provenance differs");
+  expect(() => scoreProbeHeldout(data.inputs, [
+    data.outputs[0], { ...data.outputs[1], promptVersion: "other-prompt" },
+    ...data.outputs.slice(2)], data.judgments, data.answerReceipts))
+    .toThrow("Mixed held-out model or prompt versions");
+  expect(() => scoreProbeHeldout(data.inputs, data.outputs, data.judgments,
+    [{ ...data.answerReceipts[0], parentSourceVersion: data.inputs[1].sourceVersion },
+      ...data.answerReceipts.slice(1)])).toThrow("Incomplete probe judgment");
 });

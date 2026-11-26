@@ -26,7 +26,8 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   const receiptById = new Map();
   for (const receipt of answerReceipts) {
     if (!isObject(receipt) || !nonblank(receipt.id) || !nonblank(receipt.caseId)
-      || !uuid.test(receipt.sourceVersion) || !digest.test(receipt.answerDigest)
+      || !uuid.test(receipt.sourceVersion) || !uuid.test(receipt.parentSourceVersion)
+      || !digest.test(receipt.answerDigest)
       || receiptById.has(receipt.id)) throw new Error("Invalid answer receipt");
     receiptById.set(receipt.id, receipt);
   }
@@ -34,6 +35,7 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   let noProbes = 0; let errors = 0; let timeouts = 0;
   let appropriateDecisions = 0; let inappropriateNoProbeDecisions = 0;
   const followUpAnswerIds = new Set();
+  let model; let promptVersion;
   for (const [id, input] of inputById) {
     const output = outputById.get(id);
     const judgment = judgmentById.get(id);
@@ -41,6 +43,17 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
       || !output || !judgment || !actions.has(output.action)
       || !nonblank(judgment.reviewerId) || typeof judgment.decisionAppropriate !== "boolean")
       throw new Error("Incomplete held-out case");
+    const answerDigest = createHash("sha256").update(input.answer).digest("hex");
+    if (!uuid.test(input.sourceVersion) || input.answerDigest !== answerDigest
+      || output.sourceVersion !== input.sourceVersion
+      || output.answerDigest !== answerDigest
+      || judgment.sourceVersion !== input.sourceVersion
+      || judgment.answerDigest !== answerDigest
+      || !nonblank(output.model) || !nonblank(output.promptVersion))
+      throw new Error("Held-out source or model provenance differs");
+    if (model === undefined) { model = output.model; promptVersion = output.promptVersion; }
+    else if (output.model !== model || output.promptVersion !== promptVersion)
+      throw new Error("Mixed held-out model or prompt versions");
     if (judgment.decisionAppropriate) appropriateDecisions++;
     if (output.action === "probe") {
       if (!nonblank(output.text) || !output.text.trim().endsWith("?")
@@ -48,7 +61,8 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
         || typeof judgment.offTopicFollowUp !== "boolean"
         || !nonblank(judgment.followUpAnswerId)
         || followUpAnswerIds.has(judgment.followUpAnswerId)
-        || receiptById.get(judgment.followUpAnswerId)?.caseId !== id)
+        || receiptById.get(judgment.followUpAnswerId)?.caseId !== id
+        || receiptById.get(judgment.followUpAnswerId)?.parentSourceVersion !== input.sourceVersion)
         throw new Error("Incomplete probe judgment");
       followUpAnswerIds.add(judgment.followUpAnswerId);
       probes++;
@@ -75,7 +89,8 @@ export function scoreProbeHeldout(inputs, outputs, judgments, answerReceipts) {
   const qualityRate = probes === 0 ? null : acceptable / probes;
   const probeCoverageRate = probes / inputById.size;
   const decisionAppropriateRate = appropriateDecisions / inputById.size;
-  return { mode: "held-out-scoring", sampleSize: 60, probes, acceptable, qualityRate,
+  return { mode: "held-out-scoring", model, promptVersion, sampleSize: 60,
+    probes, acceptable, qualityRate,
     probeCoverageRate, appropriateDecisions, decisionAppropriateRate,
     inappropriateNoProbeDecisions, offTopicAnswers, noProbes, errors, timeouts,
     rubricPassed: probes > 0 && qualityRate >= 0.9 && offTopicAnswers === 0 };
@@ -103,13 +118,20 @@ export function syntheticProbeHeldout() {
   for (const [seedIndex, [coreQuestion, answer, guideGoal, text]] of seeds.entries()) {
     for (const [variantIndex, variant] of variants.entries()) {
       const id = `synthetic-${String(seedIndex + 1).padStart(2, "0")}-${variantIndex + 1}`;
-      inputs.push({ id, coreQuestion, answer: `${answer} This happened ${variant}.`, guideGoal });
-      outputs.push({ id, action: "probe", text });
+      const sourceVersion = `a9700000-0000-4000-8000-${String(seedIndex * 5 + variantIndex + 1).padStart(12, "0")}`;
+      const sourceAnswer = `${answer} This happened ${variant}.`;
+      const answerDigest = createHash("sha256").update(sourceAnswer).digest("hex");
+      inputs.push({ id, coreQuestion, answer: sourceAnswer, guideGoal,
+        sourceVersion, answerDigest });
+      outputs.push({ id, action: "probe", text, sourceVersion, answerDigest,
+        model: "synthetic-script", promptVersion: "synthetic-v1" });
       judgments.push({ id, reviewerId: "synthetic-script", decisionAppropriate: true,
+        sourceVersion, answerDigest,
         nonLeading: true, onGoal: true, offTopicFollowUp: false,
         followUpAnswerId: `${id}-fictional-follow-up` });
       answerReceipts.push({ id: `${id}-fictional-follow-up`, caseId: id,
-        sourceVersion: `a9700000-0000-4000-8000-${String(seedIndex * 5 + variantIndex + 1).padStart(12, "0")}`,
+        parentSourceVersion: sourceVersion,
+        sourceVersion: `a9700000-0000-4000-8000-${String(seedIndex * 5 + variantIndex + 61).padStart(12, "0")}`,
         answerDigest: createHash("sha256").update(`fictional reply ${id}`).digest("hex") });
     }
   }
