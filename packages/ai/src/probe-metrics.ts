@@ -33,12 +33,15 @@ export interface ProbeOpportunity {
   readonly sourceVersion: string;
   /** Absent for a qualified timeout recorded before a browser turn existed. */
   readonly browserUploadConfirmedAtMs: number | null;
+  /** Opaque page-clock identity; null only when no browser upload time exists. */
+  readonly browserClockOriginId: string | null;
   readonly device: ProbeAttemptRecord["device"];
   readonly evidence: ProbeAttemptRecord["evidence"];
 }
 
 export interface ProbeMeasuredAttempt extends ProbeAttemptRecord {
   readonly sourceVersion: string;
+  readonly browserClockOriginId: string | null;
 }
 
 export interface ProbeAttemptLogSummary {
@@ -93,6 +96,9 @@ export function summarizeCompleteProbeOpportunityLog(
   for (const opportunity of opportunities) {
     if (!opportunity || !uuid.test(opportunity.turnId)
       || !uuid.test(opportunity.sourceVersion)
+      || (opportunity.browserUploadConfirmedAtMs === null
+        ? opportunity.browserClockOriginId !== null
+        : !uuid.test(String(opportunity.browserClockOriginId)))
       || (opportunity.browserUploadConfirmedAtMs !== null
         && (!Number.isFinite(opportunity.browserUploadConfirmedAtMs)
           || opportunity.browserUploadConfirmedAtMs < 0))
@@ -109,6 +115,11 @@ export function summarizeCompleteProbeOpportunityLog(
     const opportunity = expected.get(record.turnId.toLowerCase());
     if (!uuid.test(record.sourceVersion) || !opportunity
       || opportunity.sourceVersion.toLowerCase() !== record.sourceVersion.toLowerCase()
+      || (opportunity.browserClockOriginId === null
+        ? record.browserClockOriginId !== null
+        : !uuid.test(String(record.browserClockOriginId))
+          || opportunity.browserClockOriginId.toLowerCase()
+            !== record.browserClockOriginId?.toLowerCase())
       || opportunity.device !== record.device || opportunity.evidence !== record.evidence
       || (record.result?.outcome === "rendered"
         && (opportunity.browserUploadConfirmedAtMs === null
