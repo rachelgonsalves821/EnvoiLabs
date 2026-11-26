@@ -38,6 +38,18 @@ describe("Gate 2 default-off VAPID transport", () => {
       { kind: "two_hours_left", path })).rejects.toThrow("connection lost");
   });
 
+  it("sends matched offers only to the generic authenticated home path", async () => {
+    const sender = vi.fn().mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+    const transport = createGate2WebPushTransport({ ...config, sender });
+    expect(await transport.send(destination,
+      { kind: "matched_offer", path: "/r" })).toBe("sent");
+    expect(await transport.send(destination,
+      { kind: "matched_offer", path: "/r/earnings" as "/r" })).toBe("failed");
+    expect(sender).toHaveBeenCalledOnce();
+    expect(sender.mock.calls[0]?.[1]).toBe(JSON.stringify({
+      kind: "matched_offer", path: "/r" }));
+  });
+
   it("requires VAPID configuration before a transport can exist", () => {
     expect(() => createGate2WebPushTransport({ ...config,
       vapidPrivateKey: "" })).toThrow("VAPID configuration unavailable");

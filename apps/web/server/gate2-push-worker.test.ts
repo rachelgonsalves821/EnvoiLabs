@@ -44,8 +44,37 @@ describe("respondent push worker", () => {
     const close = vi.fn();
     click({ notification: { close, data: { path: "https://evil.test/" } }, waitUntil });
     expect(openWindow).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
     click({ notification: { close, data: { path: signedPath } }, waitUntil });
     expect(openWindow).toHaveBeenCalledExactlyOnceWith(signedPath);
-    expect(close).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("shows only fixed matched-offer copy and opens the generic signed-in home", async () => {
+    vi.stubEnv("ENVOI_GATE2_PUSH_WORKER_ENABLED", "true");
+    vi.stubEnv("ENVOI_GATE2_OFFER_PUSH_ENABLED", "true");
+    const handlers = new Map<string, ((event: unknown) => void)[]>();
+    const showNotification = vi.fn().mockResolvedValue(undefined);
+    const openWindow = vi.fn().mockResolvedValue(undefined);
+    runInNewContext(await GET().text(), { self: {
+      addEventListener: (name: string, handler: (event: unknown) => void) =>
+        handlers.set(name, [...(handlers.get(name) ?? []), handler]),
+      skipWaiting: () => Promise.resolve(),
+      registration: { showNotification }, clients: { openWindow },
+    } });
+    const waitUntil = vi.fn();
+    for (const push of handlers.get("push") ?? []) {
+      push({ data: { text: () => JSON.stringify({ kind: "matched_offer",
+        path: "/r", title: "Injected", body: "Private study" }) }, waitUntil });
+      push({ data: { text: () => JSON.stringify({ kind: "matched_offer",
+        path: "https://evil.test/" }) }, waitUntil });
+    }
+    expect(showNotification).toHaveBeenCalledExactlyOnceWith("New study match", {
+      body: "A study that may fit you is ready to review.",
+      tag: "gate2-matched-offer", data: { path: "/r" },
+    });
+    for (const click of handlers.get("notificationclick") ?? [])
+      click({ notification: { close: vi.fn(), data: { path: "/r" } }, waitUntil });
+    expect(openWindow).toHaveBeenCalledExactlyOnceWith("/r");
   });
 });

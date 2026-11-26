@@ -1,8 +1,13 @@
 import { sendNotification, type WebPushError } from "web-push";
-import type { NudgeTransport } from "@envoi-labs/services/nudge-delivery";
+import type { NudgeKind } from "@envoi-labs/services/nudges";
 
 const signedResumePath = /^\/r\/s\/[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}\.\d{13}\.[A-Za-z0-9_-]{43}$/i;
 type Sender = typeof sendNotification;
+export type Gate2WebPushTransport = {
+  send(destination: { endpoint: string; keys: { p256dh: string; auth: string } },
+    payload: { kind: NudgeKind; path: string } |
+      { kind: "matched_offer"; path: "/r" }): Promise<"sent" | "failed">;
+};
 
 /** Transport only. The consent-aware ledger decides whether a send is allowed. */
 export function createGate2WebPushTransport(config: {
@@ -11,7 +16,7 @@ export function createGate2WebPushTransport(config: {
   vapidPrivateKey: string;
   allowedPushOrigins: readonly string[];
   sender?: Sender;
-}): NudgeTransport {
+}): Gate2WebPushTransport {
   if (!/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s/]+(?:\/\S*)?)$/.test(config.vapidSubject) ||
     !/^[A-Za-z0-9_-]{60,120}$/.test(config.vapidPublicKey) ||
     !/^[A-Za-z0-9_-]{35,100}$/.test(config.vapidPrivateKey) ||
@@ -32,8 +37,9 @@ export function createGate2WebPushTransport(config: {
       if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password ||
         !config.allowedPushOrigins.includes(endpoint.origin) ||
         !destination.keys.p256dh || !destination.keys.auth ||
-        !signedResumePath.test(payload.path) ||
-        (payload.kind !== "halfway" && payload.kind !== "two_hours_left"))
+        !(payload.kind === "matched_offer" ? payload.path === "/r" :
+          signedResumePath.test(payload.path) &&
+          (payload.kind === "halfway" || payload.kind === "two_hours_left")))
         return "failed";
       try {
         const result = await sender(destination, JSON.stringify(payload), {
