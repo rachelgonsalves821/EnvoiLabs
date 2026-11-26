@@ -79,6 +79,7 @@ export ENVOI_APP_ORIGIN="http://127.0.0.1:3100"
 export ENVOI_TEST_LOCAL_SUPABASE=1
 export ENVOI_GATE1_TEST_LAUNCH=1
 export ENVOI_GATE2_SCREENING_SHEET_ENABLED=true
+export ENVOI_GATE2_SCREENING_VOICE_ENABLED=true
 export ENVOI_GATE2_EARNINGS_ENABLED=true
 export ENVOI_MARKETPLACE_FEASIBILITY_ENABLED=true
 
@@ -87,7 +88,7 @@ if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
 fi
 
 cd -- "$repo_dir"
-pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts gate2-screening.spec.ts gate2-marketplace.spec.ts
+pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts gate2-screening.spec.ts gate2-screening-voice.spec.ts gate2-marketplace.spec.ts
 if [[ "${ENVOI_AUTH_TEST_LINK:-custom}" == 'custom' ]]; then
   node --test apps/web/server/respondent/gate1-worker.integration.mjs apps/web/server/respondent/gate1-worker-formats.integration.mjs
 fi
