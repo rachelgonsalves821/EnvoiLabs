@@ -45,11 +45,13 @@ OfferPushLedger {
       if (typeof data !== "boolean") throw new Error("Invalid offer queue result");
       return data;
     },
-    async listDispatchable() {
-      const { data, error } = await client.rpc("list_gate2_offer_push_dispatchable");
+    async listDispatchable(afterId) {
+      if (afterId !== null && !uuid.test(afterId))
+        throw new Error("Invalid offer push cursor");
+      const { data, error } = await client.rpc("list_gate2_offer_push_dispatch_page",
+        afterId === null ? {} : { supplied_after_id: afterId });
       if (error) throw error;
-      // The ledger's dispatchable query is not paged yet.
-      return ids(data, Number.MAX_SAFE_INTEGER);
+      return ids(data, 100);
     },
     async prepare(outboxId) {
       if (!uuid.test(outboxId)) throw new Error("Invalid offer outbox identity");

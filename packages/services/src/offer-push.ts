@@ -10,7 +10,7 @@ export type ClaimedOfferPush = {
 export type OfferPushLedger = {
   readCandidates(): Promise<readonly string[]>;
   enqueue(inviteId: string): Promise<boolean>;
-  listDispatchable(): Promise<readonly string[]>;
+  listDispatchable(afterId: string | null): Promise<readonly string[]>;
   prepare(outboxId: string): Promise<readonly string[]>;
   claim(deliveryId: string, claimId: string): Promise<ClaimedOfferPush | null>;
   observe(deliveryId: string, claimId: string,
@@ -36,10 +36,17 @@ export async function dispatchMatchedOfferPush(input: {
     try { if (await input.ledger.enqueue(inviteId)) result.queued += 1; }
     catch { result.unresolved += 1; }
   }
-  let outboxIds: readonly string[];
-  try { outboxIds = await input.ledger.listDispatchable(); }
-  catch { return { ...result, unresolved: result.unresolved + 1 }; }
-  for (const outboxId of outboxIds) {
+  let afterId: string | null = null;
+  for (let page = 0; page < 5; page += 1) {
+    let outboxIds: readonly string[];
+    try { outboxIds = await input.ledger.listDispatchable(afterId); }
+    catch { return { ...result, unresolved: result.unresolved + 1 }; }
+    if (outboxIds.length === 0) break;
+    if (outboxIds.length > 100 || new Set(outboxIds).size !== outboxIds.length ||
+        outboxIds.includes(afterId ?? ""))
+      return { ...result, unresolved: result.unresolved + 1 };
+    afterId = outboxIds[outboxIds.length - 1] ?? null;
+    for (const outboxId of outboxIds) {
     let deliveryIds: readonly string[];
     try { deliveryIds = await input.ledger.prepare(outboxId); }
     catch { result.unresolved += 1; continue; }
@@ -75,6 +82,8 @@ export async function dispatchMatchedOfferPush(input: {
         else result.unresolved += 1;
       } catch { result.unresolved += 1; }
     }
+    }
+    if (outboxIds.length < 100) break;
   }
   return result;
 }
