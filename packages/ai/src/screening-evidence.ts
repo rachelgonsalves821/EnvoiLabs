@@ -35,6 +35,7 @@ export interface ScreeningAuthorizationAttempt {
 export interface ScreeningModelConfig {
   readonly providerModel: string;
   readonly promptVersion: string;
+  readonly timeoutMs: number;
 }
 
 interface Judgment {
@@ -77,6 +78,7 @@ function sameInput(current: ScreeningEvidenceInput, frozen: ScreeningEvidenceInp
 /** Advisory Agent 3 port: false forces Platform's review/clarification path. */
 export async function evidenceSupports(provider: LLMProvider, input: ScreeningEvidenceInput,
   config: ScreeningModelConfig, modelUse?: ScreeningModelUsePort): Promise<boolean> {
+  if (!input || !config || !modelUse) return false;
   const frozen: ScreeningEvidenceInput = { studyId: input.studyId, answerId: input.answerId,
     ruleId: input.ruleId, ruleVersion: input.ruleVersion,
     criterionText: input.criterionText, question: input.question,
@@ -90,25 +92,33 @@ export async function evidenceSupports(provider: LLMProvider, input: ScreeningEv
     || (result !== "supported" && result !== "contradicted")
     || !Number.isSafeInteger(span?.startChar) || !Number.isSafeInteger(span?.endChar)
     || span.startChar < 0 || span.endChar <= span.startChar
-    || !config?.providerModel?.trim() || !config.promptVersion?.trim()) return false;
+    || !config.providerModel?.trim() || !config.promptVersion?.trim()
+    || !Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1) return false;
   const chars = Array.from(answerText);
   if (span.endChar > chars.length) return false;
   const excerpt = chars.slice(span.startChar, span.endChar).join("");
   if (!excerpt.trim()) return false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const providerModel = config.providerModel;
     const promptVersion = config.promptVersion;
+    const timeoutMs = config.timeoutMs;
+    const sameConfig = () => config.providerModel === providerModel
+      && config.promptVersion === promptVersion && config.timeoutMs === timeoutMs;
+    const timeout = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    });
     const promptDigest = await sha256(system);
     const sourceDigest = await sha256(JSON.stringify({ studyId, answerId, ruleId,
       ruleVersion, criterionText, question, answerText }));
     const attempt = Object.freeze({ purpose: "ai_screening" as const,
       providerModel, promptVersion, promptDigest, studyId, answerId, ruleId,
       ruleVersion, sourceDigest });
-    if (!modelUse || await modelUse.authorize(attempt) !== true
-      || !sameInput(input, frozen)
-      || await modelUse.authorize(attempt) !== true
-      || !sameInput(input, frozen)) return false;
-    const generated = await provider.generate({
+    const authorized = () => Promise.race([modelUse.authorize(attempt), timeout]);
+    if (await authorized() !== true || !sameInput(input, frozen) || !sameConfig()
+      || await authorized() !== true || !sameInput(input, frozen)
+      || !sameConfig()) return false;
+    const generated = await Promise.race([provider.generate({
       purpose: "ai_screening",
       promptVersion,
       system,
@@ -116,16 +126,17 @@ export async function evidenceSupports(provider: LLMProvider, input: ScreeningEv
         approvedCriterion: criterionText, question, fullAnswer: answerText,
         proposedExcerpt: excerpt,
       }) }],
-    });
-    if (generated.model !== providerModel) return false;
+    }), timeout]);
+    if (!generated || generated.model !== providerModel || !sameInput(input, frozen)
+      || !sameConfig()) return false;
     const parsed: unknown = typeof generated.output === "string"
       ? JSON.parse(generated.output) : generated.output;
     const supported = isJudgment(parsed) && parsed.relation === result && parsed.evidenceText === excerpt
       && parsed.respondentOwnExperience && parsed.criterionAndTimeframeMatch
       && parsed.explicitNotInferred;
-    return supported && sameInput(input, frozen)
-      && await modelUse.authorize(attempt) === true && sameInput(input, frozen);
+    return supported && sameInput(input, frozen) && sameConfig()
+      && await authorized() === true && sameInput(input, frozen) && sameConfig();
   } catch {
     return false;
-  }
+  } finally { if (timer !== undefined) clearTimeout(timer); }
 }

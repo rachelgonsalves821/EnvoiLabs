@@ -6,7 +6,8 @@ import { evidenceSupports, type ScreeningEvidenceInput } from "../src/screening-
 const criterion = "Has worked as a hospital nurse in the past 12 months";
 const question = "Have you worked as a hospital nurse in the past 12 months?";
 const id = (n: number) => `a9700000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-const config = { providerModel: "fictional-fixture", promptVersion: "screening-evidence-v1" };
+const config = { providerModel: "fictional-fixture", promptVersion: "screening-evidence-v1",
+  timeoutMs: 100 };
 const input = (answerText: string, result: ScreeningEvidenceInput["result"], excerpt = answerText): ScreeningEvidenceInput => {
   const startChar = Array.from(answerText.slice(0, answerText.indexOf(excerpt))).length;
   return { studyId: id(1), answerId: id(2), ruleId: id(3), ruleVersion: 1,
@@ -94,6 +95,47 @@ describe("screening evidence boundary", () => {
       model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
     const authorize = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     expect(await evidenceSupports({ generate }, candidate, config, { authorize })).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("bounds authorization and does not dispatch after a missed deadline", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
+      model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
+    expect(await evidenceSupports({ generate }, candidate, { ...config, timeoutMs: 1 },
+      { authorize: () => new Promise<boolean>(() => undefined) })).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("withholds a late judge result and rechecks current source after inference", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const generate = vi.fn(() => new Promise<LLMResponse>((resolve) => {
+      setTimeout(() => resolve({ output: judgment("supported", candidate.answerText),
+        model: config.providerModel, inputTokens: 0, outputTokens: 0,
+        latencyMs: 0, costMicros: 0 }), 20);
+    }));
+    const authorize = vi.fn().mockResolvedValue(true);
+    expect(await evidenceSupports({ generate }, candidate, { ...config, timeoutMs: 1 },
+      { authorize })).toBe(false);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(authorize).toHaveBeenCalledTimes(2);
+    const changed = { ...candidate, span: { ...candidate.span } };
+    expect(await evidenceSupports({ generate: async () => {
+      changed.answerText = "A changed answer.";
+      return { output: judgment("supported", candidate.answerText),
+        model: config.providerModel, inputTokens: 0, outputTokens: 0,
+        latencyMs: 0, costMicros: 0 };
+    } }, changed, config, { authorize: async () => true })).toBe(false);
+  });
+
+  it("does not dispatch after the approved judge configuration changes", async () => {
+    const candidate = input("I worked as a hospital nurse this year.", "supported");
+    const mutable = { ...config };
+    const generate = vi.fn(async () => ({ output: judgment("supported", candidate.answerText),
+      model: config.providerModel, inputTokens: 0, outputTokens: 0, latencyMs: 0, costMicros: 0 }));
+    expect(await evidenceSupports({ generate }, candidate, mutable,
+      { authorize: async () => { mutable.promptVersion = "unapproved"; return true; } }))
+      .toBe(false);
     expect(generate).not.toHaveBeenCalled();
   });
 
