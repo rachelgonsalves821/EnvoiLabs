@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(27);
+select plan(28);
 
 select is((select tgfoid from pg_trigger where tgname = 'lock_gate2_guide_study'
     and tgrelid = 'public.guide_questions'::regclass),
