@@ -6,6 +6,7 @@ const text = (value) => typeof value === "string" && value.trim().length > 0;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const digest = /^[0-9a-f]{64}$/;
 const sha = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const shaText = (value) => createHash("sha256").update(value).digest("hex");
 
 function indexed(rows, name) {
   if (!Array.isArray(rows) || rows.length !== 10) throw new Error(`${name}: exactly 10 studies required`);
@@ -31,15 +32,18 @@ export function scoreAnalystHeldout(inputs, outputs, judgments) {
     const output = outputById.get(id);
     const judgment = judgmentById.get(id);
     if (!uuid.test(input.studyId) || studyIds.has(input.studyId)
+      || !text(input.decisionQuestion)
       || !Array.isArray(input.sources) || input.sources.length === 0
       || !input.sources.every((source) => object(source)
         && source.studyId === input.studyId && uuid.test(source.transcriptId)
         && uuid.test(source.sourceVersion) && text(source.redactedText)
         && source.published === true && source.withdrawn === false)
-      || new Set(input.sources.map((source) => source.transcriptId)).size !== input.sources.length
+      || new Set(input.sources.map((source) => source.transcriptId.toLowerCase())).size !== input.sources.length
       || !output || !judgment || !digest.test(output.sourceDigest)
       || output.sourceDigest !== sha(input.sources)
       || judgment.sourceDigest !== output.sourceDigest
+      || output.decisionQuestionDigest !== shaText(input.decisionQuestion)
+      || judgment.decisionQuestionDigest !== output.decisionQuestionDigest
       || !text(output.model) || !text(output.promptVersion)
       || !text(judgment.reviewerId) || !Array.isArray(output.themes)
       || output.themes.length === 0 || !Array.isArray(judgment.labels))
@@ -100,11 +104,15 @@ export function syntheticAnalystHeldout() {
     const quote = { studyId, transcriptId, sourceVersion, startChar: 2,
       endChar: 11, exactText: "fictional", rationale: "Fictional reviewer context",
       confidence: 0.9 };
-    inputs.push({ id, studyId, sources });
-    outputs.push({ id, sourceDigest, model: "fictional", promptVersion: "fixture-v1",
+    const decisionQuestion = "Would a clear receipt change your decision?";
+    const decisionQuestionDigest = shaText(decisionQuestion);
+    inputs.push({ id, studyId, decisionQuestion, sources });
+    outputs.push({ id, sourceDigest, decisionQuestionDigest,
+      model: "fictional", promptVersion: "fixture-v1",
       themes: [{ labelId: "theme-1", count: 1, total: 1,
         supportingQuotes: [quote], contradictingQuotes: [] }] });
-    judgments.push({ id, sourceDigest, reviewerId: "fictional-script",
+    judgments.push({ id, sourceDigest, decisionQuestionDigest,
+      reviewerId: "fictional-script",
       labels: [{ labelId: "theme-1", handCount: 1, handTotal: 1 }] });
   }
   return { inputs, outputs, judgments };

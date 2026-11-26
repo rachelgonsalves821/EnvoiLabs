@@ -1,10 +1,13 @@
 import { expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { scoreAnalystHeldout, syntheticAnalystHeldout } from "../evals/analyst-heldout.mjs";
 
 it("scores ten fictional studies and prints only aggregate evidence", () => {
   const { inputs, outputs, judgments } = syntheticAnalystHeldout();
+  expect(outputs[0].decisionQuestionDigest).toBe(createHash("sha256")
+    .update(inputs[0].decisionQuestion).digest("hex"));
   const report = scoreAnalystHeldout(inputs, outputs, judgments);
   expect(report).toMatchObject({ sampleSize: 10, themes: 10, quotes: 10,
     verifiedQuotes: 10, countsWithinOne: 10, totalsMatched: 10, rubricPassed: true });
@@ -37,6 +40,14 @@ it("refuses altered sources, missing labels and mixed model versions", () => {
   version.outputs[0].model = "another-model";
   expect(() => scoreAnalystHeldout(version.inputs, version.outputs,
     version.judgments)).toThrow("Mixed analyst model");
+  const question = syntheticAnalystHeldout();
+  question.inputs[0].decisionQuestion = "Would a different price change your decision?";
+  expect(() => scoreAnalystHeldout(question.inputs, question.outputs,
+    question.judgments)).toThrow("Incomplete analyst study");
+  const review = syntheticAnalystHeldout();
+  review.judgments[0].decisionQuestionDigest = "f".repeat(64);
+  expect(() => scoreAnalystHeldout(review.inputs, review.outputs,
+    review.judgments)).toThrow("Incomplete analyst study");
 });
 
 it("rejects duplicate study and output IDs", () => {
@@ -48,6 +59,11 @@ it("rejects duplicate study and output IDs", () => {
   duplicate.outputs[1].id = duplicate.outputs[0].id;
   expect(() => scoreAnalystHeldout(duplicate.inputs, duplicate.outputs,
     duplicate.judgments)).toThrow("duplicate id");
+  const source = syntheticAnalystHeldout();
+  source.inputs[0].sources.push({ ...source.inputs[0].sources[0],
+    transcriptId: source.inputs[0].sources[0].transcriptId.toUpperCase() });
+  expect(() => scoreAnalystHeldout(source.inputs, source.outputs,
+    source.judgments)).toThrow("Incomplete analyst study");
 });
 
 it("labels the fictional CLI result as unproved", () => {
