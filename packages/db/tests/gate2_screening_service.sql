@@ -1,6 +1,10 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
+-- Historical transition invariants exercise the retired RPC inside this
+-- rollback-only fixture. Migration 170 denies this grant in the real schema.
+grant execute on function public.commit_gate2_screening_decision(
+    uuid, uuid, integer, text, integer, integer, text, boolean) to service_role;
 select no_plan();
 
 update public.studies set state = 'fielding'

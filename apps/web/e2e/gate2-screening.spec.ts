@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createScreeningAdapter } from "@envoi-labs/services/screening-adapter";
 import { screenSubmittedAnswer } from "@envoi-labs/services/screening";
+import { publishGate2ScreeningRedaction } from
+  "@envoi-labs/services/screening-redaction-publisher";
+import { decideQualifiedScreeningAnswer } from
+  "@envoi-labs/services/qualified-screening-decision";
 import { deliveredEmail, localService, loopbackOrigin } from "./support/disposable-auth";
 
 test.describe("Gate 2 private screening sheet", () => {
@@ -128,8 +132,8 @@ test.describe("Gate 2 private screening sheet", () => {
         await stranger.close();
       }
 
-      // A separate synthetic respondent exercises the reviewed decision port.
-      // This fixture is test-only; the live external screening model remains off.
+      // A separate synthetic respondent verifies the retired raw decision
+      // adapter cannot advance an offer without a qualified source.
       const qualifiedEmail = `gate2-screen-qualified-${randomUUID()}@example.test`;
       const qualifiedContext = await browser.newContext({ baseURL: origin });
       try {
@@ -198,13 +202,90 @@ test.describe("Gate 2 private screening sheet", () => {
                 input.span.endChar).join("") === answerText;
           },
         });
-        expect((await screenSubmittedAnswer(reviewer, submitted))?.action).toBe("qualify");
-        expect((await screenSubmittedAnswer(reviewer, submitted))?.action).toBe("qualify");
+        expect(await screenSubmittedAnswer(reviewer, submitted)).toBeNull();
         expect(interpretations).toBe(1);
         const invited = await db.from("invites").select("state")
           .eq("id", qualifiedOffer.data.id).single();
         expect(invited.error).toBeNull();
-        expect(invited.data?.state).toBe("invited");
+        expect(invited.data?.state).toBe("screening");
+        const decisions = await db.from("gate2_screening_events").select("id")
+          .eq("rule_id", rule.data.id);
+        expect(decisions.error).toBeNull();
+        expect(decisions.data).toEqual([]);
+
+        // This purpose and policy exist only in the disposable Auth job.
+        const purpose = await db.from("consents").insert({
+          respondent_id: qualifiedProfile.data.id, study_id: study.data.id,
+          purpose: "ai_screening", granted: true,
+          text_version: "synthetic-ai-screening-v1",
+        }).select("id").single();
+        if (purpose.error || !purpose.data) throw new Error("Synthetic purpose missing");
+        const receipt = await db.rpc("test_gate2_screening_purpose_receipt" as never,
+          { supplied_consent_id: purpose.data.id } as never);
+        expect(receipt.error).toBeNull();
+        expect(receipt.data).toBe(true);
+        const stored = await db.rpc("store_gate2_screening_answer", {
+          requested_invite_id: qualifiedOffer.data.id,
+          requested_respondent_id: qualifiedProfile.data.id,
+          requested_study_id: study.data.id,
+          requested_rule_id: rule.data.id, requested_version: 1,
+          requested_kind: "text", requested_text: answerText,
+          requested_consent_version: null, requested_key: submittedKey,
+        });
+        const saved = stored.data as { id?: string } | null;
+        if (stored.error || !saved?.id) throw new Error("Synthetic answer replay failed");
+        const qualified = await publishGate2ScreeningRedaction(db,
+          { policyDigest: "a".repeat(64), qualificationDigest: "b".repeat(64),
+            redact: async () => answerText }, {
+            answerId: saved.id, policyDigest: "a".repeat(64),
+            qualificationDigest: "b".repeat(64),
+            idempotencyKey: `gate2-redaction:${randomUUID()}`,
+          });
+        expect(qualified?.qualified).toBe(true);
+        let qualifiedInterpretations = 0;
+        const decisionRequest = { studyId: study.data.id, answerId: saved.id,
+          ruleId: rule.data.id, ruleVersion: 1,
+          providerModel: "synthetic-model", promptVersion: "screening-v1",
+          promptDigest: "c".repeat(64) };
+        const currentSource = await db.rpc("current_gate2_screening_model_source", {
+          requested_study_id: decisionRequest.studyId,
+          requested_answer_id: decisionRequest.answerId,
+          requested_rule_id: decisionRequest.ruleId,
+          requested_rule_version: decisionRequest.ruleVersion,
+          requested_provider_model: decisionRequest.providerModel,
+          requested_prompt_version: decisionRequest.promptVersion,
+          requested_prompt_digest: decisionRequest.promptDigest,
+        });
+        expect(currentSource.error).toBeNull();
+        expect(currentSource.data).toMatchObject({
+          answerId: saved.id, redactedSourceVersion: qualified?.sourceVersion,
+        });
+        const syntheticModel = {
+          async interpret(source: { answerText: string }) {
+            qualifiedInterpretations += 1;
+            expect(source.answerText).toBe(answerText);
+            return { result: "supported", span: {
+              startChar: 0, endChar: Array.from(source.answerText).length } };
+          },
+          async evidenceSupports(source: { answerText: string; result: string }) {
+            return source.answerText === answerText && source.result === "supported";
+          },
+        };
+        const firstDecision = await decideQualifiedScreeningAnswer(db,
+          syntheticModel, decisionRequest);
+        expect(qualifiedInterpretations).toBe(1);
+        const committed = await db.from("gate2_screening_events")
+          .select("action,redacted_source_version").eq("answer_id", saved.id);
+        expect(committed.error).toBeNull();
+        expect(committed.data).toHaveLength(1);
+        expect(firstDecision?.action).toBe("qualify");
+        expect((await decideQualifiedScreeningAnswer(db, syntheticModel,
+          decisionRequest))?.action).toBe("qualify");
+        expect(qualifiedInterpretations).toBe(1);
+        const approvedOffer = await db.from("invites").select("state")
+          .eq("id", qualifiedOffer.data.id).single();
+        expect(approvedOffer.error).toBeNull();
+        expect(approvedOffer.data?.state).toBe("invited");
         await qualifiedPage.goto("/r");
         await qualifiedPage.getByRole("button", { name: "Start answering" }).click();
         await expect(qualifiedPage).toHaveURL(
