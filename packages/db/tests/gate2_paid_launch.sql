@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(27);
+select plan(28);
 
 select is((select tgfoid from pg_trigger where tgname = 'lock_gate2_guide_study'
     and tgrelid = 'public.guide_questions'::regclass),
@@ -155,6 +155,9 @@ select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
 select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
     'a9900000-0000-4000-8000-000000000001', 'evt_paid'), true,
     'exact launch retry returns prior outcome');
+select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
+    'a9900000-0000-4000-8000-000000000001', 'evt_paid'), true,
+    'third delivery returns the same paid launch outcome');
 select is(public.launch_gate2_paid_study('90600000-0000-4000-8000-000000000001',
     'a9900000-0000-4000-8000-000000000001', 'other_event'), false,
     'different event cannot replay fielding transition');
