@@ -23,6 +23,39 @@ describe("researcher report display and export flow", () => {
     unsubscribe();
   });
 
+  it("hands a renderer only the freshly rechecked, reviewed report", async () => {
+    const changed = { ...current, summary: { ...current.summary,
+      themes: [{ ...current.summary.themes[0]!, supportingQuotes: [
+        { ...quote, sourceVersion: id(6), exactText: "revised" },
+      ] }] } };
+    const port = { readCurrent: vi.fn().mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(changed).mockResolvedValue(changed) };
+    const controller = new ReportUiController(port, studyId);
+    await controller.refresh();
+    expect(await controller.requestReviewedSnapshot()).toBeNull();
+    expect(controller.getState()).toMatchObject({ kind: "ready", report: changed });
+    const reviewed = await controller.requestReviewedSnapshot();
+    expect(reviewed).toMatchObject({ reportId: current.reportId,
+      summary: { themes: [{ supportingQuotes: [{ exactText: "revised" }] }] } });
+    expect(reviewed?.summary.themes[0]?.supportingQuotes[0]?.exactText).not.toBe("ordered");
+    expect(port.readCurrent).toHaveBeenCalledTimes(3);
+  });
+
+  it("withholds a renderer snapshot when a newer refresh revokes the report", async () => {
+    let resolveExport: (value: unknown) => void = () => undefined;
+    const port = { readCurrent: vi.fn().mockResolvedValueOnce(current)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveExport = resolve; }))
+      .mockResolvedValueOnce(null) };
+    const controller = new ReportUiController(port, studyId);
+    await controller.refresh();
+    const pending = controller.requestReviewedSnapshot();
+    expect(controller.getState()).toEqual({ kind: "loading", canExport: false });
+    expect(await controller.refresh()).toEqual({ kind: "withheld", canExport: false });
+    resolveExport(current);
+    expect(await pending).toBeNull();
+    expect(JSON.stringify(controller.getState())).not.toContain("ordered");
+  });
+
   it("clears a previously visible report when the current predicate withholds it", async () => {
     const port = { readCurrent: vi.fn().mockResolvedValueOnce(current).mockResolvedValue(null) };
     const controller = new ReportUiController(port, studyId);
