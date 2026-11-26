@@ -93,6 +93,7 @@ revoke all on function public.test_gate2_screening_purpose_receipt(uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.test_gate2_screening_purpose_receipt(uuid)
     to service_role;
+notify pgrst, 'reload schema';
 SQL
 
 # Local-only payout denomination fixture. The helper exists only in this
