@@ -42,6 +42,9 @@ export default async function RespondentEarningsPage() {
                 <span>Study reward</span>
                 <strong>{formatReward(item.earnedCents)}</strong>
                 <span>{labels[item.payoutStatus]}</span>
+                {item.payoutStatus === "delivered" && item.payoutId && item.deliveredAt &&
+                  <small>Delivered {new Date(item.deliveredAt).toISOString().slice(0, 10)} ·
+                    Receipt {item.payoutId}</small>}
               </Card>
             </li>)}
           </ul>}

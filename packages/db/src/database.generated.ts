@@ -2156,6 +2156,14 @@ export type Database = {
         }
         Returns: Json
       }
+      reserve_gate2_sandbox_visa_batch: {
+        Args: {
+          annual_cap_cents: number
+          requested_request_id: string
+          requested_respondent_id: string
+        }
+        Returns: Json
+      }
       reserve_gate2_sandbox_visa_intent: {
         Args: { annual_cap_cents: number; requested_session_id: string }
         Returns: Json

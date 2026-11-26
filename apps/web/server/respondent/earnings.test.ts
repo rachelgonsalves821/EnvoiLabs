@@ -16,4 +16,16 @@ describe("respondent Earnings snapshot", () => {
       { ...valid.sessions[0], payoutStatus: "paid" }] })).toBeNull();
     expect(parseCurrentEarnings({ ...valid, referral: null })).toBeNull();
   });
+  it("keeps one batch receipt attached to each earned session", () => {
+    const payoutId = "11111111-1111-4111-8111-111111111111";
+    const batchId = "22222222-2222-4222-8222-222222222222";
+    const delivered = { ...valid, deliveredCents: 300, sessions: [{
+      ...valid.sessions[0], payoutStatus: "delivered",
+      payoutId, batchId, deliveredAt: "2026-11-25T02:00:00Z" }] };
+    expect(parseCurrentEarnings(delivered)).toEqual(delivered);
+    expect(parseCurrentEarnings({ ...delivered, sessions: [{
+      ...delivered.sessions[0], batchId: "other" }] })).toBeNull();
+    expect(parseCurrentEarnings({ ...delivered, sessions: [{
+      ...delivered.sessions[0], deliveredAt: "not-a-date" }] })).toBeNull();
+  });
 });
