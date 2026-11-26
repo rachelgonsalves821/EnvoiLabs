@@ -18,7 +18,7 @@ const rule = { id: request.ruleId, studyId: request.studyId,
   criterionId: "a9f30000-0000-4000-8000-000000000001", version: 1,
   criterionKind: "must", criterionText: source.criterionText,
   timeframeText: "past 12 months", question: source.question,
-  approvedAt: "2026-11-25T00:00:00Z" };
+  approvedAt: "2026-11-25T00:00:00+00:00" };
 
 function setup() {
   let event: Record<string, unknown> | null = null;

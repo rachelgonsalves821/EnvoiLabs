@@ -51,7 +51,14 @@ export async function decideQualifiedScreeningAnswer(db: Database, model: Model,
       requested_study_id: request.studyId,
       requested_version: request.ruleVersion,
     });
-    const rule = ScreeningRuleV1Schema.safeParse(ruleResult.data);
+    const rawRule = ruleResult.data;
+    if (!rawRule || typeof rawRule !== "object" || Array.isArray(rawRule)) return null;
+    const ruleRow = rawRule as Record<string, unknown>;
+    if (typeof ruleRow.approvedAt !== "string") return null;
+    const approvedAt = new Date(ruleRow.approvedAt);
+    if (!Number.isFinite(approvedAt.getTime())) return null;
+    const rule = ScreeningRuleV1Schema.safeParse({ ...ruleRow,
+      approvedAt: approvedAt.toISOString() });
     if (ruleResult.error || !rule.success || rule.data.id !== request.ruleId ||
         rule.data.studyId !== request.studyId ||
         rule.data.version !== request.ruleVersion) return null;
