@@ -2102,6 +2102,17 @@ export type Database = {
         }
         Returns: string
       }
+      publish_gate2_screening_redacted_source: {
+        Args: {
+          requested_answer_id: string
+          requested_key: string
+          requested_policy_digest: string
+          requested_raw_digest: string
+          requested_redacted_text: string
+          requested_redaction_passed: boolean
+        }
+        Returns: Json
+      }
       queue_gate2_nudge: {
         Args: {
           supplied_invite_id: string
@@ -2164,6 +2175,10 @@ export type Database = {
       }
       read_gate2_screening_audio_reservation: {
         Args: { supplied_audio_id: string; supplied_invite_id: string }
+        Returns: Json
+      }
+      read_gate2_screening_redaction_input: {
+        Args: { requested_answer_id: string; requested_policy_digest: string }
         Returns: Json
       }
       read_gate2_screening_sheet: {
