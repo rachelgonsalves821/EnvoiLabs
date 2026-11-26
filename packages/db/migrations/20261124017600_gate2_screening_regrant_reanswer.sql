@@ -63,6 +63,49 @@ create trigger gate2_reopen_screening_on_regrant
     after insert on internal.gate2_screening_consent_receipts
     for each row execute function internal.gate2_reopen_screening_on_regrant();
 
+create function internal.gate2_reanswer_authorized(
+    requested_answer_id uuid, requested_offer_id uuid,
+    requested_study_id uuid
+) returns boolean language sql stable security definer set search_path = '' as $$
+    select exists (
+        select 1 from pii.gate2_screener_answers as answer
+        join public.invites as offer on offer.id = answer.invite_id
+            and offer.study_id = answer.study_id
+        join public.gate2_screening_events as old_event
+            on old_event.answer_id = answer.id and old_event.action = 'qualify'
+        join internal.gate2_screening_decision_grants as binding
+            on binding.event_id = old_event.id
+        join lateral (
+            select grant_row.* from public.consents as grant_row
+            where grant_row.respondent_id = offer.respondent_id
+                and grant_row.study_id = offer.study_id
+                and grant_row.purpose = 'ai_screening'
+            order by grant_row.created_at desc,
+                grant_row.recorded_sequence desc limit 1
+        ) as current_grant on current_grant.granted
+            and current_grant.id <> binding.consent_id
+        join internal.gate2_screening_consent_receipts as receipt
+            on receipt.consent_id = current_grant.id
+        join internal.gate2_screening_model_policies as policy
+            on policy.consent_text_version = current_grant.text_version
+            and policy.consent_text_digest = receipt.text_digest
+            and policy.approved_at <= now() and policy.revoked_at is null
+        where answer.id = requested_answer_id
+            and offer.id = requested_offer_id
+            and offer.study_id = requested_study_id
+            and offer.state = 'screening'
+            and exists (select 1 from public.audit_log as transition
+                where transition.entity = 'invite'
+                    and transition.entity_id = offer.id
+                    and transition.from_state = 'invited'
+                    and transition.to_state = 'screening'
+                    and transition.meta ->> 'reason'
+                        = 'screening_consent_regrant')
+    );
+$$;
+revoke all on function internal.gate2_reanswer_authorized(uuid,uuid,uuid)
+    from public, anon, authenticated, service_role;
+
 create or replace function public.read_gate2_screening_sheet(supplied_invite_id uuid)
 returns jsonb language sql volatile security definer set search_path = '' as $$
     select jsonb_build_object('inviteId', offer.id, 'studyId', offer.study_id,
@@ -93,6 +136,8 @@ returns jsonb language sql volatile security definer set search_path = '' as $$
                     event.prompt_digest) ->> 'action'
             left join public.gate2_screening_events as stale_event
                 on stale_event.answer_id = answer.id and event.id is null
+                and internal.gate2_reanswer_authorized(
+                    answer.id, offer.id, offer.study_id)
             left join lateral (
                 select audio.id from internal.gate2_screening_audio_uploads as audio
                 where audio.invite_id = offer.id and audio.rule_id = current_rule.id
@@ -166,7 +211,9 @@ begin
             where event.answer_id = source.id
                 and public.get_gate2_current_qualified_screening_decision(
                     source.id, event.provider_model, event.prompt_version,
-                    event.prompt_digest) is null)
+                    event.prompt_digest) is null
+                and internal.gate2_reanswer_authorized(
+                    source.id, offer.id, offer.study_id))
     then raise check_violation; end if;
     perform public.store_gate2_screening_answer(offer.id, owner_id,
         offer.study_id, supplied_rule_id, supplied_version,
