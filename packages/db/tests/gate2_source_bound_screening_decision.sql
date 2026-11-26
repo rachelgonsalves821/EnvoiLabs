@@ -58,6 +58,45 @@ insert into internal.gate2_screening_redacted_sources (answer_id,
 select ok(not has_function_privilege('authenticated',
     'public.commit_gate2_qualified_screening_decision(uuid,uuid,integer,text,integer,integer,text,boolean,uuid,text,text,text,text)',
     'EXECUTE'), 'browser cannot submit a model-backed decision');
+savepoint screened_out_result;
+set local role service_role;
+select is(public.commit_gate2_qualified_screening_decision(
+    'a9f30000-0000-4000-8000-000000000004',
+    'a9f30000-0000-4000-8000-000000000003', 1,
+    'contradicted', 0, 36, 'screen_out', false,
+    (public.current_gate2_screening_model_source(
+        '90600000-0000-4000-8000-000000000001',
+        'a9f30000-0000-4000-8000-000000000004',
+        'a9f30000-0000-4000-8000-000000000003', 1,
+        'synthetic-model', 'screening-v1', repeat('a', 64))
+        ->> 'redactedSourceVersion')::uuid,
+    repeat('c', 64), 'synthetic-model', 'screening-v1', repeat('a', 64))
+    ->> 'action', 'screen_out', 'synthetic screen-out reaches the terminal offer state');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000002","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002'), null::jsonb,
+    'another respondent cannot read a screened-out result');
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002') ->> 'state',
+    'screened_out', 'owner reads the current status-only result');
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002') -> 'questions',
+    '[]'::jsonb, 'screened-out result reveals no question or answer');
+reset role;
+insert into public.consents (respondent_id, study_id, purpose, granted,
+    text_version) values ('90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_screening', false,
+    'synthetic-ai-screening-v1');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_screening_sheet(
+    'a9f30000-0000-4000-8000-000000000002'), null::jsonb,
+    'withdrawn model purpose hides a stale screen-out result');
+reset role;
+rollback to savepoint screened_out_result;
 set local role service_role;
 select is(public.commit_gate2_qualified_screening_decision(
     'a9f30000-0000-4000-8000-000000000004',
