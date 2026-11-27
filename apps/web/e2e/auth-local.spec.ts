@@ -430,14 +430,50 @@ test.describe("local Auth with synthetic fixtures", () => {
     const consent = { respondent_id: respondent.data.id, study_id: studyId, purpose: "researcher_access", text_version: "fixture" };
     const grant = await service.from("consents").insert({ ...consent, granted: true });
     expect(grant.error).toBeNull();
+    expect(await (await page.request.get(endpoint)).json()).toEqual(empty);
+    expect(await (await page.request.get(endpoint + "?version=2")).json())
+      .toEqual({ studyId, respondents: [] });
+    const retention = await service.from("consents").insert({
+      ...consent, purpose: "retention", granted: true,
+    });
+    expect(retention.error).toBeNull();
+    const privateInput = await service.rpc("test_gate1_transcript_input", {
+      supplied_answer_id: questionFixtures[0]!.id,
+      supplied_raw_text: "I ordered soup after class.",
+    });
+    expect(privateInput.error).toBeNull();
+    expect(privateInput.data).toBe(true);
+    const claim = await service.rpc("claim_gate1_answer_job", {
+      supplied_answer_id: questionFixtures[0]!.id,
+    });
+    expect(claim.error).toBeNull();
+    const leaseId = (claim.data as { leaseId?: string } | null)?.leaseId;
+    if (!leaseId) throw new Error("The synthetic transcript job did not produce a lease.");
+    const complete = await service.rpc("complete_gate1_answer_job", {
+      supplied_answer_id: questionFixtures[0]!.id,
+      supplied_lease_id: leaseId,
+      supplied_redacted_text: redactedText,
+      supplied_redaction_passed: true,
+      supplied_policy_digest: "a".repeat(64),
+      supplied_qualification_digest: "b".repeat(64),
+    });
+    expect(complete.error).toBeNull();
+    expect((complete.data as { status?: string } | null)?.status).toBe("published");
     const published = await page.request.get(endpoint);
     expect(published.headers()["cache-control"]).toBe("private, no-store");
     expect(await published.json()).toEqual({ studyId, transcripts: [{ id: transcriptId, redactedText }] });
+    const grouped = await page.request.get(endpoint + "?version=2");
+    expect(grouped.headers()["cache-control"]).toBe("private, no-store");
+    const groupedBody = await grouped.json() as { respondents: { transcripts: { id: string; redactedText: string }[] }[] };
+    expect(groupedBody.respondents.flatMap(({ transcripts: rows }) => rows))
+      .toContainEqual({ id: transcriptId, redactedText });
     await expect(transcriptPanel.getByText(redactedText)).toBeVisible({ timeout: 12_000 });
 
     const withdrawal = await service.from("consents").insert({ ...consent, granted: false });
     expect(withdrawal.error).toBeNull();
     expect(await (await page.request.get(endpoint)).json()).toEqual(empty);
+    expect(await (await page.request.get(endpoint + "?version=2")).json())
+      .toEqual({ studyId, respondents: [] });
     await expect(transcriptPanel.getByText(redactedText)).toHaveCount(0, { timeout: 12_000 });
 
     const restore = await service.from("consents").insert({ ...consent, granted: true });

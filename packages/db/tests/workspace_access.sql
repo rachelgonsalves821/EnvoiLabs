@@ -13,7 +13,7 @@ insert into access_matrix values
     ('public.researchers',        array[0, 0, 1, 1, 1, 0, null]),
     ('public.respondents',        array[1, 1, 0, 0, 0, 0, null]),
     ('public.profile_attributes', array[6, 6, 0, 0, 0, 0, null]),
-    ('public.consents',           array[1, 0, 0, 0, 0, 0, null]),
+    ('public.consents',           array[2, 0, 0, 0, 0, 0, null]),
     ('public.invites',            array[1, 1, 0, 0, 0, 0, null]),
     ('public.screener_answers',   array[1, 0, 0, 0, 0, 0, null]),
     ('public.sessions',           array[1, 0, 0, 0, 0, 0, null]),
@@ -103,9 +103,9 @@ insert into public.invites (id, study_id, respondent_id, state, reward_cents, ex
         '90500000-0000-4000-8000-000000000001', 'accepted', 300, now() + interval '1 day'),
     ('91100000-0000-4000-8000-000000000002', '90600000-0000-4000-8000-000000000001',
         '90500000-0000-4000-8000-000000000002', 'invited', 300, now() + interval '1 day');
-insert into public.sessions (id, study_id, invite_id)
+insert into public.sessions (id, study_id, invite_id, state)
 values ('91200000-0000-4000-8000-000000000001', '90600000-0000-4000-8000-000000000001',
-    '91100000-0000-4000-8000-000000000001');
+    '91100000-0000-4000-8000-000000000001', 'in_progress');
 insert into public.answers (id, study_id, session_id, guide_question_id, kind, sequence)
 values ('91300000-0000-4000-8000-000000000001', '90600000-0000-4000-8000-000000000001',
     '91200000-0000-4000-8000-000000000001', '91000000-0000-4000-8000-000000000001', 'text', 1);
@@ -180,6 +180,35 @@ reset role;
 insert into public.consents (respondent_id, purpose, granted, text_version, created_at)
 values ('90500000-0000-4000-8000-000000000001', 'researcher_access', true, 'fixture-1', now());
 set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from public.transcripts), 0::bigint,
+    'same-tenant MFA researcher cannot directly read jobless redacted text');
+select is((select count(*) from research.transcripts), 0::bigint,
+    'security-invoker view withholds jobless redacted text');
+select is_empty($$select * from public.read_gate1_researcher_transcripts(
+    '90600000-0000-4000-8000-000000000001')$$,
+    'grouped V2 transcript RPC withholds jobless redacted text');
+reset role;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001', 'retention', true, 'fixture-1');
+insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
+values (repeat('a', 64), repeat('b', 64));
+insert into internal.gate1_answer_jobs (answer_id)
+values ('91300000-0000-4000-8000-000000000001');
+create temp table qualified_workspace_claim (payload jsonb);
+grant select, insert on qualified_workspace_claim to service_role;
+set local role service_role;
+insert into qualified_workspace_claim
+select public.claim_gate1_answer_job('91300000-0000-4000-8000-000000000001');
+select is(public.complete_gate1_answer_job(
+    '91300000-0000-4000-8000-000000000001',
+    (select (payload ->> 'leaseId')::uuid from qualified_workspace_claim),
+    supplied_redacted_text => 'I ordered soup.', supplied_redaction_passed => true,
+    supplied_policy_digest => repeat('a', 64),
+    supplied_qualification_digest => repeat('b', 64)) ->> 'status',
+    'published', 'synthetic worker creates the current qualification receipt');
+reset role;
+set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}';
 select * from pg_temp.check_access('Tenant researcher with MFA', 3);
 select is((select redacted_text from research.transcripts), 'I ordered soup.', 'Consented text is available to the MFA tenant researcher');
@@ -253,11 +282,10 @@ values ('91400000-0000-4000-8000-000000000002', 'Synthetic pending redaction fix
        ('91400000-0000-4000-8000-000000000003', 'Synthetic failed redaction fixture');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
-select results_eq(
+select is_empty(
     $$select id, redacted_text from public.transcripts
       where study_id = '90600000-0000-4000-8000-000000000001' order by created_at, id$$,
-    $$values ('91400000-0000-4000-8000-000000000001'::uuid, 'I ordered soup.'::text)$$,
-    'The viewer projection exposes only published text, even with pending or failed raw rows and consent'
+    'regrant cannot revive the old receipt or expose pending and failed raw rows'
 );
 
 reset role;
