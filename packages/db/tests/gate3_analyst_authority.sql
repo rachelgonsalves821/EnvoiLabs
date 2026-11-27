@@ -28,10 +28,19 @@ select public.freeze_gate2_marketplace_quote(
     8000, 400, '90200000-0000-4000-8000-000000000001');
 reset role;
 insert into public.gate2_payment_events (quote_id, study_id,
-    provider_checkout_id, provider_event_id, event_kind, amount_cents, currency)
+    provider_checkout_id, provider_event_id, event_kind, amount_cents,
+    currency, provider_observed_at)
 values ((select id from analyst_quote),
     'a9900000-0000-4000-8000-000000000001',
-    'fixture-analyst-checkout', 'fixture-analyst-paid', 'paid', 8000, 'usd');
+    'fixture-analyst-checkout', 'fixture-analyst-created',
+    'checkout_created', 8000, 'usd', clock_timestamp());
+insert into public.gate2_payment_events (quote_id, study_id,
+    provider_checkout_id, provider_event_id, event_kind, amount_cents,
+    currency, provider_observed_at)
+values ((select id from analyst_quote),
+    'a9900000-0000-4000-8000-000000000001',
+    'fixture-analyst-checkout', 'fixture-analyst-paid', 'paid', 8000, 'usd',
+    clock_timestamp());
 update public.studies set state = 'fielding'
 where id = 'a9900000-0000-4000-8000-000000000001';
 insert into internal.gate1_redaction_policies (policy_digest,
