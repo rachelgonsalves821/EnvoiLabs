@@ -243,6 +243,48 @@ $$;
 revoke all on function internal.gate3_public_text_digest(jsonb, jsonb)
     from public, anon, authenticated, service_role;
 
+-- Only an independently credentialed redaction/qualification worker may be
+-- granted this no-login role in a later approved environment setup. Neither
+-- the publisher service nor a researcher can self-certify the public text.
+create role gate3_report_qualifier nologin;
+create function public.record_gate3_public_text_qualification(
+    supplied_report_id uuid, supplied_summary jsonb, supplied_claims jsonb,
+    supplied_policy text, supplied_qualification text,
+    supplied_receipt_id uuid
+) returns boolean language plpgsql security definer set search_path = '' as $$
+declare target public.reports%rowtype;
+    prior pii.gate3_public_text_qualifications%rowtype;
+    supplied_digest text;
+begin
+    select * into target from public.reports where id = supplied_report_id for update;
+    if not found or target.state <> 'ready' or supplied_receipt_id is null
+        or jsonb_typeof(supplied_summary) is distinct from 'object'
+        or jsonb_typeof(supplied_claims) is distinct from 'object'
+        or not internal.gate3_policy_qualified(
+            supplied_policy, supplied_qualification)
+    then return false; end if;
+    supplied_digest := internal.gate3_public_text_digest(
+        supplied_summary, supplied_claims);
+    select * into prior from pii.gate3_public_text_qualifications
+        where report_id = target.id;
+    if found then return prior.payload_digest = supplied_digest
+        and prior.policy_digest = supplied_policy
+        and prior.qualification_digest = supplied_qualification
+        and prior.qualifier_receipt_id = supplied_receipt_id; end if;
+    insert into pii.gate3_public_text_qualifications
+        (report_id, payload_digest, policy_digest, qualification_digest,
+            qualifier_receipt_id)
+    values (target.id, supplied_digest, supplied_policy,
+        supplied_qualification, supplied_receipt_id);
+    return true;
+end;
+$$;
+revoke all on function public.record_gate3_public_text_qualification(
+    uuid, jsonb, jsonb, text, text, uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function public.record_gate3_public_text_qualification(
+    uuid, jsonb, jsonb, text, text, uuid) to gate3_report_qualifier;
+
 create function internal.gate3_public_text_current(
     supplied_report_id uuid, supplied_summary jsonb, supplied_claims jsonb,
     supplied_policy text, supplied_qualification text

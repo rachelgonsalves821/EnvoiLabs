@@ -2331,6 +2331,17 @@ export type Database = {
         Args: { supplied_answer_id: string; supplied_auth_user_id: string }
         Returns: Json
       }
+      record_gate3_public_text_qualification: {
+        Args: {
+          supplied_claims: Json
+          supplied_policy: string
+          supplied_qualification: string
+          supplied_receipt_id: string
+          supplied_report_id: string
+          supplied_summary: Json
+        }
+        Returns: boolean
+      }
       record_gate3_withheld_proposal: {
         Args: {
           supplied_actor: string

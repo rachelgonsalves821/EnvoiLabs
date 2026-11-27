@@ -113,6 +113,7 @@ select jsonb_build_object('version', 2, 'executiveAnswer', 'One soup order',
         'contradictingQuotes', '[]'::jsonb))) as payload
 from expected_report_quotes;
 grant select on expected_report_summary to service_role;
+grant select on expected_report_summary to gate3_report_qualifier;
 create temp table expected_reviews as
 select jsonb_build_array(jsonb_build_object(
     'proposalId', 'a9700000-0000-4000-8000-000000000021',
@@ -347,6 +348,13 @@ select throws_ok($$insert into pii.gate3_public_text_qualifications
     values ('a9700000-0000-4000-8000-000000000006', repeat('a',64),
         repeat('a',64), repeat('b',64), gen_random_uuid())$$,
     '42501', null, 'service role cannot mint its own public-text receipt');
+select ok(not has_function_privilege('service_role',
+    'public.record_gate3_public_text_qualification(uuid,jsonb,jsonb,text,text,uuid)',
+    'EXECUTE') and not has_function_privilege('authenticated',
+    'public.record_gate3_public_text_qualification(uuid,jsonb,jsonb,text,text,uuid)',
+    'EXECUTE') and has_function_privilege('gate3_report_qualifier',
+    'public.record_gate3_public_text_qualification(uuid,jsonb,jsonb,text,text,uuid)',
+    'EXECUTE'), 'only separate no-login qualifier may record public-text approval');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     (select payload from expected_report_summary),
@@ -363,12 +371,30 @@ select is((select count(*) from research.reports where id =
     'no direct-RPC sentinel can make the report readable');
 reset role;
 -- Synthetic fixture stands in for an independently authorized qualifier.
-insert into pii.gate3_public_text_qualifications
-    (report_id, payload_digest, policy_digest, qualification_digest, qualifier_receipt_id)
-values ('a9700000-0000-4000-8000-000000000006',
-    internal.gate3_public_text_digest((select payload from expected_report_summary),
-        '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}'),
-    repeat('a',64), repeat('b',64), 'a9700000-0000-4000-8000-000000000052');
+set local role gate3_report_qualifier;
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000006',
+    (select payload from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000052'), true,
+    'separate synthetic qualifier records the exact approved public text');
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000006',
+    (select payload from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000052'), true,
+    'exact qualifier receipt replay is idempotent');
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{executiveAnswer}', '"Changed text"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000052'), false,
+    'same receipt cannot approve changed public text');
+reset role;
 set local role service_role;
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
@@ -520,6 +546,7 @@ select jsonb_build_object('version', 2, 'executiveAnswer', 'Edited soup summary'
         'contradictingQuotes', '[]'::jsonb))) as payload
 from edited_report_quotes;
 grant select on edited_report_summary to service_role;
+grant select on edited_report_summary to gate3_report_qualifier;
 create temp table edited_reviews as
 select jsonb_build_array(
     jsonb_build_object('proposalId', 'a9700000-0000-4000-8000-000000000033',
@@ -552,12 +579,15 @@ select is(public.attest_gate3_reviewed_support(
         payload #>> '{1,0,sourceVersion}')) from edited_report_quotes)), true,
     'second report version has a separate reviewed source attestation');
 reset role;
-insert into pii.gate3_public_text_qualifications
-    (report_id, payload_digest, policy_digest, qualification_digest, qualifier_receipt_id)
-values ('a9700000-0000-4000-8000-000000000030',
-    internal.gate3_public_text_digest((select payload from edited_report_summary),
-        '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}'),
-    repeat('a',64), repeat('b',64), 'a9700000-0000-4000-8000-000000000053');
+set local role gate3_report_qualifier;
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000030',
+    (select payload from edited_report_summary),
+    '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000053'), true,
+    'next report version has its own independently qualified public text');
+reset role;
 set local role service_role;
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
