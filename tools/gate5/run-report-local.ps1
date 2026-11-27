@@ -1,6 +1,9 @@
 param(
-  [ValidatePattern('^[a-z0-9][a-z0-9-]*\.spec\.ts$')][string]$Spec = 'gate5-report.spec.ts',
-  [ValidateSet('desktop-chromium', 'mobile-webkit')][string]$Project = 'desktop-chromium'
+  [ValidateSet('gate5-report.spec.ts', 'gate2-marketplace.spec.ts',
+    'researcher/gate3-report.spec.ts')][string]$Spec = 'gate5-report.spec.ts',
+  [ValidateSet('desktop-chromium', 'mobile-webkit')][string]$Project = 'desktop-chromium',
+  [ValidateSet('withdrawal', 'reredaction', 'deletion', 'newest-withheld')]
+    [string]$Scenario = 'withdrawal'
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -81,6 +84,16 @@ try {
     $env:ENVOI_GATE2_SCREENING_VOICE_ENABLED = 'true'
     $env:ENVOI_GATE2_EARNINGS_ENABLED = 'true'
     $env:ENVOI_MARKETPLACE_FEASIBILITY_ENABLED = 'true'
+  }
+  if ($Spec -eq 'researcher/gate3-report.spec.ts') {
+    $gate3Spec = Join-Path $repo 'apps\web\e2e\researcher\gate3-report.spec.ts'
+    if (-not (Test-Path -LiteralPath $gate3Spec)) {
+      throw 'Gate 3 temporary local-only spec is absent'
+    }
+    $env:ENVOI_GATE3_MOUNTED_REPORT_FIXTURE = '1'
+    $env:ENVOI_GATE3_MOUNTED_ORIGIN = 'http://127.0.0.1:3100'
+    $env:ENVOI_GATE3_MOUNTED_DB_CONTAINER = $dbContainer
+    $env:ENVOI_GATE3_MOUNTED_SCENARIO = $Scenario
   }
   Push-Location $repo
   try {
