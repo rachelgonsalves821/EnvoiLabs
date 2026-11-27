@@ -18,11 +18,21 @@ export function uploadReceiptWakeEvent(answerId: string) {
 }
 
 export async function scheduleUploadReceiptWake(answerId: string,
-  send: (event: NonNullable<ReturnType<typeof uploadReceiptWakeEvent>>) => Promise<unknown>) {
+  send: (event: NonNullable<ReturnType<typeof uploadReceiptWakeEvent>>,
+    signal: AbortSignal) => Promise<unknown>, budgetMs = 500) {
   const event = uploadReceiptWakeEvent(answerId);
   if (!event) return "ineligible" as const;
-  try { await send(event); return "sent" as const; }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), budgetMs);
+  try {
+    return await Promise.race([
+      send(event, controller.signal).then(() => "sent" as const),
+      new Promise<"unavailable">((resolve) => controller.signal.addEventListener(
+        "abort", () => resolve("unavailable"), { once: true })),
+    ]);
+  }
   catch { return "unavailable" as const; }
+  finally { clearTimeout(timeout); controller.abort(); }
 }
 
 // Event payloads carry only the saved answer ID. The targeted selector then

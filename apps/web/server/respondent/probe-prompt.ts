@@ -39,7 +39,8 @@ export async function markProbeShown(request: NextRequest) {
 }
 
 export function createRecordProbeUploadClockHandler(schedule?:
-  (event: NonNullable<ReturnType<typeof uploadReceiptWakeEvent>>) => Promise<unknown>) {
+  (event: NonNullable<ReturnType<typeof uploadReceiptWakeEvent>>,
+    signal: AbortSignal) => Promise<unknown>) {
 return async function recordProbeUploadClock(request: NextRequest) {
   if (process.env.ENVOI_GATE3_PROBE_DISPATCH_ENABLED !== "true") return failure(404);
   const parsed = await input(request);

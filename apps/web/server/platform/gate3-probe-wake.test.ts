@@ -27,11 +27,14 @@ describe("default-off targeted probe wake", () => {
       .not.toBe(uploadReceiptWakeEvent(answerId)?.id);
     const send = vi.fn().mockResolvedValue(undefined);
     expect(await scheduleUploadReceiptWake(answerId, send)).toBe("sent");
-    expect(send).toHaveBeenCalledWith(uploadReceiptWakeEvent(answerId));
+    expect(send).toHaveBeenCalledWith(uploadReceiptWakeEvent(answerId),
+      expect.any(AbortSignal));
     expect(await scheduleUploadReceiptWake("bad", send)).toBe("ineligible");
     expect(send).toHaveBeenCalledTimes(1);
     send.mockRejectedValue(new Error("synthetic transport failure"));
     expect(await scheduleUploadReceiptWake(answerId, send)).toBe("unavailable");
+    const hung = vi.fn(() => new Promise<never>(() => undefined));
+    expect(await scheduleUploadReceiptWake(answerId, hung, 1)).toBe("unavailable");
   });
 
   it("rejects disabled, unknown or source-bearing events before any database or runner call", async () => {
