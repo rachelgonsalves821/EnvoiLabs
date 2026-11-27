@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProbeDecisionPort, dispatchReadyProbeBatch,
-  dispatchReadyProbeCandidates, listReadyProbeCandidates,
+import { createProbeDecisionPort, dispatchReadyProbeAnswer, dispatchReadyProbeBatch,
+  dispatchReadyProbeCandidates, listReadyProbeCandidates, readReadyProbeAnswer,
   sweepDueProbeRenders, sweepDueProbeTimeouts,
   type ProbeReadyCandidate, type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
@@ -185,6 +185,58 @@ describe("probe persistence boundary", () => {
       data: [{ answerId, sessionId, authUserId, sourceText: "private fixture" }] }), 1))
       .rejects.toThrow("invalid private ready selector");
     await expect(listReadyProbeCandidates(call, 101)).rejects.toThrow("ready selector limit");
+  });
+
+  it("targets the exact answer on either wake and binds the selected respondent", async () => {
+    const candidate = { answerId: "a9720000-0000-4000-8000-000000000005",
+      sessionId: "a9720000-0000-4000-8000-000000000004",
+      authUserId: "90300000-0000-4000-8000-000000000001" };
+    const call = vi.fn<ProbeRpc>().mockImplementation(async (name) => ({ error: null,
+      data: name === "read_gate3_probe_ready_answer" ? candidate
+        : "a9720000-0000-4000-8000-000000000006" }));
+    const build = vi.fn((_selected: ProbeReadyCandidate,
+      source: { sourceText: string; questionText: string }) => buildRequest(source));
+    const run = vi.fn(async (selected: ProbeReadyCandidate,
+      port: ReturnType<typeof createProbeDecisionPort>) => {
+      expect(selected).toEqual(candidate);
+      expect(await port.beginCurrentTurn(selected.answerId))
+        .toBe("a9720000-0000-4000-8000-000000000006");
+      return { status: "committed" as const };
+    });
+    expect(await dispatchReadyProbeAnswer(call, candidate.answerId, build, run))
+      .toBe("committed");
+    expect(call).toHaveBeenCalledWith("read_gate3_probe_ready_answer", {
+      supplied_answer_id: candidate.answerId });
+    expect(call).toHaveBeenCalledWith("begin_gate3_probe_turn_with_clock", {
+      supplied_answer_id: candidate.answerId,
+      supplied_auth_user_id: candidate.authUserId });
+    expect(build).not.toHaveBeenCalled();
+    call.mockResolvedValue({ data: null, error: null });
+    expect(await dispatchReadyProbeAnswer(call, candidate.answerId, build, run))
+      .toBe("stale");
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(await readReadyProbeAnswer(call, "untrusted"))
+      .toBeNull();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a targeted selector that substitutes an answer or leaks source", async () => {
+    const answerId = "a9720000-0000-4000-8000-000000000005";
+    const otherId = "a9720000-0000-4000-8000-000000000006";
+    const candidate = { answerId: otherId,
+      sessionId: "a9720000-0000-4000-8000-000000000004",
+      authUserId: "90300000-0000-4000-8000-000000000001" };
+    const run = vi.fn();
+    const build = vi.fn();
+    const bad = vi.fn<ProbeRpc>().mockResolvedValue({ data: candidate, error: null });
+    expect(await dispatchReadyProbeAnswer(bad, answerId, build, run))
+      .toBe("unavailable");
+    bad.mockResolvedValue({ data: { ...candidate, answerId,
+      sourceText: "private fixture" }, error: null });
+    expect(await dispatchReadyProbeAnswer(bad, answerId, build, run))
+      .toBe("unavailable");
+    expect(run).not.toHaveBeenCalled();
+    expect(build).not.toHaveBeenCalled();
   });
 
   it("dispatches a bounded ID batch and records independent stale or failed outcomes", async () => {

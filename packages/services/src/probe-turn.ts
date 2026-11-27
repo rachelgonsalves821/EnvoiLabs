@@ -71,6 +71,37 @@ export async function listReadyProbeCandidates(call: ProbeRpc, limit = 25):
   return items;
 }
 
+// Both the qualified-answer wake and browser-receipt wake may arrive first.
+// Select the exact saved answer; a global bounded page can omit it until expiry.
+export async function readReadyProbeAnswer(call: ProbeRpc, answerId: string):
+  Promise<ProbeReadyCandidate | null> {
+  if (!uuid(answerId)) return null;
+  const { data, error } = await call("read_gate3_probe_ready_answer", {
+    supplied_answer_id: answerId });
+  if (error) throw error;
+  if (data === null) return null;
+  const item = record(data);
+  if (!item || Object.keys(item).length !== 3 || item.answerId !== answerId
+    || !uuid(item.sessionId) || !uuid(item.authUserId))
+    throw new Error("invalid private targeted candidate");
+  return item as unknown as ProbeReadyCandidate;
+}
+
+export async function dispatchReadyProbeAnswer(call: ProbeRpc, answerId: string,
+  buildRequest: (candidate: ProbeReadyCandidate, source: Source) => Request,
+  runSaved: (candidate: ProbeReadyCandidate,
+    port: ReturnType<typeof createProbeDecisionPort>) =>
+      Promise<{ readonly status: "committed" | "stale" | "unavailable" }>):
+  Promise<"committed" | "stale" | "unavailable"> {
+  try {
+    const candidate = await readReadyProbeAnswer(call, answerId);
+    if (!candidate) return "stale";
+    const port = createProbeDecisionPort(call, candidate.authUserId,
+      (source) => buildRequest(candidate, source));
+    return (await runSaved(candidate, port)).status;
+  } catch { return "unavailable"; }
+}
+
 export interface ProbeDispatchBatchResult {
   readonly scanned: number;
   readonly committed: number;
