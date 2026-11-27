@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireRespondent } from "../../../../server/auth/identity";
 import { sessionClient } from "../../../../server/auth/supabase";
+import { fictionalWalkthroughEnabled } from "../../../../server/gate5/fictional-preview";
 import { readCurrentEarnings } from "../../../../server/respondent/earnings";
 import { formatReward } from "../reward";
 import { ReferralEntry } from "./referral-entry";
@@ -21,6 +22,7 @@ const labels = {
 
 export default async function RespondentEarningsPage() {
   if (process.env.ENVOI_GATE2_EARNINGS_ENABLED !== "true") notFound();
+  const fictionalPayout = fictionalWalkthroughEnabled();
   await requireRespondent();
   const jar = await cookies();
   const client = sessionClient({ getAll: () => jar.getAll() });
@@ -29,6 +31,12 @@ export default async function RespondentEarningsPage() {
     <section className="respondent-earnings" aria-labelledby="respondent-earnings-heading">
       <a href="/r">← Your studies</a>
       <h1 id="respondent-earnings-heading">Earnings</h1>
+      {fictionalPayout && <p role="status" style={{ padding: "0.85rem 1rem",
+        border: "2px solid #8b5e00", borderRadius: "0.75rem",
+        backgroundColor: "#fff2cc", fontWeight: 700 }}>
+        Fictional product test · Payout mocked. Delivered amounts and receipts below
+        come from simulated provider responses, not a real Visa order.
+      </p>}
       {earnings === null ? <p role="alert">Earnings couldn’t load. Refresh this page to try again.</p> : <>
         <p>Rewards from approved answers appear here. A payout is delivered only after it is confirmed.</p>
         <div className="respondent-earnings-summary">

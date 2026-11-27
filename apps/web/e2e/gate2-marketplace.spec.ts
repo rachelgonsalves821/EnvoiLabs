@@ -26,12 +26,17 @@ test.describe("Gate 2 marketplace fixture replay", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
   test("AAL2 feasibility, frozen $2/$1 quote, synthetic paid launch and matched respondent offer", async ({ browser, baseURL }) => {
-    test.setTimeout(360_000);
+    test.setTimeout(process.env.ENVOI_GATE5_FULL_WALKTHROUGH === "1" ? 600_000 : 360_000);
     const origin = loopbackOrigin(baseURL);
     const db = localService();
     const typedDb = db as unknown as SupabaseClient<Database>;
     const researcherEmail = `gate2-market-researcher-${randomUUID()}@example.test`;
-    const org = await db.from("organizations").insert({ name: "Synthetic open marketplace" }).select("id").single();
+    const fullWalkthrough = process.env.ENVOI_GATE5_FULL_WALKTHROUGH === "1";
+    const org = fullWalkthrough
+      ? await db.from("organizations").select("id")
+        .eq("id", "90100000-0000-4000-8000-000000000001").single()
+      : await db.from("organizations").insert({ name: "Synthetic open marketplace" })
+        .select("id").single();
     if (org.error || !org.data) throw new Error(`Organization: ${org.error?.message}`);
     const account = await db.auth.admin.createUser({
       email: researcherEmail, email_confirm: !useDefaultTemplate,
@@ -161,6 +166,14 @@ test.describe("Gate 2 marketplace fixture replay", () => {
       });
       expect(matched.error).toBeNull();
       expect(matched.data).toMatchObject({ created: 10, remaining: 0 });
+      await page.goto(`/app/studies/${study.data.id}`);
+      if (process.env.ENVOI_GATE5_FICTIONAL_WALKTHROUGH === "true") {
+        await expect(page.getByText(/Fictional product test · Payment simulated/))
+          .toBeVisible();
+      } else {
+        await expect(page.getByText(/Fictional product test · Payment simulated/))
+          .toHaveCount(0);
+      }
       const offers = await db.from("invites").select("id,respondent_id,state,reward_cents")
         .eq("study_id", study.data.id);
       expect(offers.error).toBeNull();
@@ -571,6 +584,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         expect(await issueGate2SandboxVisaBatch(batchInput)).toBe("delivered");
         expect(orderPosts).toBe(1);
         await respondent.goto("/r/earnings");
+        if (process.env.ENVOI_GATE5_FICTIONAL_WALKTHROUGH === "true") {
+          await expect(respondent.getByText(/Fictional product test · Payout mocked/))
+            .toBeVisible();
+        } else {
+          await expect(respondent.getByText(/Fictional product test · Payout mocked/))
+            .toHaveCount(0);
+        }
         await expect(respondent.getByRole("heading", { name: "Earned" })
           .locator("..").getByText("$15.00")).toBeVisible();
         await expect(respondent.getByRole("heading", { name: "Delivered" })
@@ -580,6 +600,92 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         const receipts = await respondent.locator(".respondent-earnings-list small")
           .allTextContents();
         expect(new Set(receipts)).toHaveProperty("size", 1);
+        if (fullWalkthrough) {
+          const remaining = [offers.data?.[1], ...(offers.data?.slice(5) ?? [])];
+          expect(remaining).toHaveLength(6);
+          for (const offer of remaining) {
+            if (!offer) throw new Error("A purchased slot has no fictional offer.");
+            const email = respondentEmails[respondentIds.indexOf(offer.respondent_id)];
+            if (!email) throw new Error("A matched fictional email is missing.");
+            const journey = await submitOffer(email, offer.id);
+            try {
+              const approved = await db.rpc("decide_gate2_marketplace_quality", {
+                supplied_study_id: study.data.id, supplied_quote_id: prepared.quote.id,
+                supplied_session_id: journey.sessionId,
+                supplied_actor_auth_id: account.data.user.id,
+                supplied_decision: "approve", supplied_score: 100,
+                supplied_components: { synthetic: true }, supplied_reason: null,
+              });
+              expect(approved.error).toBeNull();
+            } finally { await journey.context.close(); }
+          }
+          const completed = await db.from("sessions").select("id,state")
+            .eq("study_id", study.data.id).in("state", ["approved", "removed"]);
+          expect(completed.error).toBeNull();
+          expect(completed.data?.filter(({ state }) => state === "approved")).toHaveLength(10);
+          expect(completed.data?.filter(({ state }) => state === "removed")).toHaveLength(1);
+          const quoteStillFrozen = await db.from("gate2_quote_snapshots")
+            .select("id,total_cents").eq("study_id", study.data.id);
+          expect(quoteStillFrozen.data).toEqual([{ id: prepared.quote.id, total_cents: 10_000 }]);
+
+          const ownReferral = await respondent.request.get("/api/respondent/referral");
+          expect(ownReferral.status()).toBe(200);
+          const { code } = await ownReferral.json() as { code: string };
+          for (let index = 0; index < 5; index += 1) {
+            const email = `gate5-referee-${index}-${randomUUID()}@example.test`;
+            const created = await db.auth.admin.createUser({ email, email_confirm: true });
+            if (created.error || !created.data.user) throw new Error("Fictional referee missing.");
+            const provisioned = await db.rpc("provision_email_respondent", {
+              supplied_user_id: created.data.user.id,
+            });
+            if (provisioned.error || !provisioned.data) throw new Error("Fictional referee profile missing.");
+            const facts = await db.from("profile_attributes").insert(profile.map(([key, value_json]) =>
+              ({ respondent_id: provisioned.data, key, value_json, source: "signup" })));
+            expect(facts.error).toBeNull();
+            const refereeContext = await browser.newContext({ baseURL: origin });
+            try {
+              const referee = await refereeContext.newPage();
+              await referee.goto("/r/signup");
+              await referee.getByLabel("Email address").fill(email);
+              await referee.getByRole("checkbox", { name: /18 or older/ }).check();
+              await referee.getByRole("button", { name: "Email me a sign-in link" }).click();
+              const link = await deliveredEmail(referee, email, origin,
+                "/api/respondent/auth/callback");
+              await referee.goto(link.href);
+              await referee.goto("/r");
+              const referralSelf = await referee.request.get("/api/respondent/referral");
+              expect(referralSelf.status()).toBe(200);
+              const registered = await referee.request.post("/api/respondent/referral", {
+                headers: { origin },
+                data: { code },
+              });
+              expect(registered.status()).toBe(200);
+              expect(await registered.json()).toMatchObject({ attributed: true, profileVerified: true });
+            } finally { await refereeContext.close(); }
+          }
+          const vested = await db.from("gate2_referral_vestings")
+            .select("bonus_cents,verified_profile_count")
+            .eq("referrer_id", first.respondent_id).single();
+          expect(vested.error).toBeNull();
+          expect(vested.data).toMatchObject({ bonus_cents: 500, verified_profile_count: 5 });
+          await respondent.reload();
+          await expect(respondent.getByText("5 verified profiles")).toBeVisible();
+          await expect(respondent.getByText("$5.00 referral bonus vested")).toBeVisible();
+
+          const qualifiedStudyId = "90600000-0000-4000-8000-000000000001";
+          const qualifiedRead = await page.request.get(
+            `/api/researcher/studies/${qualifiedStudyId}/report`);
+          expect(qualifiedRead.status()).toBe(200);
+          expect(qualifiedRead.headers()["cache-control"]).toBe("private, no-store");
+          await page.goto(`/app/studies/${qualifiedStudyId}`);
+          await expect(page.getByRole("heading", { name: "Research report" })).toBeVisible();
+          await expect(page.getByText("ordered soup", { exact: true })).toBeVisible();
+          const reportDownload = page.waitForEvent("download");
+          await page.getByRole("button", { name: "Download themes and quotes CSV" }).click();
+          expect((await reportDownload).suggestedFilename())
+            .toBe("envoi-labs-themes-and-quotes.csv");
+          return;
+        }
         const second = offers.data?.[1];
         const secondEmail = second && respondentEmails[respondentIds.indexOf(second.respondent_id)];
         const firstQuestion = core[0];
