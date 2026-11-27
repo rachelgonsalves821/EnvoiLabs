@@ -32,6 +32,8 @@ select ok(not has_function_privilege('authenticated',
     and not has_function_privilege('authenticated',
     'public.read_gate3_probe_pending(uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('authenticated',
+    'public.record_gate3_probe_upload_clock(uuid,uuid,uuid,double precision,text)', 'EXECUTE')
+    and not has_function_privilege('authenticated',
     'public.commit_gate3_probe_decision(uuid,uuid,uuid,uuid,uuid,uuid,text,jsonb)', 'EXECUTE')
     and not has_table_privilege('service_role', 'internal.gate3_probe_turns', 'SELECT'),
     'private ledger and source read are restricted to service RPCs');
@@ -101,6 +103,43 @@ values ('a9700000-0000-4000-8000-000000000004',
     repeat('a', 64), repeat('b', 64));
 create temporary table probe_ids (turn_id uuid not null);
 grant select, insert on probe_ids to service_role;
+set local role service_role;
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000002',
+    'a9700000-0000-4000-8000-000000000010', 1000,
+    'text_save_response'), 'stale',
+    'another respondent cannot stamp the upload clock');
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000010', 1000,
+    'text_save_response'), 'recorded',
+    'current answer stores its page-clock upload acknowledgement');
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000010', 1000,
+    'text_save_response'), 'recorded',
+    'identical upload-clock retry is idempotent');
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000011', 1000,
+    'text_save_response'), 'stale',
+    'a changed page clock cannot rewrite the first receipt');
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000010', 1000,
+    'voice_object_put'), 'stale',
+    'text answers cannot claim a voice upload acknowledgement');
+reset role;
+select throws_ok($$
+    update internal.gate3_probe_opportunities
+    set browser_clock_origin_id = 'a9700000-0000-4000-8000-000000000011'
+    where answer_id = 'a9700000-0000-4000-8000-000000000004'
+$$, '23514', null, 'the private upload receipt cannot be rewritten');
 set local role service_role;
 select is(public.read_gate3_probe_pending(
     'a9700000-0000-4000-8000-000000000003',
