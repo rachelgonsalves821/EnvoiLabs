@@ -874,6 +874,111 @@ select is(internal.gate3_reviewed_support_current(
     'a9700000-0000-4000-8000-000000000040', repeat('a', 64), repeat('b', 64)),
     true, 'six distinct current supporters justify six of ten');
 
+-- Twelve distinct approved people may support a finding with ten public quotes.
+insert into auth.users (id)
+select ('a9710000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+from generate_series(10, 11) as n;
+insert into public.respondents (id, auth_user_id, age_attested_at)
+select ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9710000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    clock_timestamp() from generate_series(10, 11) as n;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+select ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    purpose, true, 'fixture-v1'
+from generate_series(10, 11) as n
+cross join unnest(array['retention', 'researcher_access']) as purpose;
+insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
+select ('a9730000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001',
+    ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    'accepted', 160, clock_timestamp() + interval '1 day'
+from generate_series(10, 11) as n;
+insert into public.sessions (id, invite_id, study_id, state, submitted_at)
+select ('a9740000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9730000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001', 'submitted', clock_timestamp()
+from generate_series(10, 11) as n;
+insert into public.quality_scores (session_id, score, components_json, decision)
+select ('a9740000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    90, '{}'::jsonb, 'approve' from generate_series(10, 11) as n;
+update public.sessions set state = 'approved' where id in
+    (select ('a9740000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+        from generate_series(10, 11) as n);
+insert into public.answers (id, session_id, study_id, guide_question_id, kind, sequence)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    case when n = 11 then 'a9700000-0000-4000-8000-000000000003'::uuid
+        else ('a9740000-0000-4000-8000-' ||
+            lpad(to_hex(case when n >= 12 then n - 2 else n - 1 end), 12, '0'))::uuid end,
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001', 'text',
+    case when n = 11 then 2 else 1 end
+from generate_series(8, 13) as n;
+insert into public.transcripts (id, answer_id, study_id, provider, model, latency_ms, cost_micros)
+select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001', 'typed', 'none', 0, 0
+from generate_series(8, 13) as n;
+insert into pii.transcript_raw (transcript_id, raw_text)
+select id, 'Synthetic qualified supporter' from public.transcripts
+where id in (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    from generate_series(8, 13) as n);
+insert into internal.gate1_answer_jobs (answer_id)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+from generate_series(8, 13) as n;
+set local role service_role;
+insert into support_claims
+select answer_id, (public.claim_gate1_answer_job(answer_id) ->> 'leaseId')::uuid
+from (select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    as answer_id from generate_series(8, 13) as n) as requested;
+select is(public.complete_gate1_answer_job(answer_id, lease_id,
+    supplied_redacted_text => 'Qualified supporter', supplied_redaction_passed => true,
+    supplied_policy_digest => repeat('a', 64), supplied_qualification_digest => repeat('b', 64)
+    ) ->> 'status', 'published', 'additional fictional support source is qualified')
+from support_claims where answer_id in
+    (select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+        from generate_series(8, 13) as n);
+reset role;
+insert into public.reports (id, study_id, version, state, summary_json)
+values ('a9700000-0000-4000-8000-000000000050',
+    '90600000-0000-4000-8000-000000000001', 4, 'ready', '{"raw":"private capped quote test"}');
+insert into public.findings (id, report_id, study_id, position, claim, count, total, confidence)
+values ('a9700000-0000-4000-8000-000000000051',
+    'a9700000-0000-4000-8000-000000000050',
+    '90600000-0000-4000-8000-000000000001', 1, 'Private broad claim', 12, 12, 'high');
+insert into public.evidence_quotes
+    (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
+select ('a9770000-0000-4000-8000-' || lpad(to_hex(row_number() over (order by id)), 12, '0'))::uuid,
+    'a9700000-0000-4000-8000-000000000051', id, study_id,
+    0, 9, 'Qualified', redacted_source_version
+from public.transcripts where id in
+    (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+        from generate_series(1, 11) as n where n <> 7);
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000050',
+    'a9700000-0000-4000-8000-000000000051',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000053',
+    (select jsonb_agg(jsonb_build_object('transcriptId', id,
+        'sourceVersion', redacted_source_version) order by id)
+        from public.transcripts where id in
+        (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+            from generate_series(1, 13) as n where n <> 7))), true,
+    'reviewer attests twelve distinct qualified supporters');
+reset role;
+select is((select count(*) from public.evidence_quotes where finding_id =
+    'a9700000-0000-4000-8000-000000000051'), 10::bigint,
+    'only ten of twelve supporting quotes are public');
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000050', repeat('a', 64), repeat('b', 64)),
+    true, 'twelve reviewed supporters can back twelve of twelve with ten quotes');
+update public.transcripts set redacted_text = 'Changed unquoted source'
+where id = 'a9760000-0000-4000-8000-000000000013';
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000050', repeat('a', 64), repeat('b', 64)),
+    false, 're-redaction of unquoted supporter invalidates the whole finding');
+
 reset role;
 set local role authenticated;
 select * from finish();
