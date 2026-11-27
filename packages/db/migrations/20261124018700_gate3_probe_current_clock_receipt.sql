@@ -1,6 +1,7 @@
 -- A legacy begin may have preceded the immutable browser upload receipt.
 -- No provider-ready read, decision or respondent display may trust that turn
 -- unless the captured page-clock receipt now matches its frozen upload time.
+-- A terminal timeout with no turn clock remains readable for the denominator.
 create or replace function internal.gate3_probe_current(
     supplied_turn_id uuid, supplied_auth_user_id uuid
 ) returns boolean language sql volatile security definer set search_path = '' as $$
@@ -15,9 +16,12 @@ create or replace function internal.gate3_probe_current(
         join public.studies as study on study.id = interview.study_id
         join public.guide_questions as question on question.id = turn.guide_question_id
         where turn.id = supplied_turn_id and respondent.auth_user_id = supplied_auth_user_id
-            and opportunity.browser_clock_origin_id is not null
-            and opportunity.browser_upload_receipt_ms is not null
-            and opportunity.browser_upload_receipt_ms = turn.browser_upload_confirmed_ms
+            and ((opportunity.browser_clock_origin_id is not null
+                and opportunity.browser_upload_receipt_ms is not null
+                and opportunity.browser_upload_receipt_ms = turn.browser_upload_confirmed_ms)
+                or (turn.browser_upload_confirmed_ms is null
+                    and turn.decision_json ->> 'action' = 'next'
+                    and turn.decision_json ->> 'outcome' = 'timeout'))
             and respondent.status = 'active' and offer.state = 'accepted'
             and offer.expires_at > clock_timestamp() and study.state = 'fielding'
             and interview.state = 'in_progress'
@@ -88,9 +92,12 @@ returns jsonb language sql volatile security definer set search_path = '' as $$
                 as current_qualified,
             coalesce((turn_id is not null and turn_source_version = current_source_version
                 and turn_revision = current_revision
-                and browser_clock_origin_id is not null
-                and browser_upload_receipt_ms is not null
-                and browser_upload_receipt_ms = browser_upload_confirmed_ms), false)
+                and ((browser_clock_origin_id is not null
+                    and browser_upload_receipt_ms is not null
+                    and browser_upload_receipt_ms = browser_upload_confirmed_ms)
+                    or (browser_upload_confirmed_ms is null
+                        and decision_json ->> 'action' = 'next'
+                        and decision_json ->> 'outcome' = 'timeout'))), false)
                 as current_turn
         from captured
     ), entries as (
