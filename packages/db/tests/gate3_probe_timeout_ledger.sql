@@ -133,6 +133,14 @@ insert into internal.gate1_answer_jobs (answer_id, source_hash,
 values ('a9720000-0000-4000-8000-000000000007',
     decode(repeat('d', 64), 'hex'), clock_timestamp() - interval '10 seconds',
     'published', repeat('a', 64), repeat('b', 64));
+-- This synthetic receipt models a browser acknowledgement that occurred
+-- before the server decision deadline, although the fixture runs later.
+update internal.gate3_probe_opportunities set
+    browser_clock_origin_id = 'a9720000-0000-4000-8000-000000000011',
+    browser_upload_receipt_ms = 2000,
+    browser_upload_kind = 'text_save_response',
+    browser_clock_recorded_at = clock_timestamp() - interval '12 seconds'
+where answer_id = 'a9720000-0000-4000-8000-000000000007';
 set local role service_role;
 create temporary table provider_turn (turn_id uuid not null);
 grant select, insert on provider_turn to service_role;
@@ -196,6 +204,12 @@ insert into internal.gate1_answer_jobs (answer_id, source_hash,
 values ('a9720000-0000-4000-8000-000000000009',
     decode(repeat('e', 64), 'hex'), clock_timestamp(), 'published',
     repeat('a', 64), repeat('b', 64));
+update internal.gate3_probe_opportunities set
+    browser_clock_origin_id = 'a9720000-0000-4000-8000-000000000012',
+    browser_upload_receipt_ms = 3000,
+    browser_upload_kind = 'text_save_response',
+    browser_clock_recorded_at = clock_timestamp()
+where answer_id = 'a9720000-0000-4000-8000-000000000009';
 set local role service_role;
 select is(public.record_gate3_probe_timeout(
     'a9720000-0000-4000-8000-000000000009',
