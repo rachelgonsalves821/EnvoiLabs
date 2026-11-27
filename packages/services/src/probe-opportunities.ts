@@ -24,8 +24,11 @@ export interface ProbeOpportunity {
   readonly renderOutcome: "shown" | "error" | "timeout" | "superseded" | null;
   readonly renderResolvedAt: string | null;
   readonly probeId: string | null;
+  readonly browserClockOriginId: string | null;
+  readonly browserUploadReceiptMs: number | null;
   readonly browserUploadConfirmedMs: number | null;
   readonly browserRenderedMs: number | null;
+  readonly browserMeasurementComparable: boolean;
 }
 export interface ProbeOpportunitySnapshot {
   readonly studyId: string;
@@ -67,8 +70,19 @@ function parseItem(value: unknown): ProbeOpportunity {
       value.renderOutcome === "timeout" || value.renderOutcome === "superseded") ||
     !nullableTime(value.renderResolvedAt) ||
     ((value.renderOutcome === null) !== (value.renderResolvedAt === null)) ||
-    !nullableUuid(value.probeId) || !nullableClock(value.browserUploadConfirmedMs) ||
+    !nullableUuid(value.probeId) || !nullableUuid(value.browserClockOriginId) ||
+    !nullableClock(value.browserUploadReceiptMs) ||
+    ((value.browserClockOriginId === null) !== (value.browserUploadReceiptMs === null)) ||
+    !nullableClock(value.browserUploadConfirmedMs) ||
     !nullableClock(value.browserRenderedMs) ||
+    typeof value.browserMeasurementComparable !== "boolean" ||
+    (value.browserMeasurementComparable && (
+      value.outcome !== "rendered" || value.renderOutcome !== "shown" ||
+      value.browserClockOriginId === null || value.browserUploadReceiptMs === null ||
+      value.browserUploadConfirmedMs !== value.browserUploadReceiptMs ||
+      value.browserRenderedMs === null ||
+      value.browserRenderedMs < value.browserUploadReceiptMs ||
+      value.browserRenderedMs > value.browserUploadReceiptMs + 6000)) ||
     (value.outcome === "rendered" && (value.shownAt === null ||
       value.browserUploadConfirmedMs === null || value.browserRenderedMs === null ||
       value.renderOutcome !== "shown")) ||

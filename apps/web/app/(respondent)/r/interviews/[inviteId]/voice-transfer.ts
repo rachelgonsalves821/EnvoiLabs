@@ -1,5 +1,6 @@
 import { RecordAnswerResponseSchema, StartAudioUploadResponseSchema } from "@envoi-labs/contracts";
 import { interviewRequest } from "../../interview-request";
+import { browserProbeClockStamp } from "./browser-probe-clock";
 import type { VoiceTake } from "./use-voice-capture";
 
 type UploadReservation = {
@@ -7,6 +8,7 @@ type UploadReservation = {
   uploadUrl: string;
   expiresAt: string;
   uploaded: boolean;
+  uploadClock?: ReturnType<typeof browserProbeClockStamp>;
 };
 
 // Keep the same uploaded object and answer ID when only final confirmation needs retrying.
@@ -62,6 +64,8 @@ async function stage({ take, transfer, scope, signal }: VoiceTransferInput) {
     // An earlier PUT can succeed even if its acknowledgement was lost. In that case
     // storage may reject the retry. The confirm endpoint checks the reserved object's metadata.
     if (status !== 200 && status !== 409) return status;
+    if (status === 200 && process.env.NEXT_PUBLIC_ENVOI_GATE3_PROBE_CLOCK_ENABLED === "true")
+      reservation.uploadClock = browserProbeClockStamp();
     reservation.uploaded = true;
   }
   return 200;
@@ -76,9 +80,15 @@ async function confirm({ take, transfer, scope, signal }: VoiceTransferInput) {
   }, signal);
   if (response.status >= 400) return response.status;
   const recorded = RecordAnswerResponseSchema.safeParse(response.data);
-  return recorded.success && recorded.data.answer.id === take.answerId &&
+  const valid = recorded.success && recorded.data.answer.id === take.answerId &&
     recorded.data.answer.kind === "voice" && recorded.data.answer.sessionId === scope.sessionId &&
-    recorded.data.answer.guideQuestionId === scope.guideQuestionId ? 200 : 503;
+    recorded.data.answer.guideQuestionId === scope.guideQuestionId;
+  if (!valid) return 503;
+  if (reservation.uploadClock) await interviewRequest("/api/respondent/probes/upload-clock", {
+    answerId: take.answerId, browserClockOriginId: reservation.uploadClock.browserClockOriginId,
+    browserUploadConfirmedAtMs: reservation.uploadClock.atMs, browserUploadKind: "voice_object_put",
+  }, signal);
+  return 200;
 }
 
 async function withRetry(input: VoiceTransferInput, action: (input: VoiceTransferInput) => Promise<number>) {

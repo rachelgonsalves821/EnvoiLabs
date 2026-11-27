@@ -1775,6 +1775,10 @@ export type Database = {
         }
         Returns: string
       }
+      begin_gate3_probe_turn_with_clock: {
+        Args: { supplied_answer_id: string; supplied_auth_user_id: string }
+        Returns: string
+      }
       claim_gate1_answer_job: {
         Args: { supplied_answer_id?: string }
         Returns: Json
@@ -2063,6 +2067,17 @@ export type Database = {
       mark_gate3_probe_shown: {
         Args: {
           supplied_auth_user_id: string
+          supplied_browser_rendered_ms: number
+          supplied_probe_id: string
+          supplied_session_id: string
+          supplied_turn_id: string
+        }
+        Returns: string
+      }
+      mark_gate3_probe_shown_with_clock: {
+        Args: {
+          supplied_auth_user_id: string
+          supplied_browser_clock_origin_id: string
           supplied_browser_rendered_ms: number
           supplied_probe_id: string
           supplied_session_id: string

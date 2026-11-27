@@ -54,7 +54,8 @@ describe("probe persistence boundary", () => {
     const outage = createProbeDecisionPort(async () => ({ data: null, error: Error("offline") }),
       "respondent", buildRequest);
     expect(await outage.markShown({ sessionId: "session", turnId: "turn",
-      probeId: "probe", browserRenderedAtMs: 1200 })).toBe("unavailable");
+      probeId: "probe", browserClockOriginId: "page-clock",
+      browserRenderedAtMs: 1200 })).toBe("unavailable");
     const malformed = createProbeDecisionPort(async () => ({ data: { decision: "broken" },
       error: null }), "respondent", buildRequest);
     await expect(malformed.readCommitted("session", "turn"))

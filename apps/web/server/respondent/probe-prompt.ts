@@ -1,5 +1,5 @@
 import {
-  MarkProbeShownRequestSchema, RecordAnswerResponseSchema,
+  MarkProbeShownRequestSchema, RecordAnswerResponseSchema, RecordProbeUploadClockRequestSchema,
   RecordProbeRenderErrorRequestSchema, RecordProbeTextAnswerRequestSchema,
 } from "@envoi-labs/contracts";
 import type { NextRequest } from "next/server";
@@ -23,12 +23,35 @@ export async function markProbeShown(request: NextRequest) {
   if (!actor) return failure(401);
   const trusted = trustedClient();
   if (!trusted) return failure(503);
-  const { data, error } = await trusted.rpc("mark_gate3_probe_shown", {
+  const { data, error } = await trusted.rpc("mark_gate3_probe_shown_with_clock", {
     supplied_session_id: choice.data.sessionId,
     supplied_turn_id: choice.data.turnId,
     supplied_probe_id: choice.data.probeId,
     supplied_auth_user_id: actor.authUserId,
+    supplied_browser_clock_origin_id: choice.data.browserClockOriginId,
     supplied_browser_rendered_ms: choice.data.browserRenderedAtMs,
+  });
+  if (error) return failure(503);
+  if (data !== "recorded") return failure(409);
+  return actor.session.commit(reply(200, { status: "recorded" }));
+}
+
+export async function recordProbeUploadClock(request: NextRequest) {
+  if (process.env.ENVOI_GATE3_PROBE_DISPATCH_ENABLED !== "true") return failure(404);
+  const parsed = await input(request);
+  if (parsed.error !== undefined) return failure(parsed.error);
+  const receipt = RecordProbeUploadClockRequestSchema.safeParse(parsed.body);
+  if (!receipt.success) return failure(400);
+  const actor = await respondent(request);
+  if (!actor) return failure(401);
+  const trusted = trustedClient();
+  if (!trusted) return failure(503);
+  const { data, error } = await trusted.rpc("record_gate3_probe_upload_clock", {
+    supplied_answer_id: receipt.data.answerId,
+    supplied_auth_user_id: actor.authUserId,
+    supplied_browser_clock_origin_id: receipt.data.browserClockOriginId,
+    supplied_browser_upload_confirmed_ms: receipt.data.browserUploadConfirmedAtMs,
+    supplied_browser_upload_kind: receipt.data.browserUploadKind,
   });
   if (error) return failure(503);
   if (data !== "recorded") return failure(409);

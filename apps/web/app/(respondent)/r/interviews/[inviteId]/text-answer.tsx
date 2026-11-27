@@ -4,6 +4,7 @@ import { RecordAnswerResponseSchema } from "@envoi-labs/contracts";
 import { Button } from "@envoi-labs/ui";
 import { useRef, useState, type SubmitEvent } from "react";
 import { interviewRequest } from "../../interview-request";
+import { browserProbeClockStamp } from "./browser-probe-clock";
 import { interviewCopy as copy } from "./copy";
 
 export function TextAnswer({ sessionId, questionId, onSaved, onBusyChange }: {
@@ -37,9 +38,15 @@ export function TextAnswer({ sessionId, questionId, onSaved, onBusyChange }: {
     const response = await interviewRequest("/api/respondent/answers/record", {
       kind: "text", answerId, sessionId, guideQuestionId: questionId, text: answer,
     });
+    const uploadClock = process.env.NEXT_PUBLIC_ENVOI_GATE3_PROBE_CLOCK_ENABLED === "true"
+      ? browserProbeClockStamp() : null;
     const recorded = RecordAnswerResponseSchema.safeParse(response.data);
     if (recorded.success && recorded.data.answer.id === answerId &&
       recorded.data.answer.sessionId === sessionId && recorded.data.answer.guideQuestionId === questionId) {
+      if (uploadClock) await interviewRequest("/api/respondent/probes/upload-clock", {
+        answerId, browserClockOriginId: uploadClock.browserClockOriginId,
+        browserUploadConfirmedAtMs: uploadClock.atMs, browserUploadKind: "text_save_response",
+      });
       onSaved();
       return;
     }

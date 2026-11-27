@@ -133,11 +133,13 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
         ? { status: "committed", value: saved } : { status: "unavailable" };
     },
     async markShown(input: { readonly sessionId: string; readonly turnId: string;
-      readonly probeId: string; readonly browserRenderedAtMs: number }): Promise<
+      readonly probeId: string; readonly browserClockOriginId: string;
+      readonly browserRenderedAtMs: number }): Promise<
       "recorded" | "stale" | "unavailable"> {
-      const { data, error } = await call("mark_gate3_probe_shown", {
+      const { data, error } = await call("mark_gate3_probe_shown_with_clock", {
         supplied_session_id: input.sessionId, supplied_turn_id: input.turnId,
         supplied_probe_id: input.probeId, supplied_auth_user_id: authUserId,
+        supplied_browser_clock_origin_id: input.browserClockOriginId,
         supplied_browser_rendered_ms: input.browserRenderedAtMs });
       if (error) return "unavailable";
       return data === "recorded" || data === "stale" ? data : "unavailable";
