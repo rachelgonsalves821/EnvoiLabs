@@ -13,6 +13,16 @@ insert into public.brief_versions (study_id, version, brief_json, created_by)
 values ('a9900000-0000-4000-8000-000000000001', 1,
     '{"decision":"Which fictional meal should we make?", "hypotheses":["Clarity helps choice"]}',
     '90400000-0000-4000-8000-000000000001');
+insert into auth.users (id)
+values ('a9700000-0000-4000-8000-000000000009');
+insert into public.organizations (id, name)
+values ('a9700000-0000-4000-8000-000000000010',
+    'Other fictional analyst tenant');
+insert into public.researchers (auth_user_id, organization_id,
+    terms_version, terms_accepted_at)
+values ('a9700000-0000-4000-8000-000000000009',
+    'a9700000-0000-4000-8000-000000000010',
+    'fictional-v1', now());
 insert into public.guide_questions (id, study_id, position, text)
 select ('a9910000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
     'a9900000-0000-4000-8000-000000000001', n,
@@ -165,7 +175,7 @@ select is(public.authorize_gate3_analyst_snapshot(
 select is(public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
     (select id from analyst_quote),
-    '90200000-0000-4000-8000-000000000002',
+    'a9700000-0000-4000-8000-000000000009',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
     'unbound researcher cannot request private source');
 select is(public.read_gate3_analyst_snapshot(
