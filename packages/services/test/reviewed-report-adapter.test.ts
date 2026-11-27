@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PublishedThemeSetV2Schema } from "@envoi-labs/contracts";
-import { loadCurrentQualifiedReport, loadQualifiedReport, publishReviewedReport, recordWithheldProposal,
+import { loadCurrentQualifiedReport, loadQualifiedReport, loadReviewedSupportSnapshot,
+  publishReviewedReport, recordWithheldProposal,
   type ReviewedEvidenceDecision } from "../src/reviewed-report-adapter.js";
 
 const content = PublishedThemeSetV2Schema.parse({ version: 2,
@@ -88,5 +89,24 @@ describe("reviewed report database adapter", () => {
     expect(db.rpc).toHaveBeenCalledWith("read_gate3_current_qualified_report", {
       supplied_study_id: quote.studyId,
     });
+  });
+
+  it("reads only a complete private reviewer-support identity snapshot", async () => {
+    const reportId = "a9700000-0000-4000-8000-000000000006";
+    const respondentId = "90500000-0000-4000-8000-000000000001";
+    const snapshot = { reportId, studyId: quote.studyId,
+      findings: [{ id: "a9700000-0000-4000-8000-000000000007", position: 1 }],
+      approvedRespondentIds: [respondentId],
+      sourceRespondents: [{ transcriptId: quote.transcriptId,
+        sourceVersion: quote.sourceVersion, respondentId }],
+      reviewedSupport: [{ position: 1, sources: [{ transcriptId: quote.transcriptId,
+        sourceVersion: quote.sourceVersion }] }] };
+    const db = { rpc: vi.fn().mockResolvedValueOnce({ data: snapshot, error: null })
+      .mockResolvedValueOnce({ data: { ...snapshot, sourceRespondents: [
+        { ...snapshot.sourceRespondents[0], sourceVersion: "invalid" }] }, error: null }) };
+    expect(await loadReviewedSupportSnapshot(db, reportId)).toEqual(snapshot);
+    expect(await loadReviewedSupportSnapshot(db, reportId)).toBeNull();
+    expect(db.rpc).toHaveBeenCalledWith("read_gate3_reviewed_support_snapshot", {
+      supplied_report_id: reportId });
   });
 });

@@ -147,3 +147,45 @@ export async function loadCurrentQualifiedReport(
   return typeof scoped.id === "string" && scoped.studyId === studyId && summary.success
     ? { reportId: scoped.id, studyId, summary: summary.data } : null;
 }
+
+export type ReviewedSupportSource = { transcriptId: string; sourceVersion: string };
+export type ReviewedSupportSnapshot = {
+  reportId: string; studyId: string;
+  findings: { id: string; position: number }[];
+  approvedRespondentIds: string[];
+  sourceRespondents: (ReviewedSupportSource & { respondentId: string })[];
+  reviewedSupport: { position: number; sources: ReviewedSupportSource[] }[];
+};
+
+type SupportDatabase = {
+  rpc(name: "read_gate3_reviewed_support_snapshot", args: {
+    supplied_report_id: string;
+  }): PromiseLike<{ data: unknown; error: unknown }>;
+};
+
+const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+// Private whole-report identity snapshot for Gate 3's final reviewed bridge.
+// The database derives approval, source ownership and attestations; no model
+// or researcher request supplies membership to this reader.
+export async function loadReviewedSupportSnapshot(db: SupportDatabase,
+  reportId: string): Promise<ReviewedSupportSnapshot | null> {
+  if (!uuid.test(reportId)) return null;
+  const { data, error } = await db.rpc("read_gate3_reviewed_support_snapshot", {
+    supplied_report_id: reportId });
+  if (error) throw error;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const value = data as Partial<ReviewedSupportSnapshot>;
+  if (value.reportId !== reportId || !uuid.test(value.studyId ?? "")
+    || !Array.isArray(value.findings) || !Array.isArray(value.approvedRespondentIds)
+    || !Array.isArray(value.sourceRespondents) || !Array.isArray(value.reviewedSupport)
+    || value.findings.some((item) => !item || !uuid.test(item.id)
+      || !Number.isSafeInteger(item.position))
+    || value.approvedRespondentIds.some((id) => !uuid.test(id))
+    || value.sourceRespondents.some((item) => !item || !uuid.test(item.transcriptId)
+      || !uuid.test(item.sourceVersion) || !uuid.test(item.respondentId))
+    || value.reviewedSupport.some((item) => !item || !Number.isSafeInteger(item.position)
+      || !Array.isArray(item.sources) || item.sources.some((source) => !source
+        || !uuid.test(source.transcriptId) || !uuid.test(source.sourceVersion)))) return null;
+  return value as ReviewedSupportSnapshot;
+}

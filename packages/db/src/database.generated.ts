@@ -1767,6 +1767,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      attest_gate3_reviewed_support: {
+        Args: {
+          supplied_actor_auth_user_id: string
+          supplied_causation_id: string
+          supplied_finding_id: string
+          supplied_report_id: string
+          supplied_sources: Json
+        }
+        Returns: boolean
+      }
       begin_gate3_probe_turn: {
         Args: {
           supplied_answer_id: string
@@ -2231,6 +2241,10 @@ export type Database = {
       }
       read_gate3_qualified_report: {
         Args: { supplied_report_id: string; supplied_study_id: string }
+        Returns: Json
+      }
+      read_gate3_reviewed_support_snapshot: {
+        Args: { supplied_report_id: string }
         Returns: Json
       }
       read_gate3_ready_probe_turn: {
