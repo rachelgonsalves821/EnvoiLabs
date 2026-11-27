@@ -5,6 +5,8 @@ import {
 import type { NextRequest } from "next/server";
 import { failure, input, reply } from "../auth/http";
 import { requestSession, trustedClient } from "../auth/supabase";
+import { scheduleUploadReceiptWake, type uploadReceiptWakeEvent,
+} from "../platform/gate3-probe-wake";
 
 async function respondent(request: NextRequest) {
   const session = requestSession(request);
@@ -36,7 +38,9 @@ export async function markProbeShown(request: NextRequest) {
   return actor.session.commit(reply(200, { status: "recorded" }));
 }
 
-export async function recordProbeUploadClock(request: NextRequest) {
+export function createRecordProbeUploadClockHandler(schedule?:
+  (event: NonNullable<ReturnType<typeof uploadReceiptWakeEvent>>) => Promise<unknown>) {
+return async function recordProbeUploadClock(request: NextRequest) {
   if (process.env.ENVOI_GATE3_PROBE_DISPATCH_ENABLED !== "true") return failure(404);
   const parsed = await input(request);
   if (parsed.error !== undefined) return failure(parsed.error);
@@ -55,8 +59,12 @@ export async function recordProbeUploadClock(request: NextRequest) {
   });
   if (error) return failure(503);
   if (data !== "recorded") return failure(409);
+  if (schedule) await scheduleUploadReceiptWake(receipt.data.answerId, schedule);
   return actor.session.commit(reply(200, { status: "recorded" }));
+};
 }
+
+export const recordProbeUploadClock = createRecordProbeUploadClockHandler();
 
 export async function recordProbeRenderError(request: NextRequest) {
   const parsed = await input(request);
