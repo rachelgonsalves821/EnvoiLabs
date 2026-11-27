@@ -166,6 +166,15 @@ select is(public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000002', 1000), null::uuid,
     'other respondent cannot begin the turn');
+select is(public.begin_gate3_probe_turn(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001', 1001), null::uuid,
+    'legacy begin cannot replace a captured page-clock upload receipt');
+reset role;
+select is((select count(*) from internal.gate3_probe_turns
+    where answer_id = 'a9700000-0000-4000-8000-000000000004'), 0::bigint,
+    'mismatched legacy begin created no provider-ready turn');
+set local role service_role;
 insert into probe_ids values (public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000001', 1000));
