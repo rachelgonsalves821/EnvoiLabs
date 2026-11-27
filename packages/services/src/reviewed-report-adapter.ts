@@ -1,5 +1,5 @@
 import { PublishedThemeSetV2Schema, type PublishedThemeSetV2 } from "@envoi-labs/contracts";
-import { publicationQuoteMap } from "./qualified-report.js";
+import { publicationQuoteMap } from "@envoi-labs/services/qualified-report";
 
 export type ReviewedEvidenceDecision = {
   proposalId: string;
