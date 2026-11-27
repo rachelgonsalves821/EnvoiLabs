@@ -27,6 +27,35 @@ create trigger immutable_gate3_private_analysis_proposals
     before update or delete on pii.gate3_private_analysis_proposals
     for each row execute function internal.reject_gate2_ledger_mutation();
 
+-- JSONB comparison checks semantic membership and ordered source identity.
+-- The caller also supplies the exact serialized key that Gate 3 hashed; the
+-- byte digest is checked separately so JSON formatting cannot be substituted.
+create function internal.gate3_analysis_binding_projection(snapshot jsonb)
+returns jsonb language sql immutable set search_path = '' as $$
+    select jsonb_build_object(
+        'studyId', snapshot -> 'studyId',
+        'sourceSetVersion', snapshot -> 'sourceSetVersion',
+        'consentRevision', snapshot -> 'consentRevision',
+        'reviewerReceiptId', snapshot -> 'reviewerReceiptId',
+        'briefVersion', snapshot -> 'briefVersion',
+        'pricingConfigVersion', snapshot -> 'pricingConfigVersion',
+        'decisionQuestion', snapshot -> 'decisionQuestion',
+        'hypotheses', snapshot -> 'hypotheses',
+        'guideQuestions', snapshot -> 'guideQuestions',
+        'sources', (select jsonb_agg(jsonb_build_object(
+            'studyId', source.item -> 'studyId',
+            'transcriptId', source.item -> 'transcriptId',
+            'sourceVersion', source.item -> 'sourceVersion',
+            'questionId', source.item -> 'questionId',
+            'redactedText', source.item -> 'redactedText',
+            'policyDigest', source.item -> 'policyDigest',
+            'qualificationDigest', source.item -> 'qualificationDigest')
+            order by source.item ->> 'transcriptId')
+            from jsonb_array_elements(snapshot -> 'sources') as source(item)));
+$$;
+revoke all on function internal.gate3_analysis_binding_projection(jsonb)
+    from public, anon, authenticated, service_role;
+
 create function public.write_gate3_private_analysis_proposal(
     supplied_study_id uuid, supplied_quote_id uuid,
     supplied_researcher_auth_user_id uuid,
@@ -34,10 +63,12 @@ create function public.write_gate3_private_analysis_proposal(
     supplied_map_prompt_digest text,
     supplied_reduce_provider_model text, supplied_reduce_prompt_version text,
     supplied_reduce_prompt_digest text,
-    supplied_snapshot jsonb, supplied_binding_digest text,
+    supplied_snapshot jsonb, supplied_binding_key text,
+    supplied_binding_digest text,
     supplied_draft jsonb, supplied_screened jsonb,
     supplied_request_id uuid
-) returns boolean language plpgsql security definer set search_path = '' as $$
+) returns boolean language plpgsql security definer set search_path = ''
+    set lock_timeout = '1500ms' as $$
 declare current_snapshot jsonb;
     prior pii.gate3_private_analysis_proposals%rowtype;
 begin
@@ -45,12 +76,15 @@ begin
         or supplied_researcher_auth_user_id is null
         or supplied_request_id is null
         or supplied_binding_digest is null
+        or supplied_binding_key is null
         or supplied_snapshot is null
         or supplied_draft is null or supplied_screened is null
         or supplied_binding_digest !~ '^[a-f0-9]{64}$'
         or coalesce(supplied_snapshot ->> 'reviewerReceiptId', '')
             !~ '^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
         or jsonb_typeof(supplied_snapshot) <> 'object'
+        or jsonb_typeof(supplied_snapshot -> 'sources') <> 'array'
+        or octet_length(convert_to(supplied_binding_key, 'UTF8')) > 8388608
         or jsonb_typeof(supplied_draft) <> 'object'
         or jsonb_typeof(supplied_screened) <> 'object'
         or octet_length(convert_to(supplied_draft::text, 'UTF8')) > 1048576
@@ -79,6 +113,10 @@ begin
         supplied_researcher_auth_user_id, supplied_map_provider_model,
         supplied_map_prompt_version, supplied_map_prompt_digest);
     if current_snapshot is null or current_snapshot <> supplied_snapshot
+        or supplied_binding_digest is distinct from encode(
+            pg_catalog.sha256(convert_to(supplied_binding_key, 'UTF8')), 'hex')
+        or supplied_binding_key::jsonb is distinct from
+            internal.gate3_analysis_binding_projection(current_snapshot)
         or not public.authorize_gate3_analyst_snapshot(
             supplied_study_id, supplied_quote_id,
             supplied_researcher_auth_user_id, supplied_reduce_provider_model,
@@ -120,14 +158,15 @@ begin
         supplied_binding_digest, supplied_request_id,
         supplied_snapshot, supplied_draft, supplied_screened);
     return true;
-exception when unique_violation then
+exception when unique_violation or lock_not_available
+    or invalid_text_representation then
     return false;
 end;
 $$;
 revoke all on function public.write_gate3_private_analysis_proposal(
     uuid, uuid, uuid, text, text, text, text, text, text,
-    jsonb, text, jsonb, jsonb, uuid)
+    jsonb, text, text, jsonb, jsonb, uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.write_gate3_private_analysis_proposal(
     uuid, uuid, uuid, text, text, text, text, text, text,
-    jsonb, text, jsonb, jsonb, uuid) to service_role;
+    jsonb, text, text, jsonb, jsonb, uuid) to service_role;

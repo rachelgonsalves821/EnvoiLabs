@@ -2516,6 +2516,7 @@ export type Database = {
       write_gate3_private_analysis_proposal: {
         Args: {
           supplied_binding_digest: string
+          supplied_binding_key: string
           supplied_draft: Json
           supplied_map_prompt_digest: string
           supplied_map_prompt_version: string

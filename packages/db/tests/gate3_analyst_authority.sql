@@ -277,6 +277,13 @@ select public.read_gate3_analyst_snapshot(
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)) as payload;
 grant select on analyst_snapshot to service_role;
+create temp table analyst_binding as
+select internal.gate3_analysis_binding_projection(payload)::text as key,
+    encode(pg_catalog.sha256(convert_to(
+        internal.gate3_analysis_binding_projection(payload)::text,
+        'UTF8')), 'hex') as digest
+from analyst_snapshot;
+grant select on analyst_binding to service_role;
 select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'sources'), 40, 'ten complete fictional respondents supply forty qualified core answers');
 select is(jsonb_array_length((select payload from analyst_snapshot)
@@ -317,7 +324,8 @@ select is(public.write_gate3_private_analysis_proposal(
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
-    (select payload from analyst_snapshot), repeat('e', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
     'a9990000-0000-4000-8000-000000000005'), true,
@@ -328,7 +336,20 @@ select is(public.write_gate3_private_analysis_proposal(
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
-    (select payload from analyst_snapshot), repeat('e', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), repeat('f', 64),
+    '{"privateDraft":"fictional"}'::jsonb,
+    '{"privateScreened":"fictional"}'::jsonb,
+    'a9990000-0000-4000-8000-000000000008'), false,
+    'caller-supplied digest cannot differ from the current binding key');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
     'a9990000-0000-4000-8000-000000000005'), true,
@@ -339,7 +360,8 @@ select is(public.write_gate3_private_analysis_proposal(
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
-    (select payload from analyst_snapshot), repeat('e', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"changed"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
     'a9990000-0000-4000-8000-000000000005'), false,
@@ -350,7 +372,8 @@ select is(public.write_gate3_private_analysis_proposal(
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
-    (select payload from analyst_snapshot), repeat('f', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"second worker"}'::jsonb,
     '{"privateScreened":"second worker"}'::jsonb,
     'a9990000-0000-4000-8000-000000000007'), false,
@@ -430,7 +453,8 @@ select is(public.write_gate3_private_analysis_proposal(
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
-    (select payload from analyst_snapshot), repeat('f', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"stale"}'::jsonb,
     '{"privateScreened":"stale"}'::jsonb,
     'a9990000-0000-4000-8000-000000000006'), false,
