@@ -607,6 +607,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           let heldReadStatus: number | null = null;
           let consentWithdrawn = false;
           const freshReadStatuses: number[] = [];
+          const freshReadBodies: unknown[] = [];
           let signalReadStarted: () => void = () => {};
           const readStarted = new Promise<void>((resolve) => { signalReadStarted = resolve; });
           let releaseRead: () => void = () => {};
@@ -629,7 +630,10 @@ test.describe("Gate 2 marketplace fixture replay", () => {
               await readGate;
               holdNextRead = false;
             }
-            if (consentWithdrawn) freshReadStatuses.push(response.status());
+            if (consentWithdrawn) {
+              freshReadStatuses.push(response.status());
+              freshReadBodies.push(await response.json());
+            }
             if (!response.ok()) {
               await route.fulfill({ response });
               if (held) signalReadFinished();
@@ -745,10 +749,12 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("visible");
           await expect.poll(() => freshReadStatuses[0]).toBe(409);
+          expect(freshReadBodies[0]).toEqual({ ok: false });
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
-          await expect(secondRespondent.getByRole("main").getByRole("alert"))
-            .toHaveText("This interview isn’t available anymore.");
+          const closedAlert = secondRespondent.getByRole("main").getByRole("alert");
+          await expect(closedAlert).toHaveText("This interview isn’t available anymore.");
+          await expect(closedAlert).toBeFocused();
         } finally {
           await secondContext.close();
         }

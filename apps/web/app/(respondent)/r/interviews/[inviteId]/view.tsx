@@ -23,6 +23,7 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   const [confirmedProbeId, setConfirmedProbeId] = useState<string | null>(null);
   const submitting = useRef(false);
   const prompt = useRef<HTMLHeadingElement>(null);
+  const closedAlert = useRef<HTMLParagraphElement>(null);
   const currentState = useRef(state.kind);
   currentState.current = state.kind;
   const displayed = state.kind === "open" ? currentPrompt(state.session) : null;
@@ -59,6 +60,10 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   useEffect(() => {
     if (state.kind === "open" || state.kind === "submitted") prompt.current?.focus();
   }, [promptIdentity]);
+
+  useEffect(() => {
+    if (state.kind === "closed") closedAlert.current?.focus();
+  }, [state.kind]);
 
   useEffect(() => {
     if (state.kind !== "open" || !state.session.probePending || state.session.currentProbe) return;
@@ -175,7 +180,9 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
       ) : (
         <div>
           <h1>{copy.title}</h1>
-          <p role={state.kind === "opening" ? "status" : "alert"}>{copy[state.kind]}</p>
+          <p ref={state.kind === "closed" ? closedAlert : undefined}
+            tabIndex={state.kind === "closed" ? -1 : undefined}
+            role={state.kind === "opening" ? "status" : "alert"}>{copy[state.kind]}</p>
         </div>
       )}
       {pendingSubmit && <p role="status">{copy.submitting}</p>}
