@@ -597,6 +597,9 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const probeTurnId = randomUUID();
           const probeId = randomUUID();
           let answerCalls = 0;
+          let pendingReads = 0;
+          let releasePending: () => void = () => {};
+          const pendingGate = new Promise<void>((resolve) => { releasePending = resolve; });
           let sessionId = "";
           let questionId = "";
           let holdNextRead = false;
@@ -612,6 +615,8 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const shownSeen = new Promise<void>((resolve) => { signalShown = resolve; });
           await secondRespondent.route("**/api/respondent/sessions/start", async (route) => {
             const response = await route.fetch();
+            const pendingRead = answerCalls === 0 && ++pendingReads <= 3;
+            if (answerCalls === 0 && pendingReads === 4) await pendingGate;
             const held = holdNextRead;
             if (held) {
               signalReadStarted();
@@ -629,7 +634,10 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             sessionId = current.sessionId;
             questionId = current.nextQuestion?.id ?? "";
             await route.fulfill({ response, json: { ...current,
-              currentProbe: answerCalls === 0 ? { turnId: probeTurnId, probeId,
+              nextQuestion: pendingRead && current.nextQuestion
+                ? { ...current.nextQuestion, text: "PRIVATE_ANSWER_SENTINEL" } : current.nextQuestion,
+              probePending: pendingRead,
+              currentProbe: answerCalls === 0 && !pendingRead ? { turnId: probeTurnId, probeId,
                 text: "What shaped your choice?" } : null } });
             if (held) signalReadFinished();
           });
@@ -648,11 +656,25 @@ test.describe("Gate 2 marketplace fixture replay", () => {
                 guideQuestionId: questionId, kind: "text", probeId,
                 durationMs: null, sequence: 1011, createdAt: now, updatedAt: now } }) });
           });
+          await secondRespondent.emulateMedia({ reducedMotion: "reduce" });
           await secondRespondent.goto("/r");
           await secondRespondent.getByRole("button", { name: "Start answering" }).click();
           await expect(secondRespondent).toHaveURL(origin + `/r/interviews/${second.id}`);
+          const preparing = secondRespondent.locator('p[role="status"]')
+            .filter({ hasText: "Preparing this follow-up…" });
+          await expect(preparing).toBeVisible();
+          await expect(preparing).toHaveCSS("animation-name", "none");
+          const home = secondRespondent.getByRole("link", { name: "Back to your studies" });
+          await home.focus();
+          await expect.poll(() => pendingReads).toBeGreaterThanOrEqual(4);
+          await expect(home).toBeFocused();
+          await expect(preparing).toHaveCount(1);
+          await expect(secondRespondent.locator("body")).not.toContainText("PRIVATE_ANSWER_SENTINEL");
+          releasePending();
           await expect(secondRespondent.getByRole("heading", { name: "What shaped your choice?" }))
             .toBeVisible();
+          await expect(secondRespondent.getByRole("heading", { name: "What shaped your choice?" }))
+            .toBeFocused();
           await shownSeen;
           await expect(secondRespondent.getByRole("button", { name: "Save answer" })).toBeDisabled();
           await expect(secondRespondent.getByLabel("Type your answer")).toBeDisabled();
