@@ -70,6 +70,32 @@ export async function listReadyProbeCandidates(call: ProbeRpc, limit = 25):
     throw new Error("duplicate ready answer");
   return items;
 }
+
+export interface ProbeDispatchBatchResult {
+  readonly scanned: number;
+  readonly committed: number;
+  readonly stale: number;
+  readonly unavailable: number;
+}
+
+// An injected runner must begin the captured turn and re-read current source,
+// consent, cap and deadline before dispatch. Selection alone authorizes no AI.
+export async function dispatchReadyProbeCandidates(call: ProbeRpc,
+  runOne: (candidate: ProbeReadyCandidate) => Promise<"committed" | "stale" | "unavailable">,
+  limit = 25): Promise<ProbeDispatchBatchResult> {
+  const candidates = await listReadyProbeCandidates(call, limit);
+  const counts = { scanned: 0, committed: 0, stale: 0, unavailable: 0 };
+  for (const candidate of candidates) {
+    let status: "committed" | "stale" | "unavailable";
+    try { status = await runOne(candidate); }
+    catch { status = "unavailable"; }
+    counts.scanned++;
+    if (status === "committed") counts.committed++;
+    else if (status === "stale") counts.stale++;
+    else counts.unavailable++;
+  }
+  return counts;
+}
 function decision(value: unknown): ProbeDecision | null {
   const item = record(value);
   if (!item || !string(item.turnId)) return null;
@@ -99,6 +125,15 @@ export function createProbeDecisionPort(call: ProbeRpc, authUserId: string,
   buildRequest: (source: Source) => Request) {
   if (!string(authUserId)) throw new Error("verified respondent identity required");
   return {
+    async beginCurrentTurn(answerId: string): Promise<string | null> {
+      if (!uuid(answerId)) return null;
+      const { data, error } = await call("begin_gate3_probe_turn_with_clock", {
+        supplied_answer_id: answerId, supplied_auth_user_id: authUserId });
+      if (error) throw error;
+      if (data === null) return null;
+      if (!uuid(data)) throw new Error("invalid captured probe turn");
+      return data;
+    },
     async readCommitted(sessionId: string, turnId: string): Promise<CommittedProbe | null> {
       const { data, error } = await call("read_gate3_committed_probe", {
         supplied_session_id: sessionId, supplied_turn_id: turnId,
