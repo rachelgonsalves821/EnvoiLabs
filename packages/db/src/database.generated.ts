@@ -1896,7 +1896,11 @@ export type Database = {
         Returns: Json
       }
       consume_gate2_test_provider_budget: {
-        Args: { requested_units: number; supplied_auth_user_id: string; supplied_study_id: string }
+        Args: {
+          requested_units: number
+          supplied_auth_user_id: string
+          supplied_study_id: string
+        }
         Returns: Json
       }
       create_gate1_study: {
