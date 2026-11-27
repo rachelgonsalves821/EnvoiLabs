@@ -399,11 +399,79 @@ select is(public.begin_gate3_probe_turn_with_clock(
     'a9700000-0000-4000-8000-000000000006',
     '90300000-0000-4000-8000-000000000001'), null::uuid,
     'production begin cannot invent a missing second upload receipt');
+reset role;
+savepoint legacy_receipt_race;
+set local role service_role;
 insert into second_probe_turn values (public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000006',
     '90300000-0000-4000-8000-000000000001', 1400));
 select ok((select turn_id is not null from second_probe_turn),
-    'qualified first probe answer can begin the second turn');
+    'legacy begin can create a turn before the page receipt arrives');
+reset role;
+create temporary table second_probe_binding as
+select id as turn_id, source_version, transcript_revision
+from internal.gate3_probe_turns
+where answer_id = 'a9700000-0000-4000-8000-000000000006';
+grant select on second_probe_binding to service_role;
+set local role service_role;
+select is((select public.read_gate3_ready_probe_turn(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    '90300000-0000-4000-8000-000000000001') from second_probe_turn),
+    null::jsonb, 'legacy turn without a captured receipt exposes no model source');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,1,outcome}', 'invalidated',
+    'a clockless legacy turn is invalidated in the private denominator');
+select is((select public.commit_gate3_probe_decision(
+    'a9700000-0000-4000-8000-000000000003',
+    'a9700000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006', turn_id,
+    '90300000-0000-4000-8000-000000000001', source_version,
+    transcript_revision, jsonb_build_object('action', 'next',
+        'turnId', turn_id, 'outcome', 'no_probe')) ->> 'status'
+    from second_probe_binding), 'stale',
+    'legacy turn without a receipt cannot commit a model decision');
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000012', 1500,
+    'text_save_response'), 'recorded',
+    'a later different immutable browser receipt can still be captured');
+select is((select public.read_gate3_ready_probe_turn(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    '90300000-0000-4000-8000-000000000001') from second_probe_turn),
+    null::jsonb, 'mismatched later receipt cannot expose the old model source');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,1,currentTurn}', 'false',
+    'mismatched later receipt cannot mark the turn current');
+select is((select public.commit_gate3_probe_decision(
+    'a9700000-0000-4000-8000-000000000003',
+    'a9700000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000006', turn_id,
+    '90300000-0000-4000-8000-000000000001', source_version,
+    transcript_revision, jsonb_build_object('action', 'next',
+        'turnId', turn_id, 'outcome', 'no_probe')) ->> 'status'
+    from second_probe_binding), 'stale',
+    'mismatched later receipt cannot commit the old turn');
+reset role;
+rollback to savepoint legacy_receipt_race;
+set local role service_role;
+insert into second_probe_turn values (public.begin_gate3_probe_turn(
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001', 1400));
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000012', 1400,
+    'text_save_response'), 'recorded',
+    'matching later receipt authorizes the exact frozen turn on replay');
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000012', 1400,
+    'text_save_response'), 'recorded',
+    'an identical receipt retry leaves the frozen clock identity intact');
 select is((select public.read_gate3_ready_probe_turn(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     '90300000-0000-4000-8000-000000000001') ->> 'probesUsed'
@@ -427,24 +495,26 @@ select is((select public.read_gate3_respondent_probe(
     'a9700000-0000-4000-8000-000000000003',
     '90300000-0000-4000-8000-000000000001') ->> 'text'),
     'What else made the route useful?', 'second probe is the current respondent prompt');
-select is((select public.mark_gate3_probe_shown(
+select is((select public.mark_gate3_probe_shown_with_clock(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (public.read_gate3_respondent_probe(
         'a9700000-0000-4000-8000-000000000003',
         '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
-    '90300000-0000-4000-8000-000000000001', 7401)
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000012', 7401)
     from second_probe_turn), 'stale', 'late browser paint cannot claim a timely receipt');
-select is((select public.mark_gate3_probe_shown(
+select is((select public.mark_gate3_probe_shown_with_clock(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (public.read_gate3_respondent_probe(
         'a9700000-0000-4000-8000-000000000003',
         '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
-    '90300000-0000-4000-8000-000000000001', 1500)
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000012', 1500)
     from second_probe_turn), 'recorded', 'second probe has its own shown receipt');
 select is(public.read_gate3_probe_opportunity_snapshot(
     '90600000-0000-4000-8000-000000000001')
-    #>> '{items,1,browserMeasurementComparable}', 'false',
-    'legacy shown receipt without a clock origin is rendered but unmeasured');
+    #>> '{items,1,browserMeasurementComparable}', 'true',
+    'matching second page-clock receipt is a comparable shown sample');
 select is((select public.record_gate3_probe_text_answer(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (public.read_gate3_respondent_probe(
