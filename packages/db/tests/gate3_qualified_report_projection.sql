@@ -371,6 +371,8 @@ select is((select count(*) from research.reports where id =
     'no direct-RPC sentinel can make the report readable');
 reset role;
 -- Synthetic fixture stands in for an independently authorized qualifier.
+-- The test connection gets temporary membership only inside this rolled-back fixture.
+grant gate3_report_qualifier to postgres;
 set local role gate3_report_qualifier;
 select is(public.record_gate3_public_text_qualification(
     'a9700000-0000-4000-8000-000000000006',
