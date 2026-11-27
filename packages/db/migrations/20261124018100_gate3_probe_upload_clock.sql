@@ -3,27 +3,27 @@
 -- server timestamp or from a later page's performance.now() value.
 alter table internal.gate3_probe_opportunities
     add column browser_clock_origin_id uuid,
-    add column browser_upload_confirmed_ms double precision,
+    add column browser_upload_receipt_ms double precision,
     add column browser_upload_kind text,
     add column browser_clock_recorded_at timestamptz,
     add constraint gate3_probe_clock_pair check (
-        (browser_clock_origin_id is null and browser_upload_confirmed_ms is null
+        (browser_clock_origin_id is null and browser_upload_receipt_ms is null
             and browser_upload_kind is null and browser_clock_recorded_at is null)
-        or (browser_clock_origin_id is not null and browser_upload_confirmed_ms is not null
+        or (browser_clock_origin_id is not null and browser_upload_receipt_ms is not null
             and browser_upload_kind in ('text_save_response', 'voice_object_put')
             and browser_clock_recorded_at is not null
-            and browser_upload_confirmed_ms >= 0
-            and browser_upload_confirmed_ms <= 1000000000000
-            and browser_upload_confirmed_ms not in (
+            and browser_upload_receipt_ms >= 0
+            and browser_upload_receipt_ms <= 1000000000000
+            and browser_upload_receipt_ms not in (
                 'Infinity'::float8, '-Infinity'::float8, 'NaN'::float8)));
 
 create function internal.gate3_keep_probe_clock_receipt()
 returns trigger language plpgsql set search_path = '' as $$
 begin
     if old.browser_clock_origin_id is not null and
-        (new.browser_clock_origin_id, new.browser_upload_confirmed_ms,
+        (new.browser_clock_origin_id, new.browser_upload_receipt_ms,
             new.browser_upload_kind, new.browser_clock_recorded_at) is distinct from
-        (old.browser_clock_origin_id, old.browser_upload_confirmed_ms,
+        (old.browser_clock_origin_id, old.browser_upload_receipt_ms,
             old.browser_upload_kind, old.browser_clock_recorded_at)
     then raise check_violation using message = 'probe upload clock receipt is immutable'; end if;
     return new;
@@ -76,14 +76,14 @@ begin
     if opportunity.browser_clock_origin_id is not null then
         return case when opportunity.browser_clock_origin_id =
                 supplied_browser_clock_origin_id
-            and opportunity.browser_upload_confirmed_ms =
+            and opportunity.browser_upload_receipt_ms =
                 supplied_browser_upload_confirmed_ms
             and opportunity.browser_upload_kind = supplied_browser_upload_kind
             then 'recorded' else 'stale' end;
     end if;
     update internal.gate3_probe_opportunities set
         browser_clock_origin_id = supplied_browser_clock_origin_id,
-        browser_upload_confirmed_ms = supplied_browser_upload_confirmed_ms,
+        browser_upload_receipt_ms = supplied_browser_upload_confirmed_ms,
         browser_upload_kind = supplied_browser_upload_kind,
         browser_clock_recorded_at = clock_timestamp()
     where answer_id = supplied_answer_id;
