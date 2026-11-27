@@ -68,6 +68,7 @@ describe("test-mode checkout observation route", () => {
     expect(paid.status).toBe(200);
     expect(paid.headers.get("cache-control")).toBe("private, no-store");
     expect(await paid.json()).toEqual({ quoteId, paymentStatus: "paid" });
+    expect(budget).toHaveBeenCalledWith({}, studyId, quoteId, "reconcile");
     expect(reconcile).toHaveBeenCalledWith({}, {}, studyId, quoteId);
     expect((await post()).status).toBe(200);
     expect((await post()).status).toBe(409);

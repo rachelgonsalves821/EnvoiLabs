@@ -10,9 +10,11 @@ export type ProviderBudget =
 // a provider client. RPC failure is unavailable and never permits a fetch.
 export async function takeGate2TestProviderBudget(
   client: SupabaseClient<Database>, studyId: string, authUserId: string,
+  purpose: "checkout" | "reconcile",
 ): Promise<ProviderBudget> {
   const { data, error } = await client.rpc("consume_gate2_test_provider_budget", {
     supplied_study_id: studyId, supplied_auth_user_id: authUserId,
+    requested_units: purpose === "checkout" ? 1 : 3,
   });
   if (error || !data || typeof data !== "object" || Array.isArray(data))
     return { status: "unavailable" };

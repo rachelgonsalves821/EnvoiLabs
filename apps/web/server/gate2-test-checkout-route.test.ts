@@ -76,6 +76,7 @@ describe("disabled test-mode researcher checkout route", () => {
       checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_fixture" });
     expect(makeDb).toHaveBeenCalledWith({}, {
       id: quoteId, organizationId: studyId, authUserId: quoteId });
+    expect(budget).toHaveBeenCalledWith({}, studyId, quoteId, "checkout");
     expect(prepare).toHaveBeenCalledWith({}, {}, studyId);
     prepare.mockResolvedValueOnce({ status: "blocked" });
     expect((await post()).status).toBe(409);

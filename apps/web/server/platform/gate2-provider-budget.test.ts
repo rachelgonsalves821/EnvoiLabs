@@ -10,10 +10,15 @@ describe("test-provider request budget adapter", () => {
   it("uses one scoped RPC for checkout creation and reconciliation", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { status: "allow", used: 1 }, error: null });
     const client = { rpc } as unknown as SupabaseClient<Database>;
-    expect(await takeGate2TestProviderBudget(client, studyId, authUserId))
+    expect(await takeGate2TestProviderBudget(client, studyId, authUserId, "checkout"))
       .toEqual({ status: "allow" });
     expect(rpc).toHaveBeenCalledWith("consume_gate2_test_provider_budget", {
-      supplied_study_id: studyId, supplied_auth_user_id: authUserId,
+      supplied_study_id: studyId, supplied_auth_user_id: authUserId, requested_units: 1,
+    });
+    expect(await takeGate2TestProviderBudget(client, studyId, authUserId, "reconcile"))
+      .toEqual({ status: "allow" });
+    expect(rpc).toHaveBeenLastCalledWith("consume_gate2_test_provider_budget", {
+      supplied_study_id: studyId, supplied_auth_user_id: authUserId, requested_units: 3,
     });
   });
 
@@ -24,13 +29,13 @@ describe("test-provider request budget adapter", () => {
       .mockResolvedValueOnce({ data: { status: "limited", retryAfterSeconds: 42 }, error: null })
       .mockResolvedValueOnce({ data: { status: "blocked" }, error: null });
     const client = { rpc } as unknown as SupabaseClient<Database>;
-    expect(await takeGate2TestProviderBudget(client, studyId, authUserId))
+    expect(await takeGate2TestProviderBudget(client, studyId, authUserId, "reconcile"))
       .toEqual({ status: "unavailable" });
-    expect(await takeGate2TestProviderBudget(client, studyId, authUserId))
+    expect(await takeGate2TestProviderBudget(client, studyId, authUserId, "reconcile"))
       .toEqual({ status: "unavailable" });
-    expect(await takeGate2TestProviderBudget(client, studyId, authUserId))
+    expect(await takeGate2TestProviderBudget(client, studyId, authUserId, "reconcile"))
       .toEqual({ status: "limited", retryAfterSeconds: 42 });
-    expect(await takeGate2TestProviderBudget(client, studyId, authUserId))
+    expect(await takeGate2TestProviderBudget(client, studyId, authUserId, "reconcile"))
       .toEqual({ status: "blocked" });
   });
 });

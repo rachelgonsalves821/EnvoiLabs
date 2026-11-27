@@ -37,7 +37,7 @@ export async function POST(request: NextRequest,
   const secretKey = process.env.STRIPE_TEST_SECRET_KEY;
   if (!trusted || !secretKey?.startsWith("sk_test_")) return session.commit(failure(503));
   try {
-    const budget = await takeGate2TestProviderBudget(trusted, studyId, authUserId);
+    const budget = await takeGate2TestProviderBudget(trusted, studyId, authUserId, "reconcile");
     if (budget.status === "blocked") return session.commit(failure(404));
     if (budget.status === "unavailable") return session.commit(failure(503));
     if (budget.status === "limited") {
