@@ -3,7 +3,8 @@ param(
     'researcher/gate3-report.spec.ts')][string]$Spec = 'gate5-report.spec.ts',
   [ValidateSet('desktop-chromium', 'mobile-webkit')][string]$Project = 'desktop-chromium',
   [ValidateSet('withdrawal', 'reredaction', 'deletion', 'newest-withheld')]
-    [string]$Scenario = 'withdrawal'
+    [string]$Scenario = 'withdrawal',
+  [switch]$FullWalkthrough
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -20,6 +21,9 @@ if (-not $supabaseCli -or (& $supabaseCli --version) -ne '2.84.2') {
 if (-not $target.StartsWith($repo + [IO.Path]::DirectorySeparatorChar) -or
   (Split-Path $target -Leaf) -ne '.gate5-auth' -or (Test-Path -LiteralPath $target)) {
   throw 'Refusing unexpected disposable Auth target'
+}
+if ($FullWalkthrough -and $Spec -ne 'gate2-marketplace.spec.ts') {
+  throw 'Full walkthrough mode requires the fictional marketplace browser case'
 }
 New-Item -ItemType Directory -Path (Join-Path $target 'supabase') -Force | Out-Null
 try {
@@ -89,6 +93,10 @@ try {
     $env:ENVOI_GATE2_SCREENING_VOICE_ENABLED = 'true'
     $env:ENVOI_GATE2_EARNINGS_ENABLED = 'true'
     $env:ENVOI_MARKETPLACE_FEASIBILITY_ENABLED = 'true'
+    if ($FullWalkthrough) {
+      $env:ENVOI_GATE5_FULL_WALKTHROUGH = '1'
+      $env:ENVOI_GATE2_REFERRAL_ENABLED = 'true'
+    }
   }
   if ($Spec -eq 'researcher/gate3-report.spec.ts') {
     $gate3Spec = Join-Path $repo 'apps\web\e2e\researcher\gate3-report.spec.ts'
