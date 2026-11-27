@@ -75,7 +75,7 @@ export function VoiceAnswer({ sessionId, questionId, onUseText, onSaved }: {
         <Button variant="ghost" className="respondent-record-button" aria-disabled={locked} aria-pressed={recording}
           aria-label={recording ? voice.stop : voice.start}
           onClick={() => recording ? capture.stop() : !locked && void capture.start()}>
-          <Echo state={recording ? "listen" : "idle"} size={96} />
+          <Echo state={recording ? "listen" : "idle"} size={96} level={capture.level} />
           <span>{recording ? voice.stop : voice.start}</span>
         </Button>
       )}

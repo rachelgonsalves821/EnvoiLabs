@@ -24,7 +24,8 @@ test.describe("respondent Echo", () => {
     const canvas = page.locator(".respondent-echo .ev-echo canvas");
     await expect.poll(() => canvas.evaluate((element) => {
       const target = element as HTMLCanvasElement;
-      return target.width === target.height && target.width >= 144;
+      return target.clientWidth > 0 && target.width === target.height &&
+        target.width >= target.clientWidth && target.width <= target.clientWidth * 2;
     })).toBe(true);
     await expect(canvas).toHaveCSS("pointer-events", "none");
   });
