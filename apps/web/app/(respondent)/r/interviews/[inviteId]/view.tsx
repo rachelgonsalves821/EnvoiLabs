@@ -24,6 +24,9 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   const prompt = useRef<HTMLHeadingElement>(null);
   const currentState = useRef(state.kind);
   currentState.current = state.kind;
+  const displayed = state.kind === "open" ? currentPrompt(state.session) : null;
+  const promptIdentity = state.kind === "submitted" ? "submitted" : state.kind === "open" && displayed
+    ? `${state.session.sessionId}:${displayed.kind}:${"id" in displayed ? displayed.id : ""}` : null;
 
   useEffect(() => {
     const recheck = () => {
@@ -54,6 +57,15 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
 
   useEffect(() => {
     if (state.kind === "open" || state.kind === "submitted") prompt.current?.focus();
+  }, [promptIdentity]);
+
+  useEffect(() => {
+    if (state.kind !== "open" || !state.session.probePending || state.session.currentProbe) return;
+    const timer = window.setTimeout(() => {
+      if (document.visibilityState !== "visible") return;
+      setAttempt((value) => value + 1);
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [state]);
 
   useEffect(() => {
@@ -125,8 +137,6 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     else setSubmitError(response.status === 401 ? copy.sessionExpired : copy.submitFailed);
   }
 
-  const displayed = state.kind === "open" ? currentPrompt(state.session) : null;
-
   return (
     <Card className="respondent-welcome">
       {state.kind === "open" ? (
@@ -135,7 +145,8 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
             <ProgressTrack current={state.session.progress.currentQuestion} total={state.session.progress.coreQuestionCount} />
             <EarningsChip amount={formatReward(state.session.progress.rewardCents)} />
           </div>
-          <h1 ref={prompt} tabIndex={-1}>{displayed && "text" in displayed ? displayed.text : copy.complete}</h1>
+          <h1 ref={prompt} tabIndex={-1}>{displayed?.kind === "pending"
+            ? copy.preparingFollowup : displayed && "text" in displayed ? displayed.text : copy.complete}</h1>
           {state.session.currentProbe
             ? <ProbeRenderBoundary key={state.session.currentProbe.probeId}
                 onError={() => recordRenderFailure(state.session.sessionId,
@@ -145,6 +156,8 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
                   probeId={state.session.currentProbe.probeId}
                   shown={confirmedProbeId === state.session.currentProbe.probeId} onSaved={retry} />
               </ProbeRenderBoundary>
+            : state.session.probePending
+            ? <p role="status">{copy.preparingFollowup}</p>
             : state.session.nextQuestion
             ? <AnswerComposer key={state.session.nextQuestion.id} canRecord={canRecord} sessionId={state.session.sessionId}
               questionId={state.session.nextQuestion.id} onSaved={retry} />

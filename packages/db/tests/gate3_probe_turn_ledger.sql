@@ -30,6 +30,8 @@ from unnest(array['retention', 'researcher_access']) as consent(purpose);
 select ok(not has_function_privilege('authenticated',
     'public.read_gate3_ready_probe_turn(uuid,uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('authenticated',
+    'public.read_gate3_probe_pending(uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('authenticated',
     'public.commit_gate3_probe_decision(uuid,uuid,uuid,uuid,uuid,uuid,text,jsonb)', 'EXECUTE')
     and not has_table_privilege('service_role', 'internal.gate3_probe_turns', 'SELECT'),
     'private ledger and source read are restricted to service RPCs');
@@ -38,6 +40,44 @@ select ok(not exists (select 1 from public.consents
         and study_id = '90600000-0000-4000-8000-000000000001'
         and purpose = 'ai_followup' and granted),
     'AI follow-up defaults to denied');
+insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
+values (repeat('a', 64), repeat('b', 64));
+savepoint no_grant_answer;
+insert into public.answers (id, session_id, study_id, guide_question_id, kind, sequence)
+values ('a9700000-0000-4000-8000-000000000008',
+    'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001', 'text', 1);
+insert into public.transcripts (id, answer_id, study_id, redacted_text,
+    provider, model, latency_ms, cost_micros)
+values ('a9700000-0000-4000-8000-000000000009',
+    'a9700000-0000-4000-8000-000000000008',
+    '90600000-0000-4000-8000-000000000001',
+    'I chose the nearby option.', 'typed', 'none', 0, 0);
+insert into internal.gate1_answer_jobs (answer_id, source_hash,
+    completed_at, result_status, publication_policy_digest,
+    publication_qualification_digest)
+values ('a9700000-0000-4000-8000-000000000008',
+    decode(repeat('d', 64), 'hex'), clock_timestamp(), 'published',
+    repeat('a', 64), repeat('b', 64));
+select is((select count(*) from internal.gate3_probe_opportunities
+    where answer_id = 'a9700000-0000-4000-8000-000000000008'), 0::bigint,
+    'answer saved without AI consent has no captured opportunity');
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_followup', true,
+    'synthetic-late-grant');
+set local role service_role;
+select is(public.begin_gate3_probe_turn(
+    'a9700000-0000-4000-8000-000000000008',
+    '90300000-0000-4000-8000-000000000001', 900), null::uuid,
+    'a later consent grant cannot begin an uncaptured answer');
+select is(public.read_gate3_probe_pending(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), false,
+    'the uncaptured answer never creates a pending state');
+reset role;
+rollback to savepoint no_grant_answer;
 insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001',
     '90600000-0000-4000-8000-000000000001', 'ai_followup', true,
@@ -53,8 +93,6 @@ values ('a9700000-0000-4000-8000-000000000005',
     'a9700000-0000-4000-8000-000000000004',
     '90600000-0000-4000-8000-000000000001',
     'I chose the faster option.', 'typed', 'none', 0, 0);
-insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
-values (repeat('a', 64), repeat('b', 64));
 insert into internal.gate1_answer_jobs (answer_id, source_hash,
     completed_at, result_status, publication_policy_digest,
     publication_qualification_digest)
@@ -64,6 +102,14 @@ values ('a9700000-0000-4000-8000-000000000004',
 create temporary table probe_ids (turn_id uuid not null);
 grant select, insert on probe_ids to service_role;
 set local role service_role;
+select is(public.read_gate3_probe_pending(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000002'), false,
+    'another respondent cannot see the pending decision state');
+select is(public.read_gate3_probe_pending(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), true,
+    'current consented answer holds the static next question while undecided');
 select is(public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000002', 1000), null::uuid,
@@ -85,6 +131,46 @@ select is((select public.read_gate3_committed_probe(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     '90300000-0000-4000-8000-000000000001') from probe_ids), null::jsonb,
     'no decision before commit');
+reset role;
+create temporary table probe_binding (turn_id uuid not null, ready jsonb not null);
+grant select, insert on probe_binding to service_role;
+set local role service_role;
+insert into probe_binding select turn_id,
+    public.read_gate3_ready_probe_turn(
+        'a9700000-0000-4000-8000-000000000003', turn_id,
+        '90300000-0000-4000-8000-000000000001') as ready
+    from probe_ids;
+reset role;
+savepoint withdrawn_regrant;
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_followup', false,
+    'synthetic-withdrawal');
+insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001',
+    '90600000-0000-4000-8000-000000000001', 'ai_followup', true,
+    'synthetic-regrant');
+set local role service_role;
+select is((select public.read_gate3_ready_probe_turn(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    '90300000-0000-4000-8000-000000000001') from probe_binding), null::jsonb,
+    'withdrawal and regrant cannot expose the old provider-ready source');
+select is(public.begin_gate3_probe_turn(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001', 1000), null::uuid,
+    'withdrawal and regrant cannot reopen the old turn');
+select is((select public.commit_gate3_probe_decision(
+    'a9700000-0000-4000-8000-000000000003',
+    'a9700000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000004', turn_id,
+    '90300000-0000-4000-8000-000000000001',
+    (ready ->> 'sourceVersion')::uuid, ready ->> 'transcriptRevision',
+    jsonb_build_object('action', 'next', 'turnId', turn_id,
+        'outcome', 'no_probe')) ->> 'status' from probe_binding), 'stale',
+    'old source and turn cannot commit after consent receipt changes');
+reset role;
+rollback to savepoint withdrawn_regrant;
+set local role service_role;
 select is((select public.commit_gate3_probe_decision(
     'a9700000-0000-4000-8000-000000000003',
     'a9700000-0000-4000-8000-000000000001',
@@ -115,6 +201,10 @@ select public.commit_gate3_probe_decision(
 from probe_ids;
 select is((select result ->> 'status' from probe_actions), 'committed',
     'the first decision commits');
+select is(public.read_gate3_probe_pending(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), false,
+    'a committed decision clears the pending state');
 select is((select result -> 'value' -> 'decision' ->> 'text' from probe_actions),
     'What made speed matter?', 'committed decision retains exact wording');
 select is((select public.commit_gate3_probe_decision(

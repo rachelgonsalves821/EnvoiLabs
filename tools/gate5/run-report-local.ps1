@@ -2,9 +2,11 @@ param(
   [ValidateSet('gate5-report.spec.ts', 'gate2-marketplace.spec.ts',
     'researcher/gate3-report.spec.ts')][string]$Spec = 'gate5-report.spec.ts',
   [ValidateSet('desktop-chromium', 'mobile-webkit')][string]$Project = 'desktop-chromium',
-  [ValidateSet('withdrawal', 'reredaction', 'deletion', 'newest-withheld')]
+  [ValidateSet('withdrawal', 'reredaction', 'deletion', 'newest-withheld',
+    'source-unqualified')]
     [string]$Scenario = 'withdrawal',
-  [switch]$FullWalkthrough
+  [switch]$FullWalkthrough,
+  [switch]$MobileTrace
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -24,6 +26,12 @@ if (-not $target.StartsWith($repo + [IO.Path]::DirectorySeparatorChar) -or
 }
 if ($FullWalkthrough -and $Spec -ne 'gate2-marketplace.spec.ts') {
   throw 'Full walkthrough mode requires the fictional marketplace browser case'
+}
+if ($MobileTrace -and -not $FullWalkthrough) {
+  throw 'Mobile diagnostic requires the fictional full walkthrough fixture'
+}
+if ($Scenario -eq 'source-unqualified' -and $Spec -ne 'researcher/gate3-report.spec.ts') {
+  throw 'Private sentinel fixture requires the local-only Gate 3 mounted case'
 }
 New-Item -ItemType Directory -Path (Join-Path $target 'supabase') -Force | Out-Null
 try {
@@ -61,8 +69,17 @@ try {
     throw 'Required report publisher and quality guard migrations are absent'
   }
   Write-Output "Applied migration count, report 071, quality 151: $migrationReceipt"
+  $reportFixture = Join-Path $repo 'apps\web\e2e\fixtures\gate5-qualified-report.sql'
+  if ($Scenario -eq 'source-unqualified') {
+    $gate3Repo = [IO.Path]::GetFullPath((Join-Path $repo '..\EnvoiLabs-parallel-gate-3'))
+    $reportFixture = Join-Path $gate3Repo `
+      'apps\web\e2e\fixtures\gate3-qualified-report-private-sentinels.sql'
+    if (-not (Test-Path -LiteralPath $reportFixture -PathType Leaf)) {
+      throw 'Gate 3 local-only private sentinel fixture is unavailable'
+    }
+  }
   $ErrorActionPreference = 'Continue'
-  & docker cp (Join-Path $repo 'apps\web\e2e\fixtures\gate5-qualified-report.sql') `
+  & docker cp $reportFixture `
     "$($dbContainer):/tmp/gate5-qualified-report.sql" *> (Join-Path $target 'report.log')
   if ($LASTEXITCODE -eq 0) {
     & docker exec $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 `
@@ -96,6 +113,13 @@ try {
     if ($FullWalkthrough) {
       $env:ENVOI_GATE5_FULL_WALKTHROUGH = '1'
       $env:ENVOI_GATE2_REFERRAL_ENABLED = 'true'
+      if ($MobileTrace) { $env:ENVOI_GATE5_MOBILE_TRACE = '1' }
+      $env:ENVOI_GATE5_MOUNTED_DB_CONTAINER = $dbContainer
+      $ErrorActionPreference = 'Continue'
+      & docker cp (Join-Path $repo 'apps\web\e2e\fixtures\gate5-same-study-report.sql') `
+        "$($dbContainer):/tmp/gate5-same-study-report.sql" *> (Join-Path $target 'same-study.log')
+      $ErrorActionPreference = 'Stop'
+      if ($LASTEXITCODE -ne 0) { throw 'Same-study fictional report fixture copy failed' }
     }
   }
   if ($Spec -eq 'researcher/gate3-report.spec.ts') {
@@ -107,6 +131,9 @@ try {
     $env:ENVOI_GATE3_MOUNTED_ORIGIN = 'http://127.0.0.1:3100'
     $env:ENVOI_GATE3_MOUNTED_DB_CONTAINER = $dbContainer
     $env:ENVOI_GATE3_MOUNTED_SCENARIO = $Scenario
+    if ($Scenario -eq 'source-unqualified') {
+      $env:ENVOI_GATE3_MOUNTED_PRIVATE_SENTINELS = '1'
+    }
   }
   Push-Location $repo
   try {

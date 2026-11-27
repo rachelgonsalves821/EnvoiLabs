@@ -17,6 +17,9 @@ values
      '90500000-0000-4000-8000-000000000001', 'invited', 160, now() + interval '3 hours'),
     ('99100000-0000-4000-8000-000000000002', '90600000-0000-4000-8000-000000000001',
      '90500000-0000-4000-8000-000000000002', 'invited', 160, now() - interval '1 minute');
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001', 'retention', true, 'synthetic-session'),
+    ('90500000-0000-4000-8000-000000000001', 'researcher_access', true, 'synthetic-session');
 
 select ok(not has_function_privilege('anon', 'public.start_gate1_session(uuid)', 'EXECUTE'),
     'unsigned users cannot start an interview');

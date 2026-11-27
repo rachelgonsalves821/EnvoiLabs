@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 import { prepareStudyCheckout, type CheckoutSession } from "@envoi-labs/services/checkout";
@@ -26,7 +28,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "Runs in the disposable Chromium Auth job.");
 
   test("AAL2 feasibility, frozen $2/$1 quote, synthetic paid launch and matched respondent offer", async ({ browser, baseURL }) => {
-    test.setTimeout(process.env.ENVOI_GATE5_FULL_WALKTHROUGH === "1" ? 600_000 : 360_000);
+    test.setTimeout(process.env.ENVOI_GATE5_FULL_WALKTHROUGH === "1" ? 1_200_000 : 360_000);
     const origin = loopbackOrigin(baseURL);
     const db = localService();
     const typedDb = db as unknown as SupabaseClient<Database>;
@@ -50,24 +52,78 @@ test.describe("Gate 2 marketplace fixture replay", () => {
 
     const respondentEmails = Array.from({ length: 10 }, (_, index) =>
       `gate2-market-${index}-${randomUUID()}@example.test`);
-    const users = await Promise.all(respondentEmails.map((email) =>
-      db.auth.admin.createUser({ email, email_confirm: true })));
-    const respondentIds = await Promise.all(users.map(async (created) => {
-      if (created.error || !created.data.user) throw new Error(`Respondent: ${created.error?.message}`);
-      const provisioned = await db.rpc("provision_email_respondent", {
-        supplied_user_id: created.data.user.id,
-      });
-      if (provisioned.error || !provisioned.data) throw new Error(`Provisioning: ${provisioned.error?.message}`);
-      return provisioned.data as string;
-    }));
-    const facts = await db.from("profile_attributes").insert(respondentIds.flatMap((respondent_id) =>
-      profile.map(([key, value_json]) => ({ respondent_id, key, value_json, source: "signup" }))));
-    expect(facts.error).toBeNull();
-    const consents = await db.from("consents").insert(respondentIds.flatMap((respondent_id) =>
-      ["retention", "researcher_access"].map((purpose) => ({
-        respondent_id, purpose, granted: true, text_version: "synthetic-marketplace-fixture",
-      }))));
-    expect(consents.error).toBeNull();
+    let respondentIds: string[];
+    if (fullWalkthrough) {
+      respondentIds = [];
+      for (const email of respondentEmails) {
+        const context = await browser.newContext({ baseURL: origin });
+        try {
+          const profilePage = await context.newPage();
+          await profilePage.goto("/r/signup");
+          await profilePage.getByLabel("Email address").fill(email);
+          await profilePage.getByRole("checkbox", { name: /18 or older/ }).check();
+          await profilePage.getByRole("button", { name: "Email me a sign-in link" }).click();
+          await expect.poll(async () => (await context.cookies(origin +
+            "/api/respondent/auth/callback"))
+            .some(({ name }) => name === "envoi-respondent-age")).toBe(true);
+          const link = await deliveredEmail(profilePage, email, origin,
+            "/api/respondent/auth/callback");
+          await profilePage.goto(link.href);
+          await expect(profilePage).toHaveURL(origin + "/r/status");
+          await profilePage.getByRole("link", { name: "Profile and privacy choices" }).click();
+          await profilePage.getByLabel("What’s your age range?").selectOption("25-34");
+          await profilePage.getByLabel("How do you describe your gender?")
+            .selectOption("undisclosed");
+          await profilePage.getByLabel("Are you currently in school?")
+            .selectOption("not_student");
+          await profilePage.getByLabel("Do you live on campus?").selectOption("false");
+          await profilePage.getByLabel("How often do you shop online?")
+            .selectOption("weekly");
+          await profilePage.getByLabel("What’s your ZIP code?").fill("02139");
+          await profilePage.getByLabel("How many times do you order food in a typical week?")
+            .fill("2");
+          await profilePage.getByRole("checkbox", { name: "Food and drink" }).check();
+          await profilePage.getByRole("checkbox", { name: "Technology" }).check();
+          await profilePage.getByRole("button", { name: "Save and continue" }).click();
+          await expect(profilePage.getByRole("heading", { name: "Choose what to share" }))
+            .toBeVisible();
+          await profilePage.getByRole("checkbox", { name: /Keep my study answers/ }).check();
+          await profilePage.getByRole("checkbox",
+            { name: /Share my redacted answers with researchers/ }).check();
+          await profilePage.getByRole("button", { name: "Save privacy choices" }).click();
+          await expect(profilePage.getByRole("heading", { name: "Your account is ready" }))
+            .toBeVisible();
+          const listed = await db.auth.admin.listUsers({ page: 1, perPage: 200 });
+          const user = listed.data?.users.find((item) => item.email === email);
+          if (listed.error || !user) throw new Error("Open fictional signup user missing.");
+          const respondent = await db.from("respondents").select("id")
+            .eq("auth_user_id", user.id).single();
+          if (respondent.error || !respondent.data)
+            throw new Error("Open fictional signup profile missing.");
+          respondentIds.push(respondent.data.id);
+        } finally { await context.close(); }
+      }
+      expect(new Set(respondentIds).size).toBe(10);
+    } else {
+      const users = await Promise.all(respondentEmails.map((email) =>
+        db.auth.admin.createUser({ email, email_confirm: true })));
+      respondentIds = await Promise.all(users.map(async (created) => {
+        if (created.error || !created.data.user) throw new Error(`Respondent: ${created.error?.message}`);
+        const provisioned = await db.rpc("provision_email_respondent", {
+          supplied_user_id: created.data.user.id,
+        });
+        if (provisioned.error || !provisioned.data) throw new Error(`Provisioning: ${provisioned.error?.message}`);
+        return provisioned.data as string;
+      }));
+      const facts = await db.from("profile_attributes").insert(respondentIds.flatMap((respondent_id) =>
+        profile.map(([key, value_json]) => ({ respondent_id, key, value_json, source: "signup" }))));
+      expect(facts.error).toBeNull();
+      const consents = await db.from("consents").insert(respondentIds.flatMap((respondent_id) =>
+        ["retention", "researcher_access"].map((purpose) => ({
+          respondent_id, purpose, granted: true, text_version: "synthetic-marketplace-fixture",
+        }))));
+      expect(consents.error).toBeNull();
+    }
 
     const study = await db.from("studies").insert({
       organization_id: org.data.id, title: "Synthetic meal decisions",
@@ -76,7 +132,10 @@ test.describe("Gate 2 marketplace fixture replay", () => {
     }).select("id").single();
     if (study.error || !study.data) throw new Error(`Study: ${study.error?.message}`);
     const brief = await db.from("brief_versions").insert({
-      study_id: study.data.id, version: 1, brief_json: { purpose: "Synthetic fixture replay" },
+      study_id: study.data.id, version: 1, brief_json: {
+        purpose: "Synthetic fixture replay",
+        hypotheses: ["A clear meal choice reduces hesitation."],
+      },
       created_by: researcher.data.id,
     });
     expect(brief.error).toBeNull();
@@ -167,13 +226,11 @@ test.describe("Gate 2 marketplace fixture replay", () => {
       expect(matched.error).toBeNull();
       expect(matched.data).toMatchObject({ created: 10, remaining: 0 });
       await page.goto(`/app/studies/${study.data.id}`);
-      if (process.env.ENVOI_GATE5_FICTIONAL_WALKTHROUGH === "true") {
-        await expect(page.getByText(/Fictional product test · Payment simulated/))
-          .toBeVisible();
-      } else {
-        await expect(page.getByText(/Fictional product test · Payment simulated/))
-          .toHaveCount(0);
-      }
+      await page.setViewportSize({ width: 320, height: 740 });
+      await page.reload();
+      await expect(page.getByRole("region", { name: "Study tracking" })
+        .getByTestId("gate5-simulated-payment-inline")).toContainText("No card charged");
+      await page.setViewportSize({ width: 1280, height: 720 });
       const offers = await db.from("invites").select("id,respondent_id,state,reward_cents")
         .eq("study_id", study.data.id);
       expect(offers.error).toBeNull();
@@ -190,9 +247,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         await respondent.getByLabel("Email address").fill(respondentEmail);
         await respondent.getByRole("checkbox", { name: /18 or older/ }).check();
         await respondent.getByRole("button", { name: "Email me a sign-in link" }).click();
+        await expect.poll(async () => (await respondentContext.cookies(origin +
+          "/api/respondent/auth/callback"))
+          .some(({ name }) => name === "envoi-respondent-age")).toBe(true);
         const respondentLink = await deliveredEmail(respondent, respondentEmail, origin,
           "/api/respondent/auth/callback");
         await respondent.goto(respondentLink.href);
+        await expect(respondent).toHaveURL(origin + "/r/status");
         await respondent.goto("/r");
         await expect(respondent.getByText("$5.00")).toBeVisible();
         await expect(respondent.getByRole("button", { name: "Start answering" })).toBeVisible();
@@ -201,10 +262,71 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         await respondent.goto("/r");
         await respondent.getByRole("button", { name: "Start answering" }).click();
         await expect(respondent).toHaveURL(origin + `/r/interviews/${first.id}`);
+        if (process.env.ENVOI_GATE5_MOBILE_TRACE === "1") {
+          const mobileFirstQuestion = core[0];
+          if (!mobileFirstQuestion) throw new Error("Fictional first question is missing.");
+          const cdp = await respondentContext.newCDPSession(respondent);
+          try {
+            await respondent.setViewportSize({ width: 360, height: 780 });
+            await cdp.send("Network.enable");
+            await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+            await cdp.send("Network.emulateNetworkConditions", {
+              offline: false, latency: 150,
+              downloadThroughput: 1_600_000 / 8,
+              uploadThroughput: 750_000 / 8,
+            });
+            await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+            await respondent.addInitScript(() => {
+              const measure = window as unknown as { __gate5LcpMs?: number };
+              new PerformanceObserver((entries) => {
+                for (const entry of entries.getEntries())
+                  measure.__gate5LcpMs = entry.startTime;
+              }).observe({ type: "largest-contentful-paint", buffered: true });
+            });
+            const openedAt = Date.now();
+            await respondent.goto(`/r/interviews/${first.id}`);
+            await expect(respondent.getByRole("heading", { name: mobileFirstQuestion })).toBeVisible();
+            const firstQuestionMs = Date.now() - openedAt;
+            await respondent.waitForTimeout(1200);
+            const browser = await respondent.evaluate(() => {
+              const measure = window as unknown as { __gate5LcpMs?: number };
+              const scripts = (performance.getEntriesByType("resource") as PerformanceResourceTiming[])
+                .filter((entry) => new URL(entry.name).pathname.endsWith(".js"))
+                .map((entry) => ({
+                  path: new URL(entry.name).pathname,
+                  transferBytes: entry.transferSize,
+                  encodedBytes: entry.encodedBodySize,
+                }));
+              return { lcpMs: measure.__gate5LcpMs ?? null, scripts };
+            });
+            expect(browser.lcpMs).toBeGreaterThan(0);
+            expect(browser.scripts.length).toBeGreaterThan(0);
+            const revision = execFileSync("git", ["rev-parse", "HEAD"],
+              { encoding: "utf8" }).trim();
+            const buildId = (await readFile("apps/web/.next/BUILD_ID", "utf8")).trim();
+            await writeFile("apps/web/.next/gate5-mobile-diagnostic.json", JSON.stringify({
+              revision, buildId, profile: "360px Chromium, 4x CPU, 150ms, 1.6Mbps down",
+              runs: 1, lcpMs: browser.lcpMs, firstQuestionMs,
+              requestedJsTransferBytes: browser.scripts.reduce(
+                (sum, item) => sum + item.transferBytes, 0),
+              scripts: browser.scripts,
+            }, null, 2));
+          } finally {
+            await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+            await cdp.send("Network.setCacheDisabled", { cacheDisabled: false });
+            await cdp.send("Network.emulateNetworkConditions", {
+              offline: false, latency: 0, downloadThroughput: -1,
+              uploadThroughput: -1,
+            });
+            await cdp.detach();
+            await respondent.setViewportSize({ width: 1280, height: 720 });
+          }
+        }
         for (const [index, question] of core.entries()) {
           await expect(respondent.getByRole("heading", { name: question })).toBeVisible();
           await respondent.getByRole("textbox", { name: "Type your answer" })
-            .fill(`Synthetic answer ${index + 1} about a meal decision`);
+            .fill(index === 0 ? "Synthetic 😀 answer 1 about a meal decision"
+              : `Synthetic answer ${index + 1} about a meal decision`);
           await respondent.getByRole("button", { name: "Save answer" }).click();
         }
         await expect(respondent.getByRole("heading", { name: "You’ve answered every question" })).toBeVisible();
@@ -251,9 +373,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             await additionalPage.getByLabel("Email address").fill(additionalEmail);
             await additionalPage.getByRole("checkbox", { name: /18 or older/ }).check();
             await additionalPage.getByRole("button", { name: "Email me a sign-in link" }).click();
+            await expect.poll(async () => (await additionalContext.cookies(origin +
+              "/api/respondent/auth/callback"))
+              .some(({ name }) => name === "envoi-respondent-age")).toBe(true);
             const additionalLink = await deliveredEmail(additionalPage,
               additionalEmail, origin, "/api/respondent/auth/callback");
             await additionalPage.goto(additionalLink.href);
+            await expect(additionalPage).toHaveURL(origin + "/r/status");
             await additionalPage.goto("/r");
             await additionalPage.getByRole("button", { name: "Start answering" }).click();
             await expect(additionalPage).toHaveURL(
@@ -326,9 +452,15 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             await page.getByLabel("Email address").fill(email);
             await page.getByRole("checkbox", { name: /18 or older/ }).check();
             await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+            await expect.poll(async () => (await context.cookies(origin +
+              "/api/respondent/auth/callback"))
+              .some(({ name }) => name === "envoi-respondent-age"),
+            { message: "Fictional signup must commit its age proof before callback" })
+              .toBe(true);
             const link = await deliveredEmail(page, email, origin,
               "/api/respondent/auth/callback");
             await page.goto(link.href);
+            await expect(page).toHaveURL(origin + "/r/status");
             await page.goto("/r");
             await page.getByRole("button", { name: "Start answering" }).click();
             await expect(page).toHaveURL(origin + `/r/interviews/${offerId}`);
@@ -584,20 +716,25 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         expect(await issueGate2SandboxVisaBatch(batchInput)).toBe("delivered");
         expect(orderPosts).toBe(1);
         await respondent.goto("/r/earnings");
-        if (process.env.ENVOI_GATE5_FICTIONAL_WALKTHROUGH === "true") {
-          await expect(respondent.getByText(/Fictional product test · Payout mocked/))
-            .toBeVisible();
-        } else {
-          await expect(respondent.getByText(/Fictional product test · Payout mocked/))
-            .toHaveCount(0);
+        await respondent.setViewportSize({ width: 320, height: 740 });
+        await respondent.reload();
+        await expect(respondent.getByRole("heading", { name: "Delivered" })
+          .locator("..").getByTestId("gate5-mocked-payout-inline"))
+          .toContainText("No Visa sent");
+        const receiptRows = respondent.locator(".respondent-earnings-list li");
+        await expect(receiptRows).toHaveCount(3);
+        for (const row of await receiptRows.all()) {
+          await expect(row.getByTestId("gate5-mocked-payout-inline"))
+            .toContainText("receipt is synthetic");
         }
+        await respondent.setViewportSize({ width: 1280, height: 720 });
         await expect(respondent.getByRole("heading", { name: "Earned" })
           .locator("..").getByText("$15.00")).toBeVisible();
         await expect(respondent.getByRole("heading", { name: "Delivered" })
           .locator("..").getByText("$15.00")).toBeVisible();
-        await expect(respondent.locator(".respondent-earnings-list small"))
+        await expect(respondent.locator(".respondent-earnings-list small:not([data-testid])"))
           .toHaveCount(3);
-        const receipts = await respondent.locator(".respondent-earnings-list small")
+        const receipts = await respondent.locator(".respondent-earnings-list small:not([data-testid])")
           .allTextContents();
         expect(new Set(receipts)).toHaveProperty("size", 1);
         if (fullWalkthrough) {
@@ -649,9 +786,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
               await referee.getByLabel("Email address").fill(email);
               await referee.getByRole("checkbox", { name: /18 or older/ }).check();
               await referee.getByRole("button", { name: "Email me a sign-in link" }).click();
+              await expect.poll(async () => (await refereeContext.cookies(origin +
+                "/api/respondent/auth/callback"))
+                .some(({ name }) => name === "envoi-respondent-age")).toBe(true);
               const link = await deliveredEmail(referee, email, origin,
                 "/api/respondent/auth/callback");
               await referee.goto(link.href);
+              await expect(referee).toHaveURL(origin + "/r/status");
               await referee.goto("/r");
               const referralSelf = await referee.request.get("/api/respondent/referral");
               expect(referralSelf.status()).toBe(200);
@@ -671,19 +812,95 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await respondent.reload();
           await expect(respondent.getByText("5 verified profiles")).toBeVisible();
           await expect(respondent.getByText("$5.00 referral bonus vested")).toBeVisible();
+          const referral = respondent.locator(".respondent-earnings-referral");
+          await expect(referral).not.toContainText("Delivered");
+          await expect(referral).not.toContainText("Receipt");
+          await expect(referral).not.toContainText("Visa sent");
 
-          const qualifiedStudyId = "90600000-0000-4000-8000-000000000001";
+          const mountedDb = process.env.ENVOI_GATE5_MOUNTED_DB_CONTAINER;
+          if (!mountedDb?.startsWith("supabase_db_gate5-auth-"))
+            throw new Error("Disposable same-study database is unavailable.");
+          execFileSync("docker", ["exec", mountedDb, "psql", "-U", "postgres",
+            "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+            "-v", `offer_id=${first.id}`, "-f", "/tmp/gate5-same-study-report.sql"],
+          { stdio: "pipe" });
+          const qualifiedStudyId = study.data.id;
           const qualifiedRead = await page.request.get(
             `/api/researcher/studies/${qualifiedStudyId}/report`);
           expect(qualifiedRead.status()).toBe(200);
           expect(qualifiedRead.headers()["cache-control"]).toBe("private, no-store");
+          const published = await qualifiedRead.json() as {
+            reportId: string; studyId: string; summary: { version: number;
+              hypotheses: { hypothesis: string; result: string }[];
+              themes: { count: number; total: number; confidence: string;
+                supportingQuotes: { studyId: string; transcriptId: string;
+                  sourceVersion: string; startChar: number; endChar: number;
+                  exactText: string }[] }[] };
+          };
+          expect(Object.keys(published).sort()).toEqual(["reportId", "studyId", "summary"]);
+          expect(published).toMatchObject({
+            studyId: qualifiedStudyId,
+            reportId: "a9800000-0000-4000-8000-000000000001",
+          });
+          expect(published.summary.version).toBe(2);
+          expect(published.summary.themes).toHaveLength(1);
+          expect(published.summary.themes[0]).toMatchObject({
+            count: 1, total: 10, confidence: "low",
+          });
+          expect(published.summary.hypotheses).toEqual([{
+            hypothesis: "A clear meal choice reduces hesitation.", result: "untested",
+          }]);
+          const quote = published.summary.themes[0]?.supportingQuotes[0];
+          expect(quote).toMatchObject({ studyId: qualifiedStudyId,
+            startChar: 29, endChar: 42, exactText: "meal decision" });
+          const sourceAnswer = await db.from("answers").select("id")
+            .eq("session_id", session.data.id).eq("sequence", 1).single();
+          expect(sourceAnswer.error).toBeNull();
+          const source = await db.from("transcripts")
+            .select("id,redacted_text,redacted_source_version")
+            .eq("answer_id", sourceAnswer.data?.id).single();
+          expect(source.error).toBeNull();
+          expect(quote?.transcriptId).toBe(source.data?.id);
+          expect(quote?.sourceVersion).toBe(source.data?.redacted_source_version);
+          expect(Array.from(source.data?.redacted_text ?? "")
+            .slice(quote?.startChar, quote?.endChar).join("")).toBe("meal decision");
+          expect(JSON.stringify(published)).not.toMatch(/private fictional summary|Fictional private reason/i);
           await page.goto(`/app/studies/${qualifiedStudyId}`);
           await expect(page.getByRole("heading", { name: "Research report" })).toBeVisible();
-          await expect(page.getByText("ordered soup", { exact: true })).toBeVisible();
+          await expect(page.getByText("1 of 10 respondents · low confidence"))
+            .toBeVisible();
+          await expect(page.getByText("A clear meal choice reduces hesitation. · untested"))
+            .toBeVisible();
+          await expect(page.getByText("meal decision", { exact: true })).toBeVisible();
           const reportDownload = page.waitForEvent("download");
           await page.getByRole("button", { name: "Download themes and quotes CSV" }).click();
-          expect((await reportDownload).suggestedFilename())
+          const exported = await reportDownload;
+          expect(exported.suggestedFilename())
             .toBe("envoi-labs-themes-and-quotes.csv");
+          const csv = await readFile(await exported.path(), "utf8");
+          expect(csv).toContain("meal decision");
+          expect(csv).toContain('"1","10","low","supporting","meal decision"');
+          expect(csv).not.toContain("A clear meal choice reduces hesitation.");
+          expect(csv).toContain(`"${quote?.transcriptId}","${quote?.sourceVersion}","29","42"`);
+          expect(csv).not.toMatch(/private fictional summary|Fictional private reason/i);
+          const revokeSource = await db.from("consents").insert({
+            respondent_id: first.respondent_id, purpose: "researcher_access",
+            granted: false, text_version: "synthetic-same-study-revocation",
+          });
+          expect(revokeSource.error).toBeNull();
+          const revokedRead = await page.request.get(
+            `/api/researcher/studies/${qualifiedStudyId}/report`);
+          expect(revokedRead.status()).toBe(404);
+          expect(revokedRead.headers()["cache-control"]).toBe("private, no-store");
+          let staleExportDownloaded = false;
+          page.once("download", () => { staleExportDownloaded = true; });
+          await page.getByRole("button", { name: "Download themes and quotes CSV" }).click();
+          await expect(page.getByText("The report is currently unavailable.")).toBeVisible();
+          expect(staleExportDownloaded).toBe(false);
+          await page.reload();
+          await expect(page.getByText("meal decision", { exact: true })).toHaveCount(0);
+          await expect(page.getByRole("button", { name: "Download themes and quotes CSV" }))
+            .toHaveCount(0);
           return;
         }
         const second = offers.data?.[1];
@@ -697,12 +914,19 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await secondRespondent.getByLabel("Email address").fill(secondEmail);
           await secondRespondent.getByRole("checkbox", { name: /18 or older/ }).check();
           await secondRespondent.getByRole("button", { name: "Email me a sign-in link" }).click();
+          await expect.poll(async () => (await secondContext.cookies(origin +
+            "/api/respondent/auth/callback"))
+            .some(({ name }) => name === "envoi-respondent-age")).toBe(true);
           const secondLink = await deliveredEmail(secondRespondent, secondEmail, origin,
             "/api/respondent/auth/callback");
           await secondRespondent.goto(secondLink.href);
+          await expect(secondRespondent).toHaveURL(origin + "/r/status");
           const probeTurnId = randomUUID();
           const probeId = randomUUID();
           let answerCalls = 0;
+          let pendingReads = 0;
+          let releasePending: () => void = () => {};
+          const pendingGate = new Promise<void>((resolve) => { releasePending = resolve; });
           let sessionId = "";
           let questionId = "";
           let holdNextRead = false;
@@ -716,14 +940,21 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const receiptGate = new Promise<void>((resolve) => { releaseReceipt = resolve; });
           let signalShown: () => void = () => {};
           const shownSeen = new Promise<void>((resolve) => { signalShown = resolve; });
+          let heldReadStatus: number | null = null;
+          let withdrawalApplied = false;
+          const freshAfterWithdrawal: number[] = [];
           await secondRespondent.route("**/api/respondent/sessions/start", async (route) => {
             const response = await route.fetch();
+            const pendingRead = answerCalls === 0 && ++pendingReads <= 3;
+            if (answerCalls === 0 && pendingReads === 4) await pendingGate;
             const held = holdNextRead;
             if (held) {
+              heldReadStatus = response.status();
               signalReadStarted();
               await readGate;
               holdNextRead = false;
             }
+            if (withdrawalApplied && !held) freshAfterWithdrawal.push(response.status());
             if (!response.ok()) {
               await route.fulfill({ response });
               if (held) signalReadFinished();
@@ -735,7 +966,10 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             sessionId = current.sessionId;
             questionId = current.nextQuestion?.id ?? "";
             await route.fulfill({ response, json: { ...current,
-              currentProbe: answerCalls === 0 ? { turnId: probeTurnId, probeId,
+              nextQuestion: pendingRead && current.nextQuestion
+                ? { ...current.nextQuestion, text: "PRIVATE_ANSWER_SENTINEL" } : current.nextQuestion,
+              probePending: pendingRead,
+              currentProbe: answerCalls === 0 && !pendingRead ? { turnId: probeTurnId, probeId,
                 text: "What shaped your choice?" } : null } });
             if (held) signalReadFinished();
           });
@@ -754,11 +988,25 @@ test.describe("Gate 2 marketplace fixture replay", () => {
                 guideQuestionId: questionId, kind: "text", probeId,
                 durationMs: null, sequence: 1011, createdAt: now, updatedAt: now } }) });
           });
+          await secondRespondent.emulateMedia({ reducedMotion: "reduce" });
           await secondRespondent.goto("/r");
           await secondRespondent.getByRole("button", { name: "Start answering" }).click();
           await expect(secondRespondent).toHaveURL(origin + `/r/interviews/${second.id}`);
+          const preparing = secondRespondent.locator('p[role="status"]')
+            .filter({ hasText: "Preparing this follow-up…" });
+          await expect(preparing).toBeVisible();
+          await expect(preparing).toHaveCSS("animation-name", "none");
+          const home = secondRespondent.getByRole("link", { name: "Back to your studies" });
+          await home.focus();
+          await expect.poll(() => pendingReads).toBeGreaterThanOrEqual(4);
+          await expect(home).toBeFocused();
+          await expect(preparing).toHaveCount(1);
+          await expect(secondRespondent.locator("body")).not.toContainText("PRIVATE_ANSWER_SENTINEL");
+          releasePending();
           await expect(secondRespondent.getByRole("heading", { name: "What shaped your choice?" }))
             .toBeVisible();
+          await expect(secondRespondent.getByRole("heading", { name: "What shaped your choice?" }))
+            .toBeFocused();
           await shownSeen;
           await expect(secondRespondent.getByRole("button", { name: "Save answer" })).toBeDisabled();
           await expect(secondRespondent.getByLabel("Type your answer")).toBeDisabled();
@@ -783,12 +1031,14 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           releaseRead();
           await readFinished;
+          expect(heldReadStatus).toBe(200);
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           const withdrawn = await db.from("consents").insert({
             respondent_id: second.respondent_id, purpose: "retention", granted: false,
             text_version: "synthetic-marketplace-withdrawal",
           });
           expect(withdrawn.error).toBeNull();
+          withdrawalApplied = true;
           await secondRespondent.evaluate(() => {
             Reflect.deleteProperty(document, "visibilityState");
             document.dispatchEvent(new Event("visibilitychange"));
@@ -797,7 +1047,10 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             .toBe("visible");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
-          await expect(secondRespondent.getByRole("alert")).toBeVisible();
+          await expect.poll(() => freshAfterWithdrawal)
+            .toContain(409);
+          await expect(secondRespondent.getByRole("main").getByRole("alert"))
+            .toHaveText("This interview isn’t available anymore.");
         } finally {
           await secondContext.close();
         }
