@@ -150,4 +150,3 @@ returns jsonb language sql volatile security definer set search_path = '' as $$
             order by server_upload_confirmed_at, answer_id), '[]'::jsonb)) end
     from entries;
 $$;
-
