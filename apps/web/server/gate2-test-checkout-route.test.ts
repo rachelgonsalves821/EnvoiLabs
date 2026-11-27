@@ -2,9 +2,9 @@ import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../app/api/researcher/studies/[studyId]/checkout/route";
 
-const { getClaims, membership, prepare, makeDb, makeProvider } = vi.hoisted(() => ({
+const { getClaims, membership, prepare, makeDb, makeProvider, budget } = vi.hoisted(() => ({
   getClaims: vi.fn(), membership: vi.fn(), prepare: vi.fn(),
-  makeDb: vi.fn(), makeProvider: vi.fn(),
+  makeDb: vi.fn(), makeProvider: vi.fn(), budget: vi.fn(),
 }));
 vi.mock("./auth/supabase", async (importOriginal) => ({
   ...await importOriginal<typeof import("./auth/supabase")>(),
@@ -17,6 +17,7 @@ vi.mock("./auth/supabase", async (importOriginal) => ({
   trustedClient: () => ({}),
 }));
 vi.mock("./platform/gate2-checkout-db", () => ({ createGate2CheckoutDatabase: makeDb }));
+vi.mock("./platform/gate2-provider-budget", () => ({ takeGate2TestProviderBudget: budget }));
 vi.mock("./platform/gate2-stripe-test", () => ({ createStripeTestCheckoutProvider: makeProvider }));
 vi.mock("@envoi-labs/services/checkout", () => ({ prepareStudyCheckout: prepare }));
 
@@ -60,6 +61,7 @@ describe("disabled test-mode researcher checkout route", () => {
     vi.stubEnv("STRIPE_TEST_SECRET_KEY", "sk_test_fixture");
     getClaims.mockResolvedValue({ data: { claims: { sub: quoteId, aal: "aal2" } }, error: null });
     membership.mockResolvedValue({ data: { id: quoteId, organization_id: studyId }, error: null });
+    budget.mockResolvedValue({ status: "allow" });
     makeDb.mockReturnValue({});
     makeProvider.mockReturnValue({});
     const feasibility = { basis: "insufficient_history", fillHours: null };
@@ -78,5 +80,22 @@ describe("disabled test-mode researcher checkout route", () => {
     prepare.mockResolvedValueOnce({ status: "blocked" });
     expect((await post()).status).toBe(409);
     expect((await post({ quoteId })).status).toBe(400);
+  });
+
+  it("shares an atomic budget before any Stripe setup and fails closed", async () => {
+    vi.stubEnv("ENVOI_GATE2_TEST_CHECKOUT_ENABLED", "true");
+    vi.stubEnv("ENVOI_APP_ORIGIN", origin);
+    vi.stubEnv("STRIPE_TEST_SECRET_KEY", "sk_test_fixture");
+    getClaims.mockResolvedValue({ data: { claims: { sub: quoteId, aal: "aal2" } }, error: null });
+    membership.mockResolvedValue({ data: { id: quoteId, organization_id: studyId }, error: null });
+    budget.mockResolvedValue({ status: "limited", retryAfterSeconds: 42 });
+    const denied = await Promise.all(Array.from({ length: 4 }, () => post()));
+    expect(denied.map((response) => response.status)).toEqual([429, 429, 429, 429]);
+    expect(denied.every((response) => response.headers.get("retry-after") === "42")).toBe(true);
+    expect(makeProvider).not.toHaveBeenCalled();
+    expect(prepare).not.toHaveBeenCalled();
+    budget.mockResolvedValueOnce({ status: "unavailable" });
+    expect((await post()).status).toBe(503);
+    expect(makeProvider).not.toHaveBeenCalled();
   });
 });

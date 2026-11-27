@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { failure, input, reply } from "../../../../../../../server/auth/http";
 import { requestSession, trustedClient } from "../../../../../../../server/auth/supabase";
 import { createGate2PaidStudyDatabase } from "../../../../../../../server/platform/gate2-paid-study-db";
+import { takeGate2TestProviderBudget } from "../../../../../../../server/platform/gate2-provider-budget";
 import { createStripeTestPaymentObserver } from "../../../../../../../server/platform/gate2-stripe-payment-test";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -36,6 +37,14 @@ export async function POST(request: NextRequest,
   const secretKey = process.env.STRIPE_TEST_SECRET_KEY;
   if (!trusted || !secretKey?.startsWith("sk_test_")) return session.commit(failure(503));
   try {
+    const budget = await takeGate2TestProviderBudget(trusted, studyId, authUserId);
+    if (budget.status === "blocked") return session.commit(failure(404));
+    if (budget.status === "unavailable") return session.commit(failure(503));
+    if (budget.status === "limited") {
+      const denied = failure(429);
+      denied.headers.set("Retry-After", String(budget.retryAfterSeconds));
+      return session.commit(denied);
+    }
     const result = await reconcileCheckoutObservation(createGate2PaidStudyDatabase(trusted),
       createStripeTestPaymentObserver({ secretKey }), studyId, quoteId);
     return session.commit(result === "blocked" ? failure(409)

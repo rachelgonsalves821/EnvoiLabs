@@ -1783,6 +1783,10 @@ export type Database = {
         Args: { supplied_quote_id: string; supplied_study_id: string }
         Returns: Json
       }
+      consume_gate2_test_provider_budget: {
+        Args: { supplied_auth_user_id: string; supplied_study_id: string }
+        Returns: Json
+      }
       claim_gate2_nudge_delivery: {
         Args: { supplied_claim_id: string; supplied_delivery_id: string }
         Returns: Json
