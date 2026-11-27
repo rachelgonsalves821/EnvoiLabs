@@ -94,13 +94,18 @@ test.describe("Gate 2 private screening Storage", () => {
         })));
       expect(consents.error).toBeNull();
 
-      const reserved = await context.request.post(
-        `/api/respondent/screening/${offer.data.id}/audio`, { data: {
-          ruleId: rule.data.id, ruleVersion: 1,
-          bytes: media.length, mime: "audio/webm",
-        } });
-      expect(reserved.status()).toBe(200);
-      const lease = await reserved.json() as {
+      await page.goto(`/r/screening/${offer.data.id}`);
+      await expect(page.getByText("Fictional question?")).toBeVisible();
+      const reserved = await page.evaluate(async ({ inviteId, ruleId, bytes }) => {
+        const response = await fetch(`/api/respondent/screening/${inviteId}/audio`, {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ruleId, ruleVersion: 1, bytes, mime: "audio/webm" }),
+        });
+        return { status: response.status, body: await response.json() };
+      }, { inviteId: offer.data.id, ruleId: rule.data.id, bytes: media.length });
+      expect(reserved.status, JSON.stringify(reserved.body)).toBe(200);
+      const lease = reserved.body as {
         audioObjectId: string; expiresAt: string; uploadUrl: string };
       expect(Date.parse(lease.expiresAt)).toBeGreaterThan(Date.now());
       expect(Date.parse(lease.expiresAt)).toBeLessThanOrEqual(Date.now() + 600_000);
@@ -193,11 +198,15 @@ test.describe("Gate 2 private screening Storage", () => {
         text_version: "synthetic-storage-v1",
       });
       expect(withdrawn.error).toBeNull();
-      const confirmation = await context.request.put(
-        `/api/respondent/screening/${offer.data.id}/audio`, {
-          data: { audioObjectId: lease.audioObjectId, durationMs: 1000 },
+      const confirmationStatus = await page.evaluate(async ({ inviteId, audioObjectId }) => {
+        const response = await fetch(`/api/respondent/screening/${inviteId}/audio`, {
+          method: "PUT", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ audioObjectId, durationMs: 1000 }),
         });
-      expect(confirmation.ok()).toBe(false);
+        return response.status;
+      }, { inviteId: offer.data.id, audioObjectId: lease.audioObjectId });
+      expect(confirmationStatus).toBeGreaterThanOrEqual(400);
       expect((await request.get(direct, { headers: ownerHeaders })).ok()).toBe(false);
     } finally {
       await context.close();
