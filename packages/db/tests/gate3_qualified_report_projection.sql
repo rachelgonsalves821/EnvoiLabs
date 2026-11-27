@@ -812,6 +812,68 @@ set local role authenticated;
 select is((select count(*) from research.reports), 0::bigint, 'restored text cannot replay an old source version');
 reset role;
 
+-- Seven current source rows from only six approved people cannot back 7/10.
+insert into public.answers (id, session_id, study_id, guide_question_id, kind, sequence)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9740000-0000-4000-8000-' || lpad(to_hex(case when n = 7 then 1 else n end), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001', 'text',
+    case when n = 7 then 2 else 1 end
+from generate_series(1, 7) as n;
+insert into public.transcripts (id, answer_id, study_id, provider, model, latency_ms, cost_micros)
+select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001', 'typed', 'none', 0, 0
+from generate_series(1, 7) as n;
+insert into pii.transcript_raw (transcript_id, raw_text)
+select id, 'Synthetic qualified supporter' from public.transcripts
+where id in (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    from generate_series(1, 7) as n);
+insert into internal.gate1_answer_jobs (answer_id)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+from generate_series(1, 7) as n;
+create temp table support_claims (answer_id uuid, lease_id uuid);
+grant select, insert on support_claims to service_role;
+set local role service_role;
+insert into support_claims
+select answer_id, (public.claim_gate1_answer_job(answer_id) ->> 'leaseId')::uuid
+from (select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    as answer_id from generate_series(1, 7) as n) as requested;
+select is(public.complete_gate1_answer_job(answer_id, lease_id,
+    supplied_redacted_text => 'Qualified supporter', supplied_redaction_passed => true,
+    supplied_policy_digest => repeat('a', 64), supplied_qualification_digest => repeat('b', 64)
+    ) ->> 'status', 'published', 'extra fictional support source is qualified')
+from support_claims;
+reset role;
+insert into public.reports (id, study_id, version, state, summary_json)
+values ('a9700000-0000-4000-8000-000000000040',
+    '90600000-0000-4000-8000-000000000001', 3, 'ready', '{"raw":"private count test"}');
+insert into public.findings (id, report_id, study_id, position, claim, count, total, confidence)
+values ('a9700000-0000-4000-8000-000000000041',
+    'a9700000-0000-4000-8000-000000000040',
+    '90600000-0000-4000-8000-000000000001', 1, 'Private count claim', 7, 10, 'high');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000040',
+    'a9700000-0000-4000-8000-000000000041',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000042',
+    (select jsonb_agg(jsonb_build_object('transcriptId', id,
+        'sourceVersion', redacted_source_version) order by id)
+        from public.transcripts where id in
+        (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+            from generate_series(1, 7) as n))), true,
+    'reviewer can attest seven current sources including one repeated respondent');
+reset role;
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000040', repeat('a', 64), repeat('b', 64)),
+    false, 'seven source rows from six people cannot support a seven-of-ten claim');
+update public.findings set count = 6 where id = 'a9700000-0000-4000-8000-000000000041';
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000040', repeat('a', 64), repeat('b', 64)),
+    true, 'six distinct current supporters justify six of ten');
+
 reset role;
 set local role authenticated;
 select * from finish();
