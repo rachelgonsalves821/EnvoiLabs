@@ -328,9 +328,12 @@ select is(public.publish_gate3_reviewed_report(
     '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'qualifier failure withholds report even when source and support are current');
 reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
 select is((select count(*) from research.reports where id =
     'a9700000-0000-4000-8000-000000000006'), 0::bigint,
     'no direct-RPC sentinel can make the report readable');
+reset role;
 -- Synthetic fixture stands in for an independently authorized qualifier.
 insert into pii.gate3_public_text_qualifications
     (report_id, payload_digest, policy_digest, qualification_digest, qualifier_receipt_id)
