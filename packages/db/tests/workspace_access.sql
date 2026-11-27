@@ -13,7 +13,7 @@ insert into access_matrix values
     ('public.researchers',        array[0, 0, 1, 1, 1, 0, null]),
     ('public.respondents',        array[1, 1, 0, 0, 0, 0, null]),
     ('public.profile_attributes', array[6, 6, 0, 0, 0, 0, null]),
-    ('public.consents',           array[1, 0, 0, 0, 0, 0, null]),
+    ('public.consents',           array[2, 0, 0, 0, 0, 0, null]),
     ('public.invites',            array[1, 1, 0, 0, 0, 0, null]),
     ('public.screener_answers',   array[1, 0, 0, 0, 0, 0, null]),
     ('public.sessions',           array[1, 0, 0, 0, 0, 0, null]),
@@ -103,9 +103,9 @@ insert into public.invites (id, study_id, respondent_id, state, reward_cents, ex
         '90500000-0000-4000-8000-000000000001', 'accepted', 300, now() + interval '1 day'),
     ('91100000-0000-4000-8000-000000000002', '90600000-0000-4000-8000-000000000001',
         '90500000-0000-4000-8000-000000000002', 'invited', 300, now() + interval '1 day');
-insert into public.sessions (id, study_id, invite_id)
+insert into public.sessions (id, study_id, invite_id, state)
 values ('91200000-0000-4000-8000-000000000001', '90600000-0000-4000-8000-000000000001',
-    '91100000-0000-4000-8000-000000000001');
+    '91100000-0000-4000-8000-000000000001', 'in_progress');
 insert into public.answers (id, study_id, session_id, guide_question_id, kind, sequence)
 values ('91300000-0000-4000-8000-000000000001', '90600000-0000-4000-8000-000000000001',
     '91200000-0000-4000-8000-000000000001', '91000000-0000-4000-8000-000000000001', 'text', 1);
