@@ -309,6 +309,16 @@ select is(public.attest_gate3_reviewed_support(
         payload #>> '{1,0,sourceVersion}')) from expected_report_quotes)), true,
     'reviewer separately attests the current exact supporting source');
 reset role;
+update public.findings set count = 7
+where id = 'a9700000-0000-4000-8000-000000000007';
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000006', repeat('a', 64), repeat('b', 64)),
+    false, 'direct publication guard rejects an inflated seven of ten claim');
+update public.findings set count = 1
+where id = 'a9700000-0000-4000-8000-000000000007';
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000006', repeat('a', 64), repeat('b', 64)),
+    true, 'exact one-supporter claim is current before publication');
 set local role service_role;
 select is(jsonb_array_length(public.read_gate3_reviewed_support_snapshot(
     'a9700000-0000-4000-8000-000000000006') -> 'approvedRespondentIds'),
@@ -373,6 +383,7 @@ reset role;
 -- Synthetic fixture stands in for an independently authorized qualifier.
 -- The test connection gets temporary membership only inside this rolled-back fixture.
 grant gate3_report_qualifier to postgres;
+grant usage on schema extensions to gate3_report_qualifier;
 set local role gate3_report_qualifier;
 select is(public.record_gate3_public_text_qualification(
     'a9700000-0000-4000-8000-000000000006',
