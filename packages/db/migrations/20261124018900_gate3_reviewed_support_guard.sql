@@ -34,6 +34,8 @@ begin
     select * into target from public.reports where id = supplied_report_id for update;
     if not found or target.state <> 'ready' or supplied_causation_id is null
         or supplied_actor_auth_user_id is null
+        or auth.uid() is distinct from supplied_actor_auth_user_id
+        or auth.jwt() ->> 'aal' is distinct from 'aal2'
         or jsonb_typeof(supplied_sources) <> 'array'
         or jsonb_array_length(supplied_sources) not between 1 and 500
         or not exists (select 1 from public.findings
@@ -113,7 +115,7 @@ $$;
 revoke all on function public.attest_gate3_reviewed_support(
     uuid, uuid, uuid, uuid, jsonb) from public, anon, authenticated, service_role;
 grant execute on function public.attest_gate3_reviewed_support(
-    uuid, uuid, uuid, uuid, jsonb) to service_role;
+    uuid, uuid, uuid, uuid, jsonb) to authenticated;
 
 -- Recompute ownership and qualification at publication and at every read.
 -- Extra support rows may lift a count above the ten displayed quote limit,

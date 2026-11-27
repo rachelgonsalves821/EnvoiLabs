@@ -103,7 +103,7 @@ select jsonb_build_object('1', jsonb_build_array(jsonb_build_object(
     'sourceVersion', source_version, 'startChar', start_char,
     'endChar', end_char, 'exactText', text))) as payload
 from public.evidence_quotes where id = 'a9700000-0000-4000-8000-000000000008';
-grant select on expected_report_quotes to service_role;
+grant select on expected_report_quotes to service_role, authenticated;
 create temp table expected_report_summary as
 select jsonb_build_object('version', 2, 'executiveAnswer', 'One soup order',
     'hypotheses', '[]'::jsonb, 'themes', jsonb_build_array(jsonb_build_object(
@@ -272,15 +272,43 @@ select is(public.publish_gate3_reviewed_report(
     (select payload from expected_reviews),
     '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'direct reviewed publisher denies a missing support attestation');
+select ok(not has_function_privilege('service_role',
+    'public.attest_gate3_reviewed_support(uuid,uuid,uuid,uuid,jsonb)', 'EXECUTE'),
+    'publisher service cannot impersonate a reviewer support attestation');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
 select is(public.attest_gate3_reviewed_support(
     'a9700000-0000-4000-8000-000000000006',
     'a9700000-0000-4000-8000-000000000007',
     '90200000-0000-4000-8000-000000000001',
     'a9700000-0000-4000-8000-000000000050',
-    (select jsonb_build_array(jsonb_build_object('transcriptId', transcript_id,
-        'sourceVersion', source_version)) from public.evidence_quotes
-        where id = 'a9700000-0000-4000-8000-000000000008')), true,
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from expected_report_quotes)), false,
+    'reviewer support attestation requires MFA');
+set local request.jwt.claims = '{"sub":"a9700000-0000-4000-8000-000000000009","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000006',
+    'a9700000-0000-4000-8000-000000000007',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000050',
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from expected_report_quotes)), false,
+    'other tenant cannot impersonate the approved reviewer');
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000006',
+    'a9700000-0000-4000-8000-000000000007',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000050',
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from expected_report_quotes)), true,
     'reviewer separately attests the current exact supporting source');
+reset role;
+set local role service_role;
 select is(jsonb_array_length(public.read_gate3_reviewed_support_snapshot(
     'a9700000-0000-4000-8000-000000000006') -> 'approvedRespondentIds'),
     10, 'private snapshot has exactly ten current approved respondents');
@@ -511,15 +539,17 @@ select jsonb_build_array(
         'findingPosition', 1, 'action', 'drop', 'approvedQuote', null)) as payload
 from edited_report_quotes;
 grant select on edited_report_quotes, edited_reviews to service_role;
-set local role service_role;
+grant select on edited_report_quotes to authenticated;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
 select is(public.attest_gate3_reviewed_support(
     'a9700000-0000-4000-8000-000000000030',
     'a9700000-0000-4000-8000-000000000031',
     '90200000-0000-4000-8000-000000000001',
     'a9700000-0000-4000-8000-000000000051',
-    (select jsonb_build_array(jsonb_build_object('transcriptId', transcript_id,
-        'sourceVersion', source_version)) from public.evidence_quotes
-        where id = 'a9700000-0000-4000-8000-000000000032')), true,
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from edited_report_quotes)), true,
     'second report version has a separate reviewed source attestation');
 reset role;
 insert into pii.gate3_public_text_qualifications
