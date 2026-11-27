@@ -306,6 +306,55 @@ select is(public.authorize_gate3_analyst_snapshot(
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot)), true,
     'same frozen source and purpose authorize the model boundary');
+select ok(not has_table_privilege('service_role',
+    'pii.gate3_private_analysis_proposals', 'SELECT')
+    and not has_function_privilege('authenticated',
+    'public.write_gate3_private_analysis_proposal(uuid,uuid,uuid,text,text,text,text,text,text,jsonb,text,jsonb,jsonb,uuid)',
+    'EXECUTE'), 'private proposals have no direct service or client read');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot), repeat('e', 64),
+    '{"privateDraft":"fictional"}'::jsonb,
+    '{"privateScreened":"fictional"}'::jsonb,
+    'a9990000-0000-4000-8000-000000000005'), true,
+    'first private proposal stores against current reviewed snapshot');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot), repeat('e', 64),
+    '{"privateDraft":"fictional"}'::jsonb,
+    '{"privateScreened":"fictional"}'::jsonb,
+    'a9990000-0000-4000-8000-000000000005'), true,
+    'same private proposal replay returns prior result');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot), repeat('e', 64),
+    '{"privateDraft":"changed"}'::jsonb,
+    '{"privateScreened":"fictional"}'::jsonb,
+    'a9990000-0000-4000-8000-000000000005'), false,
+    'replayed causation cannot replace the first private proposal');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot), repeat('f', 64),
+    '{"privateDraft":"second worker"}'::jsonb,
+    '{"privateScreened":"second worker"}'::jsonb,
+    'a9990000-0000-4000-8000-000000000007'), false,
+    'second worker cannot store another proposal for same reviewed source');
 select is(public.authorize_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
     (select id from analyst_quote),
@@ -375,6 +424,17 @@ select is(public.authorize_gate3_analyst_snapshot(
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot)), false,
     'edited redacted text lacks exact publication receipt');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot), repeat('f', 64),
+    '{"privateDraft":"stale"}'::jsonb,
+    '{"privateScreened":"stale"}'::jsonb,
+    'a9990000-0000-4000-8000-000000000006'), false,
+    'changed source cannot enter private proposal sink');
 reset role;
 rollback to savepoint stale_analysis_source;
 savepoint stale_analysis_guide;
