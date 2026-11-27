@@ -2,9 +2,9 @@ import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../app/api/researcher/studies/[studyId]/checkout/reconcile/route";
 
-const { getClaims, researcherRow, studyRow, reconcile, makeDb, makeObserver } = vi.hoisted(() => ({
+const { getClaims, researcherRow, studyRow, reconcile, makeDb, makeObserver, budget } = vi.hoisted(() => ({
   getClaims: vi.fn(), researcherRow: vi.fn(), studyRow: vi.fn(),
-  reconcile: vi.fn(), makeDb: vi.fn(), makeObserver: vi.fn(),
+  reconcile: vi.fn(), makeDb: vi.fn(), makeObserver: vi.fn(), budget: vi.fn(),
 }));
 vi.mock("./auth/supabase", async (importOriginal) => ({
   ...await importOriginal<typeof import("./auth/supabase")>(),
@@ -16,6 +16,7 @@ vi.mock("./auth/supabase", async (importOriginal) => ({
   trustedClient: () => ({}),
 }));
 vi.mock("./platform/gate2-paid-study-db", () => ({ createGate2PaidStudyDatabase: makeDb }));
+vi.mock("./platform/gate2-provider-budget", () => ({ takeGate2TestProviderBudget: budget }));
 vi.mock("./platform/gate2-stripe-payment-test", () => ({ createStripeTestPaymentObserver: makeObserver }));
 vi.mock("@envoi-labs/services/paid-study", () => ({ reconcileCheckoutObservation: reconcile }));
 
@@ -37,6 +38,7 @@ function authorized() {
   studyRow.mockResolvedValue({ data: { id: studyId }, error: null });
   makeDb.mockReturnValue({});
   makeObserver.mockReturnValue({});
+  budget.mockResolvedValue({ status: "allow" });
 }
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
 
@@ -66,9 +68,22 @@ describe("test-mode checkout observation route", () => {
     expect(paid.status).toBe(200);
     expect(paid.headers.get("cache-control")).toBe("private, no-store");
     expect(await paid.json()).toEqual({ quoteId, paymentStatus: "paid" });
+    expect(budget).toHaveBeenCalledWith({}, studyId, quoteId, "reconcile");
     expect(reconcile).toHaveBeenCalledWith({}, {}, studyId, quoteId);
     expect((await post()).status).toBe(200);
     expect((await post()).status).toBe(409);
     expect((await post()).status).toBe(503);
+  });
+  it("denies repeated provider reads and outages before observer creation", async () => {
+    authorized();
+    budget.mockResolvedValue({ status: "limited", retryAfterSeconds: 42 });
+    const denied = await Promise.all(Array.from({ length: 4 }, () => post()));
+    expect(denied.map((response) => response.status)).toEqual([429, 429, 429, 429]);
+    expect(denied.every((response) => response.headers.get("retry-after") === "42")).toBe(true);
+    expect(makeObserver).not.toHaveBeenCalled();
+    expect(reconcile).not.toHaveBeenCalled();
+    budget.mockResolvedValueOnce({ status: "unavailable" });
+    expect((await post()).status).toBe(503);
+    expect(makeObserver).not.toHaveBeenCalled();
   });
 });

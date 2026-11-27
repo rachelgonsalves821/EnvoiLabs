@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { failure, input, reply } from "../../../../../../server/auth/http";
 import { appOrigin, requestSession, trustedClient } from "../../../../../../server/auth/supabase";
 import { createGate2CheckoutDatabase } from "../../../../../../server/platform/gate2-checkout-db";
+import { takeGate2TestProviderBudget } from "../../../../../../server/platform/gate2-provider-budget";
 import { createStripeTestCheckoutProvider } from "../../../../../../server/platform/gate2-stripe-test";
 
 export async function POST(request: NextRequest,
@@ -24,12 +25,25 @@ export async function POST(request: NextRequest,
     .select("id,organization_id").eq("auth_user_id", authUserId).maybeSingle();
   if (error) return session.commit(failure(503));
   if (!researcher) return session.commit(failure(403));
+  const { data: study, error: studyError } = await session.client.from("studies")
+    .select("id").eq("id", studyId)
+    .eq("organization_id", researcher.organization_id).maybeSingle();
+  if (studyError) return session.commit(failure(503));
+  if (!study) return session.commit(failure(404));
   const trusted = trustedClient();
   const origin = appOrigin();
   const secretKey = process.env.STRIPE_TEST_SECRET_KEY;
   if (!trusted || !origin?.startsWith("https://") || !secretKey?.startsWith("sk_test_"))
     return session.commit(failure(503));
   try {
+    const budget = await takeGate2TestProviderBudget(trusted, studyId, authUserId, "checkout");
+    if (budget.status === "blocked") return session.commit(failure(404));
+    if (budget.status === "unavailable") return session.commit(failure(503));
+    if (budget.status === "limited") {
+      const denied = failure(429);
+      denied.headers.set("Retry-After", String(budget.retryAfterSeconds));
+      return session.commit(denied);
+    }
     const returnPath = `${origin}/app/studies/${encodeURIComponent(studyId)}`;
     const provider = createStripeTestCheckoutProvider({ secretKey,
       successUrl: `${returnPath}?checkout=returned`,
