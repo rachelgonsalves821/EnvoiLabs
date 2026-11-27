@@ -117,7 +117,7 @@ if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
 fi
 
 cd -- "$repo_dir"
-pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts gate2-screening.spec.ts gate2-screening-voice.spec.ts gate2-marketplace.spec.ts gate2-audio-selector.spec.ts
+pnpm exec playwright test --project=desktop-chromium --retries 0 --workers 1 auth-local.spec.ts gate1-slice.spec.ts gate2-screening.spec.ts gate2-screening-voice.spec.ts gate2-marketplace.spec.ts gate2-audio-selector.spec.ts gate2-echo.spec.ts
 if [[ "${ENVOI_AUTH_TEST_LINK:-custom}" == 'custom' ]]; then
   node --test apps/web/server/respondent/gate1-worker.integration.mjs apps/web/server/respondent/gate1-worker-formats.integration.mjs
 fi

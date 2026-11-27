@@ -78,7 +78,10 @@
   box-sizing: border-box;
   display: inline-block;
   flex: none;
+  overflow: hidden;
+  position: relative;
 }
+.ev-echo-canvas { display: block; inline-size: 100%; block-size: 100%; pointer-events: none; }
 .ev-echo[data-state=listen] { outline: 5px solid var(--pulse-wash); outline-offset: 2px; }
 .ev-echo[data-state=payout] { background: var(--zest); border-color: var(--zest-deep); }
 .ev-sheet-host { display: contents; }

@@ -21,6 +21,7 @@ export function useVoiceCapture() {
   const captureRequested = useRef(false);
   const generation = useRef(0);
   const preview = useRef<string | null>(null);
+  const readLevel = useRef<() => number>(() => 0);
 
   function discardPreview() {
     if (!preview.current) return;
@@ -75,10 +76,36 @@ export function useVoiceCapture() {
       return;
     }
 
+    let meter: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    if (typeof AudioContext !== "undefined") {
+      try {
+        meter = new AudioContext();
+        source = meter.createMediaStreamSource(stream);
+        const analyser = meter.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        const samples = new Uint8Array(analyser.fftSize);
+        readLevel.current = () => {
+          analyser.getByteTimeDomainData(samples);
+          let energy = 0;
+          for (const sample of samples) energy += ((sample - 128) / 128) ** 2;
+          return Math.min(1, Math.sqrt(energy / samples.length) * 4);
+        };
+        void meter.resume().catch(() => {});
+      } catch {
+        source?.disconnect();
+        if (meter) void meter.close().catch(() => {});
+      }
+    }
+
     const parts: Blob[] = [];
     const startedAt = performance.now();
     let endedAt: number | undefined;
     const release = () => {
+      readLevel.current = () => 0;
+      source?.disconnect();
+      if (meter) void meter.close().catch(() => {});
       clearInterval(ticker);
       clearTimeout(timeLimit);
       document.removeEventListener("visibilitychange", stopWhenHidden);
@@ -155,5 +182,6 @@ export function useVoiceCapture() {
     setState({ kind: "idle" });
   }
 
-  return { state, error, start, stop: () => active.current?.stop(), discard };
+  return { state, error, start, stop: () => active.current?.stop(), discard,
+    level: () => readLevel.current() };
 }
