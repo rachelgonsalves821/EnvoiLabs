@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(15);
+select plan(19);
 
 update auth.users set email_confirmed_at = now()
 where id in ('90300000-0000-4000-8000-000000000001', '90300000-0000-4000-8000-000000000002');
@@ -27,14 +27,37 @@ select throws_ok($$
         '99500000-0000-4000-8000-000000000001', '99800000-0000-4000-8000-000000000001', 'Synthetic answer')
 $$, '42501', null, 'another verified respondent cannot save this session');
 set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select throws_ok($$ select public.start_gate1_session('99600000-0000-4000-8000-000000000001') $$,
+    '23514', null, 'interview read withholds the question before consent');
 select throws_ok($$
     select public.record_gate1_text_answer('99700000-0000-4000-8000-000000000001',
         '99500000-0000-4000-8000-000000000001', '99800000-0000-4000-8000-000000000001', 'Synthetic answer')
 $$, '23514', null, 'record cannot write without retention consent');
 reset role;
 insert into public.consents (respondent_id, purpose, granted, text_version)
-values ('90500000-0000-4000-8000-000000000001', 'retention', true, 'gate1-preview-v1');
+values ('90500000-0000-4000-8000-000000000001', 'retention', true, 'gate1-preview-v1'),
+    ('90500000-0000-4000-8000-000000000001', 'researcher_access', true, 'gate1-preview-v1');
 
+set local role authenticated;
+select is(public.start_gate1_session('99600000-0000-4000-8000-000000000001')
+    #>> '{nextQuestion,text}', 'Question 1', 'current grants permit the next question');
+reset role;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001', 'retention', false, 'gate1-preview-v1');
+set local role authenticated;
+select throws_ok($$ select public.start_gate1_session('99600000-0000-4000-8000-000000000001') $$,
+    '23514', null, 'withdrawal withholds the resumed question');
+reset role;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001', 'retention', true, 'gate1-preview-v1');
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001', 'researcher_access', false, 'gate1-preview-v1');
+set local role authenticated;
+select throws_ok($$ select public.start_gate1_session('99600000-0000-4000-8000-000000000001') $$,
+    '23514', null, 'researcher-access withdrawal also withholds the question');
+reset role;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001', 'researcher_access', true, 'gate1-preview-v1');
 set local role authenticated;
 select throws_ok($$
     select public.record_gate1_text_answer('99700000-0000-4000-8000-000000000001',
