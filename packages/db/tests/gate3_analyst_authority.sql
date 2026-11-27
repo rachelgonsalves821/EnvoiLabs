@@ -277,6 +277,7 @@ select public.read_gate3_analyst_snapshot(
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)) as payload;
 grant select on analyst_snapshot to service_role;
+grant select on analyst_snapshot to gate3_analysis_validator;
 create temp table analyst_binding as
 select internal.gate3_analysis_binding_projection(payload)::text as key,
     encode(pg_catalog.sha256(convert_to(
@@ -284,6 +285,7 @@ select internal.gate3_analysis_binding_projection(payload)::text as key,
         'UTF8')), 'hex') as digest
 from analyst_snapshot;
 grant select on analyst_binding to service_role;
+grant select on analyst_binding to gate3_analysis_validator;
 create temp table analyst_binding_variants as
 with altered as (
     select 'quote'::text as variant,
