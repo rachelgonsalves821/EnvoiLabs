@@ -48,6 +48,12 @@ try {
   Get-Content -LiteralPath (Join-Path $repo 'packages\db\seed.sql') -Raw |
     docker exec -i $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 *> (Join-Path $target 'seed.log')
   if ($LASTEXITCODE -ne 0) { throw 'Fictional seed failed' }
+  $migrationReceipt = & docker exec $dbContainer psql -U postgres -d postgres -Atc `
+    "select count(*),bool_or(version='20261124007100'),bool_or(version='20261124015100') from supabase_migrations.schema_migrations"
+  if ($LASTEXITCODE -ne 0 -or $migrationReceipt -notmatch '^\d+\|t\|t$') {
+    throw 'Required report publisher and quality guard migrations are absent'
+  }
+  Write-Output "Applied migration count, report 071, quality 151: $migrationReceipt"
   $ErrorActionPreference = 'Continue'
   Get-Content -LiteralPath (Join-Path $repo 'apps\web\e2e\fixtures\gate5-qualified-report.sql') -Raw |
     docker exec -i $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 *> (Join-Path $target 'report.log')
@@ -55,6 +61,11 @@ try {
   if ($LASTEXITCODE -ne 0) {
     Get-Content -LiteralPath (Join-Path $target 'report.log') -Tail 15
     throw 'Fictional report fixture failed'
+  }
+  if ($Spec -eq 'gate2-marketplace.spec.ts') {
+    Get-Content -LiteralPath (Join-Path $repo 'packages\db\scripts\gate2-visa-e2e-fixture.sql') -Raw |
+      docker exec -i $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 *> (Join-Path $target 'marketplace.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Fictional marketplace helper failed' }
   }
 
   $env:SUPABASE_URL = $values['API_URL']

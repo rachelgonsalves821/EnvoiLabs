@@ -1,6 +1,6 @@
 # December 5 fictional marketplace walkthrough
 
-Status: local fictional report rehearsal in progress. Integrated source anchor `53fa433` includes Gate 2's checked report publisher/import head `c99e9ca`; draft PR #253's last observed remote head is `6e0ad03`. The signed-in report needs an exact committed rerun and independent Gate 3 review. No protected preview or provider receipt exists. The coordinator records the final source and applied migration order before a walkthrough.
+Status: local fictional report rehearsal passed on `3b79f75`, including Gate 2's checked report publisher/import head `c99e9ca`; draft PR #253's last observed remote head is `3b79f75` and its hosted checks are pending. Gate 3's independent mounted-state review and the full marketplace journey remain open. No protected preview or provider receipt exists. The coordinator records the final source and applied migration order before a walkthrough.
 
 ## Isolation and evidence record
 

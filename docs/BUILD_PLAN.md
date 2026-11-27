@@ -34,7 +34,7 @@ Rule of ownership. Each directory has exactly one owning agent (section 3). You 
 | Storage | Supabase Storage, private buckets, signed URLs | Audio files |
 | Auth | Supabase Auth. A one-time email link opens the persistent respondent account. Researchers use an email link plus TOTP MFA. | Match the callback to the account type. |
 | Payments | Stripe Checkout and webhooks | Researcher payment |
-| Payouts | Tremendous API (sandbox first) | Gift cards, W-9 and 1099 handling |
+| Payouts | Tremendous API (TEST first) | Proposed prepaid Visa, verified recipient and denomination, W-9 and 1099 handling |
 | LLM | Anthropic Claude via `packages/ai` provider interface | Structured outputs, tool use |
 | Transcription | OpenAI primary and Groq Whisper fallback behind an interface | Pin and verify supported models for the deployment before enabling live calls |
 | Redaction | Deterministic analyzer plus approved contextual pass | See section 11 for Presidio evaluation and private hosting |
@@ -198,7 +198,7 @@ Exit criteria
 - [ ] Quality hold job approves or removes sessions using the v1 quality score, and removed sessions trigger replacement invites
 - [ ] Tremendous TEST prepaid Visa order after approved answered-core reward reservation, idempotent with annual cap and account-verified SKU, denomination, recipient and provider receipt. Earnings distinguishes earned, vested, ordered and delivered; below-minimum aggregation policy remains open.
 - [ ] Points ledger, milestone bonuses and receipt UI
-- [ ] **First real study** run on a dedicated, access-controlled preview with hand-recruited respondents (at least 10 completes) and Rachel as researcher. Complete the pre-study checklist below before enrollment.
+- [ ] **First real study** follows the fictional open-marketplace test and approved terms. Run on a dedicated, access-controlled environment with open signup, verified eligible profiles and at least ten purchased completes; complete the pre-study checklist below before enrollment.
 
 Integration tests required
 - `IT-2.1` Playwright fictional marketplace chain: scoping fixture to frozen $2/$1 quote of at least ten, verified TEST Checkout or labelled simulation, launch, approved core answers and reviewed replacement, private Earnings, then verified TEST Visa order or visibly mocked payout. Record exact provider receipts where claimed.
@@ -295,7 +295,7 @@ Risks: <anything that might slip a gate>
 | 1 | Repo, CI, Supabase, schema v1, RLS, contracts v1, fakes, seed, lint rules | `packages/ui` tokens and base components, respondent shell, email signup and sign-in | `packages/ai` interfaces and fakes, prompt file structure, eval harness, researcher shell |
 | 2 | State machines, matching, invites, session APIs, audit log | Profile, consent, invite card, interview screen with recording | Minimal study form, guide editor, transcription pipeline |
 | 3 | Gate 1 integration suite, expiry job | Upload and resume, receipt stub | Redaction v1, tracking page |
-| 4 | Pricing, Stripe, quality v1, payout sandbox, screening rules | Confirming screener, push subscription and nudges, gift card choice | Scoping, screening interpretation and evals, live brief, quote and checkout |
+| 4 | Pricing, Stripe, quality v1, payout TEST mode, screening rules | Confirming screener, push subscription and nudges, proposed prepaid Visa recipient/eligibility copy | Scoping, screening interpretation and evals, live brief, quote and checkout |
 | 5 | Gate 2 suite, points ledger, replacement invites, pre-study privacy and compensation checks | Points and receipt, probe display, physical-device checks | Interviewer probe agent v1, first real study support |
 | 6 | Fraud controls, liveness check, retention job, admin console | Full Echo (WebGL states), probe display, privacy controls | Analyst agent, report UI, evidence verification |
 | 7 | Gate 3 suite, load test, pilot ops | Accessibility pass, pilot fixes | Evals to threshold, next-study proposal, pilot fixes |
@@ -316,5 +316,5 @@ For each proposal, verify the license at the pinned revision and for the files u
 - **Platform and both UIs, Gate 1.** Use scoped answer IDs and separate upload authorization from answer confirmation. Confirm ownership, object metadata and consent server-side. Persist answer confirmation and a durable record for job delivery together. Keep job retries, re-records and repeated confirmations from creating duplicate answers. Resolve resume against persisted state and current authorization.
 - **Platform and AI, Gate 1.** Require tenant or respondent scope in queries, private storage, limited worker privileges and a separate redacted publication path. Suppress raw payloads in telemetry, CI fixtures, structured logs and researcher access. Check current consent before external processing and again before publication. A pending deletion or revoked permission must prevent a delayed job from republishing the data.
 - **Platform, Gate 2.** Exercise duplicate, concurrent and out-of-order payment and payout events. Confirm provider payment state, quote, currency and amount before launch. Reserve payout capacity transactionally across pending and delivered orders. Reconcile unclear provider outcomes before retrying, and keep money movement and refund evidence tied to immutable records.
-- **Platform, Gate 2 economics.** Track realized revenue net of refunds and include incentives, reward and payment fees, recruiting, replacements, transcription and LLM spend per approved complete. Record pilot assumptions and observed values separately. Keep the $1 price and open incentive, minimum and refund decisions in the PRD.
+- **Platform, Gate 2 economics.** Track realized revenue net of refunds and include incentives, reward and payment fees, recruiting, replacements, transcription and LLM spend per approved complete. Record pilot assumptions and observed values separately. Keep the proposed $2 researcher/$1 approved answered-core reward, minimum ten, proportional unfilled refund and pending terms decision in the PRD.
 - **All agents.** Keep fixture audio and transcripts synthetic or specifically approved for repository distribution. Preserve the typed-answer path, including microphone denial. Bring any change to mandatory voice liveness or consent eligibility to Rachel as a PRD decision before running the real study.

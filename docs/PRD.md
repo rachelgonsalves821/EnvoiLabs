@@ -71,7 +71,7 @@ North star metric is **decision-ready studies delivered per week**. A study coun
 5. Video, screen share or usability testing.
 6. Native mobile apps. WhatsApp as an interview channel (waitlist only).
 7. Respondents becoming researchers.
-8. Cash, Venmo or PayPal payouts. Gift cards only.
+8. Cash, Venmo or PayPal transfers. Prepaid Visa through Tremendous is the proposed payout direction, subject to account catalog, recipient and denomination verification.
 
 ## 5. Decisions already made (do not reopen without Rachel)
 
@@ -108,7 +108,7 @@ These journeys turn Rachel's original handwritten notes into the v1 experience. 
 | Waiver sign | Consent by purpose (recording, transcription vendor, retention, researcher access, voice clip sharing) | Voice is sensitive data. One waiver is not enough |
 | WhatsApp messages or in-app | Web app only in v1. WhatsApp waitlist at signup, build in v1.1 if 30%+ opt in | Keeps the first release focused on one interview channel |
 | Surveys live 24 hours, agents nudge stalls | Kept. Two nudges by web push, resume at the exact question | Matches the notes |
-| Paid within a week, points toward prizes | Gift cards after a 24 to 48 hour quality hold. Points with a cash value and milestone bonuses. No prize draws | Keeps rewards deterministic |
+| Paid within a week, points toward prizes | Approved answered-core rewards after a 24 to 48 hour quality hold; prepaid Visa is the proposed delivery method. Points with a cash value and milestone bonuses. No prize draws | Keeps rewards deterministic; actual provider delivery needs verified terms and receipt |
 | Completers can become researchers | Not in v1. Paid respondent referrals instead | Different buyer, conflicts of interest |
 | Researcher price by participants, complexity, screening | $2 per core question per purchased respondent, minimum ten | December 5 fictional marketplace direction; real terms pending |
 | Follow-up questions as a paid opt-in | Live follow-ups in every study, never billed | Probing is where interview value comes from |
@@ -242,7 +242,7 @@ The respondent has a persistent account in the Envoi web app. Home shows study i
 | R-PLAT-02 | Matching | SQL filter on profile attributes plus participation caps and cooldowns. Feasibility estimate from eligible active respondents and historical accept and complete rates. | Agent 1 | In progress (Platform) | [Seeded matching tests](../packages/db/tests/gate1_study_launch.sql) |
 | R-PLAT-03 | Study, invite, session and payout state machines | Explicit states and transitions as in section 10. Illegal transitions throw. Every transition writes an audit row. | Agent 1 | In progress (Platform) | [Pure transition tests](../packages/core/test/state.test.ts) |
 | R-PLAT-04 | Quality scoring | Per-response score 0 to 100 from specificity, relevance, consistency with profile and behavioral signals. Below threshold auto-flags for removal and triggers a replacement invite. | Agent 1 with Agent 3 | Not started | |
-| R-PLAT-05 | Fraud controls | One account per verified email. Device and gift card recipient caps, speed and duplicate audio checks. | Agent 1 | Not started | |
+| R-PLAT-05 | Fraud controls | One account per verified email. Device and payout-recipient caps, speed and duplicate audio checks. | Agent 1 | Not started | |
 | R-PLAT-06 | Voice liveness (v1 light) | Random spoken phrase before each study, checked by transcript match. Speaker match is a v1.1 stretch. | Agent 1 with Agent 2 | Not started | |
 | R-PLAT-07 | Redaction | Names, emails, phone numbers, addresses and employers removed from transcripts before any researcher view. An evaluated deterministic analyzer followed by approved contextual redaction. Presidio is the first candidate (BUILD_PLAN section 11). Recall 99%+ for phones and emails, 95%+ for names and employers on the redaction eval. Raw text never reaches researcher endpoints. | Agent 3 | In progress (Researcher and AI) | [Presidio evaluation](adr/0003-presidio-transcript-redaction-evaluation.md), [independent synthetic speech evaluation](adr/0004-offline-contextual-redaction.md). Publication stays closed pending qualification. |
 | R-PLAT-08 | Payout service | Prepaid Visa direction through Tremendous, with idempotent reservation/order/receipt, quality hold, and annual cap below $2,000. TEST sandbox order requires an account-available SKU, verified recipient and confirmed denomination. | Agent 1 | In progress | Synthetic reservation and adapter; actual TEST order remains open. |
@@ -513,7 +513,7 @@ The respondent panel, matching, quality scoring, fraud controls, payouts, points
 | --- | --- | --- |
 | Gate 0 | End of week 1 | Foundations ready |
 | Gate 1 | End of week 3 | Vertical slice, one study end to end with seeded data |
-| Gate 2 | End of week 5 | Money loop and scoping, first real study with hand-recruited respondents |
+| Gate 2 | End of week 5 | Money loop and scoping, fictional open-marketplace journey with verified profiles and at least ten purchased completes; first real study requires approved terms and separate enrollment review |
 | Gate 3 | End of week 7 | Probing, reports, quality, pilot with 30 to 50 respondents and 2 to 3 founders |
 | Gate 4 | End of week 8 | Launch hardening |
 
@@ -547,5 +547,5 @@ See [BUILD_PLAN section 6](BUILD_PLAN.md#6-stage-gates) for acceptance and pre-s
 | 2026-11-20 | Rachel via Claude | Added section 6 user journeys (notes-to-v1 map, respondent and researcher journeys with edge cases and metrics, where AI is used), section 13 design guidelines (tokens, type, Echo, components, layout, motion, copy, accessibility) and section 14 open-source building blocks. Renumbered sections 6 onward and updated references in all docs |
 | 2026-11-20 | Envoi Labs | Incorporated the revised kit’s journeys, design and upstream evaluations while preserving live status, Envoi Labs naming and the audited release prerequisites. |
 | 2026-11-21 | Envoi Labs | Added the confirming screener AI specification and mapped both UI journeys, voice transcription and upstream evaluation to gate acceptance. |
-| 2026-11-21 | Rachel via Codex | Clarified the persistent respondent account, eligible studies on Home and gift card management in Earnings. |
+| 2026-11-21 | Rachel via Codex | Clarified the persistent respondent account and eligible studies on Home. Its gift-card management direction was superseded on 2026-11-26 by the proposed prepaid Visa direction above. |
 | 2026-11-21 | Rachel via Codex | Switched respondent account sign-in to a one-time email link. Mapped email delivery, verified identity and the 18+ check to Gate 0. |

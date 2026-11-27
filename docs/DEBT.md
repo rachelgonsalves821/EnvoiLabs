@@ -4,7 +4,7 @@ Every shortcut, stub, fake or TODO gets a row. Debt without a must-fix gate is n
 
 | ID | Description | Owner | Created | Must fix by | Status |
 | --- | --- | --- | --- | --- | --- |
-| D-001 | Old 40-cent incentive and $1 researcher price remain in older journey copy; reconcile all customer-facing text to frozen $2/$1 marketplace quote after terms approval (PRD Q-01). | Agent 1 and Agent 3 | 2026-11-19 | Before real checkout | Open |
+| D-001 | Final customer/respondent terms for proposed $2 researcher/$1 approved answered-core reward, minimum ten and proportional unfilled refund remain unapproved (PRD Q-01). Reconcile external copy and consent only after approval; fictional test copy must visibly label simulation. | Agent 1 and Agent 3 | 2026-11-19 | Before real checkout | Open |
 | D-002 | Commit the CI-generated pnpm lockfile and require frozen installs | Agent 1 | 2026-11-19 | Gate 0 | Closed |
 | D-003 | Complete the draft contracts with Gate 1 APIs, public entity schemas and typed events | Agent 1 | 2026-11-19 | Gate 0 | Closed |
 | D-004 | Add database integration, Playwright and generated-file drift checks to the initial PR workflow | Agent 1 | 2026-11-19 | Gate 0 | Closed |
