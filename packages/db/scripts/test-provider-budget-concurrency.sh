@@ -19,7 +19,15 @@ if [[ ! $db_url =~ ^postgresql://postgres:[^@]+@127\.0\.0\.1:[0-9]+/postgres$ ]]
 fi
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/envoi-budget-XXXXXXXX")"
-trap 'rm -r -- "$work"' EXIT
+first_pid=''
+second_pid=''
+cleanup() {
+  touch "$work/release-first"
+  if [[ -n $first_pid ]]; then wait "$first_pid" 2>/dev/null || true; fi
+  if [[ -n $second_pid ]]; then wait "$second_pid" 2>/dev/null || true; fi
+  rm -r -- "$work"
+}
+trap cleanup EXIT
 study='90600000-0000-4000-8000-000000000001'
 researcher='90200000-0000-4000-8000-000000000001'
 # Do not let the two transactions straddle an hourly window boundary.
@@ -39,7 +47,7 @@ begin;
 set role service_role;
 select public.consume_gate2_test_provider_budget('$study', '$researcher', 3) ->> 'status';
 \! touch '$work/first-holds-lock'
-select pg_sleep(2);
+\! sh -c 'while [ ! -f "$work/release-first" ]; do sleep 0.05; done'
 commit;
 SQL
 psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -f "$work/first.sql" \
@@ -55,10 +63,23 @@ if [[ ! -f "$work/first-holds-lock" ]]; then
   exit 1
 fi
 
-psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
+PGAPPNAME=envoi_gate2_budget_waiter psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
   "begin; set role service_role; select public.consume_gate2_test_provider_budget('$study', '$researcher', 3) ->> 'status'; commit;" \
   >"$work/second.out" 2>"$work/second.err" &
 second_pid=$!
+observed_wait=0
+for _ in $(seq 1 100); do
+  blocked="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
+    "select count(*) from pg_stat_activity where application_name = 'envoi_gate2_budget_waiter' and state = 'active' and wait_event_type = 'Lock' and query like '%consume_gate2_test_provider_budget%'")"
+  if [[ $blocked == 1 ]]; then observed_wait=1; break; fi
+  if ! kill -0 "$second_pid" 2>/dev/null; then break; fi
+  sleep 0.1
+done
+if [[ $observed_wait != 1 ]]; then
+  printf 'Second connection was not observed waiting on the budget row lock.\n' >&2
+  exit 1
+fi
+touch "$work/release-first"
 wait "$first_pid"
 wait "$second_pid"
 if ! grep -qx 'allow' "$work/first.out" || ! grep -qx 'limited' "$work/second.out"; then
@@ -71,4 +92,4 @@ if [[ $reserved != 12 ]]; then
   printf 'Concurrent budget row was not capped at twelve.\n' >&2
   exit 1
 fi
-printf 'Two-connection provider budget boundary passed.\n'
+printf 'Observed lock-wait provider budget boundary passed.\n'
