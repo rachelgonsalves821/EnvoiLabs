@@ -6,6 +6,16 @@ Status: preparation. Source base `410b141`; Gate 5 draft PR #253 at `5d4ce17`. N
 
 Use a new protected preview with its own disposable database and private Storage. Never reuse Gate 1's standalone cleanup preview database. Record the preview deployment SHA, database identifier, actual `schema_migrations` history, Gate 2 migration 151 presence, and rollback deployment. Use fictional names, addresses, answers and profiles only. Keep external model dispatch and production money settings off.
 
+**TEST Visa isolation preflight, currently unrun.** Before setting `ENVOI_GATE5_VISA_TEST_ENABLED=true`, the preview owner must record the actual Supabase project ref and Storage bucket in the preview dashboard, compare the project ref and host against the actual production project, confirm the preview uses separate private Storage and only fictional recipients, and record the reviewer, time and preview deployment SHA below. Configure `ENVOI_GATE5_ISOLATED_DATABASE_URL`, `ENVOI_GATE5_PRODUCTION_DATABASE_URL`, and their two project refs from those observed dashboards. Set `ENVOI_GATE5_ISOLATION_APPROVED=true` only after that receipt exists. The route rejects an absent approval, mismatched refs/hosts, non-Supabase or non-HTTPS URL, identical preview/production project, non-preview deployment, non-TEST key or missing secret. Matching operator-supplied values alone are not proof of isolation; the dashboard comparison is mandatory. Leave the route disabled and payout mocked if any field is unverified.
+
+| Preview isolation receipt | Observed value |
+| --- | --- |
+| Preview deployment SHA and URL | Unrun |
+| Preview Supabase project ref and host | Unrun |
+| Production Supabase project ref and host | Unrun |
+| Separate private Storage bucket and fictional recipient check | Unrun |
+| Reviewer and observed time | Unrun |
+
 For each row below, record **pass**, **fail**, or **unrun**, the exact browser/API receipt and source revision. `Unrun` never counts as pass. The overall walkthrough passes only if every required fictional step passes. A payout or payment can be labelled simulated where specified; the label must be visible to Rachel.
 
 | Step | Fictional action | Required observation |

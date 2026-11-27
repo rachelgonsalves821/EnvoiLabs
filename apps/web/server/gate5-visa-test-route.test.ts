@@ -22,8 +22,12 @@ function enabled() {
   vi.stubEnv("ENVOI_GATE5_VISA_TEST_ENABLED", "true");
   vi.stubEnv("ENVOI_GATE5_VISA_TEST_SECRET", secret);
   vi.stubEnv("TREMENDOUS_TEST_API_KEY", "TEST_fixture");
-  vi.stubEnv("SUPABASE_URL", "https://isolated.example.test");
-  vi.stubEnv("ENVOI_GATE5_ISOLATED_DATABASE_URL", "https://isolated.example.test");
+  vi.stubEnv("SUPABASE_URL", "https://fictional-preview.supabase.co");
+  vi.stubEnv("ENVOI_GATE5_ISOLATED_DATABASE_URL", "https://fictional-preview.supabase.co");
+  vi.stubEnv("ENVOI_GATE5_PRODUCTION_DATABASE_URL", "https://fictional-production.supabase.co");
+  vi.stubEnv("ENVOI_GATE5_PREVIEW_PROJECT_REF", "fictional-preview");
+  vi.stubEnv("ENVOI_GATE5_PRODUCTION_PROJECT_REF", "fictional-production");
+  vi.stubEnv("ENVOI_GATE5_ISOLATION_APPROVED", "true");
   vi.stubEnv("VERCEL_ENV", "preview");
   issue.mockResolvedValue("ordered");
 }
@@ -44,9 +48,15 @@ describe("default-off TEST Visa invocation", () => {
     vi.stubEnv("TREMENDOUS_TEST_API_KEY", "LIVE_fixture");
     expect((await POST(request())).status).toBe(503);
     vi.stubEnv("TREMENDOUS_TEST_API_KEY", "TEST_fixture");
-    vi.stubEnv("ENVOI_GATE5_ISOLATED_DATABASE_URL", "https://other.example.test");
+    vi.stubEnv("ENVOI_GATE5_ISOLATED_DATABASE_URL", "https://other-preview.supabase.co");
     expect((await POST(request())).status).toBe(503);
-    vi.stubEnv("ENVOI_GATE5_ISOLATED_DATABASE_URL", "https://isolated.example.test");
+    vi.stubEnv("ENVOI_GATE5_ISOLATED_DATABASE_URL", "https://fictional-preview.supabase.co");
+    vi.stubEnv("ENVOI_GATE5_PRODUCTION_DATABASE_URL", "https://fictional-preview.supabase.co");
+    expect((await POST(request())).status).toBe(503);
+    vi.stubEnv("ENVOI_GATE5_PRODUCTION_DATABASE_URL", "https://fictional-production.supabase.co");
+    vi.stubEnv("ENVOI_GATE5_ISOLATION_APPROVED", "false");
+    expect((await POST(request())).status).toBe(503);
+    vi.stubEnv("ENVOI_GATE5_ISOLATION_APPROVED", "true");
     expect((await POST(request("wrong"))).status).toBe(403);
     expect(issue).not.toHaveBeenCalled();
   });
