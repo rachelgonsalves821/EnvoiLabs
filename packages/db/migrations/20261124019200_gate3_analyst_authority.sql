@@ -133,6 +133,9 @@ create function public.read_gate3_analyst_snapshot(
         from public.studies as study
         join public.gate2_quote_snapshots as quote
             on quote.study_id = study.id and quote.id = supplied_quote_id
+        join public.pricing_configs as config
+            on config.id = quote.pricing_config_id
+            and config.version = quote.pricing_config_version
         join public.brief_versions as brief on brief.study_id = study.id
             and brief.version = quote.brief_version
         where study.id = supplied_study_id
@@ -140,6 +143,8 @@ create function public.read_gate3_analyst_snapshot(
                 'analyzing', 'report_ready')
             and study.target_completes >= 10
             and quote.pricing_config_version >= 101
+            and config.params_json =
+                '{"unitPriceCents":200,"incentivePerQuestionCents":100}'::jsonb
             and jsonb_array_length(quote.line_items_json) = 1
             and case when quote.line_items_json -> 0 ->> 'respondentCount'
                 ~ '^[0-9]+$' then

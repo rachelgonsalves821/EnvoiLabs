@@ -7,7 +7,7 @@ insert into public.studies (id, organization_id, title, state,
     target_completes, length_minutes)
 values ('a9900000-0000-4000-8000-000000000001',
     '90100000-0000-4000-8000-000000000001',
-    'Fictional analyst authority', 'fielding', 10, 10);
+    'Fictional analyst authority', 'awaiting_payment', 10, 10);
 insert into public.brief_versions (study_id, version, brief_json, created_by)
 values ('a9900000-0000-4000-8000-000000000001', 1,
     '{"decision":"Which fictional meal should we make?", "hypotheses":["Clarity helps choice"]}',
@@ -16,21 +16,23 @@ insert into public.guide_questions (id, study_id, position, text)
 select ('a9910000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
     'a9900000-0000-4000-8000-000000000001', n,
     'Fictional core question ' || n from generate_series(1, 4) as n;
-insert into public.gate2_quote_snapshots (id, study_id, brief_version,
-    guide_digest, pricing_config_id, pricing_config_version,
-    line_items_json, total_cents, incentive_cents_per_complete,
-    feasibility_json)
-select 'a9900000-0000-4000-8000-000000000002',
+create temp table analyst_quote (id uuid);
+grant select, insert on analyst_quote to service_role;
+set local role service_role;
+insert into analyst_quote
+select public.freeze_gate2_marketplace_quote(
     'a9900000-0000-4000-8000-000000000001', 1,
-    public.gate2_guide_digest('a9900000-0000-4000-8000-000000000001'),
-    config.id, 101, '[{"respondentCount":10}]', 8000, 400,
-    '{"fictional":true}' from public.pricing_configs as config
-    where config.version = 101;
+    (select id from public.pricing_configs where version = 101), 101,
+    '[{"label":"Core questions","coreQuestionCount":4,"respondentCount":10,"unitPriceCents":200,"amountCents":8000}]',
+    8000, 400, '90200000-0000-4000-8000-000000000001');
+reset role;
 insert into public.gate2_payment_events (quote_id, study_id,
     provider_checkout_id, provider_event_id, event_kind, amount_cents, currency)
-values ('a9900000-0000-4000-8000-000000000002',
+values ((select id from analyst_quote),
     'a9900000-0000-4000-8000-000000000001',
     'fixture-analyst-checkout', 'fixture-analyst-paid', 'paid', 8000, 'usd');
+update public.studies set state = 'fielding'
+where id = 'a9900000-0000-4000-8000-000000000001';
 insert into internal.gate1_redaction_policies (policy_digest,
     qualification_digest)
 values (repeat('a', 64), repeat('b', 64));
@@ -120,7 +122,7 @@ select ok(not has_function_privilege('authenticated',
 set local role service_role;
 select is(public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
     'no approved model policy means no analyst source');
@@ -134,7 +136,7 @@ values ('fixture-model', 'fixture-prompt-v1', repeat('d', 64),
 create temp table analyst_snapshot as
 select public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)) as payload;
 grant select on analyst_snapshot to service_role;
@@ -145,20 +147,20 @@ select is(jsonb_array_length((select payload from analyst_snapshot)
 set local role service_role;
 select is(public.authorize_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot)), true,
     'same frozen source and purpose authorize the model boundary');
 select is(public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000002',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
     'unbound researcher cannot request private source');
 select is(public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'other-prompt', repeat('d', 64)), null::jsonb,
     'unapproved prompt cannot read model input');
@@ -170,7 +172,7 @@ where id = 'a9950000-0000-4000-8000-000000000001';
 set local role service_role;
 select is(public.authorize_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot)), false,
@@ -183,7 +185,7 @@ where id = 'a9910000-0000-4000-8000-000000000001';
 set local role service_role;
 select is(public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
     'guide changed after quote withholds analysis');
@@ -199,7 +201,7 @@ values ('90500000-0000-4000-8000-000000000001',
 set local role service_role;
 select is(public.authorize_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot)), false,
@@ -220,7 +222,7 @@ where respondent_id = '90500000-0000-4000-8000-000000000001'
 set local role service_role;
 select is(public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
-    'a9900000-0000-4000-8000-000000000002',
+    (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
     'same-text regrant cannot revive an old captured source');
