@@ -5,6 +5,7 @@ import { readResearcherStudyTracking } from "../../../../../server/researcher/st
 import workspace from "../../researcher.module.css";
 import { trackingCopy as copy } from "./copy";
 import { StudyTrackingPanel } from "./study-tracking-panel";
+import { StudyReportMount } from "./study-report-mount";
 
 export default async function StudyTrackingPage({ params }: { params: Promise<{ studyId: string }> }) {
   await requireResearcher();
@@ -23,7 +24,10 @@ export default async function StudyTrackingPage({ params }: { params: Promise<{ 
       <main className={workspace.main} id="study-tracking" tabIndex={-1}>
         <h1>{available ? result.title : copy.title}</h1>
         {available ? (
-          <StudyTrackingPanel key={result.tracking.studyId} initial={result.tracking} targetCompletes={result.targetCompletes} />
+          <>
+            <StudyTrackingPanel key={result.tracking.studyId} initial={result.tracking} targetCompletes={result.targetCompletes} />
+            <StudyReportMount key={result.tracking.studyId} studyId={result.tracking.studyId} />
+          </>
         ) : (
           <><p>{copy.unavailable}</p><a href={`/app/studies/${encodeURIComponent(studyId)}`}>{copy.retry}</a></>
         )}
