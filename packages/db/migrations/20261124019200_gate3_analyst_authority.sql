@@ -196,7 +196,7 @@ create function public.read_gate3_analyst_snapshot(
         order by offer.respondent_id, interview.id
     ), core_answers as (
         select answer.id, answer.study_id, answer.guide_question_id,
-            approved.respondent_id
+            approved.respondent_id, approved.session_id
         from approved
         join public.answers as answer on answer.session_id = approved.session_id
             and answer.probe_id is null
@@ -278,7 +278,11 @@ create function public.read_gate3_analyst_snapshot(
         and guide.first_position = 1
         and guide.last_position = guide.question_count
         and (select count(*) from approved) >= 10
-        and (select count(*) from core_answers) > 0
+        and (select count(*) from core_answers) =
+            (select count(*) from approved) * guide.question_count
+        and (select count(distinct (session_id, guide_question_id))
+            from core_answers) =
+            (select count(*) from approved) * guide.question_count
         and (select count(*) from core_answers) =
             (select count(*) from qualified)
         and (select count(distinct respondent_id) from approved) =

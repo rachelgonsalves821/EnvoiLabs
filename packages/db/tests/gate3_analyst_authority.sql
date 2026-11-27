@@ -152,6 +152,61 @@ insert into internal.gate3_analysis_model_policies (
     consent_text_version, consent_text_digest, approved_at)
 values ('fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     'fictional-analysis-v1', repeat('c', 64), now() - interval '1 day');
+set local role service_role;
+select is(public.read_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
+    'ten approved respondents with one of four core answers each are incomplete');
+reset role;
+
+-- Complete every frozen core question with a distinct Gate 1 qualified source.
+insert into public.answers (id, session_id, study_id,
+    guide_question_id, kind, sequence)
+select ('a9940000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9930000-0000-4000-8000-' ||
+        lpad(to_hex(((n - 11) / 3) + 1), 12, '0'))::uuid,
+    'a9900000-0000-4000-8000-000000000001',
+    ('a9910000-0000-4000-8000-' ||
+        lpad(to_hex(((n - 11) % 3) + 2), 12, '0'))::uuid,
+    'text', ((n - 11) % 3) + 2
+from generate_series(11, 40) as n;
+insert into public.transcripts (id, answer_id, study_id,
+    provider, model, latency_ms, cost_micros)
+select ('a9950000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9940000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    'a9900000-0000-4000-8000-000000000001', 'typed', 'none', 0, 0
+from generate_series(11, 40) as n;
+insert into pii.transcript_raw (transcript_id, raw_text)
+select ('a9950000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    'Fictional private answer ' || n from generate_series(11, 40) as n;
+insert into internal.gate1_answer_jobs (answer_id)
+select id from public.answers
+where study_id = 'a9900000-0000-4000-8000-000000000001'
+    and id > 'a9940000-0000-4000-8000-00000000000a'::uuid;
+set local role service_role;
+do $$
+declare n integer; answer_id uuid; lease jsonb; result jsonb;
+begin
+    for n in 11..40 loop
+        answer_id := ('a9940000-0000-4000-8000-' ||
+            lpad(to_hex(n), 12, '0'))::uuid;
+        lease := public.claim_gate1_answer_job(answer_id);
+        if lease ->> 'answerId' is distinct from answer_id::text
+        then raise exception 'complete core lease missing: %', n; end if;
+        result := public.complete_gate1_answer_job(answer_id,
+            (lease ->> 'leaseId')::uuid,
+            supplied_redacted_text => 'Fictional qualified answer ' || n,
+            supplied_redaction_passed => true,
+            supplied_policy_digest => repeat('a', 64),
+            supplied_qualification_digest => repeat('b', 64));
+        if result ->> 'status' is distinct from 'published'
+        then raise exception 'complete core source not published: %', n; end if;
+    end loop;
+end;
+$$;
+reset role;
 
 create temp table analyst_snapshot as
 select public.read_gate3_analyst_snapshot(
@@ -161,7 +216,7 @@ select public.read_gate3_analyst_snapshot(
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64)) as payload;
 grant select on analyst_snapshot to service_role;
 select is(jsonb_array_length((select payload from analyst_snapshot)
-    -> 'sources'), 10, 'ten qualified fictional respondents enter snapshot');
+    -> 'sources'), 40, 'ten complete fictional respondents supply forty qualified core answers');
 select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'guideQuestions'), 4, 'frozen four-question guide is included');
 set local role service_role;
