@@ -7,6 +7,7 @@ import { interviewRequest } from "../../interview-request";
 import { formatReward } from "../../reward";
 import { interviewCopy as copy } from "./copy";
 import { AnswerComposer } from "./answer-composer";
+import { browserProbeClockStamp } from "./browser-probe-clock";
 import { ProbeTextAnswer } from "./probe-text-answer";
 import { ProbeRenderBoundary } from "./probe-render-boundary";
 import { currentPrompt } from "./current-prompt";
@@ -85,10 +86,11 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
           paintedFrame = requestAnimationFrame(() => {
             if (!active) return;
             try {
-              const browserRenderedAtMs = performance.now();
+              const rendered = browserProbeClockStamp();
               void interviewRequest("/api/respondent/probes/shown", {
                 sessionId, turnId: probe.turnId, probeId: probe.probeId,
-                browserRenderedAtMs,
+                browserClockOriginId: rendered.browserClockOriginId,
+                browserRenderedAtMs: rendered.atMs,
               }).then((result) => {
                 if (!active) return;
                 if (result.status === 200) setConfirmedProbeId(probe.probeId);

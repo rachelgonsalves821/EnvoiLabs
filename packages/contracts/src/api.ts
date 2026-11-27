@@ -131,9 +131,17 @@ export const RecordProbeTextAnswerRequestSchema = withExample(z.strictObject({
 
 export const MarkProbeShownRequestSchema = withExample(z.strictObject({
   ...sessionId, turnId: id, probeId: id,
+  browserClockOriginId: id,
   browserRenderedAtMs: z.number().finite().nonnegative(),
 }), { ...exampleSession, turnId: exampleId, probeId: exampleId,
-  browserRenderedAtMs: 1200 });
+  browserClockOriginId: exampleId, browserRenderedAtMs: 1200 });
+
+export const RecordProbeUploadClockRequestSchema = withExample(z.strictObject({
+  answerId: id, browserClockOriginId: id,
+  browserUploadConfirmedAtMs: z.number().finite().nonnegative(),
+  browserUploadKind: z.enum(["text_save_response", "voice_object_put"]),
+}), { answerId: exampleId, browserClockOriginId: exampleId,
+  browserUploadConfirmedAtMs: 1000, browserUploadKind: "text_save_response" });
 
 export const RecordProbeRenderErrorRequestSchema = withExample(z.strictObject({
   ...sessionId, turnId: id, probeId: id,

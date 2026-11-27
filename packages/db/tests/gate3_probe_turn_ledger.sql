@@ -157,6 +157,11 @@ insert into probe_ids values (public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000001', 1000));
 select ok((select turn_id is not null from probe_ids), 'explicit synthetic consent opens one turn');
+select is(public.begin_gate3_probe_turn_with_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001'),
+    (select turn_id from probe_ids),
+    'captured upload receipt replays the exact first turn');
 select is(public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000001', 1000),
@@ -275,16 +280,39 @@ select is((select public.mark_gate3_probe_shown(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
     '90300000-0000-4000-8000-000000000001', 1200)
+    from probe_ids), 'stale',
+    'legacy shown RPC cannot bypass a captured page-clock receipt');
+select is((select public.mark_gate3_probe_shown_with_clock(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000011', 1200)
+    from probe_ids), 'stale', 'a different page clock cannot mark the probe shown');
+select is((select public.mark_gate3_probe_shown_with_clock(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000010', 1200)
     from probe_ids), 'recorded', 'paint before cutoff survives delayed RPC receipt');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,0,browserClockOriginId}',
+    'a9700000-0000-4000-8000-000000000010',
+    'private snapshot preserves the page-clock origin for scorer comparison');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,0,browserMeasurementComparable}', 'true',
+    'same-origin shown receipt is a comparable browser measurement');
 reset role;
 select ok((select shown_at > decision_deadline_at
     from internal.gate3_probe_turns where id = (select turn_id from probe_ids)),
     'shown receipt records after the server decision deadline');
 set local role service_role;
-select is((select public.mark_gate3_probe_shown(
+select is((select public.mark_gate3_probe_shown_with_clock(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
-    '90300000-0000-4000-8000-000000000001', 1200)
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000010', 1200)
     from probe_ids), 'recorded', 'shown retry is idempotent');
 select is((select public.record_gate3_probe_render_terminal(turn_id,
     '90300000-0000-4000-8000-000000000001') ->> 'outcome'
@@ -343,6 +371,10 @@ where answer_id = 'a9700000-0000-4000-8000-000000000006';
 create temporary table second_probe_turn (turn_id uuid not null);
 grant select, insert on second_probe_turn to service_role;
 set local role service_role;
+select is(public.begin_gate3_probe_turn_with_clock(
+    'a9700000-0000-4000-8000-000000000006',
+    '90300000-0000-4000-8000-000000000001'), null::uuid,
+    'production begin cannot invent a missing second upload receipt');
 insert into second_probe_turn values (public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000006',
     '90300000-0000-4000-8000-000000000001', 1400));
@@ -385,6 +417,10 @@ select is((select public.mark_gate3_probe_shown(
         '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
     '90300000-0000-4000-8000-000000000001', 1500)
     from second_probe_turn), 'recorded', 'second probe has its own shown receipt');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,1,browserMeasurementComparable}', 'false',
+    'legacy shown receipt without a clock origin is rendered but unmeasured');
 select is((select public.record_gate3_probe_text_answer(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (public.read_gate3_respondent_probe(
