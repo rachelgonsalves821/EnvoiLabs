@@ -189,6 +189,7 @@ select is(public.publish_gate3_reviewed_report(
 select is((select count(*) from pii.gate3_report_publications where report_id =
     'a9700000-0000-4000-8000-000000000006'), 0::bigint,
     'rejected summary variants leave no publication receipt');
+reset role;
 update public.findings set position = 2
 where id = 'a9700000-0000-4000-8000-000000000007';
 select is(internal.gate3_summary_matches_findings(
@@ -200,6 +201,7 @@ select is(internal.gate3_summary_matches_findings(
 update public.findings set position = 1
 where id = 'a9700000-0000-4000-8000-000000000007';
 update public.findings set total = 2 where id = 'a9700000-0000-4000-8000-000000000007';
+set local role service_role;
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     (select jsonb_set(payload, '{themes,0,total}', '2'::jsonb)
@@ -209,8 +211,10 @@ select is(public.publish_gate3_reviewed_report(
     (select payload from expected_reviews),
     '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'high confidence requires at least 60 percent support');
+reset role;
 update public.findings set total = 4, confidence = 'medium'
 where id = 'a9700000-0000-4000-8000-000000000007';
+set local role service_role;
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     (select jsonb_set(jsonb_set(payload, '{themes,0,total}', '4'::jsonb),
@@ -220,8 +224,10 @@ select is(public.publish_gate3_reviewed_report(
     (select payload from expected_reviews),
     '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'medium confidence requires at least 30 percent support');
+reset role;
 update public.findings set total = 1, confidence = 'high'
 where id = 'a9700000-0000-4000-8000-000000000007';
+set local role service_role;
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     (select payload from expected_report_summary),
