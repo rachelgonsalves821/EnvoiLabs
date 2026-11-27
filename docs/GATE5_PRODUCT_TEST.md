@@ -1,6 +1,6 @@
 # December 5 fictional marketplace walkthrough
 
-Status: local fictional report rehearsal passed on `3b79f75`, including Gate 2's checked report publisher/import head `c99e9ca`; draft PR #253's last observed remote head is `3b79f75` and its hosted checks are pending. Gate 3's independent mounted-state review and the full marketplace journey remain open. No protected preview or provider receipt exists. The coordinator records the final source and applied migration order before a walkthrough.
+Status: local fictional report rehearsal passed on `3b79f75`, including Gate 2's checked report publisher/import head `c99e9ca`; draft PR #253's exact `3b79f75` CI, Database and Local Auth checks passed. Local newer work includes a partial marketplace replay, Gate 3's independent mounted report review and simulation labels. The full marketplace journey remains open. No protected preview or provider receipt exists. The coordinator records the final source and applied migration order before a walkthrough.
 
 ## Isolation and evidence record
 
@@ -28,6 +28,21 @@ For each row below, record **pass**, **fail**, or **unrun**, the exact browser/A
 | 6 | Show the payout state. | **Payout mocked** until a TEST-only route, `TEST_` key, exact isolated database binding, account catalog Visa SKU, verified recipient, valid denomination, created order and verified receipt all exist. If all are present, record provider order ID and status; do not infer delivery from an initiation response. |
 | 7 | Open the signed-in researcher report and request CSV export. | Route is AAL2, tenant-scoped, private/no-store and reads only the latest qualified report in a single current authorization snapshot. Use fictional qualified source. Withhold on lost consent, redaction qualification, current source or report version; export rechecks independently. An absent report is clearly unavailable. |
 | 8 | Inspect the interview on a throttled mobile browser. | Record navigation, browser-requested JavaScript and LCP on the integrated SHA, and send the trace to Gate 4. An LCP miss is a launch hardening finding, not a false pass or an automatic blocker for this fictional walkthrough. |
+
+### Local acceptance ledger, 2026-11-26
+
+These are local fictional checks. The protected preview walkthrough has not run. `Pass` below applies only to the named local step, not the whole checklist.
+
+| Step | Status | Receipt and remaining work |
+| --- | --- | --- |
+| 1. Open verified profiles and researcher access | Unrun | `65334da` browser created ten distinct fictional eligible profiles through a service fixture and signed in an AAL2 researcher. Ten open-signup UI journeys were not exercised. |
+| 2. Frozen quote | Pass | `65334da` browser asserted five core questions, ten matched respondents and one frozen $100 quote at $2/$1. |
+| 3. Checkout and launch | Unrun | `65334da` used a deterministic paid observation, with no Stripe TEST receipt. A local page label now reads **Payment simulated**, but exact committed browser evidence for that label is pending. |
+| 4. Ten approved completes after removal/replacement | Unrun | Existing browser case proves one reviewed removal and replacement, but only four approved completes in the original study. |
+| 5. Earnings and referral | Unrun | Existing browser case reads three synthetic receipts and $15, but five distinct verified referrals and $5 vesting have not been exercised. |
+| 6. Visa payout | Unrun | Provider responses are injected mocks and create a synthetic delivered ledger state. No TEST catalog, recipient or order receipt exists. A local **Payout mocked** banner is under browser verification. |
+| 7. Current-qualified report and export | Pass | `3b79f75` signed-in Chromium report 1/1 passed with consent withdrawal. Gate 3's temporary local `074320a` test additionally passed desktop withdrawal, re-redaction, deletion and newer-withheld on fresh stacks, plus mobile WebKit withdrawal, after a local page-title correction. This report result is separate from the marketplace browser journey and its newer page fix still needs a committed exact-head run. |
+| 8. Mobile interview trace | Unrun | No integrated mobile interview JavaScript/LCP trace or Gate 4 20-run measurement. |
 
 ## Required handoffs
 

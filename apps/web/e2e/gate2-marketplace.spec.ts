@@ -161,6 +161,14 @@ test.describe("Gate 2 marketplace fixture replay", () => {
       });
       expect(matched.error).toBeNull();
       expect(matched.data).toMatchObject({ created: 10, remaining: 0 });
+      await page.goto(`/app/studies/${study.data.id}`);
+      if (process.env.ENVOI_GATE5_FICTIONAL_WALKTHROUGH === "true") {
+        await expect(page.getByText(/Fictional product test · Payment simulated/))
+          .toBeVisible();
+      } else {
+        await expect(page.getByText(/Fictional product test · Payment simulated/))
+          .toHaveCount(0);
+      }
       const offers = await db.from("invites").select("id,respondent_id,state,reward_cents")
         .eq("study_id", study.data.id);
       expect(offers.error).toBeNull();
@@ -571,6 +579,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
         expect(await issueGate2SandboxVisaBatch(batchInput)).toBe("delivered");
         expect(orderPosts).toBe(1);
         await respondent.goto("/r/earnings");
+        if (process.env.ENVOI_GATE5_FICTIONAL_WALKTHROUGH === "true") {
+          await expect(respondent.getByText(/Fictional product test · Payout mocked/))
+            .toBeVisible();
+        } else {
+          await expect(respondent.getByText(/Fictional product test · Payout mocked/))
+            .toHaveCount(0);
+        }
         await expect(respondent.getByRole("heading", { name: "Earned" })
           .locator("..").getByText("$15.00")).toBeVisible();
         await expect(respondent.getByRole("heading", { name: "Delivered" })

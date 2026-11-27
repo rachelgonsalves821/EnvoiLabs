@@ -70,6 +70,7 @@ try {
     throw 'Fictional report fixture failed'
   }
   if ($Spec -eq 'gate2-marketplace.spec.ts') {
+    $env:ENVOI_GATE5_FICTIONAL_WALKTHROUGH = 'true'
     Get-Content -LiteralPath (Join-Path $repo 'packages\db\scripts\gate2-visa-e2e-fixture.sql') -Raw |
       docker exec -i $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 *> (Join-Path $target 'marketplace.log')
     if ($LASTEXITCODE -ne 0) { throw 'Fictional marketplace helper failed' }
