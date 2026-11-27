@@ -713,7 +713,8 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             .toBe("visible");
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
-          await expect(secondRespondent.getByRole("alert")).toBeVisible();
+          await expect(secondRespondent.getByRole("main").getByRole("alert"))
+            .toHaveText("This interview isn’t available anymore.");
         } finally {
           await secondContext.close();
         }

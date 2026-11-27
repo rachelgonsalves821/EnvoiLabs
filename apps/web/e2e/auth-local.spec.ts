@@ -153,28 +153,24 @@ test.describe("local Auth with synthetic fixtures", () => {
 
       await page.getByRole("button", { name: "Start answering" }).click();
       await expect(page).toHaveURL(origin + "/r/interviews/" + ownInviteId);
-      await expect(page.getByRole("heading", { name: "Private test question 1" })).toBeFocused();
-      await expect(page.getByText("1 of 4")).toBeVisible();
+      await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+        "This interview isn’t available anymore.");
+      await expect(page.getByRole("heading", { name: "Private test question 1" })).toHaveCount(0);
+      await expect(page.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
 
       const session = await service.from("sessions").select("id,state").eq("invite_id", ownInviteId).single();
       expect(session.error).toBeNull();
-      expect(session.data?.state).toBe("in_progress");
+      expect(session.data?.state).toBe("started");
       if (!session.data) throw new Error("The synthetic interview session is missing.");
 
       const answer = page.getByRole("textbox", { name: "Type your answer" });
       const save = page.getByRole("button", { name: "Save answer" });
       await expect(page.getByRole("button", { name: "Start recording" })).toHaveCount(0);
-      await answer.fill("Synthetic answer one");
-      await save.click();
-      await expect(page.getByRole("main").getByRole("alert")).toHaveText(
-        "This answer couldn’t be saved. Review your privacy choices or reopen the interview.",
-      );
-      await expect(answer).toHaveValue("Synthetic answer one");
       const denied = await service.from("answers").select("id", { count: "exact", head: true }).eq("session_id", session.data.id);
       expect(denied.error).toBeNull();
       expect(denied.count).toBe(0);
 
-      await page.getByRole("link", { name: "Review privacy choices" }).click();
+      await page.goto("/r/onboarding");
       await page.getByRole("button", { name: "Review privacy choices" }).click();
       await page.getByRole("checkbox", { name: /Keep my study answers/ }).check();
       await page.getByRole("checkbox", { name: /Record my voice answers/ }).check();
