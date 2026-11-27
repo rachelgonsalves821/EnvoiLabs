@@ -598,6 +598,7 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const probeId = randomUUID();
           let answerCalls = 0;
           let pendingReads = 0;
+          let noProbeReads = 0;
           let releasePending: () => void = () => {};
           const pendingGate = new Promise<void>((resolve) => { releasePending = resolve; });
           let sessionId = "";
@@ -615,7 +616,8 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           const shownSeen = new Promise<void>((resolve) => { signalShown = resolve; });
           await secondRespondent.route("**/api/respondent/sessions/start", async (route) => {
             const response = await route.fetch();
-            const pendingRead = answerCalls === 0 && ++pendingReads <= 3;
+            const pendingRead = answerCalls === 0 ? ++pendingReads <= 3
+              : answerCalls === 1 && ++noProbeReads <= 2;
             if (answerCalls === 0 && pendingReads === 4) await pendingGate;
             const held = holdNextRead;
             if (held) {
@@ -657,6 +659,18 @@ test.describe("Gate 2 marketplace fixture replay", () => {
                 durationMs: null, sequence: 1011, createdAt: now, updatedAt: now } }) });
           });
           await secondRespondent.emulateMedia({ reducedMotion: "reduce" });
+          await secondRespondent.addInitScript(() => {
+            const calls: Record<string, number> = {};
+            (window as typeof window & { probeFocusCalls: Record<string, number> }).probeFocusCalls = calls;
+            const focus = HTMLElement.prototype.focus;
+            HTMLElement.prototype.focus = function(...args) {
+              if (this.tagName === "H1") {
+                const label = this.textContent?.trim() ?? "";
+                calls[label] = (calls[label] ?? 0) + 1;
+              }
+              return focus.apply(this, args);
+            };
+          });
           await secondRespondent.goto("/r");
           await secondRespondent.getByRole("button", { name: "Start answering" }).click();
           await expect(secondRespondent).toHaveURL(origin + `/r/interviews/${second.id}`);
@@ -670,11 +684,17 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await expect(home).toBeFocused();
           await expect(preparing).toHaveCount(1);
           await expect(secondRespondent.locator("body")).not.toContainText("PRIVATE_ANSWER_SENTINEL");
+          expect(await secondRespondent.evaluate(() =>
+            (window as typeof window & { probeFocusCalls: Record<string, number> })
+              .probeFocusCalls["Preparing this follow-up…"])).toBe(1);
           releasePending();
           await expect(secondRespondent.getByRole("heading", { name: "What shaped your choice?" }))
             .toBeVisible();
           await expect(secondRespondent.getByRole("heading", { name: "What shaped your choice?" }))
             .toBeFocused();
+          expect(await secondRespondent.evaluate(() =>
+            (window as typeof window & { probeFocusCalls: Record<string, number> })
+              .probeFocusCalls["What shaped your choice?"])).toBe(1);
           await shownSeen;
           await expect(secondRespondent.getByRole("button", { name: "Save answer" })).toBeDisabled();
           await expect(secondRespondent.getByLabel("Type your answer")).toBeDisabled();
@@ -683,7 +703,13 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           await expect(secondRespondent.getByRole("button", { name: "Save answer" })).toBeEnabled();
           await secondRespondent.getByLabel("Type your answer").fill("A shorter wait mattered.");
           await secondRespondent.getByRole("button", { name: "Save answer" }).click();
+          await expect(preparing).toBeVisible();
+          await expect.poll(() => noProbeReads).toBeGreaterThanOrEqual(2);
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toBeVisible();
+          await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toBeFocused();
+          expect(await secondRespondent.evaluate((label) =>
+            (window as typeof window & { probeFocusCalls: Record<string, number> })
+              .probeFocusCalls[label], firstQuestion)).toBe(1);
           expect(answerCalls).toBe(1);
           holdNextRead = true;
           await secondRespondent.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
