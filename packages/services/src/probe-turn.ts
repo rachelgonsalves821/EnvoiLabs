@@ -29,6 +29,11 @@ export interface ReadyProbeTurn {
 
 export type ProbeRpc = (name: string, args: Record<string, unknown>) =>
   Promise<{ data: unknown; error: unknown }>;
+export interface ProbeReadyCandidate {
+  readonly answerId: string;
+  readonly sessionId: string;
+  readonly authUserId: string;
+}
 type Request = ReadyProbeTurn["request"];
 type Source = { readonly sourceText: string; readonly questionText: string };
 
@@ -44,6 +49,26 @@ function uuid(value: unknown): value is string {
 }
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+// IDs only: the model-ready source is fetched later under the answer/session
+// lock through begin_gate3_probe_turn_with_clock and readReadyTurn.
+export async function listReadyProbeCandidates(call: ProbeRpc, limit = 25):
+  Promise<readonly ProbeReadyCandidate[]> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    throw new Error("ready selector limit must be between 1 and 100");
+  const { data, error } = await call("list_gate3_probe_ready", { supplied_limit: limit });
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length > limit ||
+    data.some((value) => {
+      const item = record(value);
+      return !item || Object.keys(item).length !== 3 ||
+        !uuid(item.answerId) || !uuid(item.sessionId) || !uuid(item.authUserId);
+    })) throw new Error("invalid private ready selector");
+  const items = data as ProbeReadyCandidate[];
+  if (new Set(items.map((item) => item.answerId)).size !== items.length)
+    throw new Error("duplicate ready answer");
+  return items;
 }
 function decision(value: unknown): ProbeDecision | null {
   const item = record(value);

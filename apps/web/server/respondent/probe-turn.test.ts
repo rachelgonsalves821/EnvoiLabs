@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProbeDecisionPort, sweepDueProbeRenders, sweepDueProbeTimeouts,
+import { createProbeDecisionPort, listReadyProbeCandidates,
+  sweepDueProbeRenders, sweepDueProbeTimeouts,
   type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
 const ids = { sessionId: "session", questionId: "question", answerId: "answer",
@@ -151,6 +152,23 @@ describe("probe persistence boundary", () => {
       .rejects.toThrow("invalid private timeout candidate");
     await expect(sweepDueProbeTimeouts(call, 101))
       .rejects.toThrow("timeout sweep limit");
+  });
+
+  it("reads bounded ready identities without exposing a model source", async () => {
+    const answerId = "a9720000-0000-4000-8000-000000000005";
+    const sessionId = "a9720000-0000-4000-8000-000000000004";
+    const authUserId = "90300000-0000-4000-8000-000000000001";
+    const call = vi.fn<ProbeRpc>().mockResolvedValue({ error: null,
+      data: [{ answerId, sessionId, authUserId }] });
+    expect(await listReadyProbeCandidates(call, 1)).toEqual([{ answerId, sessionId, authUserId }]);
+    expect(call).toHaveBeenCalledWith("list_gate3_probe_ready", { supplied_limit: 1 });
+    await expect(listReadyProbeCandidates(async () => ({ error: null,
+      data: [{ answerId, sessionId, authUserId }, { answerId, sessionId, authUserId }] }), 2))
+      .rejects.toThrow("duplicate ready answer");
+    await expect(listReadyProbeCandidates(async () => ({ error: null,
+      data: [{ answerId, sessionId, authUserId, sourceText: "private fixture" }] }), 1))
+      .rejects.toThrow("invalid private ready selector");
+    await expect(listReadyProbeCandidates(call, 101)).rejects.toThrow("ready selector limit");
   });
 
   it("settles only private overdue render candidates through the locked writer", async () => {
