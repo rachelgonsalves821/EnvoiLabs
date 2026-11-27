@@ -213,3 +213,59 @@ test("hides the old study immediately and discards its in-flight export after a 
   await expect(panel.getByText("A receipt helps.")).toHaveCount(0);
   expect(downloads).toEqual([]);
 });
+
+test("checks a quoted theme's confidence boundary and reviews a newer report before CSV", async ({ page }) => {
+  const studyId = "a9700000-0000-4000-8000-000000000001";
+  const report = (version: number, count: number, total: number,
+    confidence: "high" | "medium", exactText: string) => ({
+    reportId: `a9700000-0000-4000-8000-${String(version).padStart(12, "0")}`,
+    studyId, summary: { version: 2, executiveAnswer: "Fictional receipt findings",
+      themes: [{ claim: "Receipts make the next step clear", count, total, confidence,
+        supportingQuotes: [{ studyId,
+          transcriptId: "a9700000-0000-4000-8000-000000000020",
+          sourceVersion: `a9700000-0000-4000-8000-${String(version + 30).padStart(12, "0")}`,
+          startChar: 0, endChar: Array.from(exactText).length, exactText,
+          confidence: 0.9 }], contradictingQuotes: [] }], hypotheses: [] } });
+  let current = report(2, 6, 10, "high", "A receipt helps. 🍲");
+  const downloads: string[] = [];
+  page.on("download", (item) => downloads.push(item.suggestedFilename()));
+  await page.route("**/api/researcher/studies/*/report", async (route) => {
+    await route.fulfill({ status: 200, headers: { "cache-control": "private, no-store" },
+      json: current });
+  });
+  await page.goto("/gate3-report-fixture?endpoint=1");
+  const panel = page.getByRole("region", { name: "Research report" });
+  await expect(panel.getByText("6 of 10 respondents · high confidence")).toBeVisible();
+  await expect(panel.getByText("A receipt helps. 🍲")).toBeVisible();
+
+  current = report(2, 5, 10, "high", "A receipt helps. 🍲");
+  await panel.getByRole("button", { name: "Download themes and quotes CSV" }).click();
+  await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
+  await expect(panel.getByText("A receipt helps. 🍲")).toHaveCount(0);
+  expect(downloads).toEqual([]);
+
+  current = report(2, 2, 10, "medium", "A receipt helps. 🍲");
+  await panel.getByRole("button", { name: "Check again" }).click();
+  await expect(panel.getByText("The report is currently unavailable.")).toBeVisible();
+  current = report(3, 3, 10, "medium", "The current receipt helps.");
+  await panel.getByRole("button", { name: "Check again" }).click();
+  await expect(panel.getByText("3 of 10 respondents · medium confidence")).toBeVisible();
+  await expect(panel.getByText("The current receipt helps.")).toBeVisible();
+
+  current = report(4, 6, 10, "high", "The newest receipt helps.");
+  const action = panel.getByRole("button", { name: "Download themes and quotes CSV" });
+  await action.click();
+  await expect(panel.getByText("The report changed. Review the current version before downloading."))
+    .toBeVisible();
+  await expect(panel.getByText("The newest receipt helps.")).toBeVisible();
+  await expect(panel.getByText("The current receipt helps.")).toHaveCount(0);
+  expect(downloads).toEqual([]);
+  const downloadPromise = page.waitForEvent("download");
+  await action.click();
+  const stream = await (await downloadPromise).createReadStream();
+  expect(stream).not.toBeNull();
+  const csv = await text(stream!);
+  expect(csv).toContain("The newest receipt helps.");
+  expect(csv).not.toContain("The current receipt helps.");
+  expect(downloads).toHaveLength(1);
+});
