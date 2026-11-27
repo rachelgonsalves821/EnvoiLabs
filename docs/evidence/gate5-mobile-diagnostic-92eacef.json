@@ -1,0 +1,61 @@
+{
+  "revision": "92eacef66b6b74e13d14cdee724c1c7d50214cdc",
+  "buildId": "wiVnXRg6NFpcoO1rdeNUh",
+  "profile": "360px Chromium, 4x CPU, 150ms, 1.6Mbps down",
+  "runs": 1,
+  "lcpMs": 1844,
+  "firstQuestionMs": 2032,
+  "requestedJsTransferBytes": 197565,
+  "scripts": [
+    {
+      "path": "/_next/static/chunks/3hs64a-frqtdm.js",
+      "transferBytes": 3998,
+      "encodedBytes": 3698
+    },
+    {
+      "path": "/_next/static/chunks/1fvp9yhzd5r68.js",
+      "transferBytes": 8561,
+      "encodedBytes": 8261
+    },
+    {
+      "path": "/_next/static/chunks/2eeiidq9bbe90.js",
+      "transferBytes": 72026,
+      "encodedBytes": 71726
+    },
+    {
+      "path": "/_next/static/chunks/2a2qdvzpnno_6.js",
+      "transferBytes": 44594,
+      "encodedBytes": 44294
+    },
+    {
+      "path": "/_next/static/chunks/38kcm8kycr3z2.js",
+      "transferBytes": 3811,
+      "encodedBytes": 3511
+    },
+    {
+      "path": "/_next/static/chunks/turbopack-077hmtqrhcoji.js",
+      "transferBytes": 4654,
+      "encodedBytes": 4354
+    },
+    {
+      "path": "/_next/static/chunks/3fa8-x7-4qgh5.js",
+      "transferBytes": 638,
+      "encodedBytes": 338
+    },
+    {
+      "path": "/_next/static/chunks/2fzrw4k55bc28.js",
+      "transferBytes": 13902,
+      "encodedBytes": 13602
+    },
+    {
+      "path": "/_next/static/chunks/3ykjv6wpttxst.js",
+      "transferBytes": 6472,
+      "encodedBytes": 6172
+    },
+    {
+      "path": "/_next/static/chunks/2866-exan5ljf.js",
+      "transferBytes": 38909,
+      "encodedBytes": 38609
+    }
+  ]
+}

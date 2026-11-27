@@ -10,7 +10,9 @@ import styles from "./tracking.module.css";
 type Tracking = ReturnType<typeof StudyTrackingResponseSchema.parse>;
 const utcFinish = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
-export function StudyTrackingPanel({ initial, targetCompletes }: { initial: Tracking; targetCompletes: number }) {
+export function StudyTrackingPanel({ initial, targetCompletes, fictionalPayment }: {
+  initial: Tracking; targetCompletes: number; fictionalPayment: boolean;
+}) {
   const [snapshot, setSnapshot] = useState<Tracking | null>(initial);
   const [refreshFailed, setRefreshFailed] = useState(false);
   const { studyId } = initial;
@@ -61,6 +63,10 @@ export function StudyTrackingPanel({ initial, targetCompletes }: { initial: Trac
         <div className={styles.heading}>
           <h2 id="tracking-heading">{copy.title}</h2>
           <Chip tone={snapshot.state === "fielding" ? "tide" : "neutral"}>{stateLabels[snapshot.state]}</Chip>
+          {fictionalPayment && <p data-testid="gate5-simulated-payment-inline"
+            className={styles.simulatedMoney}>
+            Fictional product test · Payment simulated. No card charged.
+          </p>}
         </div>
         <p className={styles.progress} aria-live="polite">
           <strong>{snapshot.completed} of {targetCompletes}</strong> {copy.completes}
