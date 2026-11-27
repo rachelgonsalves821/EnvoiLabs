@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { AnalystThemeSetV2Schema } from "@envoi-labs/contracts";
 import { publicationQuoteMap, publishQualifiedThemeSet } from "../src/qualified-report.js";
 
-const analyst = AnalystThemeSetV2Schema.parse(
-  (AnalystThemeSetV2Schema.meta()?.examples as unknown[])[0]);
+const analyst = { ...AnalystThemeSetV2Schema.parse(
+  (AnalystThemeSetV2Schema.meta()?.examples as unknown[])[0]), hypotheses: [] };
 const policy = { policyDigest: "a".repeat(64), qualificationDigest: "b".repeat(64) };
 const privateString = "Ada Example, ada@example.test, +1 555 010 0100, Acme Corp, 12 Example St";
 
@@ -20,10 +20,9 @@ function setup() {
 }
 
 describe("qualified report publication boundary", () => {
-  it("qualifies executive, hypothesis and claim text before any researcher shape exists", async () => {
+  it("qualifies executive and claim text before any researcher shape exists", async () => {
     const ports = setup();
     const raw = { ...analyst, executiveAnswer: privateString,
-      hypotheses: [{ hypothesis: privateString, result: "supported" as const }],
       themes: [{ ...analyst.themes[0], claim: privateString }] };
     const publicReport = await publishQualifiedThemeSet(ports, "report_1", raw);
     expect(publicReport).not.toBeNull();
@@ -32,9 +31,16 @@ describe("qualified report publication boundary", () => {
       "Acme Corp", "12 Example St", "rationale", "followUpBrief"]) {
       expect(exposed).not.toContain(secret);
     }
-    expect(ports.qualifyText).toHaveBeenCalledTimes(3);
+    expect(ports.qualifyText).toHaveBeenCalledTimes(2);
     expect(ports.publish).toHaveBeenCalledWith("report_1", publicReport,
       publicationQuoteMap(publicReport!), policy);
+  });
+
+  it("rejects a model hypothesis verdict without reviewed evidence membership", async () => {
+    const ports = setup();
+    const raw = { ...analyst, hypotheses: [{ hypothesis: "Fees matter", result: "supported" as const }] };
+    expect(await publishQualifiedThemeSet(ports, "report_1", raw)).toBeNull();
+    expect(ports.publish).not.toHaveBeenCalled();
   });
 
   it("fails closed when the qualified policy or any text qualification is unavailable", async () => {

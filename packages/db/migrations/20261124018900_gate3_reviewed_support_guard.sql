@@ -322,7 +322,9 @@ create function public.publish_gate3_reviewed_report(
 declare target public.reports%rowtype;
 begin
     select * into target from public.reports where id = supplied_report_id for update;
-    if not found or not internal.gate3_reviewed_support_current(
+    -- V2 has no reviewer-attested hypothesis score or source membership yet.
+    if not found or supplied_summary -> 'hypotheses' is distinct from '[]'::jsonb
+        or not internal.gate3_reviewed_support_current(
         target.id, supplied_policy, supplied_qualification)
         or not internal.gate3_public_text_current(target.id, supplied_summary,
             supplied_claims, supplied_policy, supplied_qualification)
@@ -347,6 +349,7 @@ language sql stable security definer set search_path = pg_catalog as $$
         select 1 from public.reports as report
         join pii.gate3_report_publications as receipt on receipt.report_id = report.id
         where report.id = target and report.qualified_summary_json is not null
+            and report.qualified_summary_json -> 'hypotheses' = '[]'::jsonb
             and receipt.content_digest = internal.gate3_report_content_digest(report.id)
             and receipt.policy_digest = report.qualified_policy_digest
             and receipt.qualification_digest = report.qualified_qualification_digest
