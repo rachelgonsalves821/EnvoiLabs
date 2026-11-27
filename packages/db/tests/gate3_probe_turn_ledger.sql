@@ -108,6 +108,12 @@ values ('a9700000-0000-4000-8000-000000000004',
 create temporary table probe_ids (turn_id uuid not null);
 grant select, insert on probe_ids to service_role;
 set local role service_role;
+select ok(not has_function_privilege('authenticated',
+    'public.read_gate3_probe_ready_answer(uuid)', 'EXECUTE'),
+    'respondent tokens cannot call the private targeted selector');
+select is(public.read_gate3_probe_ready_answer(
+    'a9700000-0000-4000-8000-000000000004'), null::jsonb,
+    'qualification wake before the browser receipt exposes no candidate');
 select is(public.record_gate3_probe_upload_clock(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000002',
@@ -129,6 +135,12 @@ select is(public.list_gate3_probe_ready(1) #>> '{0,authUserId}',
 select is(public.list_gate3_probe_ready(1) #>> '{0,sessionId}',
     'a9700000-0000-4000-8000-000000000003',
     'ready selector binds the database session for future dispatch');
+select is(public.read_gate3_probe_ready_answer(
+    'a9700000-0000-4000-8000-000000000004'),
+    jsonb_build_object('answerId', 'a9700000-0000-4000-8000-000000000004',
+        'sessionId', 'a9700000-0000-4000-8000-000000000003',
+        'authUserId', '90300000-0000-4000-8000-000000000001'),
+    'targeted wake exposes only the current answer and database-bound identities');
 select is(public.record_gate3_probe_upload_clock(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000001',
@@ -273,6 +285,9 @@ select is(public.read_gate3_probe_pending(
     'a committed decision clears the pending state');
 select is(public.list_gate3_probe_ready(1), '[]'::jsonb,
     'committed decision leaves no ready candidate for another worker');
+select is(public.read_gate3_probe_ready_answer(
+    'a9700000-0000-4000-8000-000000000004'), null::jsonb,
+    'targeted replay after a committed decision cannot call a provider');
 select is((select result -> 'value' -> 'decision' ->> 'text' from probe_actions),
     'What made speed matter?', 'committed decision retains exact wording');
 select is((select public.commit_gate3_probe_decision(
