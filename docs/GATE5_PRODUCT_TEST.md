@@ -1,6 +1,6 @@
 # December 5 fictional marketplace walkthrough
 
-Status: local fictional report rehearsal passed on `3b79f75`, including Gate 2's checked report publisher/import head `c99e9ca`; draft PR #253's exact `3b79f75` CI, Database and Local Auth checks passed. Local newer work includes a partial marketplace replay, Gate 3's independent mounted report review and simulation labels. The full marketplace journey remains open. No protected preview or provider receipt exists. The coordinator records the final source and applied migration order before a walkthrough.
+Status: fictional marketplace browser passed locally on `b575ca6` for ten reviewed completions and five verified referrals; its qualified report belongs to a separate seeded study in the same signed-in session. Draft PR #253's `32ed047` CI, Database and Local Auth checks passed; `b575ca6` has not yet been pushed or hosted-checked. The full same-study and protected-preview walkthrough remains open. No actual provider receipt exists. The coordinator records the final source and applied migration order before a walkthrough.
 
 ## Isolation and evidence record
 
@@ -37,11 +37,11 @@ These are local fictional checks. The protected preview walkthrough has not run.
 | --- | --- | --- |
 | 1. Open verified profiles and researcher access | Unrun | `65334da` browser created ten distinct fictional eligible profiles through a service fixture and signed in an AAL2 researcher. Ten open-signup UI journeys were not exercised. |
 | 2. Frozen quote | Pass | `65334da` browser asserted five core questions, ten matched respondents and one frozen $100 quote at $2/$1. |
-| 3. Checkout and launch | Unrun | `65334da` used a deterministic paid observation, with no Stripe TEST receipt. A local page label now reads **Payment simulated**, but exact committed browser evidence for that label is pending. |
-| 4. Ten approved completes after removal/replacement | Unrun | Existing browser case proves one reviewed removal and replacement, but only four approved completes in the original study. |
-| 5. Earnings and referral | Unrun | Existing browser case reads three synthetic receipts and $15, but five distinct verified referrals and $5 vesting have not been exercised. |
-| 6. Visa payout | Unrun | Provider responses are injected mocks and create a synthetic delivered ledger state. No TEST catalog, recipient or order receipt exists. A local **Payout mocked** banner is under browser verification. |
-| 7. Current-qualified report and export | Pass | `3b79f75` signed-in Chromium report 1/1 passed with consent withdrawal. Gate 3's temporary local `074320a` test additionally passed desktop withdrawal, re-redaction, deletion and newer-withheld on fresh stacks, plus mobile WebKit withdrawal, after a local page-title correction. This report result is separate from the marketplace browser journey and its newer page fix still needs a committed exact-head run. |
+| 3. Checkout and launch | Pass | `b575ca6` used a deterministic paid observation and the signed-in tracking page visibly said **Payment simulated**. No Stripe TEST receipt exists; this is the explicitly simulated option. |
+| 4. Ten approved completes after removal/replacement | Pass | `b575ca6` browser submitted five typed answers per respondent, reviewed one removal/replacement and reached ten approved completes plus one removed without changing the frozen $100 quote. |
+| 5. Earnings and referral | Pass | `b575ca6` browser showed three mocked $15 receipts, then registered five distinct fictional profiles through the signed-in referral route; one $5 vesting row and **5 verified profiles** / **$5 referral bonus vested** appeared without claiming bonus delivery. |
+| 6. Visa payout | Pass | `b575ca6` used an injected provider mock and the Earnings page visibly said **Payout mocked** above the synthetic Delivered $15 receipt. No TEST catalog, recipient or order receipt exists; this is the explicitly mocked option. |
+| 7. Current-qualified report and export | Unrun | `3b79f75` report browser and Gate 3's local `074320a` mounted checks passed withdrawal, re-redaction, deletion and newer-withheld, with mobile WebKit withdrawal. `b575ca6` opened/exported that qualified report in the same signed-in researcher session, but it was a **different preseeded study** from the ten-complete marketplace study. Same-study qualified publication and withheld export remain to prove. |
 | 8. Mobile interview trace | Unrun | No integrated mobile interview JavaScript/LCP trace or Gate 4 20-run measurement. |
 
 ## Required handoffs
