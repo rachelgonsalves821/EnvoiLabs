@@ -57,6 +57,16 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   }, [state]);
 
   useEffect(() => {
+    if (state.kind !== "open" || !state.session.probePending || state.session.currentProbe) return;
+    const timer = window.setTimeout(() => {
+      if (document.visibilityState !== "visible") return;
+      setState({ kind: "opening" });
+      setAttempt((value) => value + 1);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [state]);
+
+  useEffect(() => {
     if (state.kind !== "open" || !state.session.currentProbe) return;
     const probe = state.session.currentProbe;
     const sessionId = state.session.sessionId;
@@ -135,7 +145,8 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
             <ProgressTrack current={state.session.progress.currentQuestion} total={state.session.progress.coreQuestionCount} />
             <EarningsChip amount={formatReward(state.session.progress.rewardCents)} />
           </div>
-          <h1 ref={prompt} tabIndex={-1}>{displayed && "text" in displayed ? displayed.text : copy.complete}</h1>
+          <h1 ref={prompt} tabIndex={-1}>{displayed?.kind === "pending"
+            ? copy.preparingFollowup : displayed && "text" in displayed ? displayed.text : copy.complete}</h1>
           {state.session.currentProbe
             ? <ProbeRenderBoundary key={state.session.currentProbe.probeId}
                 onError={() => recordRenderFailure(state.session.sessionId,
@@ -145,6 +156,8 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
                   probeId={state.session.currentProbe.probeId}
                   shown={confirmedProbeId === state.session.currentProbe.probeId} onSaved={retry} />
               </ProbeRenderBoundary>
+            : state.session.probePending
+            ? <p role="status">{copy.preparingFollowup}</p>
             : state.session.nextQuestion
             ? <AnswerComposer key={state.session.nextQuestion.id} canRecord={canRecord} sessionId={state.session.sessionId}
               questionId={state.session.nextQuestion.id} onSaved={retry} />

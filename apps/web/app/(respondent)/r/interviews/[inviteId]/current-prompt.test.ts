@@ -19,4 +19,13 @@ describe("respondent probe prompt selection", () => {
       currentProbe: { turnId: id, probeId: id, text: "Why did speed matter?" } })))
       .toEqual({ kind: "probe", id, text: "Why did speed matter?" });
   });
+
+  it("holds the next core question while the latest answer is undecided", () => {
+    expect(currentPrompt(SessionResponseSchema.parse({ ...session,
+      currentProbe: null, probePending: true }))).toEqual({ kind: "pending" });
+    expect(currentPrompt(SessionResponseSchema.parse({ ...session,
+      currentProbe: { turnId: id, probeId: id, text: "Why did speed matter?" },
+      probePending: true }))).toEqual({ kind: "probe", id,
+        text: "Why did speed matter?" });
+  });
 });
