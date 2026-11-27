@@ -96,6 +96,21 @@ export async function dispatchReadyProbeCandidates(call: ProbeRpc,
   }
   return counts;
 }
+
+// Bind the candidate's respondent identity before handing the saved-answer
+// wrapper a port. A worker cannot replace it with request or model input.
+export async function dispatchReadyProbeBatch(call: ProbeRpc,
+  buildRequest: (candidate: ProbeReadyCandidate, source: Source) => Request,
+  runSaved: (candidate: ProbeReadyCandidate,
+    port: ReturnType<typeof createProbeDecisionPort>) =>
+      Promise<{ readonly status: "committed" | "stale" | "unavailable" }>,
+  limit = 25): Promise<ProbeDispatchBatchResult> {
+  return dispatchReadyProbeCandidates(call, async (candidate) => {
+    const port = createProbeDecisionPort(call, candidate.authUserId,
+      (source) => buildRequest(candidate, source));
+    return (await runSaved(candidate, port)).status;
+  }, limit);
+}
 function decision(value: unknown): ProbeDecision | null {
   const item = record(value);
   if (!item || !string(item.turnId)) return null;

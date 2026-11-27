@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProbeDecisionPort, dispatchReadyProbeCandidates, listReadyProbeCandidates,
+import { createProbeDecisionPort, dispatchReadyProbeBatch,
+  dispatchReadyProbeCandidates, listReadyProbeCandidates,
   sweepDueProbeRenders, sweepDueProbeTimeouts,
-  type ProbeRpc } from "@envoi-labs/services/probe-turn";
+  type ProbeReadyCandidate, type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
 const ids = { sessionId: "session", questionId: "question", answerId: "answer",
   turnId: "turn", transcriptRevision: "a".repeat(64),
@@ -198,6 +199,29 @@ describe("probe persistence boundary", () => {
       scanned: 3, committed: 1, stale: 1, unavailable: 1 });
     expect(run.mock.calls.map(([candidate]) => candidate)).toEqual(candidates);
     expect(call).toHaveBeenCalledWith("list_gate3_probe_ready", { supplied_limit: 3 });
+  });
+
+  it("binds each decision port to the database-selected respondent before the runner", async () => {
+    const candidate = { answerId: "a9720000-0000-4000-8000-000000000005",
+      sessionId: "a9720000-0000-4000-8000-000000000004",
+      authUserId: "90300000-0000-4000-8000-000000000001" };
+    const turnId = "a9720000-0000-4000-8000-000000000006";
+    const call = vi.fn<ProbeRpc>().mockImplementation(async (name) => ({ error: null,
+      data: name === "list_gate3_probe_ready" ? [candidate] : turnId }));
+    const build = vi.fn((_selected: ProbeReadyCandidate,
+      source: { sourceText: string; questionText: string }) => buildRequest(source));
+    const run = vi.fn(async (selected: ProbeReadyCandidate,
+      port: ReturnType<typeof createProbeDecisionPort>) => {
+      expect(selected).toEqual(candidate);
+      expect(await port.beginCurrentTurn(selected.answerId)).toBe(turnId);
+      return { status: "committed" as const };
+    });
+    expect(await dispatchReadyProbeBatch(call, build, run, 1)).toEqual({
+      scanned: 1, committed: 1, stale: 0, unavailable: 0 });
+    expect(call).toHaveBeenCalledWith("begin_gate3_probe_turn_with_clock", {
+      supplied_answer_id: candidate.answerId,
+      supplied_auth_user_id: candidate.authUserId });
+    expect(build).not.toHaveBeenCalled();
   });
 
   it("settles only private overdue render candidates through the locked writer", async () => {
