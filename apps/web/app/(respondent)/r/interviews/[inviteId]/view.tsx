@@ -24,6 +24,9 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
   const prompt = useRef<HTMLHeadingElement>(null);
   const currentState = useRef(state.kind);
   currentState.current = state.kind;
+  const displayed = state.kind === "open" ? currentPrompt(state.session) : null;
+  const promptIdentity = state.kind === "submitted" ? "submitted" : state.kind === "open" && displayed
+    ? `${state.session.sessionId}:${displayed.kind}:${"id" in displayed ? displayed.id : ""}` : null;
 
   useEffect(() => {
     const recheck = () => {
@@ -54,13 +57,12 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
 
   useEffect(() => {
     if (state.kind === "open" || state.kind === "submitted") prompt.current?.focus();
-  }, [state]);
+  }, [promptIdentity]);
 
   useEffect(() => {
     if (state.kind !== "open" || !state.session.probePending || state.session.currentProbe) return;
     const timer = window.setTimeout(() => {
       if (document.visibilityState !== "visible") return;
-      setState({ kind: "opening" });
       setAttempt((value) => value + 1);
     }, 400);
     return () => window.clearTimeout(timer);
@@ -134,8 +136,6 @@ export function InterviewView({ inviteId, canRecord }: { inviteId: string; canRe
     if (submitted.success && submitted.data.sessionId === sessionId) setState({ kind: "submitted" });
     else setSubmitError(response.status === 401 ? copy.sessionExpired : copy.submitFailed);
   }
-
-  const displayed = state.kind === "open" ? currentPrompt(state.session) : null;
 
   return (
     <Card className="respondent-welcome">
