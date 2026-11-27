@@ -129,7 +129,7 @@ create function public.read_gate3_analyst_snapshot(
 ) returns jsonb language sql stable security definer set search_path = '' as $$
     with target as (
         select study.id as study_id, brief.brief_json,
-            quote.id as quote_id
+            quote.id as quote_id, quote.guide_digest
         from public.studies as study
         join public.gate2_quote_snapshots as quote
             on quote.study_id = study.id and quote.id = supplied_quote_id
@@ -208,10 +208,17 @@ create function public.read_gate3_analyst_snapshot(
             jsonb_build_object('studyId', answer.study_id,
                 'transcriptId', source.id,
                 'sourceVersion', source.redacted_source_version,
+                'respondentId', answer.respondent_id,
+                'sessionId', answer.session_id,
                 'questionId', answer.guide_question_id,
                 'redactedText', source.redacted_text,
                 'policyDigest', job.publication_policy_digest,
-                'qualificationDigest', job.publication_qualification_digest)
+                'qualificationDigest', job.publication_qualification_digest,
+                'receipt', jsonb_build_object(
+                    'sourceVersion', source_receipt.source_version,
+                    'redactedTextDigest', source_receipt.redacted_text_digest,
+                    'policyDigest', source_receipt.policy_digest,
+                    'qualificationDigest', source_receipt.qualification_digest))
                 as source_json,
             job.publication_policy_digest as policy_digest,
             job.publication_qualification_digest as qualification_digest
@@ -270,6 +277,10 @@ create function public.read_gate3_analyst_snapshot(
     select jsonb_build_object('studyId', target.study_id,
         'decisionQuestion', target.brief_json ->> 'decision',
         'hypotheses', target.brief_json -> 'hypotheses',
+        'guideDigest', target.guide_digest,
+        'approvedSessions', (select jsonb_agg(jsonb_build_object(
+            'respondentId', respondent_id, 'sessionId', session_id)
+            order by respondent_id) from approved),
         'guideQuestions', guide.questions,
         'sources', (select jsonb_agg(source_json order by answer_id)
             from qualified))

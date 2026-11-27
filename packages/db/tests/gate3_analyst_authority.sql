@@ -218,6 +218,19 @@ grant select on analyst_snapshot to service_role;
 select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'sources'), 40, 'ten complete fictional respondents supply forty qualified core answers');
 select is(jsonb_array_length((select payload from analyst_snapshot)
+    -> 'approvedSessions'), 10,
+    'private snapshot carries exact approved respondent/session membership');
+select is((select payload ->> 'guideDigest' from analyst_snapshot),
+    (select guide_digest from public.gate2_quote_snapshots
+        where id = (select id from analyst_quote)),
+    'private snapshot carries frozen quote guide digest');
+select is((select payload -> 'sources' -> 0 -> 'receipt'
+    ->> 'redactedTextDigest' from analyst_snapshot),
+    (select encode(pg_catalog.sha256(convert_to(
+        payload -> 'sources' -> 0 ->> 'redactedText', 'UTF8')), 'hex')
+        from analyst_snapshot),
+    'each qualified source carries matching exact text receipt');
+select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'guideQuestions'), 4, 'frozen four-question guide is included');
 set local role service_role;
 select is(public.authorize_gate3_analyst_snapshot(
@@ -240,6 +253,19 @@ select is(public.read_gate3_analyst_snapshot(
     'fixture-model', 'other-prompt', repeat('d', 64)), null::jsonb,
     'unapproved prompt cannot read model input');
 reset role;
+
+savepoint changed_analyst_membership;
+update public.respondents set status = 'paused'
+where id = '90500000-0000-4000-8000-000000000001';
+set local role service_role;
+select is(public.read_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
+    'approved cohort membership change withholds analyst source');
+reset role;
+rollback to savepoint changed_analyst_membership;
 
 savepoint stale_analysis_source;
 update public.transcripts set redacted_text = 'Changed without qualification'
