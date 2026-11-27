@@ -47,7 +47,9 @@ from (values
     ('pii.gate2_screening_transcription_receipts'),
     ('pii.gate3_evidence_proposals'),
     ('pii.gate3_evidence_decisions'),
-    ('pii.gate3_report_publications')
+    ('pii.gate3_report_publications'),
+    ('pii.gate3_reviewed_support_manifests'),
+    ('pii.gate3_public_text_qualifications')
 ) as service_only(relation);
 grant select on access_matrix to authenticated, anon;
 

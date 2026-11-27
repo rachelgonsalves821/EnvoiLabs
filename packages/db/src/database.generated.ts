@@ -1767,6 +1767,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      attest_gate3_reviewed_support: {
+        Args: {
+          supplied_actor_auth_user_id: string
+          supplied_causation_id: string
+          supplied_finding_id: string
+          supplied_report_id: string
+          supplied_sources: Json
+        }
+        Returns: boolean
+      }
       begin_gate3_probe_turn: {
         Args: {
           supplied_answer_id: string
@@ -2245,6 +2255,10 @@ export type Database = {
         Args: { supplied_auth_user_id: string; supplied_session_id: string }
         Returns: Json
       }
+      read_gate3_reviewed_support_snapshot: {
+        Args: { supplied_report_id: string }
+        Returns: Json
+      }
       record_gate1_text_answer: {
         Args: {
           supplied_answer_id: string
@@ -2316,6 +2330,17 @@ export type Database = {
       record_gate3_probe_timeout: {
         Args: { supplied_answer_id: string; supplied_auth_user_id: string }
         Returns: Json
+      }
+      record_gate3_public_text_qualification: {
+        Args: {
+          supplied_claims: Json
+          supplied_policy: string
+          supplied_qualification: string
+          supplied_receipt_id: string
+          supplied_report_id: string
+          supplied_summary: Json
+        }
+        Returns: boolean
       }
       record_gate3_withheld_proposal: {
         Args: {

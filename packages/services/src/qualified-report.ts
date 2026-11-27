@@ -31,6 +31,8 @@ export async function publishQualifiedThemeSet(
 ): Promise<PublishedThemeSetV2 | null> {
   const analyst = AnalystThemeSetV2Schema.safeParse(raw);
   if (!analyst.success) return null;
+  // Model hypothesis verdicts have no reviewed evidence link in V2 yet.
+  if (analyst.data.hypotheses.length !== 0) return null;
   const policy = await ports.activePolicy();
   if (!policy) return null;
 

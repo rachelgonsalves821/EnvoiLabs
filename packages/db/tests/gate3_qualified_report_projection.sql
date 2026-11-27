@@ -45,12 +45,46 @@ select is(public.complete_gate1_answer_job(
 ) ->> 'status', 'published', 'qualified synthetic source publishes');
 reset role;
 
+-- The reviewed publisher uses the current ten-person approved population,
+-- including nine synthetic completed respondents without supporting quotes.
+insert into auth.users (id)
+select ('a9710000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+from generate_series(1, 9) as n;
+insert into public.respondents (id, auth_user_id, age_attested_at)
+select ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9710000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    clock_timestamp() from generate_series(1, 9) as n;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+select ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    purpose, true, 'fixture-v1'
+from generate_series(1, 9) as n
+cross join unnest(array['retention', 'researcher_access']) as purpose;
+insert into public.invites (id, study_id, respondent_id, state,
+    reward_cents, expires_at)
+select ('a9730000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001',
+    ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    'accepted', 160, clock_timestamp() + interval '1 day'
+from generate_series(1, 9) as n;
+insert into public.sessions (id, invite_id, study_id, state, submitted_at)
+select ('a9740000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9730000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001', 'submitted', clock_timestamp()
+from generate_series(1, 9) as n;
+update public.sessions set state = 'submitted', submitted_at = clock_timestamp()
+where id = 'a9700000-0000-4000-8000-000000000003';
+insert into public.quality_scores (session_id, score, components_json, decision)
+select id, 90, '{}'::jsonb, 'approve' from public.sessions
+where study_id = '90600000-0000-4000-8000-000000000001';
+update public.sessions set state = 'approved'
+where study_id = '90600000-0000-4000-8000-000000000001';
+
 insert into public.reports (id, study_id, version, state, summary_json)
 values ('a9700000-0000-4000-8000-000000000006', '90600000-0000-4000-8000-000000000001',
     1, 'ready', '{"raw":"private model summary"}');
 insert into public.findings (id, report_id, study_id, position, claim, count, total, confidence)
 values ('a9700000-0000-4000-8000-000000000007', 'a9700000-0000-4000-8000-000000000006',
-    '90600000-0000-4000-8000-000000000001', 1, 'Private model claim', 1, 1, 'high');
+    '90600000-0000-4000-8000-000000000001', 1, 'Private model claim', 1, 10, 'low');
 insert into public.evidence_quotes (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
 select 'a9700000-0000-4000-8000-000000000008', 'a9700000-0000-4000-8000-000000000007', id,
     study_id, 4, 16, 'ordered soup', redacted_source_version
@@ -69,16 +103,17 @@ select jsonb_build_object('1', jsonb_build_array(jsonb_build_object(
     'sourceVersion', source_version, 'startChar', start_char,
     'endChar', end_char, 'exactText', text))) as payload
 from public.evidence_quotes where id = 'a9700000-0000-4000-8000-000000000008';
-grant select on expected_report_quotes to service_role;
+grant select on expected_report_quotes to service_role, authenticated;
 create temp table expected_report_summary as
 select jsonb_build_object('version', 2, 'executiveAnswer', 'One soup order',
     'hypotheses', '[]'::jsonb, 'themes', jsonb_build_array(jsonb_build_object(
-        'claim', 'One respondent ordered soup', 'count', 1, 'total', 1,
-        'confidence', 'high', 'supportingQuotes', jsonb_build_array(
+        'claim', 'One respondent ordered soup', 'count', 1, 'total', 10,
+        'confidence', 'low', 'supportingQuotes', jsonb_build_array(
             (payload -> '1' -> 0) || '{"confidence":0.9}'::jsonb),
         'contradictingQuotes', '[]'::jsonb))) as payload
 from expected_report_quotes;
 grant select on expected_report_summary to service_role;
+grant select on expected_report_summary to gate3_report_qualifier;
 create temp table expected_reviews as
 select jsonb_build_array(jsonb_build_object(
     'proposalId', 'a9700000-0000-4000-8000-000000000021',
@@ -200,11 +235,13 @@ select is(internal.gate3_summary_matches_findings(
     'summary theme index must match the stored 1-based finding position');
 update public.findings set position = 1
 where id = 'a9700000-0000-4000-8000-000000000007';
-update public.findings set total = 2 where id = 'a9700000-0000-4000-8000-000000000007';
+update public.findings set total = 2, confidence = 'high'
+where id = 'a9700000-0000-4000-8000-000000000007';
 set local role service_role;
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    (select jsonb_set(payload, '{themes,0,total}', '2'::jsonb)
+    (select jsonb_set(jsonb_set(payload, '{themes,0,total}', '2'::jsonb),
+        '{themes,0,confidence}', '"high"'::jsonb)
         from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
@@ -225,9 +262,183 @@ select is(public.publish_gate3_reviewed_report(
     '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'medium confidence requires at least 30 percent support');
 reset role;
-update public.findings set total = 1, confidence = 'high'
+update public.findings set total = 10, confidence = 'low'
 where id = 'a9700000-0000-4000-8000-000000000007';
 set local role service_role;
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select payload from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'direct reviewed publisher denies a missing support attestation');
+select ok(not has_function_privilege('service_role',
+    'public.attest_gate3_reviewed_support(uuid,uuid,uuid,uuid,jsonb)', 'EXECUTE'),
+    'publisher service cannot impersonate a reviewer support attestation');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000006',
+    'a9700000-0000-4000-8000-000000000007',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000050',
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from expected_report_quotes)), false,
+    'reviewer support attestation requires MFA');
+set local request.jwt.claims = '{"sub":"a9700000-0000-4000-8000-000000000009","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000006',
+    'a9700000-0000-4000-8000-000000000007',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000050',
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from expected_report_quotes)), false,
+    'other tenant cannot impersonate the approved reviewer');
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000006',
+    'a9700000-0000-4000-8000-000000000007',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000050',
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from expected_report_quotes)), true,
+    'reviewer separately attests the current exact supporting source');
+reset role;
+update public.findings set count = 7
+where id = 'a9700000-0000-4000-8000-000000000007';
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000006', repeat('a', 64), repeat('b', 64)),
+    false, 'direct publication guard rejects an inflated seven of ten claim');
+update public.findings set count = 1
+where id = 'a9700000-0000-4000-8000-000000000007';
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000006', repeat('a', 64), repeat('b', 64)),
+    true, 'exact one-supporter claim is current before publication');
+set local role service_role;
+select is(jsonb_array_length(public.read_gate3_reviewed_support_snapshot(
+    'a9700000-0000-4000-8000-000000000006') -> 'approvedRespondentIds'),
+    10, 'private snapshot has exactly ten current approved respondents');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{executiveAnswer}',
+        '"Ada Example, ada@example.test, +1 555 0100, 12 Main Street, Acme Corp"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'direct service RPC cannot publish an unqualified public executive answer');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{hypotheses}',
+        '[{"hypothesis":"Ada Example at Acme Corp, 12 Main Street", "result":"supported"}]'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'direct service RPC cannot publish unqualified public hypothesis text');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes,0,claim}',
+        '"Ada Example ada@example.test +1 555 0100 12 Main Street Acme Corp"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"Ada Example ada@example.test +1 555 0100 12 Main Street Acme Corp"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'direct service RPC cannot publish an unqualified public claim');
+select throws_ok($$insert into pii.gate3_public_text_qualifications
+    (report_id, payload_digest, policy_digest, qualification_digest, qualifier_receipt_id)
+    values ('a9700000-0000-4000-8000-000000000006', repeat('a',64),
+        repeat('a',64), repeat('b',64), gen_random_uuid())$$,
+    '42501', null, 'service role cannot mint its own public-text receipt');
+select ok(not has_function_privilege('service_role',
+    'public.record_gate3_public_text_qualification(uuid,jsonb,jsonb,text,text,uuid)',
+    'EXECUTE') and not has_function_privilege('authenticated',
+    'public.record_gate3_public_text_qualification(uuid,jsonb,jsonb,text,text,uuid)',
+    'EXECUTE') and has_function_privilege('gate3_report_qualifier',
+    'public.record_gate3_public_text_qualification(uuid,jsonb,jsonb,text,text,uuid)',
+    'EXECUTE'), 'only separate no-login qualifier may record public-text approval');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select payload from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a',64), repeat('b',64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'qualifier failure withholds report even when source and support are current');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from research.reports where id =
+    'a9700000-0000-4000-8000-000000000006'), 0::bigint,
+    'no direct-RPC sentinel can make the report readable');
+reset role;
+-- Synthetic fixture stands in for an independently authorized qualifier.
+-- The test connection gets temporary membership only inside this rolled-back fixture.
+grant gate3_report_qualifier to postgres;
+grant usage on schema extensions to gate3_report_qualifier;
+set local role gate3_report_qualifier;
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000006',
+    (select payload from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000052'), true,
+    'separate synthetic qualifier records the exact approved public text');
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000006',
+    (select payload from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000052'), true,
+    'exact qualifier receipt replay is idempotent');
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{executiveAnswer}', '"Changed text"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000052'), false,
+    'same receipt cannot approve changed public text');
+reset role;
+set local role service_role;
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{executiveAnswer}',
+        '"Ada Example ada@example.test +1 555 0100 12 Main Street Acme Corp"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a',64), repeat('b',64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'safe receipt cannot be reused for an unqualified executive answer');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{hypotheses}',
+        '[{"hypothesis":"Ada Example at Acme Corp, 12 Main Street", "result":"supported"}]'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a',64), repeat('b',64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'safe receipt cannot be reused for unqualified hypothesis text');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes,0,claim}',
+        '"Ada Example ada@example.test +1 555 0100 12 Main Street Acme Corp"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"Ada Example ada@example.test +1 555 0100 12 Main Street Acme Corp"}',
+    (select payload from expected_report_quotes), repeat('a',64), repeat('b',64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'safe receipt cannot be reused for unqualified claim text');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
     (select payload from expected_report_summary),
@@ -284,13 +495,13 @@ select is((select count(*) from research.reports), 0::bigint,
 reset role;
 update public.findings set count = 1
 where id = 'a9700000-0000-4000-8000-000000000007';
-update public.findings set confidence = 'low'
+update public.findings set confidence = 'high'
 where id = 'a9700000-0000-4000-8000-000000000007';
 set local role authenticated;
 select is((select count(*) from research.reports), 0::bigint,
     'changed confidence invalidates the whole report receipt');
 reset role;
-update public.findings set confidence = 'high'
+update public.findings set confidence = 'low'
 where id = 'a9700000-0000-4000-8000-000000000007';
 insert into public.evidence_quotes
     (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
@@ -326,7 +537,7 @@ insert into public.findings
     (id, report_id, study_id, position, claim, count, total, confidence)
 values ('a9700000-0000-4000-8000-000000000031',
     'a9700000-0000-4000-8000-000000000030',
-    '90600000-0000-4000-8000-000000000001', 1, 'Private second claim', 1, 1, 'medium');
+    '90600000-0000-4000-8000-000000000001', 1, 'Private second claim', 1, 10, 'low');
 insert into public.evidence_quotes
     (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
 select 'a9700000-0000-4000-8000-000000000032',
@@ -342,12 +553,13 @@ from public.evidence_quotes where id = 'a9700000-0000-4000-8000-000000000032';
 create temp table edited_report_summary as
 select jsonb_build_object('version', 2, 'executiveAnswer', 'Edited soup summary',
     'hypotheses', '[]'::jsonb, 'themes', jsonb_build_array(jsonb_build_object(
-        'claim', 'Qualified edited claim', 'count', 1, 'total', 1,
-        'confidence', 'medium', 'supportingQuotes', jsonb_build_array(
+        'claim', 'Qualified edited claim', 'count', 1, 'total', 10,
+        'confidence', 'low', 'supportingQuotes', jsonb_build_array(
             (payload -> '1' -> 0) || '{"confidence":0.9}'::jsonb),
         'contradictingQuotes', '[]'::jsonb))) as payload
 from edited_report_quotes;
 grant select on edited_report_summary to service_role;
+grant select on edited_report_summary to gate3_report_qualifier;
 create temp table edited_reviews as
 select jsonb_build_array(
     jsonb_build_object('proposalId', 'a9700000-0000-4000-8000-000000000033',
@@ -367,6 +579,28 @@ select jsonb_build_array(
         'findingPosition', 1, 'action', 'drop', 'approvedQuote', null)) as payload
 from edited_report_quotes;
 grant select on edited_report_quotes, edited_reviews to service_role;
+grant select on edited_report_quotes to authenticated;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000030',
+    'a9700000-0000-4000-8000-000000000031',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000051',
+    (select jsonb_build_array(jsonb_build_object('transcriptId',
+        payload #>> '{1,0,transcriptId}', 'sourceVersion',
+        payload #>> '{1,0,sourceVersion}')) from edited_report_quotes)), true,
+    'second report version has a separate reviewed source attestation');
+reset role;
+set local role gate3_report_qualifier;
+select is(public.record_gate3_public_text_qualification(
+    'a9700000-0000-4000-8000-000000000030',
+    (select payload from edited_report_summary),
+    '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
+    repeat('a',64), repeat('b',64),
+    'a9700000-0000-4000-8000-000000000053'), true,
+    'next report version has its own independently qualified public text');
+reset role;
 set local role service_role;
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
@@ -577,6 +811,176 @@ where id = 'a9700000-0000-4000-8000-000000000005';
 set local role authenticated;
 select is((select count(*) from research.reports), 0::bigint, 'restored text cannot replay an old source version');
 reset role;
+
+-- Seven current source rows from only six approved people cannot back 7/10.
+insert into public.answers (id, session_id, study_id, guide_question_id, kind, sequence)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9740000-0000-4000-8000-' || lpad(to_hex(case when n = 7 then 1 else n end), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001', 'text',
+    case when n = 7 then 2 else 1 end
+from generate_series(1, 7) as n;
+insert into public.transcripts (id, answer_id, study_id, provider, model, latency_ms, cost_micros)
+select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001', 'typed', 'none', 0, 0
+from generate_series(1, 7) as n;
+insert into pii.transcript_raw (transcript_id, raw_text)
+select id, 'Synthetic qualified supporter' from public.transcripts
+where id in (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    from generate_series(1, 7) as n);
+insert into internal.gate1_answer_jobs (answer_id)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+from generate_series(1, 7) as n;
+create temp table support_claims (answer_id uuid, lease_id uuid);
+grant select, insert on support_claims to service_role;
+set local role service_role;
+insert into support_claims
+select answer_id, (public.claim_gate1_answer_job(answer_id) ->> 'leaseId')::uuid
+from (select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    as answer_id from generate_series(1, 7) as n) as requested;
+select is(public.complete_gate1_answer_job(answer_id, lease_id,
+    supplied_redacted_text => 'Qualified supporter', supplied_redaction_passed => true,
+    supplied_policy_digest => repeat('a', 64), supplied_qualification_digest => repeat('b', 64)
+    ) ->> 'status', 'published', 'extra fictional support source is qualified')
+from support_claims;
+reset role;
+insert into public.reports (id, study_id, version, state, summary_json)
+values ('a9700000-0000-4000-8000-000000000040',
+    '90600000-0000-4000-8000-000000000001', 3, 'ready', '{"raw":"private count test"}');
+insert into public.findings (id, report_id, study_id, position, claim, count, total, confidence)
+values ('a9700000-0000-4000-8000-000000000041',
+    'a9700000-0000-4000-8000-000000000040',
+    '90600000-0000-4000-8000-000000000001', 1, 'Private count claim', 7, 10, 'high');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000040',
+    'a9700000-0000-4000-8000-000000000041',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000042',
+    (select jsonb_agg(jsonb_build_object('transcriptId', id,
+        'sourceVersion', redacted_source_version) order by id)
+        from public.transcripts where id in
+        (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+            from generate_series(1, 7) as n))), true,
+    'reviewer can attest seven current sources including one repeated respondent');
+reset role;
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000040', repeat('a', 64), repeat('b', 64)),
+    false, 'seven source rows from six people cannot support a seven-of-ten claim');
+update public.findings set count = 6 where id = 'a9700000-0000-4000-8000-000000000041';
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000040', repeat('a', 64), repeat('b', 64)),
+    true, 'six distinct current supporters justify six of ten');
+
+-- Twelve distinct approved people may support a finding with ten public quotes.
+insert into auth.users (id)
+select ('a9710000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+from generate_series(10, 11) as n;
+insert into public.respondents (id, auth_user_id, age_attested_at)
+select ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9710000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    clock_timestamp() from generate_series(10, 11) as n;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+select ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    purpose, true, 'fixture-v1'
+from generate_series(10, 11) as n
+cross join unnest(array['retention', 'researcher_access']) as purpose;
+insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
+select ('a9730000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001',
+    ('a9720000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    'accepted', 160, clock_timestamp() + interval '1 day'
+from generate_series(10, 11) as n;
+insert into public.sessions (id, invite_id, study_id, state, submitted_at)
+select ('a9740000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9730000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001', 'submitted', clock_timestamp()
+from generate_series(10, 11) as n;
+insert into public.quality_scores (session_id, score, components_json, decision)
+select ('a9740000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    90, '{}'::jsonb, 'approve' from generate_series(10, 11) as n;
+update public.sessions set state = 'approved' where id in
+    (select ('a9740000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+        from generate_series(10, 11) as n);
+insert into public.answers (id, session_id, study_id, guide_question_id, kind, sequence)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    case when n = 11 then 'a9700000-0000-4000-8000-000000000003'::uuid
+        else ('a9740000-0000-4000-8000-' ||
+            lpad(to_hex(case when n >= 12 then n - 2 else n - 1 end), 12, '0'))::uuid end,
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001', 'text',
+    case when n = 11 then 2 else 1 end
+from generate_series(8, 13) as n;
+insert into public.transcripts (id, answer_id, study_id, provider, model, latency_ms, cost_micros)
+select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '90600000-0000-4000-8000-000000000001', 'typed', 'none', 0, 0
+from generate_series(8, 13) as n;
+insert into pii.transcript_raw (transcript_id, raw_text)
+select id, 'Synthetic qualified supporter' from public.transcripts
+where id in (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    from generate_series(8, 13) as n);
+insert into internal.gate1_answer_jobs (answer_id)
+select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+from generate_series(8, 13) as n;
+set local role service_role;
+insert into support_claims
+select answer_id, (public.claim_gate1_answer_job(answer_id) ->> 'leaseId')::uuid
+from (select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+    as answer_id from generate_series(8, 13) as n) as requested;
+select is(public.complete_gate1_answer_job(answer_id, lease_id,
+    supplied_redacted_text => 'Qualified supporter', supplied_redaction_passed => true,
+    supplied_policy_digest => repeat('a', 64), supplied_qualification_digest => repeat('b', 64)
+    ) ->> 'status', 'published', 'additional fictional support source is qualified')
+from support_claims where answer_id in
+    (select ('a9750000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+        from generate_series(8, 13) as n);
+reset role;
+insert into public.reports (id, study_id, version, state, summary_json)
+values ('a9700000-0000-4000-8000-000000000050',
+    '90600000-0000-4000-8000-000000000001', 4, 'ready', '{"raw":"private capped quote test"}');
+insert into public.findings (id, report_id, study_id, position, claim, count, total, confidence)
+values ('a9700000-0000-4000-8000-000000000051',
+    'a9700000-0000-4000-8000-000000000050',
+    '90600000-0000-4000-8000-000000000001', 1, 'Private broad claim', 12, 12, 'high');
+insert into public.evidence_quotes
+    (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
+select ('a9770000-0000-4000-8000-' || lpad(to_hex(row_number() over (order by id)), 12, '0'))::uuid,
+    'a9700000-0000-4000-8000-000000000051', id, study_id,
+    0, 9, 'Qualified', redacted_source_version
+from public.transcripts where id in
+    (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+        from generate_series(1, 11) as n where n <> 7);
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.attest_gate3_reviewed_support(
+    'a9700000-0000-4000-8000-000000000050',
+    'a9700000-0000-4000-8000-000000000051',
+    '90200000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000053',
+    (select jsonb_agg(jsonb_build_object('transcriptId', id,
+        'sourceVersion', redacted_source_version) order by id)
+        from public.transcripts where id in
+        (select ('a9760000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid
+            from generate_series(1, 13) as n where n <> 7))), true,
+    'reviewer attests twelve distinct qualified supporters');
+reset role;
+select is((select count(*) from public.evidence_quotes where finding_id =
+    'a9700000-0000-4000-8000-000000000051'), 10::bigint,
+    'only ten of twelve supporting quotes are public');
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000050', repeat('a', 64), repeat('b', 64)),
+    true, 'twelve reviewed supporters can back twelve of twelve with ten quotes');
+update public.transcripts set redacted_text = 'Changed unquoted source'
+where id = ('a9760000-0000-4000-8000-' || lpad(to_hex(13), 12, '0'))::uuid;
+select is((select redacted_text from public.transcripts
+    where id = ('a9760000-0000-4000-8000-' || lpad(to_hex(13), 12, '0'))::uuid),
+    'Changed unquoted source', 'fixture actually re-redacts the unquoted supporter');
+select is(internal.gate3_reviewed_support_current(
+    'a9700000-0000-4000-8000-000000000050', repeat('a', 64), repeat('b', 64)),
+    false, 're-redaction of unquoted supporter invalidates the whole finding');
 
 reset role;
 set local role authenticated;
