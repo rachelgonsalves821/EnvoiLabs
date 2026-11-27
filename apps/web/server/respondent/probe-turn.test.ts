@@ -156,16 +156,17 @@ describe("probe persistence boundary", () => {
 
   it("reads bounded ready identities without exposing a model source", async () => {
     const answerId = "a9720000-0000-4000-8000-000000000005";
+    const sessionId = "a9720000-0000-4000-8000-000000000004";
     const authUserId = "90300000-0000-4000-8000-000000000001";
     const call = vi.fn<ProbeRpc>().mockResolvedValue({ error: null,
-      data: [{ answerId, authUserId }] });
-    expect(await listReadyProbeCandidates(call, 1)).toEqual([{ answerId, authUserId }]);
+      data: [{ answerId, sessionId, authUserId }] });
+    expect(await listReadyProbeCandidates(call, 1)).toEqual([{ answerId, sessionId, authUserId }]);
     expect(call).toHaveBeenCalledWith("list_gate3_probe_ready", { supplied_limit: 1 });
     await expect(listReadyProbeCandidates(async () => ({ error: null,
-      data: [{ answerId, authUserId }, { answerId, authUserId }] }), 2))
+      data: [{ answerId, sessionId, authUserId }, { answerId, sessionId, authUserId }] }), 2))
       .rejects.toThrow("duplicate ready answer");
     await expect(listReadyProbeCandidates(async () => ({ error: null,
-      data: [{ answerId, authUserId, sourceText: "private fixture" }] }), 1))
+      data: [{ answerId, sessionId, authUserId, sourceText: "private fixture" }] }), 1))
       .rejects.toThrow("invalid private ready selector");
     await expect(listReadyProbeCandidates(call, 101)).rejects.toThrow("ready selector limit");
   });

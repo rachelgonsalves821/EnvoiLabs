@@ -126,6 +126,9 @@ select is(public.list_gate3_probe_ready(1) #>> '{0,answerId}',
 select is(public.list_gate3_probe_ready(1) #>> '{0,authUserId}',
     '90300000-0000-4000-8000-000000000001',
     'ready selector takes respondent identity from the database');
+select is(public.list_gate3_probe_ready(1) #>> '{0,sessionId}',
+    'a9700000-0000-4000-8000-000000000003',
+    'ready selector binds the database session for future dispatch');
 select is(public.record_gate3_probe_upload_clock(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000001',

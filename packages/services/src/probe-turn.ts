@@ -31,6 +31,7 @@ export type ProbeRpc = (name: string, args: Record<string, unknown>) =>
   Promise<{ data: unknown; error: unknown }>;
 export interface ProbeReadyCandidate {
   readonly answerId: string;
+  readonly sessionId: string;
   readonly authUserId: string;
 }
 type Request = ReadyProbeTurn["request"];
@@ -61,8 +62,8 @@ export async function listReadyProbeCandidates(call: ProbeRpc, limit = 25):
   if (!Array.isArray(data) || data.length > limit ||
     data.some((value) => {
       const item = record(value);
-      return !item || Object.keys(item).length !== 2 ||
-        !uuid(item.answerId) || !uuid(item.authUserId);
+      return !item || Object.keys(item).length !== 3 ||
+        !uuid(item.answerId) || !uuid(item.sessionId) || !uuid(item.authUserId);
     })) throw new Error("invalid private ready selector");
   const items = data as ProbeReadyCandidate[];
   if (new Set(items.map((item) => item.answerId)).size !== items.length)

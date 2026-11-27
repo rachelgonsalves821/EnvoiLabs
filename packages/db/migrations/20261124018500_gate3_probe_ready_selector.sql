@@ -4,10 +4,12 @@
 create function public.list_gate3_probe_ready(supplied_limit integer)
 returns jsonb language sql volatile security definer set search_path = '' as $$
     select coalesce(jsonb_agg(jsonb_build_object(
-        'answerId', ready.answer_id, 'authUserId', ready.auth_user_id)
+        'answerId', ready.answer_id, 'sessionId', ready.session_id,
+        'authUserId', ready.auth_user_id)
         order by ready.created_at, ready.answer_id), '[]'::jsonb)
     from (
-        select answer.id as answer_id, respondent.auth_user_id,
+        select answer.id as answer_id, answer.session_id,
+            respondent.auth_user_id,
             answer.created_at
         from internal.gate3_probe_opportunities as opportunity
         join public.answers as answer on answer.id = opportunity.answer_id
