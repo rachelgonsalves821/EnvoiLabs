@@ -29,6 +29,7 @@ select ('a9910000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid,
     'Fictional core question ' || n from generate_series(1, 4) as n;
 create temp table analyst_quote (id uuid);
 grant select, insert on analyst_quote to service_role;
+grant select on analyst_quote to authenticated;
 set local role service_role;
 insert into analyst_quote
 select public.freeze_gate2_marketplace_quote(
@@ -207,6 +208,67 @@ begin
 end;
 $$;
 reset role;
+create temp table analyst_candidate_digest as
+select encode(pg_catalog.sha256(convert_to(
+    public.read_gate3_analyst_candidate_snapshot(
+        'a9900000-0000-4000-8000-000000000001',
+        (select id from analyst_quote),
+        '90200000-0000-4000-8000-000000000001',
+        'fixture-model', 'fixture-prompt-v1', repeat('d', 64))::text,
+    'UTF8')), 'hex') as value;
+grant select on analyst_candidate_digest to authenticated;
+
+set local role service_role;
+select is(public.read_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
+    'qualified cohort is withheld until independent AAL2 review');
+reset role;
+
+select ok(not has_function_privilege('service_role',
+    'public.attest_gate3_analyst_snapshot(uuid,uuid,uuid,uuid,text,text,text,text)',
+    'EXECUTE'), 'service role cannot self-attest analyst sources');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
+select is(public.attest_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'a9990000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select value from analyst_candidate_digest)), null::uuid,
+    'AAL1 researcher cannot attest private analyst source set');
+reset role;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+set local role authenticated;
+select is(public.attest_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    'a9700000-0000-4000-8000-000000000009',
+    'a9990000-0000-4000-8000-000000000002',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select value from analyst_candidate_digest)), null::uuid,
+    'actor cannot attest as a different researcher');
+select is(public.attest_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'a9990000-0000-4000-8000-000000000004',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    repeat('f', 64)), null::uuid,
+    'reviewer cannot attest a different source digest');
+select ok(public.attest_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'a9990000-0000-4000-8000-000000000003',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select value from analyst_candidate_digest)) is not null,
+    'AAL2 same-tenant researcher separately attests exact source set');
+reset role;
+reset request.jwt.claims;
 
 create temp table analyst_snapshot as
 select public.read_gate3_analyst_snapshot(
@@ -232,6 +294,10 @@ select is((select payload -> 'sources' -> 0 -> 'receipt'
     'each qualified source carries matching exact text receipt');
 select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'guideQuestions'), 4, 'frozen four-question guide is included');
+select ok((select payload from analyst_snapshot) ?& array[
+    'sourceSetVersion', 'consentRevision', 'reviewerReceiptId',
+    'briefVersion', 'pricingConfigVersion', 'quoteId'],
+    'private snapshot carries full reviewed source and frozen price identities');
 set local role service_role;
 select is(public.authorize_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
@@ -240,6 +306,23 @@ select is(public.authorize_gate3_analyst_snapshot(
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot)), true,
     'same frozen source and purpose authorize the model boundary');
+select is(public.authorize_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select jsonb_set(payload, '{consentRevision}',
+        to_jsonb('a9990000-0000-4000-8000-000000000009'::text))
+        from analyst_snapshot)), false,
+    'changed consent revision denies authorization');
+select is(public.authorize_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select jsonb_set(payload, '{pricingConfigVersion}', '102'::jsonb)
+        from analyst_snapshot)), false,
+    'changed frozen price version denies authorization');
 select is(public.read_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
     (select id from analyst_quote),
@@ -266,6 +349,20 @@ select is(public.read_gate3_analyst_snapshot(
     'approved cohort membership change withholds analyst source');
 reset role;
 rollback to savepoint changed_analyst_membership;
+
+savepoint former_analyst_reviewer;
+update public.researchers set organization_id =
+    'a9700000-0000-4000-8000-000000000010'
+where auth_user_id = '90200000-0000-4000-8000-000000000001';
+set local role service_role;
+select is(public.read_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000002',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
+    'former-tenant reviewer cannot keep an old source attestation current');
+reset role;
+rollback to savepoint former_analyst_reviewer;
 
 savepoint stale_analysis_source;
 update public.transcripts set redacted_text = 'Changed without qualification'

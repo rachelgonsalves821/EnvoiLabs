@@ -1767,6 +1767,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      attest_gate3_analyst_snapshot: {
+        Args: {
+          supplied_actor_auth_user_id: string
+          supplied_candidate_digest: string
+          supplied_causation_id: string
+          supplied_prompt_digest: string
+          supplied_prompt_version: string
+          supplied_provider_model: string
+          supplied_quote_id: string
+          supplied_study_id: string
+        }
+        Returns: string
+      }
       authorize_gate3_analyst_snapshot: {
         Args: {
           supplied_prompt_digest: string
@@ -2218,6 +2231,17 @@ export type Database = {
       }
       read_gate2_screening_sheet: {
         Args: { supplied_invite_id: string }
+        Returns: Json
+      }
+      read_gate3_analyst_candidate_snapshot: {
+        Args: {
+          supplied_prompt_digest: string
+          supplied_prompt_version: string
+          supplied_provider_model: string
+          supplied_quote_id: string
+          supplied_researcher_auth_user_id: string
+          supplied_study_id: string
+        }
         Returns: Json
       }
       read_gate3_analyst_snapshot: {
