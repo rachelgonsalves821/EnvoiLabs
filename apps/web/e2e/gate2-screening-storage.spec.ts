@@ -68,12 +68,14 @@ test.describe("Gate 2 private screening Storage", () => {
       expect(guide.error).toBeNull();
       const criterion = await db.from("criteria").insert({
         study_id: study.data.id, kind: "must", attribute_key: "test",
-        operator: "eq", value_json: true, text: "Fictional criterion",
+        operator: "eq", value_json: true,
+        text: "Fictional criterion this year",
       }).select("id").single();
       if (!criterion.data) throw new Error("Synthetic criterion missing");
       const rule = await db.from("gate2_screening_rules").insert({
         study_id: study.data.id, criterion_id: criterion.data.id,
-        version: 1, criterion_kind: "must", criterion_text: "Fictional criterion",
+        version: 1, criterion_kind: "must",
+        criterion_text: "Fictional criterion this year",
         timeframe_text: "this year", question: "Fictional question?",
         approved_by: researcher.data.id,
         approved_at: new Date(Date.now() - 1_000).toISOString(),
