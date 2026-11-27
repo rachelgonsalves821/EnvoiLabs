@@ -124,8 +124,10 @@ test.describe("Gate 2 private screening Storage", () => {
       expect(reused.ok()).toBe(false);
 
       const direct = `${api}/storage/v1/object/${bucket}/${path}`;
+      const publicUrl = `${api}/storage/v1/object/public/${bucket}/${path}`;
       const list = `${api}/storage/v1/object/list/${bucket}`;
       const anonHeaders = { apikey: anonKey };
+      expect((await request.get(publicUrl)).ok()).toBe(false);
       expect((await request.get(direct, { headers: anonHeaders })).ok()).toBe(false);
       const anonymousList = await request.post(list, {
         headers: anonHeaders, data: { prefix: `screening/${offer.data.id}` },
@@ -189,6 +191,48 @@ test.describe("Gate 2 private screening Storage", () => {
       expect((await request.put(direct, { headers: {
         ...outsiderHeaders, "content-type": "audio/webm" },
         data: replacement })).ok()).toBe(false);
+
+      for (const sameTenantResearcher of [true, false]) {
+        const otherEmail = `gate2-storage-other-${randomUUID()}@example.test`;
+        const otherPassword = `Synthetic-${randomUUID()}!`;
+        const other = await db.auth.admin.createUser({
+          email: otherEmail, password: otherPassword, email_confirm: true,
+        });
+        if (!other.data.user) throw new Error("Synthetic other account missing");
+        if (sameTenantResearcher) {
+          const sameTenant = await db.from("researchers").insert({
+            auth_user_id: other.data.user.id,
+            organization_id: org.data.id,
+            terms_version: "synthetic-test",
+            terms_accepted_at: new Date().toISOString(),
+          });
+          expect(sameTenant.error).toBeNull();
+        } else {
+          const otherRespondent = await db.from("respondents").insert({
+            auth_user_id: other.data.user.id,
+            age_attested_at: new Date().toISOString(),
+          });
+          expect(otherRespondent.error).toBeNull();
+        }
+        const otherSession = await createClient(api, anonKey).auth.signInWithPassword({
+          email: otherEmail, password: otherPassword,
+        });
+        if (!otherSession.data.session) throw new Error("Other account token missing");
+        const otherHeaders = { apikey: anonKey,
+          Authorization: `Bearer ${otherSession.data.session.access_token}` };
+        expect((await request.get(direct, { headers: otherHeaders })).ok()).toBe(false);
+        const otherList = await request.post(list, {
+          headers: otherHeaders,
+          data: { prefix: `screening/${offer.data.id}` },
+        });
+        expect(await otherList.text()).not.toContain(lease.audioObjectId);
+        expect((await request.post(direct, { headers: {
+          ...otherHeaders, "content-type": "audio/webm" },
+          data: replacement })).ok()).toBe(false);
+        expect((await request.put(direct, { headers: {
+          ...otherHeaders, "content-type": "audio/webm" },
+          data: replacement })).ok()).toBe(false);
+      }
       const unchanged = await db.storage.from(bucket).download(path);
       expect(Buffer.from(await unchanged.data!.arrayBuffer())).toEqual(media);
 
