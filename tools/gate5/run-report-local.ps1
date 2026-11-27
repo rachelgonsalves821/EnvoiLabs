@@ -75,10 +75,17 @@ try {
   $env:ENVOI_TEST_LOCAL_SUPABASE = '1'
   $env:ENVOI_GATE5_REPORT_FIXTURE = '1'
   $env:NEXT_TELEMETRY_DISABLED = '1'
+  if ($Spec -eq 'gate2-marketplace.spec.ts') {
+    $env:ENVOI_GATE1_TEST_LAUNCH = '1'
+    $env:ENVOI_GATE2_SCREENING_SHEET_ENABLED = 'true'
+    $env:ENVOI_GATE2_SCREENING_VOICE_ENABLED = 'true'
+    $env:ENVOI_GATE2_EARNINGS_ENABLED = 'true'
+    $env:ENVOI_MARKETPLACE_FEASIBILITY_ENABLED = 'true'
+  }
   Push-Location $repo
   try {
     pnpm exec playwright test --project=$Project --retries=0 --workers=1 $Spec
-    if ($LASTEXITCODE -ne 0) { throw 'Gate 5 signed-in report browser test failed' }
+    if ($LASTEXITCODE -ne 0) { throw "Disposable browser test failed: $Spec" }
   } finally { Pop-Location }
 } finally {
   $ErrorActionPreference = 'Continue'
