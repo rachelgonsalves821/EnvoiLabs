@@ -52,22 +52,24 @@ create trigger immutable_gate3_analysis_output_receipts
 
 create function public.attest_gate3_private_analysis_output(
     supplied_study_id uuid, supplied_reviewer_receipt_id uuid,
-    supplied_binding_digest text, supplied_draft jsonb,
-    supplied_screened jsonb
+    supplied_binding_digest text, supplied_draft_json text,
+    supplied_screened_json text
 ) returns uuid language plpgsql security definer set search_path = '' as $$
 declare draft_hash text; screened_hash text; prior uuid;
 begin
     if supplied_study_id is null or supplied_reviewer_receipt_id is null
         or supplied_binding_digest is null
-        or supplied_draft is null or supplied_screened is null
+        or supplied_draft_json is null or supplied_screened_json is null
         or supplied_binding_digest !~ '^[a-f0-9]{64}$'
-        or jsonb_typeof(supplied_draft) <> 'object'
-        or jsonb_typeof(supplied_screened) <> 'object'
+        or octet_length(convert_to(supplied_draft_json, 'UTF8')) > 1048576
+        or octet_length(convert_to(supplied_screened_json, 'UTF8')) > 1048576
+        or jsonb_typeof(supplied_draft_json::jsonb) <> 'object'
+        or jsonb_typeof(supplied_screened_json::jsonb) <> 'object'
     then return null; end if;
     draft_hash := encode(pg_catalog.sha256(
-        convert_to(supplied_draft::text, 'UTF8')), 'hex');
+        convert_to(supplied_draft_json, 'UTF8')), 'hex');
     screened_hash := encode(pg_catalog.sha256(
-        convert_to(supplied_screened::text, 'UTF8')), 'hex');
+        convert_to(supplied_screened_json, 'UTF8')), 'hex');
     select id into prior from internal.gate3_analysis_output_receipts
         where study_id = supplied_study_id
             and reviewer_receipt_id = supplied_reviewer_receipt_id
@@ -82,13 +84,14 @@ begin
         supplied_binding_digest, draft_hash, screened_hash)
     returning id into prior;
     return prior;
+exception when invalid_text_representation then return null;
 end;
 $$;
 revoke all on function public.attest_gate3_private_analysis_output(
-    uuid, uuid, text, jsonb, jsonb)
+    uuid, uuid, text, text, text)
     from public, anon, authenticated, service_role;
 grant execute on function public.attest_gate3_private_analysis_output(
-    uuid, uuid, text, jsonb, jsonb) to gate3_analysis_validator;
+    uuid, uuid, text, text, text) to gate3_analysis_validator;
 
 -- JSONB comparison checks semantic membership and ordered source identity.
 -- The caller also supplies the exact serialized key that Gate 3 hashed; the
@@ -138,6 +141,7 @@ create function public.write_gate3_private_analysis_proposal(
     supplied_snapshot jsonb, supplied_binding_key text,
     supplied_binding_digest text,
     supplied_draft jsonb, supplied_screened jsonb,
+    supplied_draft_json text, supplied_screened_json text,
     supplied_output_receipt_id uuid,
     supplied_request_id uuid
 ) returns boolean language plpgsql security definer set search_path = ''
@@ -153,6 +157,7 @@ begin
         or supplied_binding_key is null
         or supplied_snapshot is null
         or supplied_draft is null or supplied_screened is null
+        or supplied_draft_json is null or supplied_screened_json is null
         or supplied_binding_digest !~ '^[a-f0-9]{64}$'
         or coalesce(supplied_snapshot ->> 'reviewerReceiptId', '')
             !~ '^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
@@ -164,6 +169,8 @@ begin
         or jsonb_typeof(supplied_screened) <> 'object'
         or octet_length(convert_to(supplied_draft::text, 'UTF8')) > 1048576
         or octet_length(convert_to(supplied_screened::text, 'UTF8')) > 1048576
+        or octet_length(convert_to(supplied_draft_json, 'UTF8')) > 1048576
+        or octet_length(convert_to(supplied_screened_json, 'UTF8')) > 1048576
     then return false; end if;
 
     -- SHARE conflicts with source writers' ROW EXCLUSIVE locks. This is
@@ -188,6 +195,8 @@ begin
         supplied_researcher_auth_user_id, supplied_map_provider_model,
         supplied_map_prompt_version, supplied_map_prompt_digest);
     if current_snapshot is null or current_snapshot <> supplied_snapshot
+        or supplied_draft_json::jsonb is distinct from supplied_draft
+        or supplied_screened_json::jsonb is distinct from supplied_screened
         or supplied_binding_digest is distinct from encode(
             pg_catalog.sha256(convert_to(supplied_binding_key, 'UTF8')), 'hex')
         or supplied_binding_key::jsonb is distinct from
@@ -205,9 +214,9 @@ begin
                     (supplied_snapshot ->> 'reviewerReceiptId')::uuid
                 and receipt.binding_digest = supplied_binding_digest
                 and receipt.draft_digest = encode(pg_catalog.sha256(
-                    convert_to(supplied_draft::text, 'UTF8')), 'hex')
+                    convert_to(supplied_draft_json, 'UTF8')), 'hex')
                 and receipt.screened_digest = encode(pg_catalog.sha256(
-                    convert_to(supplied_screened::text, 'UTF8')), 'hex'))
+                    convert_to(supplied_screened_json, 'UTF8')), 'hex'))
     then return false; end if;
     select * into prior from pii.gate3_private_analysis_proposals
         where request_id = supplied_request_id
@@ -254,8 +263,8 @@ end;
 $$;
 revoke all on function public.write_gate3_private_analysis_proposal(
     uuid, uuid, uuid, text, text, text, text, text, text,
-    jsonb, text, text, jsonb, jsonb, uuid, uuid)
+    jsonb, text, text, jsonb, jsonb, text, text, uuid, uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.write_gate3_private_analysis_proposal(
     uuid, uuid, uuid, text, text, text, text, text, text,
-    jsonb, text, text, jsonb, jsonb, uuid, uuid) to service_role;
+    jsonb, text, text, jsonb, jsonb, text, text, uuid, uuid) to service_role;

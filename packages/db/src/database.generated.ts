@@ -1783,9 +1783,9 @@ export type Database = {
       attest_gate3_private_analysis_output: {
         Args: {
           supplied_binding_digest: string
-          supplied_draft: Json
+          supplied_draft_json: string
           supplied_reviewer_receipt_id: string
-          supplied_screened: Json
+          supplied_screened_json: string
           supplied_study_id: string
         }
         Returns: string
@@ -2528,6 +2528,7 @@ export type Database = {
           supplied_binding_digest: string
           supplied_binding_key: string
           supplied_draft: Json
+          supplied_draft_json: string
           supplied_map_prompt_digest: string
           supplied_map_prompt_version: string
           supplied_map_provider_model: string
@@ -2539,6 +2540,7 @@ export type Database = {
           supplied_request_id: string
           supplied_researcher_auth_user_id: string
           supplied_screened: Json
+          supplied_screened_json: string
           supplied_snapshot: Json
           supplied_study_id: string
         }

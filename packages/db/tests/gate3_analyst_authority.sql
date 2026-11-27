@@ -313,10 +313,15 @@ select public.attest_gate3_private_analysis_output(
     'a9900000-0000-4000-8000-000000000001',
     (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
     (select digest from analyst_binding),
-    '{"privateDraft":"fictional"}'::jsonb,
-    '{"privateScreened":"fictional"}'::jsonb);
+    '{"privateDraft":"fictional"}',
+    '{"privateScreened":"fictional"}');
 reset role;
 revoke gate3_analysis_validator from postgres;
+select isnt((select draft_digest from internal.gate3_analysis_output_receipts
+    where id = (select id from analyst_output_receipt)),
+    encode(pg_catalog.sha256(convert_to(
+        '{"privateDraft":"fictional"}'::jsonb::text, 'UTF8')), 'hex'),
+    'output receipt hashes exact supplied JSON bytes, not JSONB reserialization');
 select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'sources'), 40, 'ten complete fictional respondents supply forty qualified core answers');
 select is(jsonb_array_length((select payload from analyst_snapshot)
@@ -349,10 +354,10 @@ select is(public.authorize_gate3_analyst_snapshot(
 select ok(not has_table_privilege('service_role',
     'pii.gate3_private_analysis_proposals', 'SELECT')
     and not has_function_privilege('service_role',
-    'public.attest_gate3_private_analysis_output(uuid,uuid,text,jsonb,jsonb)',
+    'public.attest_gate3_private_analysis_output(uuid,uuid,text,text,text)',
     'EXECUTE')
     and not has_function_privilege('authenticated',
-    'public.write_gate3_private_analysis_proposal(uuid,uuid,uuid,text,text,text,text,text,text,jsonb,text,text,jsonb,jsonb,uuid,uuid)',
+    'public.write_gate3_private_analysis_proposal(uuid,uuid,uuid,text,text,text,text,text,text,jsonb,text,text,jsonb,jsonb,text,text,uuid,uuid)',
     'EXECUTE'), 'private proposals have no direct service or client read');
 select is(public.write_gate3_private_analysis_proposal(
     'a9900000-0000-4000-8000-000000000001',
@@ -364,6 +369,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), true,
     'first private proposal stores against current reviewed snapshot');
@@ -377,6 +383,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), repeat('f', 64),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000008'), false,
     'caller-supplied digest cannot differ from the current binding key');
@@ -391,6 +398,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select digest from analyst_binding_variants where variant = 'quote'),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000011'), false,
     'quote-only binding change cannot certify current proposal');
@@ -405,6 +413,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select digest from analyst_binding_variants where variant = 'membership'),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000012'), false,
     'reviewed cohort membership-only change cannot certify proposal');
@@ -418,6 +427,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), true,
     'same private proposal replay returns prior result');
@@ -431,6 +441,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"changed"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    '{"privateDraft":"changed"}', '{"privateScreened":"fictional"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), false,
     'replayed causation cannot replace the first private proposal');
@@ -444,6 +455,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"second worker"}'::jsonb,
     '{"privateScreened":"second worker"}'::jsonb,
+    '{"privateDraft":"second worker"}', '{"privateScreened":"second worker"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000007'), false,
     'second worker cannot store another proposal for same reviewed source');
@@ -526,6 +538,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"stale"}'::jsonb,
     '{"privateScreened":"stale"}'::jsonb,
+    '{"privateDraft":"stale"}', '{"privateScreened":"stale"}',
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000006'), false,
     'changed source cannot enter private proposal sink');
