@@ -974,7 +974,10 @@ select is(internal.gate3_reviewed_support_current(
     'a9700000-0000-4000-8000-000000000050', repeat('a', 64), repeat('b', 64)),
     true, 'twelve reviewed supporters can back twelve of twelve with ten quotes');
 update public.transcripts set redacted_text = 'Changed unquoted source'
-where id = 'a9760000-0000-4000-8000-000000000013';
+where id = ('a9760000-0000-4000-8000-' || lpad(to_hex(13), 12, '0'))::uuid;
+select is((select redacted_text from public.transcripts
+    where id = ('a9760000-0000-4000-8000-' || lpad(to_hex(13), 12, '0'))::uuid),
+    'Changed unquoted source', 'fixture actually re-redacts the unquoted supporter');
 select is(internal.gate3_reviewed_support_current(
     'a9700000-0000-4000-8000-000000000050', repeat('a', 64), repeat('b', 64)),
     false, 're-redaction of unquoted supporter invalidates the whole finding');
