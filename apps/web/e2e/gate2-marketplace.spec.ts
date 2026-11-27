@@ -604,6 +604,9 @@ test.describe("Gate 2 marketplace fixture replay", () => {
           let sessionId = "";
           let questionId = "";
           let holdNextRead = false;
+          let heldReadStatus: number | null = null;
+          let consentWithdrawn = false;
+          const freshReadStatuses: number[] = [];
           let signalReadStarted: () => void = () => {};
           const readStarted = new Promise<void>((resolve) => { signalReadStarted = resolve; });
           let releaseRead: () => void = () => {};
@@ -621,10 +624,12 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             if (answerCalls === 0 && pendingReads === 4) await pendingGate;
             const held = holdNextRead;
             if (held) {
+              heldReadStatus = response.status();
               signalReadStarted();
               await readGate;
               holdNextRead = false;
             }
+            if (consentWithdrawn) freshReadStatuses.push(response.status());
             if (!response.ok()) {
               await route.fulfill({ response });
               if (held) signalReadFinished();
@@ -731,12 +736,15 @@ test.describe("Gate 2 marketplace fixture replay", () => {
             text_version: "synthetic-marketplace-withdrawal",
           });
           expect(withdrawn.error).toBeNull();
+          expect(heldReadStatus).toBe(200);
+          consentWithdrawn = true;
           await secondRespondent.evaluate(() => {
             Reflect.deleteProperty(document, "visibilityState");
             document.dispatchEvent(new Event("visibilitychange"));
           });
           await expect.poll(() => secondRespondent.evaluate(() => document.visibilityState))
             .toBe("visible");
+          await expect.poll(() => freshReadStatuses[0]).toBe(409);
           await expect(secondRespondent.getByRole("heading", { name: firstQuestion })).toHaveCount(0);
           await expect(secondRespondent.getByRole("textbox", { name: "Type your answer" })).toHaveCount(0);
           await expect(secondRespondent.getByRole("main").getByRole("alert"))
