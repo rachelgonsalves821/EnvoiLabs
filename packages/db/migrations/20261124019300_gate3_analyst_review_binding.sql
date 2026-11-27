@@ -15,9 +15,10 @@ create table internal.gate3_analyst_review_receipts (
     causation_id uuid not null unique,
     source_set_version uuid not null default gen_random_uuid(),
     consent_revision uuid not null default gen_random_uuid(),
+    candidate_digest text not null check (candidate_digest ~ '^[a-f0-9]{64}$'),
     candidate_json jsonb not null,
     attested_at timestamptz not null default clock_timestamp(),
-    unique (study_id, quote_id, candidate_json)
+    unique (study_id, quote_id, candidate_digest)
 );
 alter table internal.gate3_analyst_review_receipts enable row level security;
 revoke all on internal.gate3_analyst_review_receipts
@@ -61,12 +62,15 @@ begin
             'UTF8')), 'hex') then return null; end if;
     select * into prior from internal.gate3_analyst_review_receipts
         where study_id = supplied_study_id and quote_id = supplied_quote_id
-            and candidate_json = current_candidate;
-    if found then return prior.id; end if;
+            and candidate_digest = supplied_candidate_digest;
+    if found then return case when prior.candidate_json = current_candidate
+        then prior.id else null end; end if;
     insert into internal.gate3_analyst_review_receipts
-        (study_id, quote_id, actor_auth_user_id, causation_id, candidate_json)
+        (study_id, quote_id, actor_auth_user_id, causation_id,
+            candidate_digest, candidate_json)
     values (supplied_study_id, supplied_quote_id,
-        supplied_actor_auth_user_id, supplied_causation_id, current_candidate)
+        supplied_actor_auth_user_id, supplied_causation_id,
+        supplied_candidate_digest, current_candidate)
     returning id into prior.id;
     return prior.id;
 end;
@@ -99,6 +103,8 @@ create function public.read_gate3_analyst_snapshot(
     join internal.gate3_analyst_review_receipts as review
         on review.study_id = supplied_study_id
         and review.quote_id = supplied_quote_id
+        and review.candidate_digest = encode(pg_catalog.sha256(
+            convert_to(candidate.payload::text, 'UTF8')), 'hex')
         and review.candidate_json = candidate.payload
     join public.gate2_quote_snapshots as quote on quote.id = review.quote_id
         and quote.study_id = review.study_id
