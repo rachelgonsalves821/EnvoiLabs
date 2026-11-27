@@ -58,8 +58,12 @@ try {
   }
   Write-Output "Applied migration count, report 071, quality 151: $migrationReceipt"
   $ErrorActionPreference = 'Continue'
-  Get-Content -LiteralPath (Join-Path $repo 'apps\web\e2e\fixtures\gate5-qualified-report.sql') -Raw |
-    docker exec -i $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 *> (Join-Path $target 'report.log')
+  & docker cp (Join-Path $repo 'apps\web\e2e\fixtures\gate5-qualified-report.sql') `
+    "$($dbContainer):/tmp/gate5-qualified-report.sql" *> (Join-Path $target 'report.log')
+  if ($LASTEXITCODE -eq 0) {
+    & docker exec $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 `
+      -f /tmp/gate5-qualified-report.sql *> (Join-Path $target 'report.log')
+  }
   $ErrorActionPreference = 'Stop'
   if ($LASTEXITCODE -ne 0) {
     Get-Content -LiteralPath (Join-Path $target 'report.log') -Tail 15
