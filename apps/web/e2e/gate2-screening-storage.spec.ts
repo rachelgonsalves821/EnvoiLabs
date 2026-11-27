@@ -61,6 +61,11 @@ test.describe("Gate 2 private screening Storage", () => {
         deadline_at: new Date(Date.now() + 86_400_000).toISOString(),
       }).select("id").single();
       if (!study.data) throw new Error("Synthetic study missing");
+      const guide = await db.from("guide_questions").insert({
+        study_id: study.data.id, position: 1,
+        text: "Describe your fictional experience.",
+      });
+      expect(guide.error).toBeNull();
       const criterion = await db.from("criteria").insert({
         study_id: study.data.id, kind: "must", attribute_key: "test",
         operator: "eq", value_json: true, text: "Fictional criterion",
