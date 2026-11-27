@@ -12,6 +12,7 @@ create table pii.gate3_private_analysis_proposals (
     reduce_provider_model text not null,
     reduce_prompt_version text not null,
     reduce_prompt_digest text not null,
+    output_receipt_id uuid not null,
     binding_digest text not null check (binding_digest ~ '^[a-f0-9]{64}$'),
     request_id uuid not null unique,
     frozen_snapshot jsonb not null,
@@ -26,6 +27,68 @@ revoke all on pii.gate3_private_analysis_proposals
 create trigger immutable_gate3_private_analysis_proposals
     before update or delete on pii.gate3_private_analysis_proposals
     for each row execute function internal.reject_gate2_ledger_mutation();
+
+-- A separately credentialed schema validator attests the exact private AI
+-- objects it accepted. No service-role caller may self-certify model text.
+create role gate3_analysis_validator nologin;
+create table internal.gate3_analysis_output_receipts (
+    id uuid primary key default gen_random_uuid(),
+    study_id uuid not null,
+    reviewer_receipt_id uuid not null,
+    binding_digest text not null check (binding_digest ~ '^[a-f0-9]{64}$'),
+    draft_digest text not null check (draft_digest ~ '^[a-f0-9]{64}$'),
+    screened_digest text not null check (screened_digest ~ '^[a-f0-9]{64}$'),
+    recorded_at timestamptz not null default clock_timestamp(),
+    unique (study_id, reviewer_receipt_id, binding_digest,
+        draft_digest, screened_digest)
+);
+alter table internal.gate3_analysis_output_receipts enable row level security;
+revoke all on internal.gate3_analysis_output_receipts
+    from public, anon, authenticated, service_role,
+        gate3_analysis_validator;
+create trigger immutable_gate3_analysis_output_receipts
+    before update or delete on internal.gate3_analysis_output_receipts
+    for each row execute function internal.reject_gate2_ledger_mutation();
+
+create function public.attest_gate3_private_analysis_output(
+    supplied_study_id uuid, supplied_reviewer_receipt_id uuid,
+    supplied_binding_digest text, supplied_draft jsonb,
+    supplied_screened jsonb
+) returns uuid language plpgsql security definer set search_path = '' as $$
+declare draft_hash text; screened_hash text; prior uuid;
+begin
+    if supplied_study_id is null or supplied_reviewer_receipt_id is null
+        or supplied_binding_digest is null
+        or supplied_draft is null or supplied_screened is null
+        or supplied_binding_digest !~ '^[a-f0-9]{64}$'
+        or jsonb_typeof(supplied_draft) <> 'object'
+        or jsonb_typeof(supplied_screened) <> 'object'
+    then return null; end if;
+    draft_hash := encode(pg_catalog.sha256(
+        convert_to(supplied_draft::text, 'UTF8')), 'hex');
+    screened_hash := encode(pg_catalog.sha256(
+        convert_to(supplied_screened::text, 'UTF8')), 'hex');
+    select id into prior from internal.gate3_analysis_output_receipts
+        where study_id = supplied_study_id
+            and reviewer_receipt_id = supplied_reviewer_receipt_id
+            and binding_digest = supplied_binding_digest
+            and draft_digest = draft_hash
+            and screened_digest = screened_hash;
+    if found then return prior; end if;
+    insert into internal.gate3_analysis_output_receipts (
+        study_id, reviewer_receipt_id, binding_digest,
+        draft_digest, screened_digest)
+    values (supplied_study_id, supplied_reviewer_receipt_id,
+        supplied_binding_digest, draft_hash, screened_hash)
+    returning id into prior;
+    return prior;
+end;
+$$;
+revoke all on function public.attest_gate3_private_analysis_output(
+    uuid, uuid, text, jsonb, jsonb)
+    from public, anon, authenticated, service_role;
+grant execute on function public.attest_gate3_private_analysis_output(
+    uuid, uuid, text, jsonb, jsonb) to gate3_analysis_validator;
 
 -- JSONB comparison checks semantic membership and ordered source identity.
 -- The caller also supplies the exact serialized key that Gate 3 hashed; the
@@ -66,6 +129,7 @@ create function public.write_gate3_private_analysis_proposal(
     supplied_snapshot jsonb, supplied_binding_key text,
     supplied_binding_digest text,
     supplied_draft jsonb, supplied_screened jsonb,
+    supplied_output_receipt_id uuid,
     supplied_request_id uuid
 ) returns boolean language plpgsql security definer set search_path = ''
     set lock_timeout = '1500ms' as $$
@@ -75,6 +139,7 @@ begin
     if supplied_study_id is null or supplied_quote_id is null
         or supplied_researcher_auth_user_id is null
         or supplied_request_id is null
+        or supplied_output_receipt_id is null
         or supplied_binding_digest is null
         or supplied_binding_key is null
         or supplied_snapshot is null
@@ -122,6 +187,17 @@ begin
             supplied_researcher_auth_user_id, supplied_reduce_provider_model,
             supplied_reduce_prompt_version, supplied_reduce_prompt_digest,
             supplied_snapshot)
+        or not exists (select 1
+            from internal.gate3_analysis_output_receipts as receipt
+            where receipt.id = supplied_output_receipt_id
+                and receipt.study_id = supplied_study_id
+                and receipt.reviewer_receipt_id =
+                    (supplied_snapshot ->> 'reviewerReceiptId')::uuid
+                and receipt.binding_digest = supplied_binding_digest
+                and receipt.draft_digest = encode(pg_catalog.sha256(
+                    convert_to(supplied_draft::text, 'UTF8')), 'hex')
+                and receipt.screened_digest = encode(pg_catalog.sha256(
+                    convert_to(supplied_screened::text, 'UTF8')), 'hex'))
     then return false; end if;
     select * into prior from pii.gate3_private_analysis_proposals
         where request_id = supplied_request_id
@@ -140,6 +216,7 @@ begin
         and prior.reduce_provider_model = supplied_reduce_provider_model
         and prior.reduce_prompt_version = supplied_reduce_prompt_version
         and prior.reduce_prompt_digest = supplied_reduce_prompt_digest
+        and prior.output_receipt_id = supplied_output_receipt_id
         and prior.binding_digest = supplied_binding_digest
         and prior.frozen_snapshot = supplied_snapshot
         and prior.draft_json = supplied_draft
@@ -148,6 +225,7 @@ begin
         study_id, quote_id, reviewer_receipt_id,
         map_provider_model, map_prompt_version, map_prompt_digest,
         reduce_provider_model, reduce_prompt_version, reduce_prompt_digest,
+        output_receipt_id,
         binding_digest,
         request_id, frozen_snapshot, draft_json, screened_json)
     values (supplied_study_id, supplied_quote_id,
@@ -155,6 +233,7 @@ begin
         supplied_map_provider_model, supplied_map_prompt_version,
         supplied_map_prompt_digest, supplied_reduce_provider_model,
         supplied_reduce_prompt_version, supplied_reduce_prompt_digest,
+        supplied_output_receipt_id,
         supplied_binding_digest, supplied_request_id,
         supplied_snapshot, supplied_draft, supplied_screened);
     return true;
@@ -165,8 +244,8 @@ end;
 $$;
 revoke all on function public.write_gate3_private_analysis_proposal(
     uuid, uuid, uuid, text, text, text, text, text, text,
-    jsonb, text, text, jsonb, jsonb, uuid)
+    jsonb, text, text, jsonb, jsonb, uuid, uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.write_gate3_private_analysis_proposal(
     uuid, uuid, uuid, text, text, text, text, text, text,
-    jsonb, text, text, jsonb, jsonb, uuid) to service_role;
+    jsonb, text, text, jsonb, jsonb, uuid, uuid) to service_role;

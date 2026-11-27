@@ -81,7 +81,10 @@ select ok(
         and not has_any_column_privilege('authenticated', c.oid, 'INSERT, UPDATE, REFERENCES')
         and not has_table_privilege('anon', c.oid, 'DELETE, TRUNCATE, TRIGGER')
         and not has_table_privilege('authenticated', c.oid, 'DELETE, TRUNCATE, TRIGGER')
-        and has_table_privilege('service_role', c.oid, 'SELECT')
+        and (has_table_privilege('service_role', c.oid, 'SELECT')
+            or (n.nspname = 'pii'
+                and c.relname = 'gate3_private_analysis_proposals'
+                and not has_table_privilege('service_role', c.oid, 'SELECT')))
         and (n.nspname <> 'pii' or not has_any_column_privilege('authenticated', c.oid, 'SELECT')),
     format('%I.%I has RLS, service access and deny-by-default client grants', n.nspname, c.relname)
 )

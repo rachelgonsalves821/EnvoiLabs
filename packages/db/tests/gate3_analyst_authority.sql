@@ -284,6 +284,20 @@ select internal.gate3_analysis_binding_projection(payload)::text as key,
         'UTF8')), 'hex') as digest
 from analyst_snapshot;
 grant select on analyst_binding to service_role;
+create temp table analyst_output_receipt (id uuid);
+grant select, insert on analyst_output_receipt to gate3_analysis_validator;
+grant select on analyst_output_receipt to service_role;
+grant gate3_analysis_validator to postgres;
+set local role gate3_analysis_validator;
+insert into analyst_output_receipt
+select public.attest_gate3_private_analysis_output(
+    'a9900000-0000-4000-8000-000000000001',
+    (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
+    (select digest from analyst_binding),
+    '{"privateDraft":"fictional"}'::jsonb,
+    '{"privateScreened":"fictional"}'::jsonb);
+reset role;
+revoke gate3_analysis_validator from postgres;
 select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'sources'), 40, 'ten complete fictional respondents supply forty qualified core answers');
 select is(jsonb_array_length((select payload from analyst_snapshot)
@@ -315,8 +329,11 @@ select is(public.authorize_gate3_analyst_snapshot(
     'same frozen source and purpose authorize the model boundary');
 select ok(not has_table_privilege('service_role',
     'pii.gate3_private_analysis_proposals', 'SELECT')
+    and not has_function_privilege('service_role',
+    'public.attest_gate3_private_analysis_output(uuid,uuid,text,jsonb,jsonb)',
+    'EXECUTE')
     and not has_function_privilege('authenticated',
-    'public.write_gate3_private_analysis_proposal(uuid,uuid,uuid,text,text,text,text,text,text,jsonb,text,jsonb,jsonb,uuid)',
+    'public.write_gate3_private_analysis_proposal(uuid,uuid,uuid,text,text,text,text,text,text,jsonb,text,text,jsonb,jsonb,uuid,uuid)',
     'EXECUTE'), 'private proposals have no direct service or client read');
 select is(public.write_gate3_private_analysis_proposal(
     'a9900000-0000-4000-8000-000000000001',
@@ -328,6 +345,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), true,
     'first private proposal stores against current reviewed snapshot');
 select is(public.write_gate3_private_analysis_proposal(
@@ -340,6 +358,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), repeat('f', 64),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000008'), false,
     'caller-supplied digest cannot differ from the current binding key');
 select is(public.write_gate3_private_analysis_proposal(
@@ -352,6 +371,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"fictional"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), true,
     'same private proposal replay returns prior result');
 select is(public.write_gate3_private_analysis_proposal(
@@ -364,6 +384,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"changed"}'::jsonb,
     '{"privateScreened":"fictional"}'::jsonb,
+    (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), false,
     'replayed causation cannot replace the first private proposal');
 select is(public.write_gate3_private_analysis_proposal(
@@ -376,6 +397,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"second worker"}'::jsonb,
     '{"privateScreened":"second worker"}'::jsonb,
+    (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000007'), false,
     'second worker cannot store another proposal for same reviewed source');
 select is(public.authorize_gate3_analyst_snapshot(
@@ -457,6 +479,7 @@ select is(public.write_gate3_private_analysis_proposal(
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"stale"}'::jsonb,
     '{"privateScreened":"stale"}'::jsonb,
+    (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000006'), false,
     'changed source cannot enter private proposal sink');
 reset role;
