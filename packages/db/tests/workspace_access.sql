@@ -282,11 +282,10 @@ values ('91400000-0000-4000-8000-000000000002', 'Synthetic pending redaction fix
        ('91400000-0000-4000-8000-000000000003', 'Synthetic failed redaction fixture');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
-select results_eq(
+select is_empty(
     $$select id, redacted_text from public.transcripts
       where study_id = '90600000-0000-4000-8000-000000000001' order by created_at, id$$,
-    $$values ('91400000-0000-4000-8000-000000000001'::uuid, 'I ordered soup.'::text)$$,
-    'The viewer projection exposes only published text, even with pending or failed raw rows and consent'
+    'regrant cannot revive the old receipt or expose pending and failed raw rows'
 );
 
 reset role;
