@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProbeDecisionPort, listReadyProbeCandidates,
+import { createProbeDecisionPort, dispatchReadyProbeBatch,
+  dispatchReadyProbeCandidates, listReadyProbeCandidates,
   sweepDueProbeRenders, sweepDueProbeTimeouts,
-  type ProbeRpc } from "@envoi-labs/services/probe-turn";
+  type ProbeReadyCandidate, type ProbeRpc } from "@envoi-labs/services/probe-turn";
 
 const ids = { sessionId: "session", questionId: "question", answerId: "answer",
   turnId: "turn", transcriptRevision: "a".repeat(64),
@@ -15,6 +16,21 @@ const buildRequest = ({ sourceText, questionText }: {
   messages: [{ role: "user" as const, content: sourceText }] });
 
 describe("probe persistence boundary", () => {
+  it("begins only the stored captured-clock turn for a verified respondent", async () => {
+    const answerId = "a9720000-0000-4000-8000-000000000005";
+    const turnId = "a9720000-0000-4000-8000-000000000006";
+    const call = vi.fn<ProbeRpc>().mockResolvedValue({ data: turnId, error: null });
+    const port = createProbeDecisionPort(call, "verified-respondent", buildRequest);
+    expect(await port.beginCurrentTurn(answerId)).toBe(turnId);
+    expect(call).toHaveBeenCalledWith("begin_gate3_probe_turn_with_clock", {
+      supplied_answer_id: answerId, supplied_auth_user_id: "verified-respondent" });
+    expect(await port.beginCurrentTurn("browser-selected")).toBeNull();
+    expect(call).toHaveBeenCalledTimes(1);
+    call.mockResolvedValueOnce({ data: null, error: null });
+    expect(await port.beginCurrentTurn(answerId)).toBeNull();
+    call.mockResolvedValueOnce({ data: "wrong", error: null });
+    await expect(port.beginCurrentTurn(answerId)).rejects.toThrow("invalid captured probe turn");
+  });
   it("passes only current redacted source to the AI request builder", async () => {
     let source = "";
     const call: ProbeRpc = async () => ({ error: null, data: { ...ids,
@@ -169,6 +185,43 @@ describe("probe persistence boundary", () => {
       data: [{ answerId, sessionId, authUserId, sourceText: "private fixture" }] }), 1))
       .rejects.toThrow("invalid private ready selector");
     await expect(listReadyProbeCandidates(call, 101)).rejects.toThrow("ready selector limit");
+  });
+
+  it("dispatches a bounded ID batch and records independent stale or failed outcomes", async () => {
+    const candidates = [0, 1, 2].map((index) => ({
+      answerId: `a9720000-0000-4000-8000-00000000000${index + 1}`,
+      sessionId: "a9720000-0000-4000-8000-000000000004",
+      authUserId: "90300000-0000-4000-8000-000000000001" }));
+    const call = vi.fn<ProbeRpc>().mockResolvedValue({ data: candidates, error: null });
+    const run = vi.fn().mockResolvedValueOnce("committed")
+      .mockResolvedValueOnce("stale").mockRejectedValueOnce(Error("private source"));
+    expect(await dispatchReadyProbeCandidates(call, run, 3)).toEqual({
+      scanned: 3, committed: 1, stale: 1, unavailable: 1 });
+    expect(run.mock.calls.map(([candidate]) => candidate)).toEqual(candidates);
+    expect(call).toHaveBeenCalledWith("list_gate3_probe_ready", { supplied_limit: 3 });
+  });
+
+  it("binds each decision port to the database-selected respondent before the runner", async () => {
+    const candidate = { answerId: "a9720000-0000-4000-8000-000000000005",
+      sessionId: "a9720000-0000-4000-8000-000000000004",
+      authUserId: "90300000-0000-4000-8000-000000000001" };
+    const turnId = "a9720000-0000-4000-8000-000000000006";
+    const call = vi.fn<ProbeRpc>().mockImplementation(async (name) => ({ error: null,
+      data: name === "list_gate3_probe_ready" ? [candidate] : turnId }));
+    const build = vi.fn((_selected: ProbeReadyCandidate,
+      source: { sourceText: string; questionText: string }) => buildRequest(source));
+    const run = vi.fn(async (selected: ProbeReadyCandidate,
+      port: ReturnType<typeof createProbeDecisionPort>) => {
+      expect(selected).toEqual(candidate);
+      expect(await port.beginCurrentTurn(selected.answerId)).toBe(turnId);
+      return { status: "committed" as const };
+    });
+    expect(await dispatchReadyProbeBatch(call, build, run, 1)).toEqual({
+      scanned: 1, committed: 1, stale: 0, unavailable: 0 });
+    expect(call).toHaveBeenCalledWith("begin_gate3_probe_turn_with_clock", {
+      supplied_answer_id: candidate.answerId,
+      supplied_auth_user_id: candidate.authUserId });
+    expect(build).not.toHaveBeenCalled();
   });
 
   it("settles only private overdue render candidates through the locked writer", async () => {
