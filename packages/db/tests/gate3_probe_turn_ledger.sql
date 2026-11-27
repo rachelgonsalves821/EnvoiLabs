@@ -30,6 +30,8 @@ from unnest(array['retention', 'researcher_access']) as consent(purpose);
 select ok(not has_function_privilege('authenticated',
     'public.read_gate3_ready_probe_turn(uuid,uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('authenticated',
+    'public.read_gate3_probe_pending(uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('authenticated',
     'public.commit_gate3_probe_decision(uuid,uuid,uuid,uuid,uuid,uuid,text,jsonb)', 'EXECUTE')
     and not has_table_privilege('service_role', 'internal.gate3_probe_turns', 'SELECT'),
     'private ledger and source read are restricted to service RPCs');
@@ -64,6 +66,14 @@ values ('a9700000-0000-4000-8000-000000000004',
 create temporary table probe_ids (turn_id uuid not null);
 grant select, insert on probe_ids to service_role;
 set local role service_role;
+select is(public.read_gate3_probe_pending(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000002'), false,
+    'another respondent cannot see the pending decision state');
+select is(public.read_gate3_probe_pending(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), true,
+    'current consented answer holds the static next question while undecided');
 select is(public.begin_gate3_probe_turn(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000002', 1000), null::uuid,
@@ -115,6 +125,10 @@ select public.commit_gate3_probe_decision(
 from probe_ids;
 select is((select result ->> 'status' from probe_actions), 'committed',
     'the first decision commits');
+select is(public.read_gate3_probe_pending(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), false,
+    'a committed decision clears the pending state');
 select is((select result -> 'value' -> 'decision' ->> 'text' from probe_actions),
     'What made speed matter?', 'committed decision retains exact wording');
 select is((select public.commit_gate3_probe_decision(

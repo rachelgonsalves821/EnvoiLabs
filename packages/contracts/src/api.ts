@@ -91,6 +91,7 @@ export const ResumeSessionRequestSchema = withExample(z.strictObject({ token: re
 export const SessionResponseSchema = withExample(z.strictObject({
   ...sessionId, progress: InterviewProgressSchema, nextQuestion: z.strictObject({ id, text }).nullable(),
   currentProbe: z.strictObject({ turnId: id, probeId: id, text }).nullable().optional(),
+  probePending: z.boolean().optional(),
   expiresAt: timestamp,
 }), { ...exampleSession, progress: { ...exampleSession, currentQuestion: 1, coreQuestionCount: gate1CoreQuestionCount, rewardCents: 0 },
   nextQuestion: { id: exampleId, text: "What did you order?" }, expiresAt: "2026-11-20T18:00:00.000Z" });
