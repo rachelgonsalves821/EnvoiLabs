@@ -1770,6 +1770,7 @@ export type Database = {
       attest_gate3_analyst_snapshot: {
         Args: {
           supplied_actor_auth_user_id: string
+          supplied_candidate_digest: string
           supplied_causation_id: string
           supplied_prompt_digest: string
           supplied_prompt_version: string

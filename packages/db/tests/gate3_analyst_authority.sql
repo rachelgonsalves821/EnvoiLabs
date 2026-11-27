@@ -208,6 +208,15 @@ begin
 end;
 $$;
 reset role;
+create temp table analyst_candidate_digest as
+select encode(pg_catalog.sha256(convert_to(
+    public.read_gate3_analyst_candidate_snapshot(
+        'a9900000-0000-4000-8000-000000000001',
+        (select id from analyst_quote),
+        '90200000-0000-4000-8000-000000000001',
+        'fixture-model', 'fixture-prompt-v1', repeat('d', 64))::text,
+    'UTF8')), 'hex') as value;
+grant select on analyst_candidate_digest to authenticated;
 
 set local role service_role;
 select is(public.read_gate3_analyst_snapshot(
@@ -219,7 +228,7 @@ select is(public.read_gate3_analyst_snapshot(
 reset role;
 
 select ok(not has_function_privilege('service_role',
-    'public.attest_gate3_analyst_snapshot(uuid,uuid,uuid,uuid,text,text,text)',
+    'public.attest_gate3_analyst_snapshot(uuid,uuid,uuid,uuid,text,text,text,text)',
     'EXECUTE'), 'service role cannot self-attest analyst sources');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}';
@@ -228,7 +237,8 @@ select is(public.attest_gate3_analyst_snapshot(
     (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'a9990000-0000-4000-8000-000000000001',
-    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::uuid,
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select value from analyst_candidate_digest)), null::uuid,
     'AAL1 researcher cannot attest private analyst source set');
 reset role;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
@@ -238,14 +248,24 @@ select is(public.attest_gate3_analyst_snapshot(
     (select id from analyst_quote),
     'a9700000-0000-4000-8000-000000000009',
     'a9990000-0000-4000-8000-000000000002',
-    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::uuid,
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select value from analyst_candidate_digest)), null::uuid,
     'actor cannot attest as a different researcher');
+select is(public.attest_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'a9990000-0000-4000-8000-000000000004',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    repeat('f', 64)), null::uuid,
+    'reviewer cannot attest a different source digest');
 select ok(public.attest_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
     (select id from analyst_quote),
     '90200000-0000-4000-8000-000000000001',
     'a9990000-0000-4000-8000-000000000003',
-    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)) is not null,
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select value from analyst_candidate_digest)) is not null,
     'AAL2 same-tenant researcher separately attests exact source set');
 reset role;
 reset request.jwt.claims;
@@ -329,6 +349,20 @@ select is(public.read_gate3_analyst_snapshot(
     'approved cohort membership change withholds analyst source');
 reset role;
 rollback to savepoint changed_analyst_membership;
+
+savepoint former_analyst_reviewer;
+update public.researchers set organization_id =
+    'a9700000-0000-4000-8000-000000000010'
+where auth_user_id = '90200000-0000-4000-8000-000000000001';
+set local role service_role;
+select is(public.read_gate3_analyst_snapshot(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000002',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64)), null::jsonb,
+    'former-tenant reviewer cannot keep an old source attestation current');
+reset role;
+rollback to savepoint former_analyst_reviewer;
 
 savepoint stale_analysis_source;
 update public.transcripts set redacted_text = 'Changed without qualification'

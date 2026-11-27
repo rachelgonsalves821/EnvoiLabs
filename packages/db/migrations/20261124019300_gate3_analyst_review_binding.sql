@@ -30,7 +30,7 @@ create function public.attest_gate3_analyst_snapshot(
     supplied_study_id uuid, supplied_quote_id uuid,
     supplied_actor_auth_user_id uuid, supplied_causation_id uuid,
     supplied_provider_model text, supplied_prompt_version text,
-    supplied_prompt_digest text
+    supplied_prompt_digest text, supplied_candidate_digest text
 ) returns uuid language plpgsql security definer set search_path = '' as $$
 declare current_candidate jsonb; prior internal.gate3_analyst_review_receipts%rowtype;
 begin
@@ -43,6 +43,8 @@ begin
         return case when prior.study_id = supplied_study_id
             and prior.quote_id = supplied_quote_id
             and prior.actor_auth_user_id = supplied_actor_auth_user_id
+            and supplied_candidate_digest = encode(pg_catalog.sha256(
+                convert_to(prior.candidate_json::text, 'UTF8')), 'hex')
             and prior.candidate_json = public.read_gate3_analyst_candidate_snapshot(
                 supplied_study_id, supplied_quote_id,
                 supplied_actor_auth_user_id, supplied_provider_model,
@@ -54,7 +56,9 @@ begin
         supplied_study_id, supplied_quote_id, supplied_actor_auth_user_id,
         supplied_provider_model, supplied_prompt_version,
         supplied_prompt_digest);
-    if current_candidate is null then return null; end if;
+    if current_candidate is null or supplied_candidate_digest is distinct from
+        encode(pg_catalog.sha256(convert_to(current_candidate::text,
+            'UTF8')), 'hex') then return null; end if;
     select * into prior from internal.gate3_analyst_review_receipts
         where study_id = supplied_study_id and quote_id = supplied_quote_id
             and candidate_json = current_candidate;
@@ -68,10 +72,10 @@ begin
 end;
 $$;
 revoke all on function public.attest_gate3_analyst_snapshot(
-    uuid, uuid, uuid, uuid, text, text, text)
+    uuid, uuid, uuid, uuid, text, text, text, text)
     from public, anon, authenticated, service_role;
 grant execute on function public.attest_gate3_analyst_snapshot(
-    uuid, uuid, uuid, uuid, text, text, text) to authenticated;
+    uuid, uuid, uuid, uuid, text, text, text, text) to authenticated;
 
 create function public.read_gate3_analyst_snapshot(
     supplied_study_id uuid, supplied_quote_id uuid,
@@ -98,6 +102,10 @@ create function public.read_gate3_analyst_snapshot(
         and review.candidate_json = candidate.payload
     join public.gate2_quote_snapshots as quote on quote.id = review.quote_id
         and quote.study_id = review.study_id
+    join public.studies as study on study.id = review.study_id
+    join public.researchers as reviewer
+        on reviewer.auth_user_id = review.actor_auth_user_id
+        and reviewer.organization_id = study.organization_id
     where candidate.payload is not null
     order by review.attested_at desc limit 1;
 $$;
