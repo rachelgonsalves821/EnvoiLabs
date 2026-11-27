@@ -93,6 +93,36 @@ revoke all on function public.test_gate2_screening_purpose_receipt(uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.test_gate2_screening_purpose_receipt(uuid)
     to service_role;
+-- Disposable browser fixture: construct one private typed answer input so
+-- the normal lease/completion RPC can produce a real synthetic receipt.
+create function public.test_gate1_transcript_input(
+    supplied_answer_id uuid, supplied_raw_text text
+) returns boolean language plpgsql security definer set search_path = '' as $$
+declare source_id uuid;
+begin
+    if nullif(btrim(supplied_raw_text), '') is null or not exists (
+        select 1 from public.answers as answer
+        join public.sessions as interview on interview.id = answer.session_id
+        join public.invites as offer on offer.id = interview.invite_id
+        join public.respondents as respondent on respondent.id = offer.respondent_id
+        join auth.users as account on account.id = respondent.auth_user_id
+        where answer.id = supplied_answer_id and answer.kind = 'text'
+            and account.email like '%@example.test'
+    ) then return false; end if;
+    select id into source_id from public.transcripts
+        where answer_id = supplied_answer_id;
+    if source_id is null then return false; end if;
+    insert into pii.transcript_raw (transcript_id, raw_text)
+    values (source_id, supplied_raw_text);
+    insert into internal.gate1_answer_jobs (answer_id)
+    values (supplied_answer_id);
+    return true;
+end;
+$$;
+revoke all on function public.test_gate1_transcript_input(uuid, text)
+    from public, anon, authenticated, service_role;
+grant execute on function public.test_gate1_transcript_input(uuid, text)
+    to service_role;
 notify pgrst, 'reload schema';
 SQL
 

@@ -180,6 +180,35 @@ reset role;
 insert into public.consents (respondent_id, purpose, granted, text_version, created_at)
 values ('90500000-0000-4000-8000-000000000001', 'researcher_access', true, 'fixture-1', now());
 set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is((select count(*) from public.transcripts), 0::bigint,
+    'same-tenant MFA researcher cannot directly read jobless redacted text');
+select is((select count(*) from research.transcripts), 0::bigint,
+    'security-invoker view withholds jobless redacted text');
+select is_empty($$select * from public.read_gate1_researcher_transcripts(
+    '90600000-0000-4000-8000-000000000001')$$,
+    'grouped V2 transcript RPC withholds jobless redacted text');
+reset role;
+insert into public.consents (respondent_id, purpose, granted, text_version)
+values ('90500000-0000-4000-8000-000000000001', 'retention', true, 'fixture-1');
+insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
+values (repeat('a', 64), repeat('b', 64));
+insert into internal.gate1_answer_jobs (answer_id)
+values ('91300000-0000-4000-8000-000000000001');
+create temp table qualified_workspace_claim (payload jsonb);
+grant select, insert on qualified_workspace_claim to service_role;
+set local role service_role;
+insert into qualified_workspace_claim
+select public.claim_gate1_answer_job('91300000-0000-4000-8000-000000000001');
+select is(public.complete_gate1_answer_job(
+    '91300000-0000-4000-8000-000000000001',
+    (select (payload ->> 'leaseId')::uuid from qualified_workspace_claim),
+    supplied_redacted_text => 'I ordered soup.', supplied_redaction_passed => true,
+    supplied_policy_digest => repeat('a', 64),
+    supplied_qualification_digest => repeat('b', 64)) ->> 'status',
+    'published', 'synthetic worker creates the current qualification receipt');
+reset role;
+set local role authenticated;
 set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}';
 select * from pg_temp.check_access('Tenant researcher with MFA', 3);
 select is((select redacted_text from research.transcripts), 'I ordered soup.', 'Consented text is available to the MFA tenant researcher');
