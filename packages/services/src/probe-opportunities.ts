@@ -81,8 +81,7 @@ function parseItem(value: unknown): ProbeOpportunity {
       value.browserClockOriginId === null || value.browserUploadReceiptMs === null ||
       value.browserUploadConfirmedMs !== value.browserUploadReceiptMs ||
       value.browserRenderedMs === null ||
-      value.browserRenderedMs < value.browserUploadReceiptMs ||
-      value.browserRenderedMs > value.browserUploadReceiptMs + 6000)) ||
+      value.browserRenderedMs < value.browserUploadReceiptMs)) ||
     (value.outcome === "rendered" && (value.shownAt === null ||
       value.browserUploadConfirmedMs === null || value.browserRenderedMs === null ||
       value.renderOutcome !== "shown")) ||

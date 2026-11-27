@@ -327,6 +327,10 @@ select is((select public.mark_gate3_probe_shown_with_clock(
     '90300000-0000-4000-8000-000000000001',
     'a9700000-0000-4000-8000-000000000011', 1200)
     from probe_ids), 'stale', 'a different page clock cannot mark the probe shown');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,0,browserMeasurementComparable}', 'false',
+    'changed-origin shown attempt is not a measurement');
 select is((select public.mark_gate3_probe_shown_with_clock(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (select (result -> 'value' ->> 'probeId')::uuid from probe_actions),
@@ -437,6 +441,10 @@ select is(public.read_gate3_probe_opportunity_snapshot(
     '90600000-0000-4000-8000-000000000001')
     #>> '{items,1,outcome}', 'invalidated',
     'a clockless legacy turn is invalidated in the private denominator');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,1,browserMeasurementComparable}', 'false',
+    'clockless legacy turn is never a comparable p95 sample');
 select is((select public.commit_gate3_probe_decision(
     'a9700000-0000-4000-8000-000000000003',
     'a9700000-0000-4000-8000-000000000001',
@@ -516,8 +524,9 @@ select is((select public.mark_gate3_probe_shown_with_clock(
         'a9700000-0000-4000-8000-000000000003',
         '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
     '90300000-0000-4000-8000-000000000001',
-    'a9700000-0000-4000-8000-000000000012', 7401)
-    from second_probe_turn), 'stale', 'late browser paint cannot claim a timely receipt');
+    'a9700000-0000-4000-8000-000000000012', 7500)
+    from second_probe_turn), 'recorded',
+    '6,100 ms same-origin paint is recorded as a slow measurement');
 select is((select public.mark_gate3_probe_shown_with_clock(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (public.read_gate3_respondent_probe(
@@ -525,11 +534,15 @@ select is((select public.mark_gate3_probe_shown_with_clock(
         '90300000-0000-4000-8000-000000000001') ->> 'probeId')::uuid,
     '90300000-0000-4000-8000-000000000001',
     'a9700000-0000-4000-8000-000000000012', 1500)
-    from second_probe_turn), 'recorded', 'second probe has its own shown receipt');
+    from second_probe_turn), 'recorded', 'later shown retry retains the first slow paint');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001')
+    #>> '{items,1,browserRenderedMs}', '7500',
+    'the snapshot preserves the first 6,100 ms browser paint');
 select is(public.read_gate3_probe_opportunity_snapshot(
     '90600000-0000-4000-8000-000000000001')
     #>> '{items,1,browserMeasurementComparable}', 'true',
-    'matching second page-clock receipt is a comparable shown sample');
+    'slow matching page-clock receipt stays in the measured p95 sample');
 select is((select public.record_gate3_probe_text_answer(
     'a9700000-0000-4000-8000-000000000003', turn_id,
     (public.read_gate3_respondent_probe(
