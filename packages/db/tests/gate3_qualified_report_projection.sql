@@ -70,6 +70,15 @@ select jsonb_build_object('1', jsonb_build_array(jsonb_build_object(
     'endChar', end_char, 'exactText', text))) as payload
 from public.evidence_quotes where id = 'a9700000-0000-4000-8000-000000000008';
 grant select on expected_report_quotes to service_role;
+create temp table expected_report_summary as
+select jsonb_build_object('version', 2, 'executiveAnswer', 'One soup order',
+    'hypotheses', '[]'::jsonb, 'themes', jsonb_build_array(jsonb_build_object(
+        'claim', 'One respondent ordered soup', 'count', 1, 'total', 1,
+        'confidence', 'high', 'supportingQuotes', jsonb_build_array(
+            (payload -> '1' -> 0) || '{"confidence":0.9}'::jsonb),
+        'contradictingQuotes', '[]'::jsonb))) as payload
+from expected_report_quotes;
+grant select on expected_report_summary to service_role;
 create temp table expected_reviews as
 select jsonb_build_array(jsonb_build_object(
     'proposalId', 'a9700000-0000-4000-8000-000000000021',
@@ -91,7 +100,7 @@ select throws_ok($$update public.findings set qualified_claim = 'Ada Example'
     '42501', null, 'service cannot directly write a qualified claim');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    (select payload from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     '{"1":[]}', repeat('a', 64), repeat('b', 64),
     (select payload from expected_reviews),
@@ -99,7 +108,7 @@ select is(public.publish_gate3_reviewed_report(
     'missing cited quote cannot be published');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    (select payload from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
     (select payload from expected_reviews),
@@ -107,7 +116,7 @@ select is(public.publish_gate3_reviewed_report(
     'caller cannot substitute a finding position');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    (select payload from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select jsonb_set(payload, '{1}', (payload -> '1') || (payload -> '1'))
         from expected_report_quotes), repeat('a', 64), repeat('b', 64),
@@ -116,7 +125,7 @@ select is(public.publish_gate3_reviewed_report(
     'extra cited quote cannot be published');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    (select payload from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select jsonb_set(payload, '{1,0,studyId}',
         '"00000000-0000-4000-8000-000000000001"'::jsonb) from expected_report_quotes),
@@ -124,9 +133,98 @@ select is(public.publish_gate3_reviewed_report(
     (select payload from expected_reviews),
     '{"a9700000-0000-4000-8000-000000000007":1}'), false,
     'quote from a different study cannot be published');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes}', '[]'::jsonb) from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'missing summary theme cannot publish a finding');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes}', (payload -> 'themes') || (payload -> 'themes'))
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'extra summary theme cannot publish');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(jsonb_set(payload, '{themes,0,count}', '2'::jsonb),
+        '{themes,0,total}', '2'::jsonb) from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'schema-valid 2 of 2 theme cannot describe persisted 1 of 1 finding');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes,0,claim}', '"Different qualified claim"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'summary claim must equal the qualified finding claim');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes,0,confidence}', '"medium"'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'summary confidence must equal the persisted finding confidence');
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes,0,supportingQuotes,0,exactText}',
+        '"Different quote"'::jsonb) from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'summary quote set must equal persisted verified quotes');
+select is((select count(*) from pii.gate3_report_publications where report_id =
+    'a9700000-0000-4000-8000-000000000006'), 0::bigint,
+    'rejected summary variants leave no publication receipt');
+update public.findings set position = 2
+where id = 'a9700000-0000-4000-8000-000000000007';
+select is(internal.gate3_summary_matches_findings(
+    'a9700000-0000-4000-8000-000000000006',
+    (select payload from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes)), false,
+    'summary theme index must match the stored 1-based finding position');
+update public.findings set position = 1
+where id = 'a9700000-0000-4000-8000-000000000007';
+update public.findings set total = 2 where id = 'a9700000-0000-4000-8000-000000000007';
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(payload, '{themes,0,total}', '2'::jsonb)
+        from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'high confidence requires at least 60 percent support');
+update public.findings set total = 4, confidence = 'medium'
+where id = 'a9700000-0000-4000-8000-000000000007';
+select is(public.publish_gate3_reviewed_report(
+    'a9700000-0000-4000-8000-000000000006',
+    (select jsonb_set(jsonb_set(payload, '{themes,0,total}', '4'::jsonb),
+        '{themes,0,confidence}', '"medium"'::jsonb) from expected_report_summary),
+    '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
+    (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
+    (select payload from expected_reviews),
+    '{"a9700000-0000-4000-8000-000000000007":1}'), false,
+    'medium confidence requires at least 30 percent support');
+update public.findings set total = 1, confidence = 'high'
+where id = 'a9700000-0000-4000-8000-000000000007';
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    (select payload from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes),
     repeat('a', 64), repeat('b', 64),
@@ -135,7 +233,7 @@ select ok(public.publish_gate3_reviewed_report(
     'trusted publisher binds exact qualified output and private decision');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    (select payload from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
     (select payload from expected_reviews),
@@ -143,7 +241,7 @@ select ok(public.publish_gate3_reviewed_report(
     'exact publication retry returns prior result');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000006',
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}',
+    (select payload from expected_report_summary),
     '{"a9700000-0000-4000-8000-000000000007":"One respondent ordered soup"}',
     (select payload from expected_report_quotes), repeat('a', 64), repeat('b', 64),
     (select jsonb_set(payload, '{0,actorId}', '"different-reviewer"'::jsonb)
@@ -212,7 +310,7 @@ select is((select count(*) from research.reports), 0::bigint,
     'privileged post-publication text mutation invalidates its receipt');
 reset role;
 update public.reports set qualified_summary_json =
-    '{"version":2,"executiveAnswer":"One soup order","hypotheses":[],"themes":[]}'
+    (select payload from expected_report_summary)
 where id = 'a9700000-0000-4000-8000-000000000006';
 insert into public.reports (id, study_id, version, state, summary_json)
 values ('a9700000-0000-4000-8000-000000000030',
@@ -235,6 +333,14 @@ select jsonb_build_object('1', jsonb_build_array(jsonb_build_object(
     'sourceVersion', source_version, 'startChar', start_char,
     'endChar', end_char, 'exactText', text))) as payload
 from public.evidence_quotes where id = 'a9700000-0000-4000-8000-000000000032';
+create temp table edited_report_summary as
+select jsonb_build_object('version', 2, 'executiveAnswer', 'Edited soup summary',
+    'hypotheses', '[]'::jsonb, 'themes', jsonb_build_array(jsonb_build_object(
+        'claim', 'Qualified edited claim', 'count', 1, 'total', 1,
+        'confidence', 'medium', 'supportingQuotes', jsonb_build_array(
+            (payload -> '1' -> 0) || '{"confidence":0.9}'::jsonb),
+        'contradictingQuotes', '[]'::jsonb))) as payload
+from edited_report_quotes;
 create temp table edited_reviews as
 select jsonb_build_array(
     jsonb_build_object('proposalId', 'a9700000-0000-4000-8000-000000000033',
@@ -257,7 +363,7 @@ grant select on edited_report_quotes, edited_reviews to service_role;
 set local role service_role;
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
-    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
+    (select payload from edited_report_summary),
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
     (select jsonb_set(payload, '{0,approvedQuote}', 'null'::jsonb)
@@ -266,7 +372,7 @@ select is(public.publish_gate3_reviewed_report(
     'publication refuses an edit with no approved quote');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
-    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
+    (select payload from edited_report_summary),
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
     (select jsonb_set(payload, '{0,editedClaim}', '"Different claim"'::jsonb)
@@ -275,7 +381,7 @@ select is(public.publish_gate3_reviewed_report(
     'edited claim must equal qualified published claim');
 select is(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
-    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
+    (select payload from edited_report_summary),
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
     (select jsonb_set(payload, '{0,editedQuoteText}', '"Different quote"'::jsonb)
@@ -284,7 +390,7 @@ select is(public.publish_gate3_reviewed_report(
     'edited quote must equal approved published quote');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
-    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
+    (select payload from edited_report_summary),
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
     (select payload from edited_reviews),
@@ -292,7 +398,7 @@ select ok(public.publish_gate3_reviewed_report(
     'edit and drop decisions commit with the reviewed report');
 select ok(public.publish_gate3_reviewed_report(
     'a9700000-0000-4000-8000-000000000030',
-    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}',
+    (select payload from edited_report_summary),
     '{"a9700000-0000-4000-8000-000000000031":"Qualified edited claim"}',
     (select payload from edited_report_quotes), repeat('a', 64), repeat('b', 64),
     (select payload from edited_reviews),
@@ -362,7 +468,7 @@ select is(public.read_gate3_current_qualified_report(
     'withheld latest version never falls back to older qualified report');
 reset role;
 update public.reports set qualified_summary_json =
-    '{"version":2,"executiveAnswer":"Edited soup summary","hypotheses":[],"themes":[]}'
+    (select payload from edited_report_summary)
 where id = 'a9700000-0000-4000-8000-000000000030';
 
 insert into internal.gate1_redaction_policies (policy_digest, qualification_digest)
