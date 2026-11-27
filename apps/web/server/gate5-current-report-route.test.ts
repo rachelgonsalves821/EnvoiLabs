@@ -86,4 +86,30 @@ describe("Gate 5 current-qualified report route", () => {
     expect((await request()).status).toBe(404);
     expect((await request()).status).toBe(503);
   });
+  it("commits a private generic 503 when claims, scope queries or params throw", async () => {
+    const check = async (response: Response) => {
+      expect(response.status).toBe(503);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(await response.json()).toEqual({ ok: false });
+      expect(commit).toHaveBeenCalledOnce();
+      expect(rpc).not.toHaveBeenCalled();
+      vi.clearAllMocks();
+    };
+    getClaims.mockRejectedValueOnce(new Error("private claims failure"));
+    await check(await request());
+
+    const { researcher } = authorized();
+    researcher.maybeSingle.mockRejectedValueOnce(new Error("private researcher failure"));
+    await check(await request());
+
+    const { scopedStudy } = authorized();
+    scopedStudy.maybeSingle.mockRejectedValueOnce(new Error("private study failure"));
+    await check(await request());
+
+    authorized();
+    await check(await GET(new NextRequest(
+      `https://preview.example.test/api/researcher/studies/${studyId}/report`),
+      { params: Promise.reject(new Error("private params failure")) }));
+  });
 });
