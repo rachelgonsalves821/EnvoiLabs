@@ -53,6 +53,32 @@
 .transcriptGroup .transcriptList { margin-block-start: var(--space-3); }
 .transcriptGroup .transcriptList > li:first-child { border-block-start: 0; padding-block-start: 0; }
 
+.report { margin-block-start: var(--space-4); }
+.report h2 { margin: 0; font: var(--text-h2); }
+.report h3 { font: var(--text-h3); }
+.reportAnswer { font: var(--text-body); overflow-wrap: anywhere; }
+.reportAnnouncement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.reportThemes { display: grid; gap: var(--space-4); }
+.reportTheme { border-block-start: 1px solid var(--line); padding-block-start: var(--space-4); }
+.reportTheme h3, .report li { overflow-wrap: anywhere; }
+.reportTheme blockquote { margin: var(--space-2) 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.report button {
+  min-height: 44px;
+  margin-block-start: var(--space-4);
+  padding-inline: var(--space-3);
+}
+.report button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
 @media (max-width: 560px) {
   .panel { padding: var(--space-4); }
   .counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

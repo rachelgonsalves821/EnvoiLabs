@@ -1,0 +1,10 @@
+[
+  { "id": "short-render", "kind": "output", "output": { "action": "probe", "text": "What happened next?" }, "renderedAtMs": 1200, "expectedOutcome": "rendered" },
+  { "id": "medium-render", "kind": "output", "output": { "action": "probe", "text": "How did you respond?" }, "renderedAtMs": 4100, "expectedOutcome": "rendered" },
+  { "id": "slow-render", "kind": "output", "output": { "action": "probe", "text": "What changed for you?" }, "renderedAtMs": 5200, "expectedOutcome": "rendered" },
+  { "id": "intentional-next", "kind": "output", "output": { "action": "next" }, "expectedOutcome": "no_probe" },
+  { "id": "provider-error", "kind": "error", "expectedOutcome": "error" },
+  { "id": "provider-timeout", "kind": "timeout", "expectedOutcome": "timeout" },
+  { "id": "malformed-probe", "kind": "output", "output": { "action": "probe", "text": "Tell me more" }, "expectedOutcome": "error" },
+  { "id": "next-question-active", "kind": "output", "output": { "action": "probe", "text": "Why?" }, "activeTurnId": "next-answer", "expectedOutcome": "superseded" }
+]

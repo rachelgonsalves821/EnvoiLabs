@@ -1,0 +1,155 @@
+import type { LLMProvider } from "./index.js";
+
+export interface ScreeningEvidenceInput {
+  readonly studyId: string;
+  readonly answerId: string;
+  readonly ruleId: string;
+  readonly ruleVersion: number;
+  /** Frozen, researcher-approved criterion wording for this exact rule version. */
+  readonly criterionText: string;
+  readonly question: string;
+  /** Current Gate 1 qualified redacted screening source. Raw answer text is forbidden. */
+  readonly redactedSourceVersion: string;
+  readonly redactionPolicyDigest: string;
+  readonly answerText: string;
+  readonly result: "supported" | "contradicted";
+  /** Zero-based Unicode code point offsets in the original answer. */
+  readonly span: { readonly startChar: number; readonly endChar: number };
+}
+
+/** Platform must check current purpose-specific consent and source authority. */
+export interface ScreeningModelUsePort {
+  authorize(input: ScreeningAuthorizationAttempt): Promise<boolean>;
+}
+
+export interface ScreeningAuthorizationAttempt {
+  readonly purpose: "ai_screening";
+  readonly providerModel: string;
+  readonly promptVersion: string;
+  readonly promptDigest: string;
+  readonly studyId: string;
+  readonly answerId: string;
+  readonly ruleId: string;
+  readonly ruleVersion: number;
+  readonly redactedSourceVersion: string;
+  readonly redactionPolicyDigest: string;
+  /** SHA-256 of the exact approved rule/question/qualified redacted answer tuple. */
+  readonly sourceDigest: string;
+}
+
+export interface ScreeningModelConfig {
+  readonly providerModel: string;
+  readonly promptVersion: string;
+  readonly timeoutMs: number;
+}
+
+interface Judgment {
+  readonly relation: "supported" | "contradicted" | "ambiguous";
+  readonly evidenceText: string;
+  readonly respondentOwnExperience: boolean;
+  readonly criterionAndTimeframeMatch: boolean;
+  readonly explicitNotInferred: boolean;
+}
+
+const system = `You independently check a respondent's redacted screening answer against the frozen approved screening criterion. Return only a JSON object with keys relation (supported, contradicted, or ambiguous), evidenceText, respondentOwnExperience, criterionAndTimeframeMatch, explicitNotInferred. Read the FULL redacted answer, including negation and qualifications outside the proposed excerpt. A supported or contradicted relation requires an explicit statement about this respondent, the exact criterion and its timeframe. Third-party statements, uncertainty, plans, missing information, partial matches and conflicting statements are ambiguous. Contradicted means explicit evidence against the criterion, not merely absence of support. Copy evidenceText exactly from the proposed excerpt. Do not infer eligibility or decide invite state.`;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function isJudgment(value: unknown): value is Judgment {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return Object.keys(data).sort().join(",") === [
+    "criterionAndTimeframeMatch", "evidenceText", "explicitNotInferred", "relation", "respondentOwnExperience",
+  ].sort().join(",")
+    && (data.relation === "supported" || data.relation === "contradicted" || data.relation === "ambiguous")
+    && typeof data.evidenceText === "string"
+    && typeof data.respondentOwnExperience === "boolean"
+    && typeof data.criterionAndTimeframeMatch === "boolean"
+    && typeof data.explicitNotInferred === "boolean";
+}
+
+function sameInput(current: ScreeningEvidenceInput, frozen: ScreeningEvidenceInput): boolean {
+  return current.studyId === frozen.studyId && current.answerId === frozen.answerId
+    && current.ruleId === frozen.ruleId && current.ruleVersion === frozen.ruleVersion
+    && current.criterionText === frozen.criterionText && current.question === frozen.question
+    && current.redactedSourceVersion === frozen.redactedSourceVersion
+    && current.redactionPolicyDigest === frozen.redactionPolicyDigest
+    && current.answerText === frozen.answerText && current.result === frozen.result
+    && current.span?.startChar === frozen.span.startChar
+    && current.span?.endChar === frozen.span.endChar;
+}
+
+/** Advisory Agent 3 port: false forces Platform's review/clarification path. */
+export async function evidenceSupports(provider: LLMProvider, input: ScreeningEvidenceInput,
+  config: ScreeningModelConfig, modelUse?: ScreeningModelUsePort): Promise<boolean> {
+  if (!input || !config || !modelUse) return false;
+  const frozen: ScreeningEvidenceInput = { studyId: input.studyId, answerId: input.answerId,
+    ruleId: input.ruleId, ruleVersion: input.ruleVersion,
+    criterionText: input.criterionText, question: input.question,
+    redactedSourceVersion: input.redactedSourceVersion,
+    redactionPolicyDigest: input.redactionPolicyDigest,
+    answerText: input.answerText, result: input.result,
+    span: { startChar: input.span?.startChar, endChar: input.span?.endChar } };
+  const { studyId, answerId, ruleId, ruleVersion,
+    criterionText, question, redactedSourceVersion, redactionPolicyDigest,
+    answerText, result, span } = frozen;
+  if (!uuid.test(studyId) || !uuid.test(answerId) || !uuid.test(ruleId)
+    || !uuid.test(redactedSourceVersion)
+    || !/^[0-9a-f]{64}$/i.test(redactionPolicyDigest)
+    || !Number.isSafeInteger(ruleVersion) || ruleVersion < 1
+    || !criterionText?.trim() || !question?.trim() || !answerText?.trim()
+    || (result !== "supported" && result !== "contradicted")
+    || !Number.isSafeInteger(span?.startChar) || !Number.isSafeInteger(span?.endChar)
+    || span.startChar < 0 || span.endChar <= span.startChar
+    || !config.providerModel?.trim() || !config.promptVersion?.trim()
+    || !Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1) return false;
+  const chars = Array.from(answerText);
+  if (span.endChar > chars.length) return false;
+  const excerpt = chars.slice(span.startChar, span.endChar).join("");
+  if (!excerpt.trim()) return false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const providerModel = config.providerModel;
+    const promptVersion = config.promptVersion;
+    const timeoutMs = config.timeoutMs;
+    const sameConfig = () => config.providerModel === providerModel
+      && config.promptVersion === promptVersion && config.timeoutMs === timeoutMs;
+    const timeout = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    });
+    const promptDigest = await sha256(system);
+    const sourceDigest = await sha256(JSON.stringify({ studyId, answerId, ruleId,
+      ruleVersion, criterionText, question, redactedSourceVersion,
+      redactionPolicyDigest, answerText }));
+    const attempt = Object.freeze({ purpose: "ai_screening" as const,
+      providerModel, promptVersion, promptDigest, studyId, answerId, ruleId,
+      ruleVersion, redactedSourceVersion, redactionPolicyDigest, sourceDigest });
+    const authorized = () => Promise.race([modelUse.authorize(attempt), timeout]);
+    if (await authorized() !== true || !sameInput(input, frozen) || !sameConfig()
+      || await authorized() !== true || !sameInput(input, frozen)
+      || !sameConfig()) return false;
+    const generated = await Promise.race([provider.generate({
+      purpose: "ai_screening",
+      promptVersion,
+      system,
+      messages: [{ role: "user", content: JSON.stringify({
+        approvedCriterion: criterionText, question, fullRedactedAnswer: answerText,
+        proposedExcerpt: excerpt,
+      }) }],
+    }), timeout]);
+    if (!generated || generated.model !== providerModel || !sameInput(input, frozen)
+      || !sameConfig()) return false;
+    const parsed: unknown = typeof generated.output === "string"
+      ? JSON.parse(generated.output) : generated.output;
+    const supported = isJudgment(parsed) && parsed.relation === result && parsed.evidenceText === excerpt
+      && parsed.respondentOwnExperience && parsed.criterionAndTimeframeMatch
+      && parsed.explicitNotInferred;
+    return supported && sameInput(input, frozen) && sameConfig()
+      && await authorized() === true && sameInput(input, frozen) && sameConfig();
+  } catch {
+    return false;
+  } finally { if (timer !== undefined) clearTimeout(timer); }
+}

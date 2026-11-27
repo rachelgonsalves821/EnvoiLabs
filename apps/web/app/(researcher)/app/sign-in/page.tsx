@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { AuthFrame } from "../_auth/frame";
 import { authCopy } from "../copy";
 import { SignInForm } from "./sign-in-form";
+
+export const metadata: Metadata = { title: `${authCopy.signIn} | Envoi Labs` };
 
 export default async function SignInPage({ searchParams }: {
   searchParams: Promise<{ error?: string | string[] }>;

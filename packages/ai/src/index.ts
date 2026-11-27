@@ -32,9 +32,30 @@ export interface Transcription {
 }
 
 export interface Transcriber {
-  transcribe(request: TranscriptionRequest): Promise<Transcription>;
+  /** Recheck the current lease and voice grant before every provider dispatch. */
+  transcribe(request: TranscriptionRequest, authorize?: () => Promise<boolean>): Promise<Transcription>;
 }
 
 export * from "./fixtures.js";
 export * from "./gate1-answer-processor.js";
 export * from "./providers.js";
+export * from "./report-evidence.js";
+export * from "./reviewed-report-bridge.js";
+export * from "./report-reader.js";
+export * from "./report-csv.js";
+export * from "./report-ui.js";
+export * from "./current-report-port.js";
+export * from "./report-browser-port.js";
+export * from "./analyst-draft.js";
+export * from "./analyst-map-reduce.js";
+export * from "./analyst-evidence-screen.js";
+export * from "./marketplace-feasibility-view.js";
+export * from "./marketplace-feasibility-browser.js";
+export * from "./probe-metrics.js";
+export * from "./probe-opportunity-coverage.js";
+export * from "./probe-runtime.js";
+export * from "./probe-state.js";
+export * from "./probe-integration.js";
+export * from "./screening-evidence.js";
+export * from "./screening-interpreter.js";
+export * from "./scoping.js";

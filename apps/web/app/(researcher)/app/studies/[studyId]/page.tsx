@@ -1,10 +1,13 @@
 import "@envoi-labs/ui/styles.css";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireResearcher } from "../../../../../server/auth/identity";
 import { readResearcherStudyTracking } from "../../../../../server/researcher/study-tracking";
 import workspace from "../../researcher.module.css";
 import { trackingCopy as copy } from "./copy";
 import { StudyTrackingPanel } from "./study-tracking-panel";
+
+export const metadata: Metadata = { title: `${copy.title} | Envoi Labs` };
 
 export default async function StudyTrackingPage({ params }: { params: Promise<{ studyId: string }> }) {
   await requireResearcher();

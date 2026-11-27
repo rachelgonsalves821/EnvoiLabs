@@ -210,16 +210,45 @@ export function createGroqTranscriber(options: TranscriptionOptions): Transcribe
   return createTranscriber("groq", options, "whisper-large-v3-turbo", "https://api.groq.com/openai/v1/audio/transcriptions", "verbose_json");
 }
 
+function canFallBack(error: unknown): error is ProviderError {
+  return error instanceof ProviderError
+    && (error.kind === "timeout" || error.kind === "transport" || error.kind === "invalid-response"
+      || (error.kind === "http" && error.status !== undefined
+        && ([404, 408, 429].includes(error.status) || error.status >= 500)));
+}
+
+function canRetryPrimary(error: ProviderError): boolean {
+  return error.kind === "timeout" || error.kind === "transport" || error.kind === "invalid-response"
+    || (error.kind === "http" && error.status !== undefined
+      && (error.status === 408 || error.status >= 500));
+}
+
+export class TranscriptionAuthorizationError extends Error {
+  constructor() {
+    super("Current transcription authority unavailable.");
+    this.name = "TranscriptionAuthorizationError";
+  }
+}
+
+/** One bounded primary retry, then fallback. The caller must supply a fresh
+ * lease/consent check for each vendor request, including the first. */
 export function withTranscriptionFallback(primary: Transcriber, fallback: Transcriber): Transcriber {
   return {
-    async transcribe(request) {
-      try {
-        return await primary.transcribe(request);
-      } catch (error) {
-        if (!(error instanceof ProviderError)
-          || !(error.kind === "timeout" || error.kind === "transport" || error.kind === "invalid-response"
-            || (error.kind === "http" && error.status !== undefined
-              && ([404, 408, 429].includes(error.status) || error.status >= 500)))) throw error;
+    async transcribe(request, authorize) {
+      const current = async () => authorize && await authorize() === true;
+      if (!await current()) throw new TranscriptionAuthorizationError();
+      try { return await primary.transcribe(request); }
+      catch (error) {
+        if (!canFallBack(error)) throw error;
+        if (canRetryPrimary(error)) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          if (!await current()) throw new TranscriptionAuthorizationError();
+          try { return await primary.transcribe(request); }
+          catch (retryError) {
+            if (!canFallBack(retryError)) throw retryError;
+          }
+        }
+        if (!await current()) throw new TranscriptionAuthorizationError();
         return fallback.transcribe(request);
       }
     },

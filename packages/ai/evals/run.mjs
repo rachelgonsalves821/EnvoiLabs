@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { FixtureLLMProvider } from "../src/fixtures.ts";
+import { decideProbe, recordProbeRender } from "../src/probe-runtime.ts";
+import { summarizeProbeOutcomes } from "../src/probe-metrics.ts";
 
 const load = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const loadJson = async (path) => JSON.parse(await load(path));
@@ -72,13 +74,69 @@ const suites = {
   guide: { prompt: "scoping", check: checkGuide },
   probe: { prompt: "interviewer", check: checkProbe },
   evidence: { prompt: "analyst", check: checkEvidence },
+  "probe-runtime": { prompt: "interviewer", check: checkProbe },
+  "probe-quality": { prompt: "interviewer", check: checkProbe },
 };
+
+async function evaluateProbeQuality() {
+  const fixtures = await loadJson("./probe-quality.json");
+  const results = fixtures.map((fixture) => {
+    const { action, text } = fixture.response;
+    const onGoal = action !== "probe" || fixture.goalTerms.some((term) =>
+      typeof text === "string" && text.toLowerCase().includes(term.toLowerCase()));
+    const neutral = action !== "probe" || !leadingPattern.test(text ?? "");
+    const valid = action === fixture.expectedAction && (action === "next"
+      ? text === undefined
+      : isText(text) && text.trim() === text && text.length <= 240
+        && text.endsWith("?") && neutral && onGoal);
+    return { id: fixture.id, expectedAccept: fixture.expectedAccept, observedAccept: valid,
+      neutral, onGoal, passed: valid === fixture.expectedAccept };
+  });
+  const acceptedProbes = results.filter((item) => item.observedAccept &&
+    fixtures.find((fixture) => fixture.id === item.id)?.response.action === "probe").length;
+  return { suite: "probe-quality", mode: "fixture-replay", passed: fixtures.length > 0
+    && results.every((item) => item.passed), metrics: { cases: results.length, acceptedProbes,
+    rejectedUnsafeProbes: results.filter((item) => !item.observedAccept).length,
+    leadingCases: results.filter((item) => !item.neutral).length,
+    offGoalCases: results.filter((item) => !item.onGoal).length }, results };
+}
+
+async function evaluateProbeRuntime() {
+  const fixtures = await loadJson("./probe-runtime.json");
+  const results = [];
+  const outcomes = [];
+  for (const fixture of fixtures) {
+    const provider = { generate: async () => {
+      if (fixture.kind === "error") throw new Error("fictional provider error");
+      if (fixture.kind === "timeout") return new Promise(() => undefined);
+      return { output: fixture.output };
+    } };
+    const activeTurnId = fixture.activeTurnId ?? fixture.id;
+    const decision = await decideProbe({ turnId: fixture.id, uploadConfirmedAtMs: 100,
+      request: { purpose: "ai_followup", promptVersion: "v1", system: "fictional fixture", messages: [] } },
+    { provider, currentTurnId: () => activeTurnId, authorize: async () => true, timeoutMs: 1 });
+    const outcome = recordProbeRender(decision, activeTurnId, fixture.renderedAtMs ?? 100);
+    outcomes.push(outcome);
+    results.push({ id: fixture.id, expectedOutcome: fixture.expectedOutcome,
+      observedOutcome: outcome.outcome, passed: outcome.outcome === fixture.expectedOutcome });
+  }
+  return { suite: "probe-runtime", mode: "fixture-replay", passed: results.length > 0
+    && results.every((result) => result.passed), metrics: summarizeProbeOutcomes(outcomes), results };
+}
 
 async function evaluate(names) {
   const active = await loadJson("../prompts/active.json");
   const baseline = await loadJson("./baseline.json");
   const reports = [];
   for (const name of names) {
+    if (name === "probe-runtime") {
+      reports.push(await evaluateProbeRuntime());
+      continue;
+    }
+    if (name === "probe-quality") {
+      reports.push(await evaluateProbeQuality());
+      continue;
+    }
     const { prompt, check } = suites[name];
     const promptVersion = active[prompt];
     const system = await load("../prompts/" + prompt + "/" + promptVersion + ".md");

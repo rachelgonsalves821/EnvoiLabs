@@ -42,13 +42,16 @@ export async function runGate1AnswerJob(ports: Gate1ProcessingPorts): Promise<Co
         const audio = await ports.readRecording(claim.audio.storagePath);
         if (await matchesRecording(audio, claim.audio)) {
           if (!await ports.validate(lease)) return "stale";
-          transcription = await transcriber.transcribe({ audio, mediaType: claim.audio.mime });
+          transcription = await transcriber.transcribe({ audio, mediaType: claim.audio.mime },
+            () => ports.validate(lease));
         }
       }
     } catch {
       // Provider and storage failures only change job scheduling.
+      if (!await ports.validate(lease)) return "stale";
     }
     if (!transcription) {
+      if (!await ports.validate(lease)) return "stale";
       await ports.retry(lease);
       return "retry";
     }

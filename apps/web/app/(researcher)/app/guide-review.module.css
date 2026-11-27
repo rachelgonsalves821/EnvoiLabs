@@ -1,0 +1,32 @@
+:global(body):has(.panel) { margin: 0; }
+
+.panel {
+  min-width: 0;
+  max-width: 760px;
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+.panel h2 { margin-block-start: 0; font: var(--text-h2); }
+.questions { display: grid; gap: var(--space-5); padding-inline-start: var(--space-6); }
+.questions li { min-width: 0; }
+.questions label { display: block; margin-block-end: var(--space-2); font: var(--text-label); }
+.questions textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 72px;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--text-body);
+}
+.questions textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block-start: var(--space-3); }
+.warning { color: var(--critical); overflow-wrap: anywhere; }
+.notice { min-height: 1.5em; }
+@media (max-width: 520px) { .panel { padding: var(--space-4); } }
