@@ -97,11 +97,17 @@ create function internal.gate3_analysis_binding_projection(snapshot jsonb)
 returns jsonb language sql immutable set search_path = '' as $$
     select jsonb_build_object(
         'studyId', snapshot -> 'studyId',
+        'quoteId', snapshot -> 'quoteId',
         'sourceSetVersion', snapshot -> 'sourceSetVersion',
         'consentRevision', snapshot -> 'consentRevision',
         'reviewerReceiptId', snapshot -> 'reviewerReceiptId',
         'briefVersion', snapshot -> 'briefVersion',
         'pricingConfigVersion', snapshot -> 'pricingConfigVersion',
+        'guideDigest', snapshot -> 'guideDigest',
+        'approvedSessions', (select jsonb_agg(member.item
+            order by member.item ->> 'respondentId')
+            from jsonb_array_elements(snapshot -> 'approvedSessions')
+                as member(item)),
         'decisionQuestion', snapshot -> 'decisionQuestion',
         'hypotheses', snapshot -> 'hypotheses',
         'guideQuestions', snapshot -> 'guideQuestions',
@@ -109,10 +115,13 @@ returns jsonb language sql immutable set search_path = '' as $$
             'studyId', source.item -> 'studyId',
             'transcriptId', source.item -> 'transcriptId',
             'sourceVersion', source.item -> 'sourceVersion',
+            'respondentId', source.item -> 'respondentId',
+            'sessionId', source.item -> 'sessionId',
             'questionId', source.item -> 'questionId',
             'redactedText', source.item -> 'redactedText',
             'policyDigest', source.item -> 'policyDigest',
-            'qualificationDigest', source.item -> 'qualificationDigest')
+            'qualificationDigest', source.item -> 'qualificationDigest',
+            'receipt', source.item -> 'receipt')
             order by source.item ->> 'transcriptId')
             from jsonb_array_elements(snapshot -> 'sources') as source(item)));
 $$;
@@ -149,6 +158,7 @@ begin
             !~ '^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
         or jsonb_typeof(supplied_snapshot) <> 'object'
         or jsonb_typeof(supplied_snapshot -> 'sources') <> 'array'
+        or jsonb_typeof(supplied_snapshot -> 'approvedSessions') <> 'array'
         or octet_length(convert_to(supplied_binding_key, 'UTF8')) > 8388608
         or jsonb_typeof(supplied_draft) <> 'object'
         or jsonb_typeof(supplied_screened) <> 'object'

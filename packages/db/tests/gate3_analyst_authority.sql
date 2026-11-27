@@ -284,6 +284,23 @@ select internal.gate3_analysis_binding_projection(payload)::text as key,
         'UTF8')), 'hex') as digest
 from analyst_snapshot;
 grant select on analyst_binding to service_role;
+create temp table analyst_binding_variants as
+with altered as (
+    select 'quote'::text as variant,
+        jsonb_set(key::jsonb, '{quoteId}',
+            to_jsonb('a9990000-0000-4000-8000-000000000009'::text))::text
+            as key from analyst_binding
+    union all
+    select 'membership'::text,
+        jsonb_set(key::jsonb,
+            '{approvedSessions,0,respondentId}',
+            to_jsonb('a9990000-0000-4000-8000-000000000010'::text))::text
+        from analyst_binding
+)
+select variant, key,
+    encode(pg_catalog.sha256(convert_to(key, 'UTF8')), 'hex') as digest
+from altered;
+grant select on analyst_binding_variants to service_role;
 create temp table analyst_output_receipt (id uuid);
 grant select, insert on analyst_output_receipt to gate3_analysis_validator;
 grant select on analyst_output_receipt to service_role;
@@ -361,6 +378,34 @@ select is(public.write_gate3_private_analysis_proposal(
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000008'), false,
     'caller-supplied digest cannot differ from the current binding key');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding_variants where variant = 'quote'),
+    (select digest from analyst_binding_variants where variant = 'quote'),
+    '{"privateDraft":"fictional"}'::jsonb,
+    '{"privateScreened":"fictional"}'::jsonb,
+    (select id from analyst_output_receipt),
+    'a9990000-0000-4000-8000-000000000011'), false,
+    'quote-only binding change cannot certify current proposal');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding_variants where variant = 'membership'),
+    (select digest from analyst_binding_variants where variant = 'membership'),
+    '{"privateDraft":"fictional"}'::jsonb,
+    '{"privateScreened":"fictional"}'::jsonb,
+    (select id from analyst_output_receipt),
+    'a9990000-0000-4000-8000-000000000012'), false,
+    'reviewed cohort membership-only change cannot certify proposal');
 select is(public.write_gate3_private_analysis_proposal(
     'a9900000-0000-4000-8000-000000000001',
     (select id from analyst_quote),
