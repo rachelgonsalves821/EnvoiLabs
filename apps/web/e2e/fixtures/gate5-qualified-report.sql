@@ -66,8 +66,18 @@ insert into public.evidence_quotes
     (id, finding_id, transcript_id, study_id, start_char, end_char, text, source_version)
 select 'a9700000-0000-4000-8000-000000000008',
     'a9700000-0000-4000-8000-000000000007', id, study_id,
-    4, 16, 'ordered soup', redacted_source_version
-from public.transcripts where id = 'a9700000-0000-4000-8000-000000000005';
+    strpos(redacted_text, 'ordered soup') - 1,
+    strpos(redacted_text, 'ordered soup') - 1 + char_length('ordered soup'),
+    'ordered soup', redacted_source_version
+from public.transcripts where id = 'a9700000-0000-4000-8000-000000000005'
+    and strpos(redacted_text, 'ordered soup') > 0;
+do $$
+begin
+    if (select count(*) from public.evidence_quotes
+        where id = 'a9700000-0000-4000-8000-000000000008') <> 1
+    then raise exception 'fictional exact quote missing'; end if;
+end;
+$$;
 
 create temp table gate5_quotes as
 select jsonb_build_object('1', jsonb_build_array(jsonb_build_object(
