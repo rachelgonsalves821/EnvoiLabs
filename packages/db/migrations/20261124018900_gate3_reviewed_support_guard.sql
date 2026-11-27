@@ -14,6 +14,7 @@ create table pii.gate3_reviewed_support_manifests (
 alter table pii.gate3_reviewed_support_manifests enable row level security;
 revoke all on pii.gate3_reviewed_support_manifests
     from public, anon, authenticated, service_role;
+grant select on pii.gate3_reviewed_support_manifests to service_role;
 create trigger immutable_gate3_reviewed_support
 before update or delete on pii.gate3_reviewed_support_manifests
 for each row execute function internal.reject_gate2_ledger_mutation();
@@ -97,8 +98,8 @@ begin
                         and input.publication_revision = job.publication_revision))
         then return false; end if;
     end loop;
-    if (select count(distinct item ->> 'transcriptId')
-        from jsonb_array_elements(supplied_sources) as item)
+    if (select count(distinct source_ref.value ->> 'transcriptId')
+        from jsonb_array_elements(supplied_sources) as source_ref(value))
         <> jsonb_array_length(supplied_sources)
     then return false; end if;
 
@@ -225,6 +226,7 @@ create table pii.gate3_public_text_qualifications (
 alter table pii.gate3_public_text_qualifications enable row level security;
 revoke all on pii.gate3_public_text_qualifications
     from public, anon, authenticated, service_role;
+grant select on pii.gate3_public_text_qualifications to service_role;
 create trigger immutable_gate3_public_text_qualification
 before update or delete on pii.gate3_public_text_qualifications
 for each row execute function internal.reject_gate2_ledger_mutation();
