@@ -347,6 +347,7 @@ select jsonb_build_object('version', 2, 'executiveAnswer', 'Edited soup summary'
             (payload -> '1' -> 0) || '{"confidence":0.9}'::jsonb),
         'contradictingQuotes', '[]'::jsonb))) as payload
 from edited_report_quotes;
+grant select on edited_report_summary to service_role;
 create temp table edited_reviews as
 select jsonb_build_array(
     jsonb_build_object('proposalId', 'a9700000-0000-4000-8000-000000000033',
