@@ -2229,6 +2229,10 @@ export type Database = {
         Args: { supplied_study_id: string }
         Returns: Json
       }
+      read_gate3_probe_pending: {
+        Args: { supplied_auth_user_id: string; supplied_session_id: string }
+        Returns: boolean
+      }
       read_gate3_qualified_report: {
         Args: { supplied_report_id: string; supplied_study_id: string }
         Returns: Json

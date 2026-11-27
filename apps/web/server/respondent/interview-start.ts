@@ -46,10 +46,19 @@ export async function startInterview(request: NextRequest) {
     supplied_session_id: result.data.sessionId,
     supplied_auth_user_id: identity.data.claims.sub,
   });
-  if (current.error) return failure(503);
+  if (current.error) return session.commit(failure(503));
+  let probePending = false;
+  if (process.env.ENVOI_GATE3_PROBE_DISPATCH_ENABLED === "true" && current.data === null) {
+    const pending = await trusted.rpc("read_gate3_probe_pending", {
+      supplied_session_id: result.data.sessionId,
+      supplied_auth_user_id: identity.data.claims.sub,
+    });
+    if (pending.error || typeof pending.data !== "boolean") return session.commit(failure(503));
+    probePending = pending.data;
+  }
   const withProbe = SessionResponseSchema.safeParse({
-    ...result.data, currentProbe: current.data,
+    ...result.data, currentProbe: current.data, probePending,
   });
-  if (!withProbe.success) return failure(503);
+  if (!withProbe.success) return session.commit(failure(503));
   return session.commit(reply(200, withProbe.data));
 }
