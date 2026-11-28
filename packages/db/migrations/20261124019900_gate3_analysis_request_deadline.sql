@@ -75,6 +75,31 @@ grant execute on function public.begin_gate3_private_analysis_request(
     uuid, uuid, uuid, text, text, text, jsonb, text, text, uuid)
     to service_role;
 
+-- Read the database clock after the lock wait, not in the WHERE predicate.
+create function internal.gate3_analysis_request_is_live(
+    supplied_request_id uuid, supplied_study_id uuid,
+    supplied_quote_id uuid, supplied_researcher_auth_user_id uuid,
+    supplied_reviewer_receipt_id uuid, supplied_binding_digest text
+) returns boolean language plpgsql security definer set search_path = ''
+    set lock_timeout = '3s' as $$
+declare saved internal.gate3_analysis_requests%rowtype;
+begin
+    select * into saved from internal.gate3_analysis_requests
+        where request_id = supplied_request_id for update;
+    if not found then return false; end if;
+    return saved.study_id = supplied_study_id
+        and saved.quote_id = supplied_quote_id
+        and saved.researcher_auth_user_id = supplied_researcher_auth_user_id
+        and saved.reviewer_receipt_id = supplied_reviewer_receipt_id
+        and saved.binding_digest = supplied_binding_digest
+        and clock_timestamp() < saved.deadline_at;
+exception when lock_not_available then return false;
+end;
+$$;
+revoke all on function internal.gate3_analysis_request_is_live(
+    uuid, uuid, uuid, uuid, uuid, text)
+    from public, anon, authenticated, service_role;
+
 create or replace function public.write_gate3_private_analysis_proposal(
     supplied_study_id uuid, supplied_quote_id uuid,
     supplied_researcher_auth_user_id uuid,
@@ -164,17 +189,13 @@ begin
     then return false; end if;
     -- Lock the server-issued request only after all source/reviewer locks. The
     -- database clock is checked at the last irreversible write boundary.
-    perform 1 from internal.gate3_analysis_requests as lease
-        where lease.request_id = supplied_request_id
-            and lease.study_id = supplied_study_id
-            and lease.quote_id = supplied_quote_id
-            and lease.researcher_auth_user_id = supplied_researcher_auth_user_id
-            and lease.reviewer_receipt_id =
-                (supplied_snapshot ->> 'reviewerReceiptId')::uuid
-            and lease.binding_digest = supplied_binding_digest
-            and clock_timestamp() < lease.deadline_at
-        for update;
-    if not found then return false; end if;    select * into prior from pii.gate3_private_analysis_proposals
+    if not internal.gate3_analysis_request_is_live(
+        supplied_request_id, supplied_study_id, supplied_quote_id,
+        supplied_researcher_auth_user_id,
+        (supplied_snapshot ->> 'reviewerReceiptId')::uuid,
+        supplied_binding_digest)
+    then return false; end if;
+    select * into prior from pii.gate3_private_analysis_proposals
         where request_id = supplied_request_id
             or (study_id = supplied_study_id
                 and reviewer_receipt_id =
