@@ -129,6 +129,9 @@ insert into reserved_referral_batch select public.reserve_gate2_sandbox_visa_bat
     'a98d0000-0000-4000-8000-000000000001', 200000);
 select is((select value ->> 'amountCents' from reserved_referral_batch), '1700',
     'four $3 rewards and the vested $5 bonus reach the $15 Visa floor');
+select is(public.claim_gate2_payout_issuer((select
+    (value ->> 'payoutId')::uuid from reserved_referral_batch), 'fictional'),
+    true, 'the batch freezes fictional issuer and referral origin together');
 select is(public.reserve_gate2_sandbox_visa_batch(
     '90500000-0000-4000-8000-000000000001',
     'a98d0000-0000-4000-8000-000000000001', 200000)
@@ -154,7 +157,7 @@ select is((public.read_gate2_current_respondent_earnings()
     'referral bonus stays distinct from earned question rewards');
 reset role;
 set local role service_role;
-select is(public.record_gate2_sandbox_visa_observation(
+select is(public.record_gate2_fictional_sandbox_visa_observation(
     (select (value ->> 'payoutId')::uuid from reserved_referral_batch),
     (select (value ->> 'payoutId')::uuid from reserved_referral_batch),
     'sandbox_visa', 'evt_batch_bonus_delivered', 'ORDER-BATCH-BONUS-1',

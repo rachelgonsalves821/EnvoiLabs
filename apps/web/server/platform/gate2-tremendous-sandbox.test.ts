@@ -113,6 +113,7 @@ describe("Tremendous sandbox Visa adapter", () => {
       ...expected, state: "pending" as const, providerOrderId: null };
     const db = { reserveSessionPayout: vi.fn().mockResolvedValueOnce(reserved)
       .mockResolvedValue({ ...reserved, state: "delivered", providerOrderId: order.id }),
+      claimIssuer: vi.fn().mockResolvedValue(true),
       recordOrder: vi.fn().mockResolvedValue(undefined) };
     expect(await issueReservedPayout(db, provider, reserved.sessionId)).toBe("delivered");
     expect(await issueReservedPayout(db, provider, reserved.sessionId)).toBe("delivered");

@@ -24,13 +24,6 @@ function reservation(value: unknown, sessionId: string): Reservation | null {
 
 // This database port is for TEST_-key testflight use only. Its RPC freezes a
 // synthetic route and SKU with the respondent-locked payout reservation.
-async function markFictionalPayout(client: SupabaseClient<Database>, payoutId: string) {
-  const { data, error } = await client.rpc("mark_gate2_fictional_payout", {
-    supplied_payout_id: payoutId,
-  });
-  if (error || data !== true) throw new Error("Fictional payout provenance unavailable");
-}
-
 export function createGate2SandboxPayoutDatabase(client: SupabaseClient<Database>,
   annualCapCents: number, fictionalProvider = false): PayoutDatabase {
   if (!Number.isSafeInteger(annualCapCents) || annualCapCents <= 0 ||
@@ -48,15 +41,25 @@ export function createGate2SandboxPayoutDatabase(client: SupabaseClient<Database
       }
       const saved = reservation(data, sessionId);
       if (!saved) throw new Error("Invalid frozen sandbox payout intent");
-      if (fictionalProvider) await markFictionalPayout(client, saved.id);
       return saved;
+    },
+    async claimIssuer(payoutId) {
+      if (!uuid(payoutId)) return false;
+      const { data, error } = await client.rpc("claim_gate2_payout_issuer", {
+        supplied_payout_id: payoutId,
+        supplied_origin: fictionalProvider ? "fictional" : "test_provider",
+      });
+      if (error) throw error;
+      return data === true;
     },
     async recordOrder(payoutId, observation) {
       if (!uuid(payoutId) || observation.recipientId !== payoutId ||
         !Number.isSafeInteger(observation.amountCents) ||
         !Number.isFinite(Date.parse(observation.observedAt)))
         throw new Error("Invalid sandbox payout observation");
-      const { data, error } = await client.rpc("record_gate2_sandbox_visa_observation", {
+      const { data, error } = await client.rpc(fictionalProvider
+        ? "record_gate2_fictional_sandbox_visa_observation"
+        : "record_gate2_sandbox_visa_observation", {
         requested_payout_id: payoutId, requested_recipient_id: payoutId,
         requested_product_id: observation.productId,
         requested_event_id: observation.eventId,
@@ -106,9 +109,9 @@ export function createGate2SandboxBatchPayoutDatabase(client: SupabaseClient<Dat
         return { status: "below_minimum" };
       const saved = batchReservation(data, respondentId);
       if (!saved) throw new Error("Invalid frozen sandbox batch intent");
-      if (fictionalProvider) await markFictionalPayout(client, saved.id);
       return saved;
     },
+    claimIssuer: single.claimIssuer,
     recordOrder: single.recordOrder,
   };
 }
@@ -142,19 +145,12 @@ export function createGate2SandboxReferralPayoutDatabase(
         !["pending", "ordered", "delivered", "failed"].includes(String(data.payoutState)) ||
         !(data.providerOrderId === null || typeof data.providerOrderId === "string"))
         throw new Error("Invalid frozen referral payout intent");
-      if (fictionalProvider) {
-        const marker = await client.rpc("mark_gate2_fictional_referral", {
-          supplied_vesting_id: vestingId,
-        });
-        if (marker.error || marker.data !== true)
-          throw new Error("Fictional referral provenance unavailable");
-        await markFictionalPayout(client, data.payoutId);
-      }
       return { id: data.payoutId, vestingId, respondentId: data.respondentId,
         recipientId: data.recipientId, productId: data.productId,
         amountCents: 500, state: data.payoutState,
         providerOrderId: data.providerOrderId } as ReferralReservation;
     },
+    claimIssuer: single.claimIssuer,
     recordOrder: single.recordOrder,
   };
 }
