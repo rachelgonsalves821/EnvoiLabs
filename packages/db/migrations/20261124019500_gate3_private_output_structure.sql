@@ -42,12 +42,31 @@ begin
         where id = supplied_reviewer_receipt_id
             and study_id = supplied_study_id;
     if not found then return null; end if;
+    -- Refuse an in-flight source or consent write; the receipt must describe
+    -- one current snapshot, not a read that races a re-redaction.
+    lock table public.studies, public.organizations, public.researchers,
+        public.brief_versions, public.guide_questions,
+        public.gate2_quote_snapshots, public.pricing_configs,
+        public.gate2_payment_events, public.sessions, public.invites,
+        public.respondents, public.quality_scores, public.removals,
+        public.answers, public.transcripts, public.consents,
+        pii.transcript_raw, pii.audio_objects,
+        internal.gate1_answer_jobs, internal.gate1_redaction_policies,
+        internal.gate3_analysis_source_receipts,
+        internal.gate3_analysis_consent_receipts,
+        internal.gate3_analysis_model_policies,
+        internal.gate3_analyst_review_receipts
+        in share mode nowait;
     snapshot := public.read_gate3_analyst_snapshot(
         supplied_study_id, review.quote_id, review.actor_auth_user_id,
         draft ->> 'model', draft ->> 'promptVersion',
         draft ->> 'promptDigest');
     if snapshot is null
         or jsonb_array_length(draft -> 'sources') <>
+            jsonb_array_length(snapshot -> 'sources')
+        or (select count(distinct proposed_source.item ->> 'transcriptId')
+            from jsonb_array_elements(draft -> 'sources')
+                as proposed_source(item)) <>
             jsonb_array_length(snapshot -> 'sources')
         or exists (select 1 from jsonb_array_elements(draft -> 'sources')
             as proposed_source(item) where not exists (
@@ -138,7 +157,7 @@ begin
             and screened_digest = screened_hash;
     return prior;
 exception when invalid_text_representation or numeric_value_out_of_range
-    or invalid_parameter_value then return null;
+    or invalid_parameter_value or lock_not_available then return null;
 end;
 $$;
 revoke all on function public.attest_gate3_private_analysis_output(
