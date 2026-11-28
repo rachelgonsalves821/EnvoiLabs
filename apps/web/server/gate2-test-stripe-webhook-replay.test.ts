@@ -50,7 +50,8 @@ function fixture() {
       provider_checkout_id: checkoutId,
       provider_event_id: `checkout-created:${checkoutId}`,
       event_kind: "checkout_created", amount_cents: 10_000,
-      currency: "usd", provider_observed_at: observedAt }],
+      currency: "usd", provider_observed_at: observedAt,
+      observation_origin: "provider" }],
   };
   let launches = 0;
   let offers = 0;
