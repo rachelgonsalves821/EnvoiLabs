@@ -2,6 +2,9 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
+-- Rolled back with this fixture; production grants stay minimal.
+grant usage on schema extensions to gate2_fictional_issuer;
+grant execute on all functions in schema extensions to gate2_fictional_issuer;
 
 insert into public.studies (id, organization_id, title, state,
     target_completes, length_minutes, deadline_at)
@@ -116,14 +119,20 @@ select ok(not has_table_privilege('service_role',
     'internal.gate2_visa_reward_batch_referrals', 'INSERT'),
     'only the respondent-locked batch RPC can claim a vesting');
 set local role service_role;
+select ok(not has_function_privilege('service_role',
+    'public.mark_gate2_fictional_referral(uuid)', 'EXECUTE'),
+    'generic service caller cannot mark fictional referral');
+set local role gate2_fictional_issuer;
 select is(public.mark_gate2_fictional_referral(
     'a98e0000-0000-4000-8000-000000000001'), true,
     'fictional referral vesting is marked before a mock order');
 select is(public.mark_gate2_fictional_referral(
     'a98e0000-0000-4000-8000-000000000001'), true,
     'fictional referral marker replay is idempotent');
+set local role service_role;
 create temporary table reserved_referral_batch (value jsonb not null);
 grant select, insert on reserved_referral_batch to service_role;
+grant select on reserved_referral_batch to gate2_fictional_issuer;
 insert into reserved_referral_batch select public.reserve_gate2_sandbox_visa_batch(
     '90500000-0000-4000-8000-000000000001',
     'a98d0000-0000-4000-8000-000000000001', 200000);
@@ -133,9 +142,11 @@ select is(public.claim_gate2_payout_issuer((select
     (value ->> 'payoutId')::uuid from reserved_referral_batch),
     'test_provider'), false,
     'TEST issuer cannot take a batch with a fictional referral source');
+set local role gate2_fictional_issuer;
 select is(public.claim_gate2_payout_issuer((select
     (value ->> 'payoutId')::uuid from reserved_referral_batch), 'fictional'),
     true, 'the batch freezes fictional issuer and referral origin together');
+set local role service_role;
 select is(public.reserve_gate2_sandbox_visa_batch(
     '90500000-0000-4000-8000-000000000001',
     'a98d0000-0000-4000-8000-000000000001', 200000)
@@ -160,7 +171,7 @@ select is((public.read_gate2_current_respondent_earnings()
     ->> 'earnedCents')::integer, 1200,
     'referral bonus stays distinct from earned question rewards');
 reset role;
-set local role service_role;
+set local role gate2_fictional_issuer;
 select is(public.record_gate2_fictional_sandbox_visa_observation(
     (select (value ->> 'payoutId')::uuid from reserved_referral_batch),
     (select (value ->> 'payoutId')::uuid from reserved_referral_batch),

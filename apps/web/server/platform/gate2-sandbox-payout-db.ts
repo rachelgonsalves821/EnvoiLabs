@@ -25,9 +25,13 @@ function reservation(value: unknown, sessionId: string): Reservation | null {
 // This database port is for TEST_-key testflight use only. Its RPC freezes a
 // synthetic route and SKU with the respondent-locked payout reservation.
 export function createGate2SandboxPayoutDatabase(client: SupabaseClient<Database>,
-  annualCapCents: number, fictionalProvider = false): PayoutDatabase {
+  annualCapCents: number, fictionalProvider = false,
+  fictionalIssuerClient?: SupabaseClient<Database>): PayoutDatabase {
   if (!Number.isSafeInteger(annualCapCents) || annualCapCents <= 0 ||
     annualCapCents > 200000) throw new Error("Invalid payout cap");
+  if (fictionalProvider && !fictionalIssuerClient)
+    throw new Error("Fictional issuer requires a separate credential");
+  const observationClient = fictionalProvider ? fictionalIssuerClient! : client;
   return {
     async reserveSessionPayout(sessionId, reservationKey) {
       if (!uuid(sessionId) || reservationKey !== `payout:${sessionId}`)
@@ -45,7 +49,7 @@ export function createGate2SandboxPayoutDatabase(client: SupabaseClient<Database
     },
     async claimIssuer(payoutId) {
       if (!uuid(payoutId)) return false;
-      const { data, error } = await client.rpc("claim_gate2_payout_issuer", {
+      const { data, error } = await observationClient.rpc("claim_gate2_payout_issuer", {
         supplied_payout_id: payoutId,
         supplied_origin: fictionalProvider ? "fictional" : "test_provider",
       });
@@ -57,7 +61,7 @@ export function createGate2SandboxPayoutDatabase(client: SupabaseClient<Database
         !Number.isSafeInteger(observation.amountCents) ||
         !Number.isFinite(Date.parse(observation.observedAt)))
         throw new Error("Invalid sandbox payout observation");
-      const { data, error } = await client.rpc(fictionalProvider
+      const { data, error } = await observationClient.rpc(fictionalProvider
         ? "record_gate2_fictional_sandbox_visa_observation"
         : "record_gate2_sandbox_visa_observation", {
         requested_payout_id: payoutId, requested_recipient_id: payoutId,
@@ -89,9 +93,10 @@ function batchReservation(value: unknown, respondentId: string): BatchReservatio
 }
 
 export function createGate2SandboxBatchPayoutDatabase(client: SupabaseClient<Database>,
-  annualCapCents: number, fictionalProvider = false): PayoutBatchDatabase {
+  annualCapCents: number, fictionalProvider = false,
+  fictionalIssuerClient?: SupabaseClient<Database>): PayoutBatchDatabase {
   const single = createGate2SandboxPayoutDatabase(client, annualCapCents,
-    fictionalProvider);
+    fictionalProvider, fictionalIssuerClient);
   return {
     async reserveBatchPayout(respondentId, requestId) {
       if (!uuid(respondentId) || !uuid(requestId))
@@ -118,10 +123,10 @@ export function createGate2SandboxBatchPayoutDatabase(client: SupabaseClient<Dat
 
 export function createGate2SandboxReferralPayoutDatabase(
   client: SupabaseClient<Database>, annualCapCents: number,
-  fictionalProvider = false,
+  fictionalProvider = false, fictionalIssuerClient?: SupabaseClient<Database>,
 ): PayoutReferralDatabase {
   const single = createGate2SandboxPayoutDatabase(client, annualCapCents,
-    fictionalProvider);
+    fictionalProvider, fictionalIssuerClient);
   return {
     async reserveReferralPayout(vestingId) {
       if (!uuid(vestingId)) throw new PayoutReservationDenied();

@@ -15,11 +15,15 @@ export async function issueGate2SandboxVisaBatch(input: {
   annualCapCents: number;
   request?: typeof fetch;
   fictionalProvider?: boolean;
+  fictionalIssuerClient?: SupabaseClient<Database>;
 }) {
   if (input.fictionalProvider && !input.request)
     throw new Error("Fictional provider requires an injected request");
+  if (input.fictionalProvider && !input.fictionalIssuerClient)
+    throw new Error("Fictional provider requires a separate issuer client");
   const database = createGate2SandboxBatchPayoutDatabase(
-    input.client, input.annualCapCents, input.fictionalProvider === true);
+    input.client, input.annualCapCents, input.fictionalProvider === true,
+    input.fictionalIssuerClient);
   const provider = createTremendousSandboxPayoutProvider({
     apiKey: input.apiKey, ...(input.request ? { request: input.request } : {}),
     recipient: (payoutId) => readGate2SandboxPayoutRecipient(input.client, payoutId),
