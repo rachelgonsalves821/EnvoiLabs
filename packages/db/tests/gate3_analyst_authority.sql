@@ -376,25 +376,27 @@ grant select on analyst_private_payload to service_role,
 create temp table analyst_output_receipt (id uuid);
 grant select, insert on analyst_output_receipt to gate3_analysis_validator;
 grant select on analyst_output_receipt to service_role;
+create temp table analyst_rejected_output (
+    arbitrary uuid, inflated uuid, stale_quote uuid);
+grant insert on analyst_rejected_output to gate3_analysis_validator;
 grant gate3_analysis_validator to postgres;
 set local role gate3_analysis_validator;
-select is(public.attest_gate3_private_analysis_output(
+insert into analyst_rejected_output (arbitrary, inflated, stale_quote)
+select public.attest_gate3_private_analysis_output(
     'a9900000-0000-4000-8000-000000000001',
     (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
     (select digest from analyst_binding),
     '{"privateDraft":"fictional"}',
-    '{"privateScreened":"fictional"}'), null::uuid,
-    'validator cannot certify arbitrary objects as qualified model evidence');
-select is(public.attest_gate3_private_analysis_output(
+    '{"privateScreened":"fictional"}'),
+    public.attest_gate3_private_analysis_output(
     'a9900000-0000-4000-8000-000000000001',
     (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
     (select digest from analyst_binding),
     (select jsonb_set(draft_text::jsonb,
         '{output,themes,0,count}', '7'::jsonb)::text
         from analyst_private_payload),
-    (select screened_text from analyst_private_payload)), null::uuid,
-    'validator rejects inflated supporter count before private storage');
-select is(public.attest_gate3_private_analysis_output(
+    (select screened_text from analyst_private_payload)),
+    public.attest_gate3_private_analysis_output(
     'a9900000-0000-4000-8000-000000000001',
     (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
     (select digest from analyst_binding),
@@ -402,8 +404,7 @@ select is(public.attest_gate3_private_analysis_output(
     (select jsonb_set(screened_text::jsonb,
         '{themes,0,supportingQuotes,0,sourceVersion}',
         to_jsonb('a9990000-0000-4000-8000-000000000099'::text))::text
-        from analyst_private_payload)), null::uuid,
-    'validator rejects quote from an unreviewed source version');
+        from analyst_private_payload));
 insert into analyst_output_receipt
 select public.attest_gate3_private_analysis_output(
     'a9900000-0000-4000-8000-000000000001',
@@ -413,6 +414,12 @@ select public.attest_gate3_private_analysis_output(
     (select screened_text from analyst_private_payload));
 reset role;
 revoke gate3_analysis_validator from postgres;
+select is((select arbitrary from analyst_rejected_output), null::uuid,
+    'validator cannot certify arbitrary objects as qualified model evidence');
+select is((select inflated from analyst_rejected_output), null::uuid,
+    'validator rejects inflated supporter count before private storage');
+select is((select stale_quote from analyst_rejected_output), null::uuid,
+    'validator rejects quote from an unreviewed source version');
 select isnt((select draft_digest from internal.gate3_analysis_output_receipts
     where id = (select id from analyst_output_receipt)),
     encode(pg_catalog.sha256(convert_to(
