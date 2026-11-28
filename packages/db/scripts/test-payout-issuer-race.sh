@@ -55,6 +55,8 @@ select format('a9950000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
 from generate_series(1, 2) as n;
 SQL
 psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -f "$work/setup.sql" >"$work/setup.out"
+psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
+  'grant gate2_fictional_issuer to postgres' >"$work/role-grant.out"
 
 cat >"$work/first.sql" <<SQL
 begin;

@@ -5,6 +5,7 @@ select no_plan();
 -- Rolled back with this fixture; production grants stay minimal.
 grant usage on schema extensions to gate2_fictional_issuer;
 grant execute on all functions in schema extensions to gate2_fictional_issuer;
+grant gate2_fictional_issuer to postgres;
 
 insert into public.studies (id, organization_id, title, state,
     target_completes, length_minutes, deadline_at)
