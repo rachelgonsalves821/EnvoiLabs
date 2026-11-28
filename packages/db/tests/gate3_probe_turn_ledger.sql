@@ -107,6 +107,28 @@ values ('a9700000-0000-4000-8000-000000000004',
     repeat('a', 64), repeat('b', 64));
 create temporary table probe_ids (turn_id uuid not null);
 grant select, insert on probe_ids to service_role;
+savepoint same_slot_late_receipt;
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence, created_at)
+values ('a9700000-0000-4000-8000-000000000012',
+    'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001',
+    'text', 2, (select created_at + interval '1 second'
+        from public.answers where id =
+            'a9700000-0000-4000-8000-000000000004'));
+set local role service_role;
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000010', 1000,
+    'text_save_response'), 'stale',
+    'late old upload receipt cannot revive the replaced answer');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001') #>> '{items,0,outcome}',
+    'superseded', 'denominator orders by frozen answer creation, not receipt arrival');
+reset role;
+rollback to savepoint same_slot_late_receipt;
 set local role service_role;
 select is(public.record_gate3_probe_upload_clock(
     'a9700000-0000-4000-8000-000000000004',
@@ -171,6 +193,28 @@ select is(public.begin_gate3_probe_turn(
     '90300000-0000-4000-8000-000000000001', 1001), null::uuid,
     'legacy begin cannot replace a captured page-clock upload receipt');
 reset role;
+savepoint same_slot_before_turn;
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence, created_at)
+values ('a9700000-0000-4000-8000-000000000012',
+    'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001',
+    'text', 2, (select created_at + interval '1 second'
+        from public.answers where id =
+            'a9700000-0000-4000-8000-000000000004'));
+set local role service_role;
+select is(public.list_gate3_probe_ready(1), '[]'::jsonb,
+    'new same-question answer removes old answer from batch ready selector');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001') #>> '{items,0,outcome}',
+    'superseded', 'private denominator marks the older answer superseded');
+select is(public.begin_gate3_probe_turn_with_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001'), null::uuid,
+    'late old clock cannot begin after same-question replacement');
+reset role;
+rollback to savepoint same_slot_before_turn;
 select is((select count(*) from internal.gate3_probe_turns
     where answer_id = 'a9700000-0000-4000-8000-000000000004'), 0::bigint,
     'mismatched legacy begin created no provider-ready turn');
@@ -207,6 +251,36 @@ insert into probe_binding select turn_id,
         '90300000-0000-4000-8000-000000000001') as ready
     from probe_ids;
 reset role;
+savepoint same_slot_after_turn;
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence, created_at)
+values ('a9700000-0000-4000-8000-000000000012',
+    'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001',
+    'text', 2, (select created_at + interval '1 second'
+        from public.answers where id =
+            'a9700000-0000-4000-8000-000000000004'));
+set local role service_role;
+select is((select public.read_gate3_ready_probe_turn(
+    'a9700000-0000-4000-8000-000000000003', turn_id,
+    '90300000-0000-4000-8000-000000000001')
+    from probe_ids), null::jsonb,
+    'existing old turn cannot provide source after same-question replacement');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001') #>> '{items,0,outcome}',
+    'invalidated', 'private denominator invalidates the older turn');
+select is((select public.commit_gate3_probe_decision(
+    'a9700000-0000-4000-8000-000000000003',
+    'a9700000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000004', turn_id,
+    '90300000-0000-4000-8000-000000000001',
+    (ready ->> 'sourceVersion')::uuid, ready ->> 'transcriptRevision',
+    jsonb_build_object('action', 'next', 'turnId', turn_id,
+        'outcome', 'no_probe')) ->> 'status' from probe_binding), 'stale',
+    'old turn cannot commit after same-question replacement');
+reset role;
+rollback to savepoint same_slot_after_turn;
 savepoint withdrawn_regrant;
 insert into public.consents (respondent_id, study_id, purpose, granted, text_version)
 values ('90500000-0000-4000-8000-000000000001',
@@ -346,6 +420,25 @@ select is((select public.read_gate3_respondent_probe(
     'a9700000-0000-4000-8000-000000000003',
     '90300000-0000-4000-8000-000000000001') ->> 'text'),
     'What made speed matter?', 'current respondent sees only the committed probe');
+reset role;
+savepoint same_slot_after_commit;
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence, created_at)
+values ('a9700000-0000-4000-8000-000000000012',
+    'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001',
+    'text', 2, (select created_at + interval '1 second'
+        from public.answers where id =
+            'a9700000-0000-4000-8000-000000000004'));
+set local role service_role;
+select is(public.read_gate3_respondent_probe(
+    'a9700000-0000-4000-8000-000000000003',
+    '90300000-0000-4000-8000-000000000001'), null::jsonb,
+    'respondent display hides a committed old probe after replacement');
+reset role;
+rollback to savepoint same_slot_after_commit;
+set local role service_role;
 select is(public.read_gate3_respondent_probe(
     'a9700000-0000-4000-8000-000000000003',
     '90300000-0000-4000-8000-000000000002'), null::jsonb,
