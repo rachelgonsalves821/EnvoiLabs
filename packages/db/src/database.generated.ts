@@ -1780,6 +1780,16 @@ export type Database = {
         }
         Returns: string
       }
+      attest_gate3_private_analysis_output: {
+        Args: {
+          supplied_binding_digest: string
+          supplied_draft_json: string
+          supplied_reviewer_receipt_id: string
+          supplied_screened_json: string
+          supplied_study_id: string
+        }
+        Returns: string
+      }
       authorize_gate3_analyst_snapshot: {
         Args: {
           supplied_prompt_digest: string
@@ -2513,6 +2523,29 @@ export type Database = {
         Returns: boolean
       }
       verify_gate2_referred_profile: { Args: never; Returns: Json }
+      write_gate3_private_analysis_proposal: {
+        Args: {
+          supplied_binding_digest: string
+          supplied_binding_key: string
+          supplied_draft: Json
+          supplied_draft_json: string
+          supplied_map_prompt_digest: string
+          supplied_map_prompt_version: string
+          supplied_map_provider_model: string
+          supplied_output_receipt_id: string
+          supplied_quote_id: string
+          supplied_reduce_prompt_digest: string
+          supplied_reduce_prompt_version: string
+          supplied_reduce_provider_model: string
+          supplied_request_id: string
+          supplied_researcher_auth_user_id: string
+          supplied_screened: Json
+          supplied_screened_json: string
+          supplied_snapshot: Json
+          supplied_study_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

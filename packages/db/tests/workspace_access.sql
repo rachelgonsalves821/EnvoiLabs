@@ -44,7 +44,8 @@ from (values
     ('public.gate2_referral_vestings'),
     ('public.gate2_screening_rules'), ('public.gate2_screening_events'),
     ('pii.gate2_screener_answers'),
-    ('pii.gate2_screening_transcription_receipts')
+    ('pii.gate2_screening_transcription_receipts'),
+    ('pii.gate3_private_analysis_proposals')
 ) as service_only(relation);
 grant select on access_matrix to authenticated, anon;
 
@@ -80,7 +81,10 @@ select ok(
         and not has_any_column_privilege('authenticated', c.oid, 'INSERT, UPDATE, REFERENCES')
         and not has_table_privilege('anon', c.oid, 'DELETE, TRUNCATE, TRIGGER')
         and not has_table_privilege('authenticated', c.oid, 'DELETE, TRUNCATE, TRIGGER')
-        and has_table_privilege('service_role', c.oid, 'SELECT')
+        and (has_table_privilege('service_role', c.oid, 'SELECT')
+            or (n.nspname = 'pii'
+                and c.relname = 'gate3_private_analysis_proposals'
+                and not has_table_privilege('service_role', c.oid, 'SELECT')))
         and (n.nspname <> 'pii' or not has_any_column_privilege('authenticated', c.oid, 'SELECT')),
     format('%I.%I has RLS, service access and deny-by-default client grants', n.nspname, c.relname)
 )
