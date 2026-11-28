@@ -55,10 +55,12 @@ select format('a9950000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
 from generate_series(1, 2) as n;
 SQL
 psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -f "$work/setup.sql" >"$work/setup.out"
+psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
+  'grant gate2_fictional_issuer to postgres' >"$work/role-grant.out"
 
 cat >"$work/first.sql" <<SQL
 begin;
-set local role service_role;
+set local role gate2_fictional_issuer;
 select public.claim_gate2_payout_issuer(
   'a9950000-0000-4000-8000-000000000001', 'fictional');
 \! touch '$work/first-holds-lock'
@@ -117,7 +119,7 @@ if [[ ! -f "$work/second-first-holds-lock" ]] ||
   printf 'TEST issuer did not claim the second payout.\n' >&2; exit 1
 fi
 PGAPPNAME=envoi_fictional_issuer_waiter psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
-  "set role service_role; select public.claim_gate2_payout_issuer(
+  "set role gate2_fictional_issuer; select public.claim_gate2_payout_issuer(
     'a9950000-0000-4000-8000-000000000002', 'fictional');" \
   >"$work/marker-second.out" 2>"$work/marker-second.err" & second_pid=$!
 observed=0

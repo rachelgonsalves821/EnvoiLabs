@@ -48,6 +48,24 @@ describe("frozen sandbox Visa database adapter", () => {
         requested_product_id: "sandbox_visa", requested_amount_cents: 300 }));
   });
 
+  it("uses the separate mock issuer only after ordinary reservation", async () => {
+    const serviceRpc = vi.fn().mockResolvedValue({ data: saved, error: null });
+    const issuerRpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    const db = createGate2SandboxPayoutDatabase(client(serviceRpc), 200000,
+      true, client(issuerRpc));
+    await db.reserveSessionPayout(sessionId, `payout:${sessionId}`);
+    expect(await db.claimIssuer(id)).toBe(true);
+    await db.recordOrder(id, { id: "ORDER-FICTIONAL", eventId: "evt_mock",
+      recipientId: id, productId: "sandbox_visa", amountCents: 300,
+      status: "ordered", observedAt: "2026-11-25T02:00:00Z" });
+    expect(serviceRpc).toHaveBeenCalledOnce();
+    expect(issuerRpc).toHaveBeenCalledWith("claim_gate2_payout_issuer",
+      { supplied_payout_id: id, supplied_origin: "fictional" });
+    expect(issuerRpc).toHaveBeenCalledWith(
+      "record_gate2_fictional_sandbox_visa_observation",
+      expect.objectContaining({ requested_payout_id: id }));
+  });
+
   it("keeps policy denial separate from a transient database failure", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: null,
       error: { code: "23514", message: "below Visa minimum" } })

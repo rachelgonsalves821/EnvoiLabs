@@ -2,6 +2,10 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
+-- Rolled back with this fixture; the production mock issuer has no pgTAP grant.
+grant usage on schema extensions to gate2_fictional_issuer;
+grant execute on all functions in schema extensions to gate2_fictional_issuer;
+grant gate2_fictional_issuer to postgres;
 
 insert into public.studies (id, organization_id, title, state,
     target_completes, length_minutes, deadline_at)
@@ -177,6 +181,7 @@ where id = '90500000-0000-4000-8000-000000000001';
 set local role service_role;
 create temporary table reserved_batch (value jsonb not null);
 grant select, insert on reserved_batch to service_role;
+grant select on reserved_batch to gate2_fictional_issuer;
 insert into reserved_batch select public.reserve_gate2_sandbox_visa_batch(
     '90500000-0000-4000-8000-000000000001',
     'a98d0000-0000-4000-8000-000000000001', 200000);
@@ -189,6 +194,10 @@ select is((select value ->> 'productId' from reserved_batch), 'sandbox_visa',
 select is((select value ->> 'recipientId' from reserved_batch),
     (select value ->> 'payoutId' from reserved_batch),
     'batch recipient lookup is bound to the frozen payout ID');
+select is(public.claim_gate2_payout_issuer((select
+    (value ->> 'payoutId')::uuid from reserved_batch), 'fictional'), false,
+    'generic service caller cannot mint fictional issuer origin');
+set local role gate2_fictional_issuer;
 select is(public.claim_gate2_payout_issuer((select
     (value ->> 'payoutId')::uuid from reserved_batch), 'fictional'), true,
     'fictional issuer claim is frozen before any mock provider request');
@@ -225,6 +234,21 @@ select is(public.record_gate2_sandbox_visa_observation(
     'sandbox_visa', 'evt_real_on_mock', 'ORDER-REAL-ON-MOCK',
     'ordered', 1200, '2026-11-25T01:00:00Z'), false,
     'real provider observation cannot cross a fictional issuer claim');
+select set_config('app.gate2_fictional_payout_observation', 'fictional', true);
+select is(public.record_gate2_sandbox_visa_observation(
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
+    'sandbox_visa', 'evt_spoofed_mock', 'ORDER-SPOOFED-MOCK',
+    'ordered', 1200, '2026-11-25T01:00:00Z'), false,
+    'generic service caller cannot spoof fictional observation with a GUC');
+select throws_ok($$insert into public.gate2_payout_events
+    (payout_id, provider_event_id, provider_order_id, event_kind,
+        amount_cents, provider_observed_at)
+    select (value ->> 'payoutId')::uuid, 'evt_spoofed_direct',
+        'ORDER-SPOOFED-DIRECT', 'ordered', 1200, '2026-11-25T01:00:00Z'
+    from reserved_batch$$, '23514', 'fictional issuer role required',
+    'direct service event insert cannot spoof mock origin with a GUC');
+select set_config('app.gate2_fictional_payout_observation', '', true);
 select throws_ok($$insert into public.gate2_payout_events
     (payout_id, provider_event_id, provider_order_id, event_kind,
         amount_cents, provider_observed_at)
@@ -232,6 +256,7 @@ select throws_ok($$insert into public.gate2_payout_events
         'ORDER-DIRECT-REAL', 'ordered', 1200, '2026-11-25T01:00:00Z'
     from reserved_batch$$, '23514', 'payout observation origin mismatch',
     'direct service event insert cannot cross the fictional issuer claim');
+set local role gate2_fictional_issuer;
 select is(public.record_gate2_fictional_sandbox_visa_observation(
     (select (value ->> 'payoutId')::uuid from reserved_batch),
     (select (value ->> 'payoutId')::uuid from reserved_batch),
@@ -250,9 +275,11 @@ select is(public.record_gate2_fictional_sandbox_visa_observation(
     'sandbox_visa', 'evt_batch_delivered', 'ORDER-BATCH-1',
     'delivered', 1200, '2026-11-25T02:00:00Z'), true,
     'second signed notification replay is idempotent');
+reset role;
 select is((select count(*) from public.gate2_payout_events
     where payout_id = (select (value ->> 'payoutId')::uuid from reserved_batch)),
     1::bigint, 'three deliveries leave one immutable payout effect');
+set local role gate2_fictional_issuer;
 select is(public.mark_gate2_fictional_payout((select
     (value ->> 'payoutId')::uuid from reserved_batch)), true,
     'fictional payout marker replay remains idempotent after delivery');

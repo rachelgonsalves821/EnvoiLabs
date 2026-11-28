@@ -39,7 +39,7 @@ describe("synthetic Visa batch issue composition", () => {
       .mockResolvedValueOnce(json({ order })) as unknown as typeof fetch;
     expect(await issueGate2SandboxVisaBatch({ client: client(rpc), apiKey: "TEST_fixture",
       respondentId, requestId, annualCapCents: 200000, request,
-      fictionalProvider: true })).toBe("delivered");
+      fictionalProvider: true, fictionalIssuerClient: client(rpc) })).toBe("delivered");
     expect(rpc).toHaveBeenCalledWith("claim_gate2_payout_issuer",
       { supplied_payout_id: payoutId, supplied_origin: "fictional" });
     const markerCall = rpc.mock.calls.findIndex(([name]) =>
@@ -77,7 +77,19 @@ describe("synthetic Visa batch issue composition", () => {
     const request = vi.fn() as unknown as typeof fetch;
     expect(await issueGate2SandboxVisaBatch({ client: client(rpc),
       apiKey: "TEST_fixture", respondentId, requestId, annualCapCents: 200000,
-      request, fictionalProvider: true })).toBe("blocked");
+      request, fictionalProvider: true,
+      fictionalIssuerClient: client(rpc) })).toBe("blocked");
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("rejects mock issuance without a separate issuer credential before any call", async () => {
+    const rpc = vi.fn();
+    const request = vi.fn() as unknown as typeof fetch;
+    await expect(issueGate2SandboxVisaBatch({ client: client(rpc),
+      apiKey: "TEST_fixture", respondentId, requestId, annualCapCents: 200000,
+      request, fictionalProvider: true }))
+      .rejects.toThrow("separate issuer client");
+    expect(rpc).not.toHaveBeenCalled();
     expect(request).not.toHaveBeenCalled();
   });
 
