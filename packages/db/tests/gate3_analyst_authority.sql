@@ -303,24 +303,121 @@ select variant, key,
     encode(pg_catalog.sha256(convert_to(key, 'UTF8')), 'hex') as digest
 from altered;
 grant select on analyst_binding_variants to service_role;
+create temp table analyst_private_payload as
+with current as (select payload from analyst_snapshot),
+evidence as (
+    select jsonb_build_object(
+        'studyId', payload ->> 'studyId',
+        'transcriptId', payload -> 'sources' -> 0 ->> 'transcriptId',
+        'sourceVersion', payload -> 'sources' -> 0 ->> 'sourceVersion',
+        'startChar', 0, 'endChar', 9, 'exactText', 'Fictional',
+        'confidence', 0.9) as verified
+    from current
+), private_draft as (
+    select jsonb_build_object(
+        'output', jsonb_build_object('version', 2,
+            'executiveAnswer', 'Fictional answer.',
+            'themes', jsonb_build_array(jsonb_build_object(
+                'claim', 'Fictional theme.', 'count', 1, 'total', 10,
+                'confidence', 'high',
+                'supportingQuotes', jsonb_build_array(
+                    evidence.verified || '{"rationale":"Fictional support."}'::jsonb),
+                'contradictingQuotes', '[]'::jsonb)),
+            'hypotheses', '[]'::jsonb,
+            'followUpBrief', jsonb_build_object(
+                'title', 'Fictional follow-up',
+                'decision', 'Which choice?',
+                'hypotheses', jsonb_build_array('Clarity helps choice'),
+                'criteria', '[]'::jsonb, 'targetCompletes', 10,
+                'stimulus', null, 'deadlineAt',
+                '2026-12-31T00:00:00.000Z')),
+        'model', 'fixture-model', 'promptVersion', 'fixture-prompt-v1',
+        'promptDigest', repeat('d', 64),
+        'mapPromptVersion', 'fixture-prompt-v1',
+        'mapPromptDigest', repeat('d', 64),
+        'mapCount', 40,
+        'mapEvidence', jsonb_build_array(
+            evidence.verified - 'studyId' - 'confidence'
+                || jsonb_build_object('questionId',
+                    current.payload -> 'sources' -> 0 ->> 'questionId')),
+        'briefDigest', repeat('e', 64),
+        'studyId', current.payload ->> 'studyId',
+        'decisionQuestionDigest', repeat('f', 64),
+        'sources', (select jsonb_agg(jsonb_build_object(
+            'transcriptId', source.item ->> 'transcriptId',
+            'sourceVersion', source.item ->> 'sourceVersion',
+            'questionId', source.item ->> 'questionId',
+            'redactedDigest',
+                source.item -> 'receipt' ->> 'redactedTextDigest',
+            'policyDigest', source.item ->> 'policyDigest',
+            'qualificationDigest',
+                source.item ->> 'qualificationDigest'))
+            from jsonb_array_elements(current.payload -> 'sources')
+                as source(item)),
+        'inputTokens', 1, 'outputTokens', 1,
+        'latencyMs', 1, 'costMicros', 0) as value
+    from current, evidence
+), private_screened as (
+    select jsonb_build_object(
+        'themes', jsonb_build_array(jsonb_build_object(
+            'position', 1, 'supportingQuotes',
+            jsonb_build_array(evidence.verified),
+            'contradictingQuotes', '[]'::jsonb)),
+        'decisions', jsonb_build_array(jsonb_build_object(
+            'themePosition', 1, 'side', 'supporting',
+            'candidateIndex', 0, 'action', 'accept'))) as value
+    from evidence
+)
+select private_draft.value::text || ' ' as draft_text,
+    private_screened.value::text || ' ' as screened_text
+from private_draft, private_screened;
+grant select on analyst_private_payload to service_role,
+    gate3_analysis_validator;
 create temp table analyst_output_receipt (id uuid);
 grant select, insert on analyst_output_receipt to gate3_analysis_validator;
 grant select on analyst_output_receipt to service_role;
 grant gate3_analysis_validator to postgres;
 set local role gate3_analysis_validator;
+select is(public.attest_gate3_private_analysis_output(
+    'a9900000-0000-4000-8000-000000000001',
+    (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
+    (select digest from analyst_binding),
+    '{"privateDraft":"fictional"}',
+    '{"privateScreened":"fictional"}'), null::uuid,
+    'validator cannot certify arbitrary objects as qualified model evidence');
+select is(public.attest_gate3_private_analysis_output(
+    'a9900000-0000-4000-8000-000000000001',
+    (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
+    (select digest from analyst_binding),
+    (select jsonb_set(draft_text::jsonb,
+        '{output,themes,0,count}', '7'::jsonb)::text
+        from analyst_private_payload),
+    (select screened_text from analyst_private_payload)), null::uuid,
+    'validator rejects inflated supporter count before private storage');
+select is(public.attest_gate3_private_analysis_output(
+    'a9900000-0000-4000-8000-000000000001',
+    (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
+    (select digest from analyst_binding),
+    (select draft_text from analyst_private_payload),
+    (select jsonb_set(screened_text::jsonb,
+        '{themes,0,supportingQuotes,0,sourceVersion}',
+        to_jsonb('a9990000-0000-4000-8000-000000000099'::text))::text
+        from analyst_private_payload)), null::uuid,
+    'validator rejects quote from an unreviewed source version');
 insert into analyst_output_receipt
 select public.attest_gate3_private_analysis_output(
     'a9900000-0000-4000-8000-000000000001',
     (select (payload ->> 'reviewerReceiptId')::uuid from analyst_snapshot),
     (select digest from analyst_binding),
-    '{"privateDraft":"fictional"}',
-    '{"privateScreened":"fictional"}');
+    (select draft_text from analyst_private_payload),
+    (select screened_text from analyst_private_payload));
 reset role;
 revoke gate3_analysis_validator from postgres;
 select isnt((select draft_digest from internal.gate3_analysis_output_receipts
     where id = (select id from analyst_output_receipt)),
     encode(pg_catalog.sha256(convert_to(
-        '{"privateDraft":"fictional"}'::jsonb::text, 'UTF8')), 'hex'),
+        (select draft_text::jsonb::text from analyst_private_payload),
+        'UTF8')), 'hex'),
     'output receipt hashes exact supplied JSON bytes, not JSONB reserialization');
 select is(jsonb_array_length((select payload from analyst_snapshot)
     -> 'sources'), 40, 'ten complete fictional respondents supply forty qualified core answers');
@@ -367,9 +464,9 @@ select is(public.write_gate3_private_analysis_proposal(
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot),
     (select key from analyst_binding), (select digest from analyst_binding),
-    '{"privateDraft":"fictional"}'::jsonb,
-    '{"privateScreened":"fictional"}'::jsonb,
-    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
+    (select draft_text::jsonb from analyst_private_payload),
+    (select screened_text::jsonb from analyst_private_payload),
+    (select draft_text from analyst_private_payload), (select screened_text from analyst_private_payload),
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), true,
     'first private proposal stores against current reviewed snapshot');
@@ -381,9 +478,9 @@ select is(public.write_gate3_private_analysis_proposal(
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot),
     (select key from analyst_binding), repeat('f', 64),
-    '{"privateDraft":"fictional"}'::jsonb,
-    '{"privateScreened":"fictional"}'::jsonb,
-    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
+    (select draft_text::jsonb from analyst_private_payload),
+    (select screened_text::jsonb from analyst_private_payload),
+    (select draft_text from analyst_private_payload), (select screened_text from analyst_private_payload),
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000008'), false,
     'caller-supplied digest cannot differ from the current binding key');
@@ -396,9 +493,9 @@ select is(public.write_gate3_private_analysis_proposal(
     (select payload from analyst_snapshot),
     (select key from analyst_binding_variants where variant = 'quote'),
     (select digest from analyst_binding_variants where variant = 'quote'),
-    '{"privateDraft":"fictional"}'::jsonb,
-    '{"privateScreened":"fictional"}'::jsonb,
-    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
+    (select draft_text::jsonb from analyst_private_payload),
+    (select screened_text::jsonb from analyst_private_payload),
+    (select draft_text from analyst_private_payload), (select screened_text from analyst_private_payload),
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000011'), false,
     'quote-only binding change cannot certify current proposal');
@@ -411,9 +508,9 @@ select is(public.write_gate3_private_analysis_proposal(
     (select payload from analyst_snapshot),
     (select key from analyst_binding_variants where variant = 'membership'),
     (select digest from analyst_binding_variants where variant = 'membership'),
-    '{"privateDraft":"fictional"}'::jsonb,
-    '{"privateScreened":"fictional"}'::jsonb,
-    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
+    (select draft_text::jsonb from analyst_private_payload),
+    (select screened_text::jsonb from analyst_private_payload),
+    (select draft_text from analyst_private_payload), (select screened_text from analyst_private_payload),
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000012'), false,
     'reviewed cohort membership-only change cannot certify proposal');
@@ -425,9 +522,9 @@ select is(public.write_gate3_private_analysis_proposal(
     'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
     (select payload from analyst_snapshot),
     (select key from analyst_binding), (select digest from analyst_binding),
-    '{"privateDraft":"fictional"}'::jsonb,
-    '{"privateScreened":"fictional"}'::jsonb,
-    '{"privateDraft":"fictional"}', '{"privateScreened":"fictional"}',
+    (select draft_text::jsonb from analyst_private_payload),
+    (select screened_text::jsonb from analyst_private_payload),
+    (select draft_text from analyst_private_payload), (select screened_text from analyst_private_payload),
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), true,
     'same private proposal replay returns prior result');
@@ -440,8 +537,8 @@ select is(public.write_gate3_private_analysis_proposal(
     (select payload from analyst_snapshot),
     (select key from analyst_binding), (select digest from analyst_binding),
     '{"privateDraft":"changed"}'::jsonb,
-    '{"privateScreened":"fictional"}'::jsonb,
-    '{"privateDraft":"changed"}', '{"privateScreened":"fictional"}',
+    (select screened_text::jsonb from analyst_private_payload),
+    '{"privateDraft":"changed"}', (select screened_text from analyst_private_payload),
     (select id from analyst_output_receipt),
     'a9990000-0000-4000-8000-000000000005'), false,
     'replayed causation cannot replace the first private proposal');
