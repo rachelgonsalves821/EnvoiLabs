@@ -14,6 +14,7 @@ const order = { id: "ORDER-REFERRAL", eventId: "event-referral",
 describe("TEST referral Visa settlement", () => {
   it("keeps a below-minimum vested bonus away from the provider", async () => {
     const db = { reserveReferralPayout: vi.fn().mockResolvedValue({ status: "below_minimum" }),
+      claimIssuer: vi.fn().mockResolvedValue(true),
       recordOrder: vi.fn() };
     const provider = { getOrderByKey: vi.fn(), createOrder: vi.fn() };
     expect(await issueReservedReferralPayout(db, provider, vestingId))
@@ -24,6 +25,7 @@ describe("TEST referral Visa settlement", () => {
   it("reconciles one frozen $5 intent and never creates again after delivery", async () => {
     const db = { reserveReferralPayout: vi.fn().mockResolvedValueOnce(reserved)
       .mockResolvedValue({ ...reserved, state: "delivered", providerOrderId: order.id }),
+      claimIssuer: vi.fn().mockResolvedValue(true),
       recordOrder: vi.fn().mockResolvedValue(undefined) };
     const provider = { getOrderByKey: vi.fn().mockResolvedValueOnce(null)
       .mockResolvedValueOnce(order), createOrder: vi.fn().mockResolvedValue(undefined) };
@@ -37,7 +39,8 @@ describe("TEST referral Visa settlement", () => {
   it("distinguishes a denial from a database outage before provider access", async () => {
     const db = { reserveReferralPayout: vi.fn()
       .mockRejectedValueOnce(new PayoutReservationDenied())
-      .mockRejectedValueOnce(new Error("transient")), recordOrder: vi.fn() };
+      .mockRejectedValueOnce(new Error("transient")),
+      claimIssuer: vi.fn().mockResolvedValue(true), recordOrder: vi.fn() };
     const provider = { getOrderByKey: vi.fn(), createOrder: vi.fn() };
     expect(await issueReservedReferralPayout(db, provider, vestingId)).toBe("blocked");
     expect(await issueReservedReferralPayout(db, provider, vestingId)).toBe("unavailable");
@@ -46,7 +49,8 @@ describe("TEST referral Visa settlement", () => {
   });
   it("rejects another vesting or denomination before provider access", async () => {
     const db = { reserveReferralPayout: vi.fn().mockResolvedValue({
-      ...reserved, amountCents: 1000 }), recordOrder: vi.fn() };
+      ...reserved, amountCents: 1000 }),
+      claimIssuer: vi.fn().mockResolvedValue(true), recordOrder: vi.fn() };
     const provider = { getOrderByKey: vi.fn(), createOrder: vi.fn() };
     expect(await issueReservedReferralPayout(db, provider, vestingId)).toBe("blocked");
     expect(provider.getOrderByKey).not.toHaveBeenCalled();

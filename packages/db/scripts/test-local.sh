@@ -25,6 +25,7 @@ cp -- "$db_dir/seed.sql" "$test_dir/supabase/seed.sql"
 supabase db start --workdir "$test_dir"
 supabase test db --workdir "$test_dir"
 bash "$db_dir/scripts/test-fictional-payment-race.sh" "$test_dir"
+bash "$db_dir/scripts/test-payout-issuer-race.sh" "$test_dir"
 
 types_file="$db_dir/src/database.generated.ts"
 generated="$test_dir/database.generated.ts"

@@ -25,6 +25,7 @@ export type PayoutDatabase = {
   // and derive recipient, product and amount from the approved session/config.
   // An exact retry must pass the same key, including after a transient error.
   reserveSessionPayout(sessionId: string, reservationKey: string): Promise<Reservation>;
+  claimIssuer(payoutId: string): Promise<boolean>;
   // The writer must deduplicate providerEventId and update payout state under
   // a payout lock. A duplicate exact observation returns the prior result.
   recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
@@ -32,6 +33,7 @@ export type PayoutDatabase = {
 export type PayoutBatchDatabase = {
   reserveBatchPayout(respondentId: string, requestId: string): Promise<
     BatchReservation | { status: "below_minimum" }>;
+  claimIssuer(payoutId: string): Promise<boolean>;
   recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
 };
 export type ReferralReservation = Omit<Reservation, "sessionId"> & {
@@ -40,6 +42,7 @@ export type ReferralReservation = Omit<Reservation, "sessionId"> & {
 export type PayoutReferralDatabase = {
   reserveReferralPayout(vestingId: string): Promise<
     ReferralReservation | { status: "below_minimum" }>;
+  claimIssuer(payoutId: string): Promise<boolean>;
   recordOrder(payoutId: string, observation: ProviderOrder): Promise<void>;
 };
 export class PayoutReservationDenied extends Error {
@@ -105,10 +108,13 @@ export async function issueReservedReferralPayout(db: PayoutReferralDatabase,
   return reconcileReservedPayout(db, provider, reserved);
 }
 
-async function reconcileReservedPayout(db: Pick<PayoutDatabase, "recordOrder">,
+async function reconcileReservedPayout(db: Pick<PayoutDatabase, "recordOrder" | "claimIssuer">,
   provider: PayoutProvider, reserved: Omit<Reservation, "sessionId">): Promise<
   "ordered" | "delivered" | "failed" | "blocked" | "unavailable"> {
   if (reserved.state === "delivered" || reserved.state === "failed") return reserved.state;
+  try {
+    if (!await db.claimIssuer(reserved.id)) return "blocked";
+  } catch { return "unavailable"; }
   const key = `gate2-payout:${reserved.id}`;
   const expected = { recipientId: reserved.recipientId,
     productId: reserved.productId, amountCents: reserved.amountCents };

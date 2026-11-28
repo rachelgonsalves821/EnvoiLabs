@@ -11,6 +11,7 @@ const order = { id: "gift_fixture_1", eventId: "evt_ordered_1", recipientId: res
 
 function setup() {
   const db = { reserveSessionPayout: vi.fn().mockResolvedValue(reservation),
+    claimIssuer: vi.fn().mockResolvedValue(true),
     recordOrder: vi.fn().mockResolvedValue(undefined) };
   const provider = { createOrder: vi.fn().mockResolvedValue(undefined),
     getOrderByKey: vi.fn().mockResolvedValueOnce(null).mockResolvedValue(order) };
@@ -115,6 +116,19 @@ describe("payout issue and reconciliation", () => {
     expect(await issueReservedPayout(db, provider, reservation.sessionId)).toBe("unavailable");
     expect(provider.createOrder).not.toHaveBeenCalled();
   });
+
+  it("freezes the issuer before provider lookup and refuses a conflicting retry", async () => {
+    const { db, provider } = setup();
+    db.claimIssuer.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    expect(await issueReservedPayout(db, provider, reservation.sessionId)).toBe("blocked");
+    expect(provider.getOrderByKey).not.toHaveBeenCalled();
+    expect(provider.createOrder).not.toHaveBeenCalled();
+    expect(await issueReservedPayout(db, provider, reservation.sessionId)).toBe("ordered");
+    expect(db.claimIssuer).toHaveBeenNthCalledWith(1, reservation.id);
+    expect(db.claimIssuer).toHaveBeenNthCalledWith(2, reservation.id);
+    expect(db.claimIssuer.mock.invocationCallOrder[1]).toBeLessThan(
+      provider.getOrderByKey.mock.invocationCallOrder[0]!);
+  });
 });
 
 describe("aggregated Visa batch issue", () => {
@@ -124,6 +138,7 @@ describe("aggregated Visa batch issue", () => {
     state: "pending" as const, providerOrderId: null };
   it("does not contact the provider below the account Visa minimum", async () => {
     const db = { reserveBatchPayout: vi.fn().mockResolvedValue({ status: "below_minimum" }),
+      claimIssuer: vi.fn().mockResolvedValue(true),
       recordOrder: vi.fn() };
     const provider = { createOrder: vi.fn(), getOrderByKey: vi.fn() };
     expect(await issueReservedBatchPayout(db, provider,
@@ -137,6 +152,7 @@ describe("aggregated Visa batch issue", () => {
     const batchOrder = { ...order, recipientId: batch.id };
     const db = { reserveBatchPayout: vi.fn().mockResolvedValueOnce(batch)
       .mockResolvedValue({ ...batch, state: "delivered", providerOrderId: batchOrder.id }),
+      claimIssuer: vi.fn().mockResolvedValue(true),
       recordOrder: vi.fn().mockResolvedValue(undefined) };
     const provider = { createOrder: vi.fn().mockRejectedValue(new Error("timeout")),
       getOrderByKey: vi.fn().mockResolvedValueOnce(null).mockResolvedValue(batchOrder) };
@@ -154,6 +170,7 @@ describe("aggregated Visa batch issue", () => {
     const db = { reserveBatchPayout: vi.fn()
       .mockRejectedValueOnce(new PayoutReservationDenied())
       .mockRejectedValueOnce(new Error("database timeout")),
+    claimIssuer: vi.fn().mockResolvedValue(true),
     recordOrder: vi.fn() };
     const provider = { createOrder: vi.fn(), getOrderByKey: vi.fn() };
     expect(await issueReservedBatchPayout(db, provider,
@@ -165,7 +182,8 @@ describe("aggregated Visa batch issue", () => {
   });
   it("blocks a batch whose recipient is not its frozen payout ID", async () => {
     const db = { reserveBatchPayout: vi.fn().mockResolvedValue({
-      ...batch, recipientId: "other" }), recordOrder: vi.fn() };
+      ...batch, recipientId: "other" }), claimIssuer: vi.fn().mockResolvedValue(true),
+      recordOrder: vi.fn() };
     const provider = { createOrder: vi.fn(), getOrderByKey: vi.fn() };
     expect(await issueReservedBatchPayout(db, provider,
       batch.respondentId, "stable-request")).toBe("blocked");

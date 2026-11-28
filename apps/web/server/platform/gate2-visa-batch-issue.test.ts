@@ -40,10 +40,10 @@ describe("synthetic Visa batch issue composition", () => {
     expect(await issueGate2SandboxVisaBatch({ client: client(rpc), apiKey: "TEST_fixture",
       respondentId, requestId, annualCapCents: 200000, request,
       fictionalProvider: true })).toBe("delivered");
-    expect(rpc).toHaveBeenCalledWith("mark_gate2_fictional_payout",
-      { supplied_payout_id: payoutId });
+    expect(rpc).toHaveBeenCalledWith("claim_gate2_payout_issuer",
+      { supplied_payout_id: payoutId, supplied_origin: "fictional" });
     const markerCall = rpc.mock.calls.findIndex(([name]) =>
-      name === "mark_gate2_fictional_payout");
+      name === "claim_gate2_payout_issuer");
     expect(markerCall).toBeGreaterThanOrEqual(0);
     expect(rpc.mock.invocationCallOrder[markerCall]!)
       .toBeLessThan((request as unknown as ReturnType<typeof vi.fn>)
@@ -52,7 +52,7 @@ describe("synthetic Visa batch issue composition", () => {
     const calls = (request as unknown as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls.filter(([url]) => url ===
       "https://testflight.tremendous.com/api/v2/orders")).toHaveLength(1);
-    expect(rpc).toHaveBeenCalledWith("record_gate2_sandbox_visa_observation",
+    expect(rpc).toHaveBeenCalledWith("record_gate2_fictional_sandbox_visa_observation",
       expect.objectContaining({ requested_payout_id: payoutId,
         requested_recipient_id: payoutId, requested_product_id: "sandbox_visa",
         requested_amount_cents: 1200 }));
@@ -68,7 +68,7 @@ describe("synthetic Visa batch issue composition", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it("does not call a mock provider if durable provenance cannot be recorded", async () => {
+  it("does not call a mock provider if another issuer owns the durable claim", async () => {
     const rpc = vi.fn().mockImplementation(async (name) => ({ error: null,
       data: name === "reserve_gate2_sandbox_visa_batch"
         ? { status: "reserved", payoutId, batchId, respondentId,
@@ -77,7 +77,7 @@ describe("synthetic Visa batch issue composition", () => {
     const request = vi.fn() as unknown as typeof fetch;
     expect(await issueGate2SandboxVisaBatch({ client: client(rpc),
       apiKey: "TEST_fixture", respondentId, requestId, annualCapCents: 200000,
-      request, fictionalProvider: true })).toBe("unavailable");
+      request, fictionalProvider: true })).toBe("blocked");
     expect(request).not.toHaveBeenCalled();
   });
 

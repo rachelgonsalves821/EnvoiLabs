@@ -30,16 +30,19 @@ describe("frozen sandbox Visa database adapter", () => {
       .rejects.toThrow("Invalid sandbox webhook claim");
   });
   it("reserves by the exact stable session key and observes the frozen route", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: saved, error: null })
-      .mockResolvedValueOnce({ data: true, error: null });
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null })
+      .mockResolvedValueOnce({ data: saved, error: null });
     const db = createGate2SandboxPayoutDatabase(client(rpc), 200000);
     expect(await db.reserveSessionPayout(sessionId, `payout:${sessionId}`)).toEqual(saved);
     expect(rpc).toHaveBeenNthCalledWith(1, "reserve_gate2_sandbox_visa_intent",
       { requested_session_id: sessionId, annual_cap_cents: 200000 });
+    expect(await db.claimIssuer(id)).toBe(true);
+    expect(rpc).toHaveBeenNthCalledWith(2, "claim_gate2_payout_issuer",
+      { supplied_payout_id: id, supplied_origin: "test_provider" });
     await db.recordOrder(id, { id: "ORDER-1", eventId: "evt_ordered",
       recipientId: id, productId: "sandbox_visa", amountCents: 300,
       status: "ordered", observedAt: "2026-11-25T02:00:00Z" });
-    expect(rpc).toHaveBeenNthCalledWith(2,
+    expect(rpc).toHaveBeenNthCalledWith(3,
       "record_gate2_sandbox_visa_observation", expect.objectContaining({
         requested_payout_id: id, requested_recipient_id: id,
         requested_product_id: "sandbox_visa", requested_amount_cents: 300 }));

@@ -456,6 +456,7 @@ export type Database = {
           created_at: string
           event_kind: string
           id: string
+          observation_origin: string
           payout_id: string
           provider_event_id: string
           provider_observed_at: string
@@ -466,6 +467,7 @@ export type Database = {
           created_at?: string
           event_kind: string
           id?: string
+          observation_origin?: string
           payout_id: string
           provider_event_id: string
           provider_observed_at: string
@@ -476,6 +478,7 @@ export type Database = {
           created_at?: string
           event_kind?: string
           id?: string
+          observation_origin?: string
           payout_id?: string
           provider_event_id?: string
           provider_observed_at?: string
@@ -1833,6 +1836,10 @@ export type Database = {
         Args: { supplied_claim_id: string; supplied_delivery_id: string }
         Returns: Json
       }
+      claim_gate2_payout_issuer: {
+        Args: { supplied_origin: string; supplied_payout_id: string }
+        Returns: boolean
+      }
       claim_gate2_refund_intent: {
         Args: {
           requested_reservation_id: string
@@ -2325,6 +2332,19 @@ export type Database = {
           supplied_text: string
         }
         Returns: Json
+      }
+      record_gate2_fictional_sandbox_visa_observation: {
+        Args: {
+          requested_amount_cents: number
+          requested_event_id: string
+          requested_kind: string
+          requested_observed_at: string
+          requested_order_id: string
+          requested_payout_id: string
+          requested_product_id: string
+          requested_recipient_id: string
+        }
+        Returns: boolean
       }
       record_gate2_payout_observation: {
         Args: {

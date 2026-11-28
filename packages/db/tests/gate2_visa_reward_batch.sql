@@ -189,9 +189,12 @@ select is((select value ->> 'productId' from reserved_batch), 'sandbox_visa',
 select is((select value ->> 'recipientId' from reserved_batch),
     (select value ->> 'payoutId' from reserved_batch),
     'batch recipient lookup is bound to the frozen payout ID');
-select is(public.mark_gate2_fictional_payout((select
-    (value ->> 'payoutId')::uuid from reserved_batch)), true,
-    'fictional payout is marked before the mock order observation');
+select is(public.claim_gate2_payout_issuer((select
+    (value ->> 'payoutId')::uuid from reserved_batch), 'fictional'), true,
+    'fictional issuer claim is frozen before any mock provider request');
+select is(public.claim_gate2_payout_issuer((select
+    (value ->> 'payoutId')::uuid from reserved_batch), 'test_provider'), false,
+    'a real issuer cannot take a fictional payout after the first claim');
 reset role;
 select is((select count(*) from internal.gate2_visa_reward_batch_items),
     4::bigint, 'each source session is claimed exactly once');
@@ -219,16 +222,29 @@ select throws_ok($$select public.reserve_gate2_session_payout(
 select is(public.record_gate2_sandbox_visa_observation(
     (select (value ->> 'payoutId')::uuid from reserved_batch),
     (select (value ->> 'payoutId')::uuid from reserved_batch),
+    'sandbox_visa', 'evt_real_on_mock', 'ORDER-REAL-ON-MOCK',
+    'ordered', 1200, '2026-11-25T01:00:00Z'), false,
+    'real provider observation cannot cross a fictional issuer claim');
+select throws_ok($$insert into public.gate2_payout_events
+    (payout_id, provider_event_id, provider_order_id, event_kind,
+        amount_cents, provider_observed_at)
+    select (value ->> 'payoutId')::uuid, 'evt_direct_real_on_mock',
+        'ORDER-DIRECT-REAL', 'ordered', 1200, '2026-11-25T01:00:00Z'
+    from reserved_batch$$, '23514', 'payout observation origin mismatch',
+    'direct service event insert cannot cross the fictional issuer claim');
+select is(public.record_gate2_fictional_sandbox_visa_observation(
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
+    (select (value ->> 'payoutId')::uuid from reserved_batch),
     'sandbox_visa', 'evt_batch_delivered', 'ORDER-BATCH-1',
     'delivered', 1200, '2026-11-25T02:00:00Z'), true,
     'one verified provider event delivers the batch');
-select is(public.record_gate2_sandbox_visa_observation(
+select is(public.record_gate2_fictional_sandbox_visa_observation(
     (select (value ->> 'payoutId')::uuid from reserved_batch),
     (select (value ->> 'payoutId')::uuid from reserved_batch),
     'sandbox_visa', 'evt_batch_delivered', 'ORDER-BATCH-1',
     'delivered', 1200, '2026-11-25T02:00:00Z'), true,
     'first signed notification replay is idempotent');
-select is(public.record_gate2_sandbox_visa_observation(
+select is(public.record_gate2_fictional_sandbox_visa_observation(
     (select (value ->> 'payoutId')::uuid from reserved_batch),
     (select (value ->> 'payoutId')::uuid from reserved_batch),
     'sandbox_visa', 'evt_batch_delivered', 'ORDER-BATCH-1',
