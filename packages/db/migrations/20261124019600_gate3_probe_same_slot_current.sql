@@ -130,8 +130,7 @@ returns jsonb language sql volatile security definer set search_path = '' as $$
                 and access_current and followup_current
                 and consent_receipt = current_consent_receipt), false)
                 as current_qualified,
-            coalesce((turn_id is not null and not later_core_answer
-                and turn_source_version = current_source_version
+            coalesce((turn_id is not null and turn_source_version = current_source_version
                 and turn_revision = current_revision
                 and ((browser_clock_origin_id is not null
                     and browser_upload_receipt_ms is not null
@@ -146,6 +145,10 @@ returns jsonb language sql volatile security definer set search_path = '' as $$
             case
                 when not current_qualified then 'withheld'
                 when turn_id is not null and not current_turn then 'invalidated'
+                when later_core_answer and turn_id is not null
+                    and (decision_json is null or
+                        (decision_json ->> 'action' = 'probe'
+                            and render_outcome is null)) then 'invalidated'
                 when decision_json ->> 'action' = 'probe' and render_outcome = 'shown'
                     then 'rendered'
                 when decision_json ->> 'action' = 'probe' and render_outcome is not null
