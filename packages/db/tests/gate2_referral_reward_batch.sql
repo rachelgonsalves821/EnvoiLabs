@@ -130,6 +130,10 @@ insert into reserved_referral_batch select public.reserve_gate2_sandbox_visa_bat
 select is((select value ->> 'amountCents' from reserved_referral_batch), '1700',
     'four $3 rewards and the vested $5 bonus reach the $15 Visa floor');
 select is(public.claim_gate2_payout_issuer((select
+    (value ->> 'payoutId')::uuid from reserved_referral_batch),
+    'test_provider'), false,
+    'TEST issuer cannot take a batch with a fictional referral source');
+select is(public.claim_gate2_payout_issuer((select
     (value ->> 'payoutId')::uuid from reserved_referral_batch), 'fictional'),
     true, 'the batch freezes fictional issuer and referral origin together');
 select is(public.reserve_gate2_sandbox_visa_batch(

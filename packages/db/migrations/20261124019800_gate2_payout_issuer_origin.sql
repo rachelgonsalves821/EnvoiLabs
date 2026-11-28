@@ -38,7 +38,12 @@ begin
                 where payout_id = payout.id)
             or (intent.referral_vesting_id is not null and exists (
                 select 1 from internal.gate2_fictional_referrals
-                where vesting_id = intent.referral_vesting_id))))
+                where vesting_id = intent.referral_vesting_id))
+            or (intent.batch_id is not null and exists (
+                select 1 from internal.gate2_visa_reward_batch_referrals as source
+                join internal.gate2_fictional_referrals as marker
+                    on marker.vesting_id = source.vesting_id
+                where source.batch_id = intent.batch_id))))
     then return false; end if;
     insert into internal.gate2_payout_issuer_claims (payout_id, origin)
     values (payout.id, supplied_origin);
