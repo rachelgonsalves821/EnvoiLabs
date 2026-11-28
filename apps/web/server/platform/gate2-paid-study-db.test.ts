@@ -21,7 +21,7 @@ function fixture() {
     gate2_payment_events: [{ quote_id: quoteId, study_id: studyId,
       provider_checkout_id: observation.id, provider_event_id: "checkout-created:cs_test_1",
       event_kind: "checkout_created", amount_cents: 500, currency: "usd",
-      provider_observed_at: observedAt }],
+      provider_observed_at: observedAt, observation_origin: "provider" }],
   };
   const from = vi.fn((table: string) => {
     let values = [...(rows[table] ?? [])];
@@ -69,6 +69,14 @@ describe("Gate 2 paid study database adapter", () => {
       { event_kind: "refunded", amount_cents: 200 },
       { event_kind: "failed", amount_cents: 500 },
     ]);
+  });
+
+  it("does not reconcile a real provider observation against a fictional checkout", async () => {
+    const { db, rows } = fixture();
+    rows.gate2_payment_events![0]!.observation_origin = "fictional";
+    await expect(db.recordObservation(observation)).rejects.toThrow("frozen checkout");
+    await db.recordObservation({ ...observation, simulationProvenance: "fictional" });
+    expect(rows.gate2_payment_events![1]!.observation_origin).toBe("fictional");
   });
 
   it("refuses a provider mismatch or conflicting replay before launch", async () => {

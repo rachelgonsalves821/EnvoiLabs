@@ -24,6 +24,7 @@ export type CheckoutSession = {
   currency: "usd";
   status: "open" | "expired" | "completed";
   url: string;
+  simulationProvenance?: "fictional";
 };
 export type CheckoutDatabase = {
   readApprovedScope(studyId: string): Promise<CheckoutScope | null>;
@@ -35,12 +36,15 @@ export type CheckoutDatabase = {
     feasibility: CheckoutScope["feasibility"];
   }): Promise<string>;
   readQuote(studyId: string, quoteId: string): Promise<unknown>;
+  markFictionalQuote(quoteId: string): Promise<boolean>;
   claimCheckoutIntent(studyId: string, quoteId: string): Promise<
-    { status: "create"; key: string } | { status: "known"; checkoutId: string } |
+    { status: "create"; key: string; fictional: boolean } |
+    { status: "known"; checkoutId: string; fictional: boolean } |
     { status: "blocked" } | { status: "unavailable" }>;
   recordCheckoutCreated(session: CheckoutSession, eventId: string, observedAt: string): Promise<void>;
 };
 export type CheckoutProvider = {
+  simulationProvenance?: "fictional" | undefined;
   create(key: string, quote: QuoteV4): Promise<CheckoutSession>;
   get(checkoutId: string): Promise<CheckoutSession>;
 };
@@ -90,13 +94,18 @@ export async function prepareStudyCheckout(
       return { status: "blocked" };
     }
     const quote = parsed.data;
+    if (provider.simulationProvenance === "fictional" &&
+      !await db.markFictionalQuote(quote.id)) return { status: "unavailable" };
     const intent = await db.claimCheckoutIntent(studyId, quote.id);
     if (intent.status === "blocked") return { status: "blocked" };
     if (intent.status === "unavailable") return { status: "unavailable" };
+    if (intent.fictional !== (provider.simulationProvenance === "fictional"))
+      return { status: "blocked" };
     let checkout: CheckoutSession;
     if (intent.status === "known") checkout = await provider.get(intent.checkoutId);
     else checkout = await provider.create(intent.key, quote);
     if (!matchesQuote(checkout, quote) ||
+      (checkout.simulationProvenance === "fictional") !== intent.fictional ||
       (intent.status === "known" && checkout.id !== intent.checkoutId)) {
       return { status: "blocked" };
     }

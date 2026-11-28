@@ -22,10 +22,12 @@ function setup() {
     readSelectedPricing: vi.fn().mockResolvedValue(config),
     freezeQuote: vi.fn().mockResolvedValue(quote.id),
     readQuote: vi.fn().mockResolvedValue(quote),
-    claimCheckoutIntent: vi.fn().mockResolvedValue({ status: "create", key: `gate2-checkout:${quote.id}` }),
+    markFictionalQuote: vi.fn().mockResolvedValue(true),
+    claimCheckoutIntent: vi.fn().mockResolvedValue({ status: "create", key: `gate2-checkout:${quote.id}`, fictional: false }),
     recordCheckoutCreated: vi.fn().mockResolvedValue(undefined),
   };
   const provider = {
+    simulationProvenance: undefined as "fictional" | undefined,
     create: vi.fn().mockResolvedValue(checkout),
     get: vi.fn().mockResolvedValue(checkout),
   };
@@ -62,7 +64,7 @@ describe("synthetic quote to checkout", () => {
 
   it("uses a recorded checkout without creating another and blocks provider mismatch", async () => {
     const { db, provider } = setup();
-    db.claimCheckoutIntent.mockResolvedValue({ status: "known", checkoutId: checkout.id });
+    db.claimCheckoutIntent.mockResolvedValue({ status: "known", checkoutId: checkout.id, fictional: false });
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toMatchObject({ status: "ready" });
     expect(provider.create).not.toHaveBeenCalled();
     expect(db.recordCheckoutCreated).not.toHaveBeenCalled();
@@ -119,5 +121,26 @@ describe("synthetic quote to checkout", () => {
     expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
     expect(provider.create).not.toHaveBeenCalled();
     expect(db.recordCheckoutCreated).not.toHaveBeenCalled();
+  });
+
+  it("marks a fictional quote before any mock provider create and denies an unmarked retry", async () => {
+    const { db, provider } = setup();
+    const fictional = { ...checkout, simulationProvenance: "fictional" as const };
+    provider.simulationProvenance = "fictional" as const;
+    provider.create.mockResolvedValue(fictional);
+    db.claimCheckoutIntent.mockResolvedValue({ status: "create",
+      key: `gate2-checkout:${quote.id}`, fictional: true });
+    db.markFictionalQuote.mockResolvedValueOnce(false);
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "unavailable" });
+    expect(provider.create).not.toHaveBeenCalled();
+    expect(db.claimCheckoutIntent).not.toHaveBeenCalled();
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toMatchObject({ status: "ready" });
+    expect(db.markFictionalQuote.mock.invocationCallOrder[1]).toBeLessThan(
+      provider.create.mock.invocationCallOrder[0]!);
+    provider.simulationProvenance = undefined;
+    db.claimCheckoutIntent.mockResolvedValue({ status: "known",
+      checkoutId: checkout.id, fictional: true });
+    expect(await prepareStudyCheckout(db, provider, quote.studyId)).toEqual({ status: "blocked" });
+    expect(provider.get).not.toHaveBeenCalled();
   });
 });

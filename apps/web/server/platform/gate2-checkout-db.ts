@@ -100,6 +100,13 @@ export function createGate2CheckoutDatabase(
       if (!row) return null;
       return mapGate2Quote(row);
     },
+    async markFictionalQuote(quoteId) {
+      const marker = await client.rpc("mark_gate2_fictional_quote", {
+        supplied_quote_id: quoteId,
+      });
+      if (marker.error) throw marker.error;
+      return marker.data === true;
+    },
     async claimCheckoutIntent(studyId, quoteId) {
       if (!await allowedStudy(studyId)) return { status: "blocked" };
       const result = readData(await client.rpc("claim_gate2_checkout_intent", {
@@ -108,11 +115,15 @@ export function createGate2CheckoutDatabase(
       if (!result || typeof result !== "object" || Array.isArray(result))
         return { status: "unavailable" };
       const value = result as Record<string, unknown>;
+      const origin = readData(await client.rpc("read_gate2_fictional_quote", {
+        supplied_quote_id: quoteId,
+      }));
+      if (typeof origin !== "boolean") return { status: "unavailable" };
       if (value.status === "create" && value.key === `gate2-checkout:${quoteId}`)
-        return { status: "create", key: value.key };
+        return { status: "create", key: value.key, fictional: origin };
       if (value.status === "known" && typeof value.checkoutId === "string" &&
         value.checkoutId.startsWith("cs_test_"))
-        return { status: "known", checkoutId: value.checkoutId };
+        return { status: "known", checkoutId: value.checkoutId, fictional: origin };
       if (value.status === "blocked") return { status: "blocked" };
       return { status: "unavailable" };
     },
@@ -128,6 +139,7 @@ export function createGate2CheckoutDatabase(
         provider_checkout_id: session.id, provider_event_id: eventId,
         event_kind: "checkout_created", amount_cents: session.amountCents,
         currency: session.currency, provider_observed_at: observedAt,
+        observation_origin: session.simulationProvenance === "fictional" ? "fictional" : "provider",
       });
       if (!error) return;
       if (error.code !== "23505") throw error;
@@ -137,7 +149,9 @@ export function createGate2CheckoutDatabase(
         .maybeSingle()) as PaymentEventRow | null;
       if (!existing || existing.provider_checkout_id !== session.id ||
         existing.provider_event_id !== eventId || existing.amount_cents !== session.amountCents ||
-        existing.currency !== session.currency || existing.study_id !== session.studyId) throw error;
+        existing.currency !== session.currency || existing.study_id !== session.studyId ||
+        existing.observation_origin !== (session.simulationProvenance === "fictional" ?
+          "fictional" : "provider")) throw error;
     },
   };
 }

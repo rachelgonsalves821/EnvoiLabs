@@ -38,7 +38,16 @@ describe("synthetic Visa batch issue composition", () => {
       .mockResolvedValueOnce(json({ order }))
       .mockResolvedValueOnce(json({ order })) as unknown as typeof fetch;
     expect(await issueGate2SandboxVisaBatch({ client: client(rpc), apiKey: "TEST_fixture",
-      respondentId, requestId, annualCapCents: 200000, request })).toBe("delivered");
+      respondentId, requestId, annualCapCents: 200000, request,
+      fictionalProvider: true })).toBe("delivered");
+    expect(rpc).toHaveBeenCalledWith("mark_gate2_fictional_payout",
+      { supplied_payout_id: payoutId });
+    const markerCall = rpc.mock.calls.findIndex(([name]) =>
+      name === "mark_gate2_fictional_payout");
+    expect(markerCall).toBeGreaterThanOrEqual(0);
+    expect(rpc.mock.invocationCallOrder[markerCall]!)
+      .toBeLessThan((request as unknown as ReturnType<typeof vi.fn>)
+        .mock.invocationCallOrder[0]!);
     expect(request).toHaveBeenCalledTimes(4);
     const calls = (request as unknown as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls.filter(([url]) => url ===
@@ -56,6 +65,19 @@ describe("synthetic Visa batch issue composition", () => {
     expect(await issueGate2SandboxVisaBatch({ client: client(rpc), apiKey: "TEST_fixture",
       respondentId, requestId, annualCapCents: 200000, request }))
       .toBe("below_minimum");
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("does not call a mock provider if durable provenance cannot be recorded", async () => {
+    const rpc = vi.fn().mockImplementation(async (name) => ({ error: null,
+      data: name === "reserve_gate2_sandbox_visa_batch"
+        ? { status: "reserved", payoutId, batchId, respondentId,
+          recipientId: payoutId, productId: "sandbox_visa", amountCents: 1200,
+          payoutState: "pending", providerOrderId: null } : false }));
+    const request = vi.fn() as unknown as typeof fetch;
+    expect(await issueGate2SandboxVisaBatch({ client: client(rpc),
+      apiKey: "TEST_fixture", respondentId, requestId, annualCapCents: 200000,
+      request, fictionalProvider: true })).toBe("unavailable");
     expect(request).not.toHaveBeenCalled();
   });
 

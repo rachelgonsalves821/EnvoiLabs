@@ -33,6 +33,8 @@ export function createGate2PaidStudyDatabase(client: SupabaseClient<Database>): 
         .eq("quote_id", observation.quoteId).eq("event_kind", "checkout_created")
         .maybeSingle()) as PaymentEventRow | null;
       if (!quote || !checkout || checkout.provider_checkout_id !== observation.id ||
+        checkout.observation_origin !== (observation.simulationProvenance === "fictional" ?
+          "fictional" : "provider") ||
         quote.pricing_config_version !== observation.pricingConfigVersion ||
         quote.total_cents !== observation.amountCents || quote.currency !== observation.currency ||
         checkout.amount_cents !== quote.total_cents || checkout.currency !== quote.currency ||
@@ -47,7 +49,8 @@ export function createGate2PaidStudyDatabase(client: SupabaseClient<Database>): 
         provider_checkout_id: checkout.provider_checkout_id,
         provider_event_id: observation.eventId, event_kind: kind,
         amount_cents: amount, currency: quote.currency,
-        provider_observed_at: observation.observedAt };
+        provider_observed_at: observation.observedAt,
+        observation_origin: checkout.observation_origin };
       const { error } = await client.from("gate2_payment_events").insert(event);
       if (!error) return;
       if (error.code !== "23505") throw error;
@@ -58,7 +61,8 @@ export function createGate2PaidStudyDatabase(client: SupabaseClient<Database>): 
       if (!prior || prior.quote_id !== event.quote_id || prior.study_id !== event.study_id ||
         prior.provider_checkout_id !== event.provider_checkout_id ||
         prior.event_kind !== event.event_kind || prior.amount_cents !== event.amount_cents ||
-        prior.currency !== event.currency) {
+        prior.currency !== event.currency ||
+        prior.observation_origin !== event.observation_origin) {
         throw error;
       }
     },
