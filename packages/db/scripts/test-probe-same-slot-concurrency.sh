@@ -30,6 +30,8 @@ cleanup() {
 trap cleanup EXIT
 
 cat >"$work/setup.sql" <<'SQL'
+update auth.users set email_confirmed_at = clock_timestamp()
+where id = '90300000-0000-4000-8000-000000000001';
 alter table public.transcripts add column if not exists redacted_source_version
   uuid not null default gen_random_uuid();
 update public.studies set state = 'fielding'
@@ -134,8 +136,8 @@ if [[ $observed_wait != 1 ]]; then
   exit 1
 fi
 touch "$work/release-first"
-wait "$first_pid"
-wait "$second_pid"
+if ! wait "$first_pid"; then cat "$work/first.err" >&2; exit 1; fi
+if ! wait "$second_pid"; then cat "$work/second.err" >&2; exit 1; fi
 if [[ $(tail -n 1 "$work/second.out") != null ]]; then
   printf 'The old probe turn opened after the replacement committed.\n' >&2
   exit 1
@@ -223,8 +225,8 @@ if [[ $observed_wait != 1 ]]; then
   exit 1
 fi
 touch "$work/release-inverse-first"
-wait "$first_pid"
-wait "$second_pid"
+if ! wait "$first_pid"; then cat "$work/inverse-first.err" >&2; exit 1; fi
+if ! wait "$second_pid"; then cat "$work/inverse-second.err" >&2; exit 1; fi
 turns="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
   "select count(*) from internal.gate3_probe_turns where answer_id =
     'a9790000-0000-4000-8000-000000000007'")"
