@@ -1802,6 +1802,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      begin_gate3_private_analysis_request: {
+        Args: {
+          supplied_binding_digest: string
+          supplied_binding_key: string
+          supplied_map_prompt_digest: string
+          supplied_map_prompt_version: string
+          supplied_map_provider_model: string
+          supplied_quote_id: string
+          supplied_request_id: string
+          supplied_researcher_auth_user_id: string
+          supplied_snapshot: Json
+          supplied_study_id: string
+        }
+        Returns: string
+      }
       begin_gate3_probe_turn: {
         Args: {
           supplied_answer_id: string

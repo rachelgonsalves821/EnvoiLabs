@@ -458,6 +458,17 @@ select ok((select payload from analyst_snapshot) ?& array[
     'sourceSetVersion', 'consentRevision', 'reviewerReceiptId',
     'briefVersion', 'pricingConfigVersion', 'quoteId'],
     'private snapshot carries full reviewed source and frozen price identities');
+insert into internal.gate3_analysis_requests (
+    request_id, study_id, quote_id, researcher_auth_user_id,
+    reviewer_receipt_id, binding_digest, started_at, deadline_at)
+values ('a9990000-0000-4000-8000-000000000003',
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    ((select payload from analyst_snapshot) ->> 'reviewerReceiptId')::uuid,
+    (select digest from analyst_binding),
+    clock_timestamp() - interval '2 minutes',
+    clock_timestamp() - interval '90 seconds');
 set local role service_role;
 select is(public.authorize_gate3_analyst_snapshot(
     'a9900000-0000-4000-8000-000000000001',
@@ -474,6 +485,45 @@ select ok(not has_table_privilege('service_role',
     and not has_function_privilege('authenticated',
     'public.write_gate3_private_analysis_proposal(uuid,uuid,uuid,text,text,text,text,text,text,jsonb,text,text,jsonb,jsonb,text,text,uuid,uuid)',
     'EXECUTE'), 'private proposals have no direct service or client read');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
+    (select draft_text::jsonb from analyst_private_payload),
+    (select screened_text::jsonb from analyst_private_payload),
+    (select draft_text from analyst_private_payload),
+    (select screened_text from analyst_private_payload),
+    (select id from analyst_output_receipt),
+    'a9990000-0000-4000-8000-000000000004'), false,
+    'unissued analysis request cannot store private output');
+select is(public.write_gate3_private_analysis_proposal(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
+    (select draft_text::jsonb from analyst_private_payload),
+    (select screened_text::jsonb from analyst_private_payload),
+    (select draft_text from analyst_private_payload),
+    (select screened_text from analyst_private_payload),
+    (select id from analyst_output_receipt),
+    'a9990000-0000-4000-8000-000000000003'), false,
+    'expired database request cannot store qualified private output');
+select ok(public.begin_gate3_private_analysis_request(
+    'a9900000-0000-4000-8000-000000000001',
+    (select id from analyst_quote),
+    '90200000-0000-4000-8000-000000000001',
+    'fixture-model', 'fixture-prompt-v1', repeat('d', 64),
+    (select payload from analyst_snapshot),
+    (select key from analyst_binding), (select digest from analyst_binding),
+    'a9990000-0000-4000-8000-000000000005') is not null,
+    'server issues a bounded request before private proposal save');
 select is(public.write_gate3_private_analysis_proposal(
     'a9900000-0000-4000-8000-000000000001',
     (select id from analyst_quote),
