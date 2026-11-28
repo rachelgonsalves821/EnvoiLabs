@@ -19,13 +19,6 @@ select format('a9890000-0000-4000-8000-%s',
     format('a9880000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
     position, 'Core question ' || position
 from generate_series(1, 4) as n cross join generate_series(1, 5) as position;
-set local role service_role;
-select is(count(public.freeze_gate2_marketplace_quote(id, 1,
-    (select id from public.pricing_configs where version = 101), 101,
-    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
-    10000, 500, '90200000-0000-4000-8000-000000000001')), 4::bigint,
-    'four studies have frozen marketplace quotes')
-from public.studies where id::text like 'a9880000-0000-4000-8000-%';
 select ok(not has_table_privilege('service_role',
     'internal.gate2_fictional_quotes', 'INSERT')
     and not has_function_privilege('authenticated',
@@ -33,6 +26,13 @@ select ok(not has_table_privilege('service_role',
     and not has_column_privilege('authenticated', 'public.payouts',
         'amount_cents', 'SELECT'),
     'mock marker writes and raw payout amounts are unavailable to clients');
+set local role service_role;
+select is(count(public.freeze_gate2_marketplace_quote(id, 1,
+    (select id from public.pricing_configs where version = 101), 101,
+    '[{"label":"Core questions","coreQuestionCount":5,"respondentCount":10,"unitPriceCents":200,"amountCents":10000}]',
+    10000, 500, '90200000-0000-4000-8000-000000000001')), 4::bigint,
+    'four studies have frozen marketplace quotes')
+from public.studies where id::text like 'a9880000-0000-4000-8000-%';
 select is(public.mark_gate2_fictional_quote((select id
     from public.gate2_quote_snapshots where study_id =
         'a9880000-0000-4000-8000-000000000001')), true,
