@@ -63,6 +63,8 @@ values ('a9790000-0000-4000-8000-000000000005',
   'a9790000-0000-4000-8000-000000000004',
   '90600000-0000-4000-8000-000000000001',
   'The closer option.', 'typed', 'none', 0, 0);
+insert into pii.transcript_raw (transcript_id, raw_text)
+values ('a9790000-0000-4000-8000-000000000005', 'The closer option.');
 insert into internal.gate1_answer_jobs (answer_id, source_hash, completed_at,
   result_status, publication_policy_digest, publication_qualification_digest)
 values ('a9790000-0000-4000-8000-000000000004',
@@ -88,14 +90,14 @@ select id from public.sessions where id =
   'a9790000-0000-4000-8000-000000000003' for update;
 \! touch '$work/first-holds-lock'
 \! sh -c 'while [ ! -f "$work/release-first" ]; do sleep 0.05; done'
-insert into public.answers (id, session_id, study_id, guide_question_id,
-  kind, sequence, created_at)
-values ('a9790000-0000-4000-8000-000000000007',
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select public.record_gate1_text_answer(
   'a9790000-0000-4000-8000-000000000003',
-  '90600000-0000-4000-8000-000000000001',
-  'a9790000-0000-4000-8000-000000000001', 'text', 2,
-  (select created_at + interval '1 second' from public.answers where id =
-    'a9790000-0000-4000-8000-000000000004'));
+  'a9790000-0000-4000-8000-000000000001',
+  'a9790000-0000-4000-8000-000000000007',
+  'The newer option.',
+  'a9790000-0000-4000-8000-000000000004');
 commit;
 SQL
 psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -f "$work/first.sql" \
@@ -145,4 +147,89 @@ if [[ $turns != 0 ]]; then
   printf 'A stale turn was persisted after the replacement committed.\n' >&2
   exit 1
 fi
-printf 'Observed same-slot probe lock race passed.\n'
+
+# Inverse order: begin B first, then an authenticated replacement C waits.
+# B's committed turn must be removed with the replaced answer before any
+# provider-ready read or model dispatch can use it.
+cat >"$work/prepare-inverse.sql" <<'SQL'
+update public.transcripts set redacted_text = 'The newer option.'
+where answer_id = 'a9790000-0000-4000-8000-000000000007';
+update internal.gate1_answer_jobs set source_hash = decode(repeat('d', 64), 'hex'),
+  completed_at = clock_timestamp(),
+  result_status = 'published', publication_policy_digest = repeat('a', 64),
+  publication_qualification_digest = repeat('b', 64)
+where answer_id = 'a9790000-0000-4000-8000-000000000007';
+set role service_role;
+select public.record_gate3_probe_upload_clock(
+  'a9790000-0000-4000-8000-000000000007',
+  '90300000-0000-4000-8000-000000000001',
+  'a9790000-0000-4000-8000-000000000008', 2000,
+  'text_save_response');
+SQL
+psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -f "$work/prepare-inverse.sql" \
+  >"$work/prepare-inverse.out"
+if [[ $(tail -n 1 "$work/prepare-inverse.out") != recorded ]]; then
+  printf 'Could not prepare the inverse qualified answer.\n' >&2
+  exit 1
+fi
+
+cat >"$work/inverse-first.sql" <<SQL
+begin;
+set local role service_role;
+select coalesce(public.begin_gate3_probe_turn_with_clock(
+  'a9790000-0000-4000-8000-000000000007',
+  '90300000-0000-4000-8000-000000000001')::text, 'null');
+\! touch '$work/inverse-first-holds-lock'
+\! sh -c 'while [ ! -f "$work/release-inverse-first" ]; do sleep 0.05; done'
+commit;
+SQL
+psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -f "$work/inverse-first.sql" \
+  >"$work/inverse-first.out" 2>"$work/inverse-first.err" &
+first_pid=$!
+for _ in $(seq 1 100); do
+  [[ -f "$work/inverse-first-holds-lock" ]] && break
+  sleep 0.05
+done
+if [[ ! -f "$work/inverse-first-holds-lock" ]] ||
+  [[ $(tail -n 1 "$work/inverse-first.out") == null ]]; then
+  printf 'Inverse probe begin did not hold an eligible turn.\n' >&2
+  exit 1
+fi
+
+PGAPPNAME=envoi_gate2_answer_waiter psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
+  "set role authenticated; set request.jwt.claims =
+    '{\"sub\":\"90300000-0000-4000-8000-000000000001\",\"role\":\"authenticated\"}';
+    select public.record_gate1_text_answer(
+      'a9790000-0000-4000-8000-000000000003',
+      'a9790000-0000-4000-8000-000000000001',
+      'a9790000-0000-4000-8000-000000000009',
+      'The final option.',
+      'a9790000-0000-4000-8000-000000000007');" \
+  >"$work/inverse-second.out" 2>"$work/inverse-second.err" &
+second_pid=$!
+observed_wait=0
+for _ in $(seq 1 100); do
+  blocked="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
+    "select count(*) from pg_stat_activity where application_name =
+      'envoi_gate2_answer_waiter' and state = 'active'
+      and wait_event_type = 'Lock'
+      and query like '%record_gate1_text_answer%'")"
+  if [[ $blocked == 1 ]]; then observed_wait=1; break; fi
+  if ! kill -0 "$second_pid" 2>/dev/null; then break; fi
+  sleep 0.1
+done
+if [[ $observed_wait != 1 ]]; then
+  printf 'Authenticated replacement was not observed waiting on the session lock.\n' >&2
+  exit 1
+fi
+touch "$work/release-inverse-first"
+wait "$first_pid"
+wait "$second_pid"
+turns="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c \
+  "select count(*) from internal.gate3_probe_turns where answer_id =
+    'a9790000-0000-4000-8000-000000000007'")"
+if [[ $turns != 0 ]]; then
+  printf 'A replaced answer retained a provider-eligible turn.\n' >&2
+  exit 1
+fi
+printf 'Observed both same-slot probe lock orders through authenticated answer replacement.\n'
