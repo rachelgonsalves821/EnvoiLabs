@@ -123,6 +123,13 @@ export function createGate2CheckoutDatabase(
         quote.total_cents !== session.amountCents ||
         quote.pricing_config_version !== session.pricingConfigVersion ||
         quote.currency !== session.currency) throw new Error("Checkout outside frozen quote scope");
+      if (session.simulationProvenance === "fictional") {
+        const marker = await client.rpc("mark_gate2_fictional_quote", {
+          supplied_quote_id: session.quoteId,
+        });
+        if (marker.error || marker.data !== true)
+          throw new Error("Fictional quote provenance unavailable");
+      }
       const { error } = await client.from("gate2_payment_events").insert({
         quote_id: session.quoteId, study_id: session.studyId,
         provider_checkout_id: session.id, provider_event_id: eventId,

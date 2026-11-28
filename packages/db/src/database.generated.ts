@@ -2103,6 +2103,18 @@ export type Database = {
         Args: { supplied_limit: number }
         Returns: Json
       }
+      mark_gate2_fictional_payout: {
+        Args: { supplied_payout_id: string }
+        Returns: boolean
+      }
+      mark_gate2_fictional_quote: {
+        Args: { supplied_quote_id: string }
+        Returns: boolean
+      }
+      mark_gate2_fictional_referral: {
+        Args: { supplied_vesting_id: string }
+        Returns: boolean
+      }
       mark_gate3_probe_shown: {
         Args: {
           supplied_auth_user_id: string

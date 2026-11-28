@@ -24,6 +24,7 @@ export type CheckoutSession = {
   currency: "usd";
   status: "open" | "expired" | "completed";
   url: string;
+  simulationProvenance?: "fictional";
 };
 export type CheckoutDatabase = {
   readApprovedScope(studyId: string): Promise<CheckoutScope | null>;

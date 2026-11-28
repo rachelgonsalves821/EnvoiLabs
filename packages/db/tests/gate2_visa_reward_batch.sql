@@ -26,6 +26,17 @@ select is(count(public.freeze_gate2_marketplace_quote(id, 1,
     10000, 500, '90200000-0000-4000-8000-000000000001')), 4::bigint,
     'four studies have frozen marketplace quotes')
 from public.studies where id::text like 'a9880000-0000-4000-8000-%';
+select ok(not has_table_privilege('service_role',
+    'internal.gate2_fictional_quotes', 'INSERT')
+    and not has_function_privilege('authenticated',
+        'public.mark_gate2_fictional_quote(uuid)', 'EXECUTE')
+    and not has_column_privilege('authenticated', 'public.payouts',
+        'amount_cents', 'SELECT'),
+    'mock marker writes and raw payout amounts are unavailable to clients');
+select is(public.mark_gate2_fictional_quote((select id
+    from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000001')), true,
+    'fictional quote is marked before the mock checkout observation');
 reset role;
 insert into public.gate2_payment_events (quote_id, study_id,
     provider_checkout_id, provider_event_id, event_kind, amount_cents,
@@ -34,6 +45,27 @@ select id, study_id, 'cs_test_batch_' || study_id::text,
     'paid:batch:' || study_id::text, 'paid', total_cents, 'usd', clock_timestamp()
 from public.gate2_quote_snapshots
 where study_id::text like 'a9880000-0000-4000-8000-%';
+set local role service_role;
+select is(public.mark_gate2_fictional_quote((select id
+    from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000001')), true,
+    'fictional quote marker replay is idempotent');
+select is(public.mark_gate2_fictional_quote((select id
+    from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000002')), false,
+    'unmarked quote cannot be relabelled after a payment observation');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}';
+select is(public.read_gate2_current_researcher_receipt(
+    'a9880000-0000-4000-8000-000000000001')
+        ->> 'simulationProvenance', 'fictional',
+    'direct researcher receipt carries the durable fictional quote marker');
+select is(public.read_gate2_current_researcher_receipt(
+    'a9880000-0000-4000-8000-000000000002')
+        ->> 'simulationProvenance', 'unverified',
+    'unmarked observation is not asserted to be real');
+reset role;
 insert into public.invites (id, study_id, respondent_id, state, reward_cents, expires_at)
 select format('a98a0000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
     format('a9880000-0000-4000-8000-%s', lpad(n::text, 12, '0'))::uuid,
@@ -123,6 +155,9 @@ select is((select value ->> 'productId' from reserved_batch), 'sandbox_visa',
 select is((select value ->> 'recipientId' from reserved_batch),
     (select value ->> 'payoutId' from reserved_batch),
     'batch recipient lookup is bound to the frozen payout ID');
+select is(public.mark_gate2_fictional_payout((select
+    (value ->> 'payoutId')::uuid from reserved_batch)), true,
+    'fictional payout is marked before the mock order observation');
 reset role;
 select is((select count(*) from internal.gate2_visa_reward_batch_items),
     4::bigint, 'each source session is claimed exactly once');
@@ -168,6 +203,9 @@ select is(public.record_gate2_sandbox_visa_observation(
 select is((select count(*) from public.gate2_payout_events
     where payout_id = (select (value ->> 'payoutId')::uuid from reserved_batch)),
     1::bigint, 'three deliveries leave one immutable payout effect');
+select is(public.mark_gate2_fictional_payout((select
+    (value ->> 'payoutId')::uuid from reserved_batch)), true,
+    'fictional payout marker replay remains idempotent after delivery');
 reset role;
 select ok(not has_function_privilege('authenticated',
     'public.read_gate2_sandbox_visa_webhook_claim(uuid)', 'EXECUTE'),
@@ -189,6 +227,13 @@ select is((select count(*) from jsonb_array_elements(
     where item ->> 'payoutStatus' = 'delivered'
         and item ->> 'deliveredAt' = '2026-11-25T02:00:00+00:00'),
     4::bigint, 'each source receipt shows the provider delivery date');
+select is((select count(*) from jsonb_array_elements(
+    public.read_gate2_current_respondent_earnings() -> 'sessions') as item
+    where item ->> 'simulationProvenance' = 'fictional'),
+    4::bigint, 'each batch receipt identifies its fictional source');
+select is(public.read_gate2_current_respondent_earnings()
+    ->> 'containsFictionalMoney', 'true',
+    'direct Earnings marks an aggregate containing mock money');
 set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000002","role":"authenticated"}';
 select is((public.read_gate2_current_respondent_earnings()
     ->> 'deliveredCents')::integer, 0,

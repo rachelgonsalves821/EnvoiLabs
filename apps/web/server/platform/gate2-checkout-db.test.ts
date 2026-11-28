@@ -17,7 +17,8 @@ const session = { id: "cs_test_1", studyId, quoteId,
   pricingConfigVersion: 101, amountCents: 10_000, currency: "usd" as const,
   status: "open" as const, url: "https://checkout.stripe.test/cs_test_1" };
 
-function fixture({ otherOrganization = false, existingCheckout = false } = {}) {
+function fixture({ otherOrganization = false, existingCheckout = false,
+  markerRejected = false } = {}) {
   const rows: Record<string, Record<string, unknown>[]> = {
     researchers: [{ id: researcher.id, organization_id: organizationId,
       auth_user_id: researcher.authUserId }],
@@ -61,7 +62,8 @@ function fixture({ otherOrganization = false, existingCheckout = false } = {}) {
   });
   const rpc = vi.fn(async (name: string) => ({ data:
     name === "read_gate2_marketplace_feasibility" ? feasibility :
-      name === "freeze_gate2_marketplace_quote" ? quoteId : existingCheckout
+      name === "freeze_gate2_marketplace_quote" ? quoteId :
+      name === "mark_gate2_fictional_quote" ? !markerRejected : existingCheckout
         ? { status: "known", checkoutId: session.id }
         : { status: "create", key: `gate2-checkout:${quoteId}` }, error: null }));
   const client = { from, rpc } as unknown as SupabaseClient<Database>;
@@ -122,5 +124,20 @@ describe("Gate 2 checkout database scope", () => {
       "2026-11-23T20:00:00Z")).resolves.toBeUndefined();
     await expect(db.recordCheckoutCreated({ ...session, id: "cs_other" }, "checkout-created:cs_other",
       "2026-11-23T20:00:00Z")).rejects.toEqual({ code: "23505" });
+  });
+
+  it("records a fictional quote marker before its mock checkout event", async () => {
+    const { db, rpc, rows } = fixture();
+    const fictional = { ...session, simulationProvenance: "fictional" as const };
+    await db.recordCheckoutCreated(fictional, `checkout-created:${session.id}`,
+      "2026-11-23T20:00:00Z");
+    expect(rpc).toHaveBeenCalledWith("mark_gate2_fictional_quote",
+      { supplied_quote_id: quoteId });
+    expect(rows.gate2_payment_events).toHaveLength(1);
+    const denied = fixture({ markerRejected: true });
+    await expect(denied.db.recordCheckoutCreated(fictional,
+      `checkout-created:${session.id}`, "2026-11-23T20:00:00Z"))
+      .rejects.toThrow("provenance");
+    expect(denied.rows.gate2_payment_events).toHaveLength(0);
   });
 });

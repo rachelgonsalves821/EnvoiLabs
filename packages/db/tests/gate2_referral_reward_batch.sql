@@ -106,10 +106,22 @@ insert into public.gate2_referral_vestings
 values ('a98e0000-0000-4000-8000-000000000001',
     '90500000-0000-4000-8000-000000000001', 5, 500,
     'gate2-referral-bonus:90500000-0000-4000-8000-000000000001');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(public.read_gate2_current_respondent_earnings()
+    -> 'referral' ->> 'simulationProvenance', 'unverified',
+    'a vesting without a mock receipt does not claim real provenance');
+reset role;
 select ok(not has_table_privilege('service_role',
     'internal.gate2_visa_reward_batch_referrals', 'INSERT'),
     'only the respondent-locked batch RPC can claim a vesting');
 set local role service_role;
+select is(public.mark_gate2_fictional_referral(
+    'a98e0000-0000-4000-8000-000000000001'), true,
+    'fictional referral vesting is marked before a mock order');
+select is(public.mark_gate2_fictional_referral(
+    'a98e0000-0000-4000-8000-000000000001'), true,
+    'fictional referral marker replay is idempotent');
 create temporary table reserved_referral_batch (value jsonb not null);
 grant select, insert on reserved_referral_batch to service_role;
 insert into reserved_referral_batch select public.reserve_gate2_sandbox_visa_batch(
@@ -134,6 +146,9 @@ set local request.jwt.claims = '{"sub":"90300000-0000-4000-8000-000000000001","r
 select is(public.read_gate2_current_respondent_earnings()
     -> 'referral' ->> 'payoutStatus', 'pending',
     'respondent sees batched referral payout as pending');
+select is(public.read_gate2_current_respondent_earnings()
+    -> 'referral' ->> 'simulationProvenance', 'fictional',
+    'direct referral receipt identifies its mock vesting');
 select is((public.read_gate2_current_respondent_earnings()
     ->> 'earnedCents')::integer, 1200,
     'referral bonus stays distinct from earned question rewards');
