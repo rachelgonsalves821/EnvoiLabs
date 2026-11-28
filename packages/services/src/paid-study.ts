@@ -11,6 +11,7 @@ export type CheckoutObservation = {
   status: "pending" | "paid" | "refunded" | "failed";
   refundedCents: number;
   observedAt: string;
+  simulationProvenance?: "fictional";
 };
 
 export type PaidStudyDatabase = {

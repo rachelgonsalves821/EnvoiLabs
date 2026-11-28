@@ -39,7 +39,10 @@ begin
     if exists (select 1 from internal.gate2_fictional_quotes
         where quote_id = supplied_quote_id) then return true; end if;
     if exists (select 1 from public.gate2_payment_events
-        where quote_id = supplied_quote_id) then return false; end if;
+        where quote_id = supplied_quote_id)
+        or exists (select 1 from internal.gate2_checkout_intents
+            where quote_id = supplied_quote_id)
+    then return false; end if;
     insert into internal.gate2_fictional_quotes (quote_id)
     values (supplied_quote_id) on conflict (quote_id) do nothing;
     return true;
@@ -48,6 +51,39 @@ $$;
 revoke all on function public.mark_gate2_fictional_quote(uuid)
     from public, anon, authenticated, service_role;
 grant execute on function public.mark_gate2_fictional_quote(uuid) to service_role;
+
+create function public.read_gate2_fictional_quote(supplied_quote_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+    select exists (select 1 from internal.gate2_fictional_quotes
+        where quote_id = supplied_quote_id);
+$$;
+revoke all on function public.read_gate2_fictional_quote(uuid)
+    from public, anon, authenticated, service_role;
+grant execute on function public.read_gate2_fictional_quote(uuid) to service_role;
+
+-- The row lock orders a provider observation against fictional marking.
+-- Once a quote is fictional, a real provider observation can never turn it
+-- into a paid real-money study, even through a direct service-role INSERT.
+alter table public.gate2_payment_events add column observation_origin text
+    not null default 'provider' check (observation_origin in ('provider', 'fictional'));
+create function internal.gate2_check_payment_observation_origin()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare is_fictional boolean;
+begin
+    perform 1 from public.gate2_quote_snapshots
+    where id = new.quote_id for share;
+    select exists (select 1 from internal.gate2_fictional_quotes
+        where quote_id = new.quote_id) into is_fictional;
+    if is_fictional is distinct from (new.observation_origin = 'fictional')
+    then raise check_violation using message = 'payment observation origin mismatch'; end if;
+    return new;
+end;
+$$;
+revoke all on function internal.gate2_check_payment_observation_origin()
+    from public, anon, authenticated, service_role;
+create trigger gate2_check_payment_observation_origin
+    before insert on public.gate2_payment_events for each row
+    execute function internal.gate2_check_payment_observation_origin();
 
 create function public.mark_gate2_fictional_payout(supplied_payout_id uuid)
 returns boolean language plpgsql security definer set search_path = '' as $$

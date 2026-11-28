@@ -407,6 +407,7 @@ export type Database = {
           currency: string
           event_kind: string
           id: string
+          observation_origin: string
           provider_checkout_id: string
           provider_event_id: string
           provider_observed_at: string
@@ -419,6 +420,7 @@ export type Database = {
           currency: string
           event_kind: string
           id?: string
+          observation_origin?: string
           provider_checkout_id: string
           provider_event_id: string
           provider_observed_at: string
@@ -431,6 +433,7 @@ export type Database = {
           currency?: string
           event_kind?: string
           id?: string
+          observation_origin?: string
           provider_checkout_id?: string
           provider_event_id?: string
           provider_observed_at?: string
@@ -2226,6 +2229,10 @@ export type Database = {
         Returns: Json
       }
       read_gate2_current_respondent_earnings: { Args: never; Returns: Json }
+      read_gate2_fictional_quote: {
+        Args: { supplied_quote_id: string }
+        Returns: boolean
+      }
       read_gate2_marketplace_feasibility: {
         Args: { supplied_auth_user_id: string; supplied_study_id: string }
         Returns: Json

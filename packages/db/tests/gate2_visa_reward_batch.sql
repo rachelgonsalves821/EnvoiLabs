@@ -37,12 +37,46 @@ select is(public.mark_gate2_fictional_quote((select id
     from public.gate2_quote_snapshots where study_id =
         'a9880000-0000-4000-8000-000000000001')), true,
     'fictional quote is marked before the mock checkout observation');
+select is(public.read_gate2_fictional_quote((select id
+    from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000001')), true,
+    'checkout claim can identify the immutable fictional quote before provider create');
+select is(public.claim_gate2_checkout_intent(
+    'a9880000-0000-4000-8000-000000000003',
+    (select id from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000003')) ->> 'status',
+    'create', 'a real checkout intent is frozen before provider create');
+select is(public.mark_gate2_fictional_quote((select id
+    from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000003')), false,
+    'a late fictional marker cannot reclassify a real checkout intent');
 reset role;
+select throws_ok($$insert into public.gate2_payment_events
+    (quote_id, study_id, provider_checkout_id, provider_event_id,
+        event_kind, amount_cents, currency, provider_observed_at)
+    select id, study_id, 'cs_test_real_on_mock', 'real-on-mock',
+        'paid', total_cents, 'usd', clock_timestamp()
+    from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000001'$$,
+    '23514', 'payment observation origin mismatch',
+    'a real provider event cannot turn a fictional quote into paid money');
+select throws_ok($$insert into public.gate2_payment_events
+    (quote_id, study_id, provider_checkout_id, provider_event_id,
+        event_kind, amount_cents, currency, provider_observed_at,
+        observation_origin)
+    select id, study_id, 'cs_test_mock_on_real', 'mock-on-real',
+        'paid', total_cents, 'usd', clock_timestamp(), 'fictional'
+    from public.gate2_quote_snapshots where study_id =
+        'a9880000-0000-4000-8000-000000000002'$$,
+    '23514', 'payment observation origin mismatch',
+    'a real quote cannot accept an unmarked fictional provider event');
 insert into public.gate2_payment_events (quote_id, study_id,
     provider_checkout_id, provider_event_id, event_kind, amount_cents,
-    currency, provider_observed_at)
+    currency, provider_observed_at, observation_origin)
 select id, study_id, 'cs_test_batch_' || study_id::text,
-    'paid:batch:' || study_id::text, 'paid', total_cents, 'usd', clock_timestamp()
+    'paid:batch:' || study_id::text, 'paid', total_cents, 'usd', clock_timestamp(),
+    case when study_id = 'a9880000-0000-4000-8000-000000000001'
+        then 'fictional' else 'provider' end
 from public.gate2_quote_snapshots
 where study_id::text like 'a9880000-0000-4000-8000-%';
 set local role service_role;
