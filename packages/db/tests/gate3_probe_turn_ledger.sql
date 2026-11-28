@@ -184,6 +184,9 @@ values ('a9700000-0000-4000-8000-000000000012',
 set local role service_role;
 select is(public.list_gate3_probe_ready(1), '[]'::jsonb,
     'new same-question answer removes old answer from batch ready selector');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001') #>> '{items,0,outcome}',
+    'superseded', 'private denominator marks the older answer superseded');
 select is(public.begin_gate3_probe_turn_with_clock(
     'a9700000-0000-4000-8000-000000000004',
     '90300000-0000-4000-8000-000000000001'), null::uuid,
@@ -242,6 +245,9 @@ select is((select public.read_gate3_ready_probe_turn(
     '90300000-0000-4000-8000-000000000001')
     from probe_ids), null::jsonb,
     'existing old turn cannot provide source after same-question replacement');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001') #>> '{items,0,outcome}',
+    'invalidated', 'private denominator invalidates the older turn');
 select is((select public.commit_gate3_probe_decision(
     'a9700000-0000-4000-8000-000000000003',
     'a9700000-0000-4000-8000-000000000001',
