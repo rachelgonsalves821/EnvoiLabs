@@ -107,6 +107,28 @@ values ('a9700000-0000-4000-8000-000000000004',
     repeat('a', 64), repeat('b', 64));
 create temporary table probe_ids (turn_id uuid not null);
 grant select, insert on probe_ids to service_role;
+savepoint same_slot_late_receipt;
+insert into public.answers (id, session_id, study_id, guide_question_id,
+    kind, sequence, created_at)
+values ('a9700000-0000-4000-8000-000000000012',
+    'a9700000-0000-4000-8000-000000000003',
+    '90600000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000001',
+    'text', 2, (select created_at + interval '1 second'
+        from public.answers where id =
+            'a9700000-0000-4000-8000-000000000004'));
+set local role service_role;
+select is(public.record_gate3_probe_upload_clock(
+    'a9700000-0000-4000-8000-000000000004',
+    '90300000-0000-4000-8000-000000000001',
+    'a9700000-0000-4000-8000-000000000010', 1000,
+    'text_save_response'), 'stale',
+    'late old upload receipt cannot revive the replaced answer');
+select is(public.read_gate3_probe_opportunity_snapshot(
+    '90600000-0000-4000-8000-000000000001') #>> '{items,0,outcome}',
+    'superseded', 'denominator orders by frozen answer creation, not receipt arrival');
+reset role;
+rollback to savepoint same_slot_late_receipt;
 set local role service_role;
 select is(public.record_gate3_probe_upload_clock(
     'a9700000-0000-4000-8000-000000000004',
